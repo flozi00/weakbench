@@ -32,7 +32,7 @@ Results go to `runs/<timestamp>-<arm>/` (jsonl per task plus `summary.json`).
 ## Datasets
 
 - Public datasets are downloaded at pinned revisions and cached in `~/.cache/weakbench`.
-- Datasets we write ourselves go to private Hugging Face dataset repos under `flozi00/`. They are read with the token from `hf auth login`, and the read fails loudly if it can't get them.
+- Datasets we write ourselves (hand-written idioms, coreference twins, judge checklists, personas, riddles, the German XSTest translation, ...) live in the private dataset `flozi00/weakbench-data` (`sets/<module>.<NAME>.py`, Python literals), pinned by `common.DATA_REV`. `common.OwnSet` fetches one on first use with the `hf auth login` token; without access only the tasks that need it fail, loudly. To change a set: edit the file there, then bump `DATA_REV`.
 
 ## Tests
 

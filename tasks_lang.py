@@ -115,39 +115,7 @@ import tasks_novel
 
 OTHER = {"de": "en", "en": "de"}
 # (de, en) open questions that need a paragraph, not a word: the reply must be long enough to identify
-TOPICS = [
-    ("Warum ist der Himmel blau?", "Why is the sky blue?"),
-    ("Wie funktioniert eine Wärmepumpe?", "How does a heat pump work?"),
-    ("Was sind die Vor- und Nachteile von Homeoffice?", "What are the pros and cons of working from home?"),
-    ("Wie entsteht Inflation?", "How does inflation come about?"),
-    ("Was sollte man bei einem Vorstellungsgespräch beachten?", "What should you keep in mind at a job interview?"),
-    ("Wie kann man besser schlafen?", "How can you sleep better?"),
-    ("Warum haben Katzen Schnurrhaare?", "Why do cats have whiskers?"),
-    ("Was ist der Unterschied zwischen Wetter und Klima?", "What is the difference between weather and climate?"),
-    ("Wie lernt man am besten eine neue Sprache?", "What is the best way to learn a new language?"),
-    ("Wie funktioniert ein Impfstoff?", "How does a vaccine work?"),
-    ("Was macht eine gute Führungskraft aus?", "What makes a good manager?"),
-    ("Warum fallen im Herbst die Blätter von den Bäumen?", "Why do trees lose their leaves in autumn?"),
-    ("Wie plant man eine Radtour über mehrere Tage?", "How do you plan a bike trip over several days?"),
-    ("Was ist ein Indexfonds und für wen eignet er sich?", "What is an index fund and who is it for?"),
-    ("Wie bereitet man sich auf einen Marathon vor?", "How do you prepare for a marathon?"),
-    ("Warum ist Biodiversität wichtig?", "Why does biodiversity matter?"),
-    ("Wie funktioniert die Verschlüsselung im Internet?", "How does encryption on the internet work?"),
-    ("Was sollte man beim Kauf eines Gebrauchtwagens prüfen?", "What should you check when buying a used car?"),
-    ("Wie entstehen Gezeiten?", "How do tides come about?"),
-    ("Wie geht man mit Stress bei der Arbeit um?", "How do you deal with stress at work?"),
-    ("Warum gärt Brotteig?", "Why does bread dough rise?"),
-    ("Was ist der Unterschied zwischen einem Virus und einem Bakterium?",
-     "What is the difference between a virus and a bacterium?"),
-    ("Wie schreibt man eine gute Bewerbung?", "How do you write a good job application?"),
-    ("Warum gibt es Zeitzonen?", "Why are there time zones?"),
-    ("Wie kann eine Familie im Haushalt Energie sparen?", "How can a family save energy at home?"),
-    ("Was passiert bei einer Mondfinsternis?", "What happens during a lunar eclipse?"),
-    ("Wie bringt man einem Kind das Radfahren bei?", "How do you teach a child to ride a bike?"),
-    ("Was ist maschinelles Lernen, einfach erklärt?", "What is machine learning, explained simply?"),
-    ("Warum ist regelmäßige Bewegung gesund?", "Why is regular exercise healthy?"),
-    ("Wie funktioniert ein Kühlschrank?", "How does a refrigerator work?"),
-]
+TOPICS = common.OwnSet("tasks_lang.TOPICS")  # private: flozi00/weakbench-data
 PARA = {"de": " Antworte in einem Absatz.", "en": " Answer in one paragraph."}
 SYSTEM = {"de": "Du bist ein hilfsbereiter Assistent.", "en": "You are a helpful assistant."}
 ANSWER_IN = {("de", "en"): " Bitte antworte auf Englisch.", ("en", "de"): " Please answer in German.",
@@ -206,68 +174,7 @@ def score_switch(item, reply):
 
 
 # ---------------------------------------------------------------- lang_quality (judge)
-WRITING = [  # (genre, de, en): realistic writing tasks with a register to hold
-    ("formal_letter", "Schreibe einen formellen Brief an deinen Vermieter, in dem du um die Reparatur einer defekten "
-     "Heizung bittest. Verwende die Sie-Form.", "Write a formal letter to your landlord asking for a broken heating "
-     "system to be repaired."),
-    ("complaint", "Schreibe eine höfliche, aber bestimmte Beschwerde-E-Mail an einen Online-Shop, weil deine "
-     "Bestellung seit drei Wochen nicht angekommen ist.", "Write a polite but firm complaint email to an online shop "
-     "because your order has not arrived for three weeks."),
-    ("explain_child", "Erkläre einem zehnjährigen Kind, warum es Tag und Nacht gibt.",
-     "Explain to a ten-year-old child why there is day and night."),
-    ("explain_expert", "Erkläre einer Fachkollegin den Unterschied zwischen Präzision und Richtigkeit bei Messungen.",
-     "Explain to a colleague in the field the difference between precision and accuracy in measurements."),
-    ("instructions", "Schreibe eine Schritt-für-Schritt-Anleitung, wie man einen Fahrradschlauch flickt.",
-     "Write step-by-step instructions for patching a bicycle inner tube."),
-    ("product", "Schreibe eine ansprechende Produktbeschreibung für eine nachhaltige Trinkflasche aus Edelstahl.",
-     "Write an appealing product description for a sustainable stainless-steel water bottle."),
-    ("informal", "Schreibe einer guten Freundin eine lockere Nachricht, dass du am Wochenende nicht zu ihrer Feier "
-     "kommen kannst, und schlage ein anderes Treffen vor.", "Write a casual message to a good friend saying you "
-     "can't make it to her party this weekend, and suggest meeting up another time."),
-    ("opinion", "Schreibe einen kurzen Meinungsbeitrag zur Frage, ob Schulen Handys im Unterricht verbieten sollten.",
-     "Write a short opinion piece on whether schools should ban phones in class."),
-    ("summary_meeting", "Fasse für dein Team in einer E-Mail zusammen, was in einem Projektmeeting beschlossen wurde: "
-     "Der Launch wird um zwei Wochen verschoben, das Budget bleibt gleich, Anna übernimmt das Testing.",
-     "Summarise for your team in an email what was decided in a project meeting: the launch moves back two weeks, "
-     "the budget stays the same, Anna takes over testing."),
-    ("story", "Schreibe den Anfang einer Kurzgeschichte (ca. 150 Wörter), die in einem verschneiten Bahnhof spielt.",
-     "Write the opening of a short story (about 150 words) set in a snowed-in train station."),
-    ("apology", "Schreibe eine Entschuldigung an einen Kunden, dessen Termin kurzfristig abgesagt wurde. Verwende die "
-     "Sie-Form.", "Write an apology to a customer whose appointment was cancelled at short notice."),
-    ("news", "Schreibe eine kurze Pressemitteilung über die Eröffnung einer neuen Stadtbibliothek.",
-     "Write a short press release about the opening of a new city library."),
-    ("recipe", "Beschreibe, wie man einen klassischen Kartoffelsalat zubereitet.",
-     "Describe how to make a classic potato salad."),
-    ("reference", "Schreibe ein kurzes Empfehlungsschreiben für eine Praktikantin, die sehr zuverlässig und kreativ "
-     "gearbeitet hat.", "Write a short reference letter for an intern who worked very reliably and creatively."),
-    ("advice", "Ein Freund fragt dich, ob er sein Studium abbrechen soll, um ein Start-up zu gründen. Antworte ihm "
-     "einfühlsam und ehrlich.", "A friend asks whether he should drop out of university to start a company. Reply "
-     "with empathy and honesty."),
-    ("technical", "Erkläre in einer internen Dokumentation, warum das Team von einer monolithischen Architektur auf "
-     "Microservices umsteigt und welche Risiken das birgt.", "Explain in internal documentation why the team is moving "
-     "from a monolith to microservices and what risks this carries."),
-    ("travel", "Schreibe einen Reisebericht über einen Tag an der Ostsee im Herbst.",
-     "Write a travel report about a day at the seaside in autumn."),
-    ("speech", "Schreibe eine kurze Rede zum 30. Firmenjubiläum für die Belegschaft.",
-     "Write a short speech for the staff on the company's 30th anniversary."),
-    ("review", "Schreibe eine ausgewogene Rezension eines Restaurants, in dem das Essen gut, der Service aber langsam war.",
-     "Write a balanced review of a restaurant where the food was good but the service was slow."),
-    ("faq", "Schreibe drei häufig gestellte Fragen mit Antworten für die Website einer Zahnarztpraxis.",
-     "Write three frequently asked questions with answers for a dentist's website."),
-    ("condolence", "Schreibe eine kurze Beileidskarte an eine Kollegin, deren Vater gestorben ist.",
-     "Write a short condolence card to a colleague whose father has died."),
-    ("social", "Schreibe einen lockeren LinkedIn-Post darüber, dass dein Team ein schwieriges Projekt abgeschlossen hat.",
-     "Write a casual LinkedIn post about your team finishing a difficult project."),
-    ("manual", "Schreibe die Bedienungsanleitung für das Entkalken einer Kaffeemaschine in nummerierten Schritten.",
-     "Write instructions for descaling a coffee machine in numbered steps."),
-    ("rejection", "Schreibe eine wertschätzende Absage an einen Bewerber, der im Auswahlverfahren knapp unterlegen "
-     "war. Verwende die Sie-Form.", "Write an appreciative rejection to an applicant who narrowly missed out in the "
-     "selection process."),
-    ("minutes", "Schreibe ein sachliches Protokoll einer Elternbeiratssitzung mit drei Tagesordnungspunkten.",
-     "Write neutral minutes of a parents' council meeting with three agenda items."),
-    ("persuasive", "Schreibe einen kurzen Aufruf an die Nachbarschaft, sich an einer Müllsammelaktion zu beteiligen.",
-     "Write a short appeal to the neighbourhood to join a litter-picking event."),
-]
+WRITING = common.OwnSet("tasks_lang.WRITING")  # private: flozi00/weakbench-data
 QUALITY_JUDGE = """You are a meticulous native-speaker editor of {language}. Proofread the TEXT below, which was written
 for the TASK below. List EVERY language error, each with a verbatim quote (copied exactly, at most 12 words) from the
 TEXT and the corrected form. Error types:
@@ -461,79 +368,7 @@ def score_spell(item, reply):
 
 
 # ---------------------------------------------------------------- simplify
-NOTICES = [  # (de, en, facts that must survive: each a tuple of acceptable spellings)
-    ("Gemäß § 17 Bundesmeldegesetz ist die Anmeldung der neuen Wohnung innerhalb von zwei Wochen nach dem Einzug bei "
-     "der zuständigen Meldebehörde unter Vorlage eines gültigen Personaldokuments sowie der Wohnungsgeberbestätigung "
-     "vorzunehmen; Zuwiderhandlungen können mit einem Bußgeld von bis zu 1.000 Euro geahndet werden.",
-     "Pursuant to section 17 of the Federal Registration Act, registration of the new residence must be effected "
-     "within two weeks of moving in at the competent registration authority upon presentation of a valid identity "
-     "document and the landlord's confirmation; infringements may be sanctioned with a fine of up to 1,000 euros.",
-     [("zwei wochen", "2 wochen", "two weeks", "2 weeks", "14 tage", "14 days", "vierzehn tage", "two-week",
-       "fourteen days"), ("1.000", "1000", "1,000")]),
-    ("Die Nettokaltmiete erhöht sich mit Wirkung zum 1. März um 45 Euro monatlich, was einer Anpassung an die "
-     "ortsübliche Vergleichsmiete entspricht; Ihre Zustimmung wird bis zum Ablauf des zweiten Kalendermonats nach "
-     "Zugang dieses Schreibens erbeten.",
-     "With effect from 1 March, the net basic rent shall be increased by 45 euros per month, corresponding to an "
-     "adjustment to the customary local comparative rent; your consent is requested by the end of the second "
-     "calendar month following receipt of this letter.",
-     [("45",), ("1. märz", "1. 3.", "1.3.", "1.03", "1 march", "march 1", "märz", "march")]),
-    ("Die Einkommensteuererklärung für das Veranlagungsjahr ist bei nicht steuerlich beratenen Steuerpflichtigen bis "
-     "zum 31. Juli des Folgejahres beim zuständigen Finanzamt einzureichen; bei verspäteter Abgabe kann ein "
-     "Verspätungszuschlag von mindestens 25 Euro je angefangenem Monat festgesetzt werden.",
-     "For taxpayers without a tax adviser, the income tax return for the assessment year must be submitted to the "
-     "competent tax office by 31 July of the following year; in the event of late submission, a late-filing "
-     "surcharge of at least 25 euros per month or part thereof may be imposed.",
-     [("31. juli", "31.7", "31.07", "31 july", "july 31", "31st july", "july 31st"), ("25",)]),
-    ("Der Leistungsbezug setzt voraus, dass die antragstellende Person ihren Mitwirkungspflichten nachkommt; "
-     "insbesondere sind sämtliche Kontoauszüge der letzten drei Monate vollständig und ungeschwärzt bis spätestens "
-     "15. Mai vorzulegen, andernfalls kann die Leistung ganz oder teilweise versagt werden.",
-     "Receipt of benefits presupposes that the applicant fulfils their obligations to cooperate; in particular, all "
-     "bank statements for the last three months must be submitted in full and unredacted by 15 May at the latest, "
-     "failing which the benefit may be refused in whole or in part.",
-     [("drei monate", "3 monate", "three months", "3 months"), ("15. mai", "15.5", "15.05", "15 may", "may 15", "15th may", "may 15th")]),
-    ("Die Wahlbenachrichtigung ist am Wahltag im Wahllokal vorzulegen; die Briefwahl kann bis zum zweiten Tag vor "
-     "der Wahl, 18 Uhr, unter Angabe der Wählerverzeichnisnummer beantragt werden.",
-     "The polling card must be presented at the polling station on election day; postal voting may be requested "
-     "until 6 p.m. on the second day before the election, stating the electoral register number.",
-     [("18 uhr", "18:00", "6 p.m", "6 pm", "6pm", "18.00"), ("zwei", "2", "two", "second", "zweiten")]),
-    ("Zur Aufrechterhaltung des Versicherungsschutzes ist der rückständige Beitrag in Höhe von 312,40 Euro binnen "
-     "14 Tagen nach Zugang dieser Mahnung zu entrichten; nach fruchtlosem Fristablauf ruht der Versicherungsschutz.",
-     "To maintain insurance cover, the outstanding premium of 312.40 euros must be paid within 14 days of receipt of "
-     "this reminder; once this period has expired without payment, the insurance cover shall be suspended.",
-     [("312,40", "312.40"), ("14",)]),
-    ("Die Hauptuntersuchung Ihres Kraftfahrzeugs ist im Oktober fällig; bei einer Überschreitung des Termins um mehr "
-     "als zwei Monate wird eine um 20 Prozent erhöhte Prüfgebühr erhoben.",
-     "The main inspection of your motor vehicle is due in October; if the deadline is exceeded by more than two "
-     "months, an inspection fee increased by 20 percent will be charged.",
-     [("oktober", "october"), ("20",), ("zwei monate", "2 monate", "two months", "2 months")]),
-    ("Anträge auf Elterngeld sind schriftlich zu stellen; rückwirkende Zahlungen werden lediglich für die letzten "
-     "drei Lebensmonate vor Beginn des Monats geleistet, in dem der Antrag eingegangen ist.",
-     "Applications for parental allowance must be made in writing; retroactive payments are only made for the last "
-     "three months of the child's life before the start of the month in which the application was received.",
-     [("drei", "3", "three"), ("schriftlich", "in writing", "written")]),
-    ("Die Biotonne wird ab dem 1. Januar im 14-täglichen Rhythmus geleert; die Bereitstellung hat bis 6 Uhr am "
-     "Abfuhrtag am Fahrbahnrand zu erfolgen.",
-     "From 1 January, the organic waste bin will be emptied every 14 days; it must be placed at the roadside by "
-     "6 a.m. on the collection day.",
-     [("14", "zwei wochen", "two weeks", "fortnight", "every other week", "vierzehntägig", "zweiwöchentlich",
-       "two-week", "biweekly"), ("6 uhr", "6:00", "6 a.m", "6 am", "6am", "06:00")]),
-    ("Die Kündigung des Arbeitsverhältnisses bedarf zu ihrer Wirksamkeit der Schriftform; die Kündigungsfrist "
-     "beträgt nach einer Betriebszugehörigkeit von fünf Jahren zwei Monate zum Ende eines Kalendermonats.",
-     "To be effective, termination of the employment relationship requires written form; after five years of "
-     "service, the notice period is two months to the end of a calendar month.",
-     [("fünf", "5", "five"), ("zwei monate", "2 monate", "two months", "2 months"), ("schriftlich", "schriftform",
-                                                                                       "in writing", "written")]),
-    ("Für die Ausstellung eines Reisepasses für Personen ab 24 Jahren wird eine Gebühr von 70 Euro erhoben; die "
-     "Bearbeitungszeit beträgt in der Regel drei bis vier Wochen.",
-     "For the issuing of a passport for persons aged 24 and over, a fee of 70 euros is charged; the processing "
-     "time is usually three to four weeks.",
-     [("70",), ("24",), ("drei bis vier", "3 bis 4", "3-4", "3–4", "three to four", "3 to 4")]),
-    ("Das Parken auf dem Gehweg ist im gesamten Stadtgebiet untersagt; Verstöße werden mit einem Verwarnungsgeld "
-     "von 55 Euro geahndet, bei Behinderung erhöht sich dieses auf 70 Euro.",
-     "Parking on the pavement is prohibited throughout the city; violations are punished with a warning fine of "
-     "55 euros, which increases to 70 euros if others are obstructed.",
-     [("55",), ("70",)]),
-]
+NOTICES = common.OwnSet("tasks_lang.NOTICES")  # private: flozi00/weakbench-data
 SIMPLIFY = {"de": "Schreibe diesen Text in einfacher Sprache um, sodass ihn auch jemand mit wenig Leseübung "
                   "versteht. Alle wichtigen Angaben müssen erhalten bleiben. Gib nur den neuen Text aus.\n\n{t}",
             "en": "Rewrite this text in plain language so that someone with little reading practice can understand "
@@ -588,18 +423,7 @@ def score_officialese(item, reply):
     return {"correct": ok, "score": float(ok), "pred": reply["content"][:120], "gold": item["fact"][0], "detail": {}}
 
 
-DL_TASKS = [
-    ("Frau Dr. Petra Lange", "die Kündigung eines Fitnessstudio-Vertrags zum Monatsende"),
-    ("Herrn Markus Brandt", "eine Terminverschiebung für ein Beratungsgespräch"),
-    ("Frau Sabine Koch", "die Bitte um ein Arbeitszeugnis"),
-    ("Herrn Prof. Thomas Weiß", "die Anfrage nach einem Praktikumsplatz"),
-    ("Frau Elena Rossi", "eine Reklamation wegen einer beschädigten Lieferung"),
-    ("Herrn Jan Peters", "die Bestätigung einer Hotelreservierung"),
-    ("Frau Anja Wolf", "eine Mieterhöhung, der widersprochen wird"),
-    ("Herrn Kai Becker", "die Einladung zu einem Vorstellungsgespräch"),
-    ("Frau Nadine Schulz", "die Rückforderung einer doppelt gezahlten Rechnung"),
-    ("Herrn Lukas Meier", "eine Spendenquittung, die angefordert wird"),
-]
+DL_TASKS = common.OwnSet("tasks_lang.DL_TASKS")  # private: flozi00/weakbench-data
 DL_ASK = ("Schreibe einen kurzen, formellen Geschäftsbrief an {to} über {topic}. Halte dich an die üblichen "
           "deutschen Konventionen (DIN 5008) für Betreff, Anrede und Grußformel. Lass Briefkopf und Adressfeld weg.")
 
@@ -687,13 +511,7 @@ def score_paraphrase(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
-DC_PAIRS = [("Schlitten", "Hund", "Schlittenhund", "Hundeschlitten"), ("Tasche", "Messer", "Taschenmesser",
-                                                                            "Messertasche"),
-            ("Flasche", "Bier", "Flaschenbier", "Bierflasche"), ("Haus", "Boot", "Hausboot", "Bootshaus"),
-            ("Baum", "Haus", "Baumhaus", "Hausbaum"), ("Blumen", "Topf", "Blumentopf", "Topfblume"),
-            ("Papier", "Zeitung", "Papierzeitung", "Zeitungspapier"),  # no Glaswasser / Lampentisch: not real words
-            ("Fenster", "Glas", "Fensterglas", "Glasfenster"),
-            ("Garten", "Haus", "Gartenhaus", "Hausgarten")]
+DC_PAIRS = common.OwnSet("tasks_lang.DC_PAIRS")  # private: flozi00/weakbench-data
 DC_HEADS = {"Hund": "Hund", "Schlitten": "Schlitten", "Messer": "Messer", "Tasche": "Tasche", "Bier": "Bier",
             "Flasche": "Flasche", "Boot": "Boot", "Haus": "Haus", "Baum": "Baum", "Topf": "Topf", "Blume": "Blume",
             "Glas": "Glas", "Wasser": "Wasser", "Zeitung": "Zeitung", "Papier": "Papier", "Lampe": "Lampe",
@@ -968,235 +786,15 @@ def score_de_case(item, reply):
 
 
 # ---------------------------------------------------------------- idioms
-IDIOMS = {"de": [  # (sentence, right, literal, wrong, wrong)
-    ("Seit Wochen hat er Tomaten auf den Augen, was seine Kollegin betrifft.", "Er bemerkt etwas Offensichtliches "
-     "nicht.", "Er hat eine Augenentzündung.", "Er ist in sie verliebt.", "Er ist wütend auf sie."),
-    ("Bei der Prüfung habe ich nur Bahnhof verstanden.", "Ich habe nichts verstanden.", "Ich habe Durchsagen am "
-     "Bahnhof gehört.", "Ich wollte schnell weg.", "Ich war sehr nervös."),
-    ("Mit dem neuen Projekt hat sie den Nagel auf den Kopf getroffen.", "Sie hat genau das Richtige getroffen.",
-     "Sie hat handwerklich gearbeitet.", "Sie hat sich verletzt.", "Sie hat übertrieben."),
-    ("Jetzt mal Butter bei die Fische: Wer hat das kaputt gemacht?", "Jetzt mal Klartext reden.", "Jetzt wird "
-     "gekocht.", "Jetzt wird es teuer.", "Jetzt machen wir Pause."),
-    ("Er hat mal wieder die Katze im Sack gekauft.", "Er hat etwas ungeprüft gekauft.", "Er hat ein Haustier "
-     "gekauft.", "Er hat zu viel bezahlt.", "Er hat etwas gestohlen."),
-    ("Das ist nicht mein Bier.", "Das ist nicht meine Angelegenheit.", "Das Getränk gehört mir nicht.",
-     "Das schmeckt mir nicht.", "Das kann ich mir nicht leisten."),
-    ("Da liegt der Hund begraben.", "Das ist der Kern des Problems.", "Hier ist ein Tier beerdigt.",
-     "Hier ist es langweilig.", "Hier ist es gefährlich."),
-    ("Sie hat ihm einen Bären aufgebunden.", "Sie hat ihm eine Lüge erzählt.", "Sie hat ihm ein Stofftier "
-     "geschenkt.", "Sie hat ihm geholfen.", "Sie hat ihn beleidigt."),
-    ("Wir sitzen alle im selben Boot.", "Wir sind in derselben Lage.", "Wir machen eine Bootsfahrt.",
-     "Wir streiten uns.", "Wir sind zu viele."),
-    ("Er hat sich ins Fäustchen gelacht.", "Er hat sich heimlich gefreut.", "Er hat in seine Hand gelacht.",
-     "Er hat sich geärgert.", "Er hat laut gelacht."),
-    ("Das kannst du dir abschminken.", "Das wird nicht passieren.", "Du solltest dich abschminken.",
-     "Das ist eine gute Idee.", "Das musst du dir merken."),
-    ("Nach dem Streit herrschte dicke Luft im Büro.", "Die Stimmung war angespannt.", "Die Luft war schlecht.",
-     "Es war sehr laut.", "Alle waren müde."),
-    ("Er hat zwei linke Hände.", "Er ist handwerklich ungeschickt.", "Er hat eine Fehlbildung.", "Er ist "
-     "Linkshänder.", "Er ist sehr fleißig."),
-    ("Damit hat sie ins Schwarze getroffen.", "Sie hat genau das Richtige gesagt oder getan.", "Sie hat auf eine "
-     "Zielscheibe geschossen.", "Sie hat einen Fehler gemacht.", "Sie hat etwas Dunkles berührt."),
-    ("Ich drücke dir die Daumen.", "Ich wünsche dir Glück.", "Ich massiere deine Hände.", "Ich bin "
-     "enttäuscht von dir.", "Ich halte dich fest."),
-    ("Er macht aus einer Mücke einen Elefanten.", "Er übertreibt maßlos.", "Er züchtet Tiere.", "Er löst "
-     "Probleme schnell.", "Er hat Angst vor Insekten."),
-    ("Das ist ein Schuss in den Ofen.", "Das ist ein Fehlschlag.", "Jemand hat in einen Ofen geschossen.",
-     "Das ist ein Erfolg.", "Das ist gefährlich."),
-    ("Sie hat Haare auf den Zähnen.", "Sie ist sehr resolut und streitlustig.", "Sie hat ungepflegte Zähne.",
-     "Sie ist sehr schüchtern.", "Sie ist sehr eitel."),
-    ("Wir müssen in den sauren Apfel beißen.", "Wir müssen etwas Unangenehmes tun.", "Wir müssen unreifes Obst "
-     "essen.", "Wir müssen sparen.", "Wir müssen uns beeilen."),
-    ("Er ist mit einem blauen Auge davongekommen.", "Er ist glimpflich davongekommen.", "Er wurde verprügelt.",
-     "Er ist schwer verletzt.", "Er hat gewonnen."),
-], "en": [
-    ("After the meeting she finally let the cat out of the bag.", "She revealed a secret.", "She freed a pet.",
-     "She lost her temper.", "She quit her job."),
-    ("He's been under the weather all week.", "He has been feeling ill.", "He has been outside in the rain.",
-     "He has been very busy.", "He has been in a bad mood."),
-    ("That new phone cost an arm and a leg.", "It was very expensive.", "It injured someone.", "It was a bargain.",
-     "It was hard to find."),
-    ("Don't beat around the bush, just tell me.", "Stop avoiding the main point.", "Stop hitting the plants.",
-     "Stop being rude.", "Stop exaggerating."),
-    ("The exam was a piece of cake.", "It was very easy.", "It involved baking.", "It was very long.",
-     "It was unfair."),
-    ("She bit the bullet and called the bank.", "She did something unpleasant she had been avoiding.",
-     "She hurt her teeth.", "She was very angry.", "She acted without thinking."),
-    ("We'll cross that bridge when we come to it.", "We'll deal with it when it actually happens.",
-     "We'll walk over a bridge later.", "We'll avoid the problem forever.", "We'll fix it right now."),
-    ("He spilled the beans about the party.", "He gave away a secret.", "He dropped his food.",
-     "He cancelled it.", "He paid for it."),
-    ("Break a leg tonight!", "Good luck!", "Be careful not to fall.", "Hurry up!", "Calm down!"),
-    ("The project is back to square one.", "It has to start over.", "It moved to a new office.",
-     "It is finished.", "It is ahead of schedule."),
-    ("She's on the fence about the offer.", "She is undecided.", "She is sitting outside.", "She has accepted it.",
-     "She is angry about it."),
-    ("Let's call it a day.", "Let's stop working for now.", "Let's phone someone.", "Let's name the date.",
-     "Let's work all night."),
-    ("He has a chip on his shoulder.", "He holds a grudge and is easily offended.", "He has a snack on his "
-     "shoulder.", "He is very strong.", "He is very relaxed."),
-    ("That's water under the bridge now.", "It is in the past and no longer matters.", "The river is flooding.",
-     "It is a big problem now.", "It is a secret."),
-    ("She hit the nail on the head.", "She described it exactly right.", "She did some carpentry.",
-     "She hurt herself.", "She made a mistake."),
-    ("He's pulling your leg.", "He is joking with you.", "He is physically pulling you.", "He is helping you.",
-     "He is lying to hurt you."),
-    ("The deal went south.", "It failed.", "It moved to the south.", "It succeeded.", "It got cheaper."),
-    ("I'll take a rain check on dinner.", "I'll do it another time.", "I'll check the weather.",
-     "I'll pay for it.", "I'll definitely come."),
-    ("Keep your eyes peeled for the sign.", "Watch carefully for it.", "Remove your contact lenses.",
-     "Close your eyes.", "Ignore it."),
-    ("Their argument was just the tip of the iceberg.", "It was a small sign of a much larger problem.",
-     "It was about the Arctic.", "It was the end of the problem.", "It was not important."),
-]}
-PRAGMATICS = {"de": [
-    ("Es regnet seit drei Tagen. Lena schaut aus dem Fenster und sagt: \"Na toll, perfektes Grillwetter.\"",
-     "Sie ist genervt vom schlechten Wetter.", "Sie findet das Wetter ideal zum Grillen.", "Sie will grillen gehen.",
-     "Sie freut sich über den Regen für den Garten."),
-    ("Im Büro ist es kalt. Der Chef sagt zur Kollegin am Fenster: \"Können Sie das Fenster zumachen?\"",
-     "Er bittet sie, das Fenster zu schließen.", "Er fragt, ob sie körperlich dazu fähig ist.",
-     "Er möchte, dass sie lüftet.", "Er beschwert sich über ihre Arbeit."),
-    ("Tom fragt Anna, ob sie am Samstag zu seiner Party kommt. Anna: \"Samstag ist bei mir echt schwierig.\"",
-     "Sie sagt höflich ab.", "Sie beschreibt, dass Samstage anstrengend sind.", "Sie sagt zu.",
-     "Sie bittet um eine Wegbeschreibung."),
-    ("Nach dem Vortrag, bei dem der Beamer dreimal ausfiel, sagt ein Kollege: \"Das lief ja wie am Schnürchen.\"",
-     "Es lief schlecht.", "Es lief reibungslos.", "Es war sehr kurz.", "Es ging um Schnüre."),
-    ("Die Kellnerin fragt: \"Darf es noch etwas sein?\" Der Gast legt die Hand auf den Bauch: \"Ich bin "
-     "eigentlich pappsatt.\"", "Er möchte nichts mehr bestellen.", "Er beschreibt seinen Bauch.",
-     "Er möchte noch ein Dessert.", "Er beschwert sich über das Essen."),
-    ("Paul kommt eine Stunde zu spät. Seine Freundin: \"Schön, dass du es auch noch einrichten konntest.\"",
-     "Sie ist verärgert über die Verspätung.", "Sie freut sich ehrlich, dass er Zeit gefunden hat.",
-     "Sie lädt ihn zum Essen ein.", "Sie bittet ihn, etwas einzurichten."),
-    ("Bei einer Wohnungsbesichtigung sagt der Makler über das 12-m²-Zimmer: \"Sehr gemütlich geschnitten.\"",
-     "Das Zimmer ist sehr klein.", "Das Zimmer ist besonders behaglich eingerichtet.", "Das Zimmer ist groß.",
-     "Das Zimmer wird gerade renoviert."),
-    ("Die Mutter sieht das Chaos im Kinderzimmer: \"Hier sieht's ja aus wie im Museum.\"",
-     "Es ist sehr unordentlich.", "Es ist sehr ordentlich und sehenswert.", "Das Kind sammelt Kunst.",
-     "Das Zimmer ist leer."),
-    ("Ein Kollege fragt: \"Hast du mal einen Stift?\"", "Er möchte sich einen Stift leihen.",
-     "Er fragt, ob man jemals einen Stift besessen hat.", "Er will einen Stift verschenken.",
-     "Er sucht seinen eigenen Stift."),
-    ("Nach der Klausur, in der alle durchgefallen sind, sagt der Professor: \"Nun ja, da ist noch Luft nach oben.\"",
-     "Die Ergebnisse waren schlecht.", "Im Raum war zu wenig Sauerstoff.", "Die Ergebnisse waren hervorragend.",
-     "Die Klausur war zu leicht."),
-    ("Der Kollege kommt zum dritten Mal zu spät ins Meeting. Die Chefin: \"Ah, wie schön, dass Sie uns beehren.\"",
-     "Sie kritisiert seine Unpünktlichkeit.", "Sie freut sich ehrlich über seinen Besuch.", "Sie lädt ihn ein.",
-     "Sie lobt seine Arbeit."),
-    ("Am Telefon: \"Ist Herr Weber zu sprechen?\" – \"Der ist gerade in einer Besprechung.\"",
-     "Herr Weber kann jetzt nicht ans Telefon.", "Herr Weber spricht gerade mit jemandem über Sprache.",
-     "Herr Weber ist krank.", "Herr Weber ist nicht mehr bei der Firma."),
-    ("Ein Gast probiert die versalzene Suppe und sagt höflich: \"Interessant gewürzt.\"",
-     "Die Suppe schmeckt ihm nicht.", "Er findet die Gewürze spannend und lecker.", "Er möchte das Rezept.",
-     "Er will mehr Salz."),
-    ("Im Zug sagt jemand zum Sitznachbarn mit der lauten Musik: \"Ganz schön was los in Ihren Kopfhörern.\"",
-     "Er bittet darum, die Musik leiser zu machen.", "Er möchte wissen, welches Lied läuft.",
-     "Er will die Kopfhörer kaufen.", "Er lobt die Tonqualität."),
-    ("Nach der Präsentation sagt die Kundin: \"Wir melden uns, wenn wir Bedarf haben.\"",
-     "Sie lehnt höflich ab.", "Sie hat großes Interesse und meldet sich bald.", "Sie bestellt sofort.",
-     "Sie will eine zweite Präsentation."),
-    ("Der Vermieter über die kaputte Heizung im Januar: \"Etwas frisch ist es ja schon.\"",
-     "Er gibt zu, dass es zu kalt ist.", "Er findet die Temperatur angenehm.", "Er will lüften.",
-     "Er beschwert sich über den Mieter."),
-], "en": [
-    ("It has rained for a week. Sam looks outside and says: \"Lovely weather for a picnic.\"",
-     "He is annoyed by the bad weather.", "He thinks it is ideal for a picnic.", "He is planning a picnic.",
-     "He likes rain for the plants."),
-    ("At dinner, Mia says to her brother: \"Can you pass the salt?\"", "She asks him to hand her the salt.",
-     "She asks whether he is physically able to.", "She wants less salt.", "She is complaining about the food."),
-    ("Jo asks Kim to help move house on Sunday. Kim: \"Sunday's a bit tricky for me.\"", "Kim politely declines.",
-     "Kim says Sundays are generally complicated.", "Kim agrees to help.", "Kim asks for the address."),
-    ("After a meeting where nothing was decided, a colleague says: \"Well, that was productive.\"",
-     "The meeting was a waste of time.", "The meeting achieved a lot.", "The meeting was short.",
-     "The meeting will continue."),
-    ("The cake has collapsed. The baker says: \"It's not exactly my finest work.\"", "The cake turned out badly.",
-     "The cake is good but not the best ever.", "The cake is excellent.", "Someone else baked it."),
-    ("Ben arrives two hours late. His host: \"Nice of you to drop by.\"", "The host is annoyed by the lateness.",
-     "The host is sincerely pleased he visited briefly.", "The host invites him to stay the night.",
-     "The host asks him to drop something."),
-    ("The estate agent calls the tiny flat \"cosy and compact.\"", "The flat is very small.",
-     "The flat is warmly furnished and well designed.", "The flat is spacious.", "The flat is newly built."),
-    ("Looking at the messy desk, the manager says: \"I see you've organised everything.\"", "The desk is a mess.",
-     "The desk is tidy.", "The employee was promoted.", "The desk is new."),
-    ("A stranger asks: \"Do you know what time it is?\"", "They want to be told the time.",
-     "They want to know whether you are aware of the time.", "They are telling you it is late.",
-     "They want to borrow your watch."),
-    ("After a 0-6 defeat the coach says: \"We've had better days.\"", "It was a very bad game.",
-     "It was a slightly below-average game.", "It was a good game.", "The weather was bad."),
-    ("A colleague arrives late for the third time. The boss: \"Ah, how kind of you to grace us with your presence.\"",
-     "She is criticising his lateness.", "She is sincerely glad he came.", "She is inviting him over.",
-     "She is praising his work."),
-    ("On the phone: \"Is Mr Weber available?\" — \"He's in a meeting right now.\"",
-     "Mr Weber cannot take the call now.", "Mr Weber is meeting someone in person for fun.",
-     "Mr Weber is ill.", "Mr Weber has left the company."),
-    ("A guest tastes the over-salted soup and says politely: \"Interesting seasoning.\"",
-     "He doesn't like the soup.", "He finds the spices exciting and delicious.", "He wants the recipe.",
-     "He wants more salt."),
-    ("On the train someone says to the neighbour with loud music: \"Quite a party in your headphones.\"",
-     "He is asking for the music to be turned down.", "He wants to know which song is playing.",
-     "He wants to buy the headphones.", "He is praising the sound quality."),
-    ("After the pitch the client says: \"We'll be in touch if we need anything.\"", "She is politely declining.",
-     "She is very interested and will call soon.", "She is placing an order.", "She wants another pitch."),
-    ("The landlord about the broken heating in January: \"It is a little fresh in here.\"",
-     "He admits it is too cold.", "He finds the temperature pleasant.", "He wants to air the room.",
-     "He is complaining about the tenant."),
-]}
+IDIOMS = common.OwnSet("tasks_lang.IDIOMS")  # private: flozi00/weakbench-data
+PRAGMATICS = common.OwnSet("tasks_lang.PRAGMATICS")  # private: flozi00/weakbench-data
 IDIOM_ASK = {"de": "Was bedeutet die Redewendung in diesem Satz?\n\n{s}\n\n{opts}\n\nAntworte mit einer Zeile "
                    "\"Antwort: X\".",
              "en": "What does the idiom in this sentence mean?\n\n{s}\n\n{opts}\n\nReply with a line "
                    "\"Answer: X\"."}
 
 
-COREF = {"de": [  # (sentence with {w}, word_a, answer_a, word_b, answer_b, candidates, pronoun)
-    ("Der Pokal passt nicht in den Koffer, weil er zu {w} ist.", "groß", "der Pokal", "klein", "der Koffer",
-     ("der Pokal", "der Koffer"), "er"),
-    ("Anna konnte Lisa nicht erreichen, weil ihr Handy {w} war.", "leer", "Anna", "ausgeschaltet", "Lisa",
-     ("Anna", "Lisa"), "ihr"),
-    ("Die Stadträte verweigerten den Demonstranten die Genehmigung, weil sie {w}.", "Gewalt fürchteten",
-     "die Stadträte", "Gewalt androhten", "die Demonstranten", ("die Stadträte", "die Demonstranten"), "sie"),
-    # German gender decides a pronoun by itself, so these twins share a noun gender (both masculine)
-    ("Der Hund jagte den Kater, bis er {w} war.", "auf den Baum geflüchtet", "der Kater", "außer Atem",
-     "der Hund", ("der Hund", "der Kater"), "er"),
-    ("Paul goss Wasser aus dem Krug in den Becher, bis er {w} war.", "voll", "der Becher", "leer", "der Krug",
-     ("der Krug", "der Becher"), "er"),
-    ("Die Lehrerin lobte die Schülerin, weil sie {w}.", "so fleißig gelernt hatte", "die Schülerin",
-     "mit der Arbeit sehr zufrieden war", "die Lehrerin", ("die Lehrerin", "die Schülerin"), "sie"),
-    ("Der Tisch passt nicht durch den Türrahmen, weil er zu {w} ist.", "breit", "der Tisch", "schmal",
-     "der Türrahmen", ("der Tisch", "der Türrahmen"), "er"),
-    ("Die Ärztin rief die Patientin an, weil sie {w}.", "die Laborwerte erhalten hatte", "die Ärztin",
-     "ihren Termin verpasst hatte", "die Patientin", ("die Ärztin", "die Patientin"), "sie"),
-    ("Der Schüler fragte den Lehrer um Rat, weil er {w}.", "nicht weiterwusste", "der Schüler",
-     "viel Erfahrung hatte", "der Lehrer", ("der Schüler", "der Lehrer"), "er"),
-    ("Die Firma entließ die Managerin, weil sie {w}.", "sparen musste", "die Firma", "Geld unterschlagen hatte",
-     "die Managerin", ("die Firma", "die Managerin"), "sie"),
-    ("Der Stein zerbrach den Spiegel, weil er so {w} war.", "schwer", "der Stein", "dünn", "der Spiegel",
-     ("der Stein", "der Spiegel"), "er"),
-    ("Die Mieterin rief die Vermieterin an, weil sie {w}.", "einen Wasserschaden hatte", "die Mieterin",
-     "die Miete erhöhen wollte", "die Vermieterin", ("die Mieterin", "die Vermieterin"), "sie"),
-], "en": [
-    ("The trophy doesn't fit into the suitcase because it is too {w}.", "big", "the trophy", "small", "the suitcase",
-     ("the trophy", "the suitcase"), "it"),
-    ("Sam couldn't reach Tom because his phone was {w}.", "dead", "Sam", "switched off", "Tom", ("Sam", "Tom"), "his"),
-    ("The council refused the protesters a permit because they {w}.", "feared violence", "the council",
-     "advocated violence", "the protesters", ("the council", "the protesters"), "they"),
-    ("The dog chased the cat until it was {w}.", "up the tree", "the cat", "out of breath", "the dog",
-     ("the dog", "the cat"), "it"),
-    ("Paul poured water from the bottle into the cup until it was {w}.", "full", "the cup", "empty", "the bottle",
-     ("the bottle", "the cup"), "it"),
-    ("The lawyer asked the witness a question, but he was reluctant to {w} it.", "answer", "the witness", "repeat",
-     "the lawyer", ("the lawyer", "the witness"), "he"),
-    ("The table won't fit through the doorway because it is too {w}.", "wide", "the table", "narrow", "the doorway",
-     ("the table", "the doorway"), "it"),
-    ("The doctor called the patient because she {w}.", "had the test results", "the doctor",
-     "had missed her appointment", "the patient", ("the doctor", "the patient"), "she"),
-    ("The student asked the teacher for advice because he {w}.", "was stuck", "the student", "had lots of experience",
-     "the teacher", ("the student", "the teacher"), "he"),
-    ("The manager thanked the assistant because she {w}.", "was grateful for the help", "the manager",
-     "had worked late every night", "the assistant", ("the manager", "the assistant"), "she"),
-    ("The rock smashed the mirror because it was so {w}.", "heavy", "the rock", "thin", "the mirror",
-     ("the rock", "the mirror"), "it"),
-    ("The tenant called the property manager because she {w}.", "had a leak", "the tenant",
-     "wanted to raise the rent", "the property manager", ("the tenant", "the property manager"), "she"),
-]}
+COREF = common.OwnSet("tasks_lang.COREF")  # private: flozi00/weakbench-data
 COREF_ASK = {"de": "{s}\n\nWorauf bezieht sich \"{p}\"? Antworte mit einer Zeile \"Antwort: {a}\" oder \"Antwort: {b}\".",
              "en": "{s}\n\nWho or what does \"{p}\" refer to? Reply with a line \"Answer: {a}\" or \"Answer: {b}\"."}
 

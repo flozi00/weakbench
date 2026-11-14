@@ -13,6 +13,7 @@ grounded_qa  Extractive question answering: answer from the passage only, scored
 
 Both are deterministic: no judge, no execution, no sampling beyond the server's own.
 """
+import common
 import collections
 import json
 import random
@@ -186,27 +187,7 @@ def score_injection(item, reply):
 # A short "reference card" states a fact with a swapped value (Australia's capital is Melbourne). Half the items
 # ask what the TEXT says (the swapped value is right), half what is TRUE in reality (the real value is right),
 # so a model that ignores the context and one that believes everything it reads both lose half.
-CC_FACTS = [  # (subject en, subject de, relation key, real, decoy) — values identical in DE/EN
-    ("Australia", "Australien", "capital", "Canberra", "Melbourne"), ("Canada", "Kanada", "capital", "Ottawa",
-                                                                       "Toronto"),
-    ("Switzerland", "der Schweiz", "capital", "Bern", "Basel"), ("Turkey", "der Türkei", "capital", "Ankara",
-                                                                   "Istanbul"),  # DE always follows "von"
-    ("Brazil", "Brasilien", "capital", "Brasília", "Rio de Janeiro"), ("Morocco", "Marokko", "capital", "Rabat",
-                                                                        "Casablanca"),
-    ("gold", "Gold", "symbol", "Au", "Ag"), ("sodium", "Natrium", "symbol", "Na", "So"),
-    ("iron", "Eisen", "symbol", "Fe", "Ir"), ("potassium", "Kalium", "symbol", "K", "P"),
-    ("Faust", "Faust", "author", "Goethe", "Schiller"), ("Hamlet", "Hamlet", "author", "Shakespeare", "Marlowe"),
-    ("The Trial", "Der Process", "author", "Kafka", "Rilke"), ("Don Quixote", "Don Quijote", "author", "Cervantes",
-                                                                 "Lope de Vega"),
-    ("New Zealand", "Neuseeland", "capital", "Wellington", "Auckland"), ("Vietnam", "Vietnam", "capital", "Hanoi",
-                                                                          "Saigon"),
-    ("Nigeria", "Nigeria", "capital", "Abuja", "Lagos"), ("Pakistan", "Pakistan", "capital", "Islamabad", "Karachi"),
-    ("silver", "Silber", "symbol", "Ag", "Si"), ("lead", "Blei", "symbol", "Pb", "Ld"),
-    ("tin", "Zinn", "symbol", "Sn", "Ti"), ("mercury", "Quecksilber", "symbol", "Hg", "Me"),
-    ("The Tin Drum", "Die Blechtrommel", "author", "Grass", "Böll"),  # values spelled alike in DE and EN
-    ("The Magic Mountain", "Der Zauberberg", "author", "Thomas Mann", "Hermann Hesse"),
-    ("Pride and Prejudice", "Stolz und Vorurteil", "author", "Austen", "Brontë"),
-]
+CC_FACTS = common.OwnSet("tasks_text.CC_FACTS")  # private: flozi00/weakbench-data
 CC_SAY = {"en": {"capital": "Reference card: The capital of {s} is {v}.", "symbol": "Reference card: The chemical "
                  "symbol of {s} is {v}.", "author": "Reference card: {s} was written by {v}."},
           "de": {"capital": "Infokarte: Die Hauptstadt von {s} ist {v}.", "symbol": "Infokarte: Das chemische Symbol "

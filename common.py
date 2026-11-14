@@ -11,6 +11,8 @@ writes one run directory:
 and appends its summary rows to results/<kind>.jsonl (the ledger
 that is committed). compare.py pairs two run directories item by item.
 """
+import ast
+import functools
 import collections
 import datetime
 import fcntl
@@ -310,7 +312,28 @@ def hf_list(repo, revision, repo_type="datasets"):
 
 
 # our own hand-written / translated sets, private, pinned
-DATA_REPO, DATA_REV = "flozi00/weakbench-data", "d526a41f581187d2bcbc1a5286a6978f1fff0903"
+DATA_REPO, DATA_REV = "flozi00/weakbench-data", "e2b8719f3b0cc04c3ddc3495d6c041dbcc708c29"
+
+
+class OwnSet:
+    """A hand-written set from the private DATA_REPO (`sets/<module>.<NAME>.py`, a Python literal), fetched on
+    first use so a run without access fails loudly only in the tasks that need it."""
+
+    def __init__(self, name):
+        self.name = name
+
+    @functools.cached_property
+    def value(self):
+        return ast.literal_eval(hf_file(DATA_REPO, DATA_REV, f"sets/{self.name}.py").read_text(encoding="utf-8"))
+
+    def __getitem__(self, k):
+        return self.value[k]
+
+    def __len__(self):
+        return len(self.value)
+
+    def __iter__(self):
+        return iter(self.value)
 
 
 def hf_file(repo, revision, filename, repo_type="datasets"):

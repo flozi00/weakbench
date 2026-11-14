@@ -2383,6 +2383,27 @@ FS_TOPIC = {"en": ["Zorvel parking rule", "Brimak market fee", "Telo night bus",
             "de": ["Zorvel-Parkregel", "Brimak-Marktgebühr", "Telo-Nachtbuslinie", "Quanda-Beleuchtungsregel"]}
 
 
+FS_TEXT2 = {  # a second wording per kind, so one memorised sentence is not enough
+    "en": {"ad_hominem": "Why listen to {p} about the {x}? {p} cannot even keep a garden tidy.",
+           "false_dilemma": "You either support the {x} or you do not care about the town at all.",
+           "hasty_generalization": "The {x} was tried for one day last week and it rained. It will never work here.",
+           "post_hoc": "Since the {x} began, two shops have closed. Clearly the {x} is driving businesses away.",
+           "slippery_slope": "Today the {x}, tomorrow a permit for every garden party, and in a year a permit for "
+                             "breathing.",
+           "none": "The {x} needs ten volunteers, and only six have signed up. So the {x} cannot start with volunteers "
+                   "alone yet."},
+    "de": {"ad_hominem": "Warum sollte man {p} bei der {x} zuhören? {p} schafft es nicht einmal, den eigenen Garten "
+                         "ordentlich zu halten.",
+           "false_dilemma": "Entweder du unterstützt die {x}, oder dir ist die Stadt völlig egal.",
+           "hasty_generalization": "Die {x} wurde letzte Woche einen Tag lang getestet, und es hat geregnet. Das wird "
+                                   "hier nie funktionieren.",
+           "post_hoc": "Seit es die {x} gibt, haben zwei Läden geschlossen. Die {x} vertreibt also die Geschäfte.",
+           "slippery_slope": "Heute die {x}, morgen eine Genehmigung für jedes Gartenfest, und in einem Jahr eine "
+                             "Genehmigung zum Atmen.",
+           "none": "Für die {x} braucht es zehn Freiwillige, und erst sechs haben sich gemeldet. Also kann die {x} noch "
+                   "nicht allein mit Freiwilligen starten."}}
+
+
 def load_fallacy_spot(lang, n, seed):
     items = []
     for i in range(n or 120):
@@ -2390,7 +2411,7 @@ def load_fallacy_spot(lang, n, seed):
         kind = FS_KINDS[i % len(FS_KINDS)]
         labels = list(FS_KINDS)
         r.shuffle(labels)
-        arg = FS_TEXT[lang][kind].format(x=r.choice(FS_TOPIC[lang]), p=r.choice(["Ms Arden", "Mr Kolb"] if lang == "en"
+        arg = (FS_TEXT, FS_TEXT2)[(i // len(FS_KINDS)) % 2][lang][kind].format(x=r.choice(FS_TOPIC[lang]), p=r.choice(["Ms Arden", "Mr Kolb"] if lang == "en"
                                                                                    else ["Frau Arden", "Herr Kolb"]))
         opts = "\n".join(f"{'ABCDEF'[j]}) {FS_LABEL[lang][k]}" for j, k in enumerate(labels))
         q = ("Which reasoning flaw does this argument contain?" if lang == "en"

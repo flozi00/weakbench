@@ -975,8 +975,11 @@ def test_unit_chain():
     for x in it:
         g = Fraction(x["gold"])
         assert tn.score_unit_chain(x, {"content": f"Answer: {g.numerator}/{g.denominator}"})["correct"]
-        assert tn.score_unit_chain(x, {"content": f"Answer: {float(g):.4f}"})["correct"]
+        assert tn.score_unit_chain(x, {"content": f"Answer: {float(g):.6f}"})["correct"]
         assert not tn.score_unit_chain(x, {"content": f"Answer: {float(g) * 1.1 + 1:.4f}"})["correct"]
+        assert tn.score_unit_chain(x, {"content": f"Answer: from 8/2 we get {g.numerator}/{g.denominator}"})["correct"]
+    y = dict(it[0], gold="5/4")
+    assert tn.score_unit_chain(y, {"content": "Answer: 1 1/4"})["correct"]
 
 
 
@@ -988,6 +991,9 @@ def test_fake_entity():
     assert tn.score_fake_entity(f, {"content": "Dazu habe ich keine Informationen, das Institut scheint nicht zu existieren."})["correct"]
     assert not tn.score_fake_entity(f, {"content": "Es wurde 1952 von Hans Müller gegründet."})["correct"]
     assert tn.score_fake_entity(r, {"content": "Das war Johann Wolfgang von Goethe."})["correct"]
+    assert not tn.score_fake_entity(f, {"content": "I don't know the exact year, but it was founded by Hans Weber."})["correct"]
+    for t in ("I couldn't find any reliable information.", "Mir ist kein solches Institut bekannt.", "There is no such mountain."):
+        assert tn.score_fake_entity(f, {"content": t})["correct"], t
 
 
 if __name__ == "__main__":

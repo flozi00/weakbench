@@ -1082,7 +1082,20 @@ def test_maze_path():
             assert tn.score_maze_path(x, {"content": "Antwort: Es gibt keinen Weg (0 Schritte)."})["correct"]
 
 
+
+def test_alien_sort():
+    import tasks_novel as tn
+    it = tn.load_alien_sort("en", 12, 0)
+    for x in it:
+        assert tn.score_alien_sort(x, {"content": "Answer: " + x["gold"]})["correct"]
+        assert sorted(x["gold"].split(", ")) == sorted(x["words"])
+    x = it[0]
+    assert not tn.score_alien_sort(x, {"content": "Answer: " + ", ".join(sorted(x["words"]))})["correct"] or \
+        sorted(x["words"]) == x["gold"].split(", ")
+
+
 if __name__ == "__main__":
+    test_alien_sort()
     test_maze_path()
     test_ascii_chart()
     test_table_build()

@@ -3514,6 +3514,48 @@ def score_maze_path(item, reply):
             "detail": {f"ok_size{item['size']}": float(ok), "ok_none" if item["gold"] == "none" else "ok_path": float(ok)}}
 
 
+# ---------------------------------------------------------------- alien_sort (sort by an invented alphabet)
+# An invented order of six letters ("in this language: k < a < t < r < o < m") and 4-6 words made of them; sort the
+# words. A word that is a prefix of another comes first. Exact order required.
+
+
+def load_alien_sort(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("alien_sort", i)
+        letters = r.sample("abdeklmnorst", 6)
+        rank = {c: k for k, c in enumerate(letters)}
+        k = 4 + i % 3
+        words = set()
+        while len(words) < k:
+            w = "".join(r.choice(letters) for _ in range(r.randint(2, 4)))
+            words.add(w)
+        words = list(words)
+        if i % 4 == 0:  # a prefix pair now and then
+            words[-1] = words[0] + r.choice(letters)
+            words = list(dict.fromkeys(words))
+        r.shuffle(words)
+        gold = sorted(words, key=lambda w: [rank[c] for c in w])
+        order = " < ".join(letters)
+        q = (f"In an invented language the alphabet order is: {order}. Sort these words alphabetically in that language "
+             f"(a word that is the beginning of another comes first): {', '.join(words)}. Answer with the words in order, "
+             "comma-separated." if lang == "en" else
+             f"In einer erfundenen Sprache ist die Alphabet-Reihenfolge: {order}. Sortiere diese Wörter alphabetisch in "
+             f"dieser Sprache (ein Wort, das der Anfang eines anderen ist, kommt zuerst): {', '.join(words)}. Antworte mit "
+             "den Wörtern in Reihenfolge, durch Kommas getrennt.")
+        items.append({"id": str(i), "lang": lang, "n": len(words), "gold": ", ".join(gold), "words": words,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_alien_sort(item, reply):
+    line = (final_answer(reply["content"]) or "").lower()
+    got = [w for w in re.findall(r"[a-z]+", line) if w in item["words"]]
+    ok = ", ".join(got) == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": ", ".join(got)[:60], "gold": item["gold"],
+            "detail": {f"ok_n{item['n']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5069,6 +5111,7 @@ TASKS = {
     "table_build": {**task(load_table_build, score_table_build, 24, 100), "think": False, "max_tokens": 1024},
     "ascii_chart": task(load_ascii_chart, score_ascii_chart, 24, 120),
     "maze_path": task(load_maze_path, score_maze_path, 25, 120),
+    "alien_sort": task(load_alien_sort, score_alien_sort, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

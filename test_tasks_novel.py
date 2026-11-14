@@ -1152,6 +1152,7 @@ def test_base_rate():
         assert tn.score_base_rate(x, {"content": f"Answer: about {x['gold']}%"})["correct"]
         assert tn.score_base_rate(x, {"content": f"Answer: {x['naive']}%"})["detail"]["naive"] == 1.0
     assert "10,000" in it[1]["messages"][0]["content"]
+    assert not any(".5" in x["messages"][0]["content"].split("?")[0] for x in tn.load_base_rate("en", 40, 0) if x["freq"])
 
 
 if __name__ == "__main__":

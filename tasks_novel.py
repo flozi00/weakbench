@@ -3761,11 +3761,12 @@ def load_base_rate(lang, n, seed):
     items = []
     for i in range(n or 120):
         r = rng_of("base_rate", i)
-        prev = r.choice([0.5, 1, 2, 5])
-        sens = r.choice([80, 90, 95, 99])
-        fpr = r.choice([2, 5, 9, 10])
-        sick = 10000 * prev / 100
-        tp, fp = sick * sens / 100, (10000 - sick) * fpr / 100
+        while True:  # whole people in the frequency version
+            prev, sens, fpr = r.choice([0.5, 1, 2, 5]), r.choice([80, 90, 95, 99]), r.choice([2, 5, 9, 10])
+            sick = 10000 * prev / 100
+            tp, fp = sick * sens / 100, (10000 - sick) * fpr / 100
+            if tp == int(tp) and fp == int(fp):
+                break
         gold = round(100 * tp / (tp + fp), 1)
         freq = i % 2 == 1
         if lang == "en":

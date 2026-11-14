@@ -853,7 +853,19 @@ def test_arith_length():
     assert not tn.score_arith_length(x, {"content": f"Antwort: {g + 1}"})["correct"]
 
 
+
+def test_nesting_depth():
+    import tasks_novel as tn
+    assert tn.nd_balanced("([]{})") and not tn.nd_balanced("([)]") and not tn.nd_balanced("((")
+    it = tn.load_nesting_depth("en", 144, 0)
+    bal = [x["gold"] for x in it if x["kind"] == "balance"]
+    assert 0.3 < bal.count("yes") / len(bal) < 0.7
+    for x in it[:12]:
+        assert tn.score_nesting_depth(x, {"content": f"Answer: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_nesting_depth()
     test_arith_length()
     test_fallacy_spot()
     test_counterfactual_world()

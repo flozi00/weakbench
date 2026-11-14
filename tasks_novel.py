@@ -2458,6 +2458,83 @@ def score_arith_length(item, reply):
             "detail": {f"ok_{item['op']}{item['digits']}": float(ok), f"ok_d{item['digits']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- nesting_depth (where composition breaks, by depth)
+# Two kinds: evaluate a nested expression of small numbers at depth 1..6, and decide whether a bracket string of
+# depth 2..7 over ()[]{} is balanced (one swapped or dropped bracket in half of them). Per-depth sub-metrics.
+ND_DEPTH = (1, 2, 3, 4, 5, 6)
+
+
+def nd_expr(r, d):
+    if d == 0:
+        return str(r.randint(1, 9))
+    op = r.choice("+-*")
+    left, right = nd_expr(r, d - 1), str(r.randint(1, 9))
+    if r.random() < 0.5:
+        left, right = right, left
+    return f"({left} {op} {right})"
+
+
+def nd_brackets(r, d):
+    pairs = ["()", "[]", "{}"]
+    s = ""
+    for _ in range(r.randint(1, 2)):
+        inner = ""
+        for _ in range(d):
+            p = r.choice(pairs)
+            inner = p[0] + inner + p[1]
+        s += inner
+    return s
+
+
+def load_nesting_depth(lang, n, seed):
+    items = []
+    for i in range(n or 144):
+        r = rng_of("nesting_depth", i)
+        kind = ("eval", "balance")[i % 2]
+        d = ND_DEPTH[(i // 2) % len(ND_DEPTH)]
+        if kind == "eval":
+            e = nd_expr(r, d)
+            gold = str(eval(e))  # noqa: S307 - our own generated digits and + - * only
+            q = (f"Evaluate: {e}" if lang == "en" else f"Berechne: {e}")
+        else:
+            s = nd_brackets(r, d + 1)
+            ok = (i // 12) % 2 == 0
+            if not ok:
+                k = r.randrange(len(s))
+                swap = {"(": "[", "[": "{", "{": "(", ")": "]", "]": "}", "}": ")"}
+                s = s[:k] + swap[s[k]] + s[k + 1:] if r.random() < 0.6 else s[:k] + s[k + 1:]
+            gold = ("yes" if lang == "en" else "ja") if nd_balanced(s) else ("no" if lang == "en" else "nein")
+            q = (f"Is this bracket string balanced (every bracket closed by its matching type, properly nested)? "
+                 f"Answer yes or no.\n{s}" if lang == "en" else
+                 f"Ist diese Klammerfolge korrekt (jede Klammer vom passenden Typ geschlossen, richtig verschachtelt)? "
+                 f"Antworte mit ja oder nein.\n{s}")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "depth": d, "gold": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def nd_balanced(s):
+    stack, match = [], {")": "(", "]": "[", "}": "{"}
+    for c in s:
+        if c in "([{":
+            stack.append(c)
+        elif not stack or stack.pop() != match[c]:
+            return False
+    return not stack
+
+
+def score_nesting_depth(item, reply):
+    line = (final_answer(reply["content"]) or "").lower()
+    if item["kind"] == "eval":
+        m = re.findall(r"[−-]?\d+", line.replace("−", "-").split("=")[-1])
+        ok = bool(m) and m[0] == item["gold"]
+    else:
+        yn = [w for w in re.findall(r"[a-z]+", line) if w in ("yes", "no", "ja", "nein")]
+        ok = yn[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}_d{item['depth']}": float(ok), f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3998,6 +4075,7 @@ TASKS = {
     "counterfactual_world": task(load_counterfactual_world, score_counterfactual_world, 25, 200),
     "fallacy_spot": task(load_fallacy_spot, score_fallacy_spot, 24, 120),
     "arith_length": task(load_arith_length, score_arith_length, 28, 140),
+    "nesting_depth": task(load_nesting_depth, score_nesting_depth, 24, 144),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

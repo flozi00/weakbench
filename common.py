@@ -317,10 +317,11 @@ DATA_REPO, DATA_REV = "flozi00/weakbench-data", "5a0c00d5c0895b899658e3a7891d35a
 
 def distinct(load, pool=600):
     """Wrap a generated-task loader so it yields only items with a prompt not seen before (in item order, so the quick
-    tier stays a prefix of the full tier). It draws up to `pool` candidates; with n=None it returns every distinct one."""
-    def wrapped(lang, n, seed):
+    tier stays a prefix of the full tier). It draws 3n candidates first and falls back to `pool` when that is not
+    enough; with n=None it returns every distinct item among `pool` draws."""
+    def take(lang, draws, n, seed):
         out, seen = [], set()
-        for x in load(lang, min(pool, 3 * n) if n else pool, seed):  # item i never depends on n: same prefix
+        for x in load(lang, draws, seed):
             key = json.dumps(x.get("turns") or x["messages"], sort_keys=True, ensure_ascii=False)
             if key not in seen:
                 seen.add(key)
@@ -328,6 +329,10 @@ def distinct(load, pool=600):
                 if n and len(out) == n:
                     break
         return out
+
+    def wrapped(lang, n, seed):
+        out = take(lang, min(pool, 3 * n), n, seed) if n else []
+        return out if n and len(out) == n else take(lang, pool, n, seed)
     return wrapped
 
 

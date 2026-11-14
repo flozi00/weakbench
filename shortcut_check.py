@@ -14,7 +14,10 @@ REPLIES = ["Answer: yes", "Answer: no", "Antwort: ja", "Antwort: nein", "Answer:
 tasks = sys.argv[1].split(",") if len(sys.argv) > 1 else [n for m in ("tasks_novel", "tasks_lang") for n in importlib.import_module(m).TASKS]
 mods = [importlib.import_module(m) for m in ("tasks_novel", "tasks_lang")]
 for name in tasks:
-    t = next(m.TASKS[name] for m in mods if name in m.TASKS)
+    t = next((m.TASKS[name] for m in mods if name in m.TASKS), None)
+    if t is None or t.get("needs_judge"):
+        print(f"{name:24s} skipped (judge task or not generated)")
+        continue
     best = (0, None)
     for lang in t["langs"]:
         items = t["load"](lang, t["counts"]["full"][lang] or None, 0)

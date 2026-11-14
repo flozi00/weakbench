@@ -839,6 +839,8 @@ def test_fallacy_spot():
         for x in it:
             assert "{" not in x["messages"][0]["content"]
             assert tn.score_fallacy_spot(x, {"content": f"Answer: {x['gold']}) ..."})["correct"]
+            lab = tn.FS_LABEL[lang][x["kind"]].split(" (")[0]
+            assert tn.score_fallacy_spot(x, {"content": f"Answer: {lab}"})["correct"], lab
 
 
 
@@ -862,6 +864,9 @@ def test_nesting_depth():
     assert 0.3 < bal.count("yes") / len(bal) < 0.7
     for x in it[:12]:
         assert tn.score_nesting_depth(x, {"content": f"Answer: {x['gold']}"})["correct"]
+    no = [x for x in it if x["kind"] == "balance" and x["gold"] == "no"]
+    odd = [x for x in no if len(x["messages"][0]["content"].split("\n")[1]) % 2]
+    assert len(odd) <= len(no) // 3, (len(odd), len(no))
 
 
 if __name__ == "__main__":

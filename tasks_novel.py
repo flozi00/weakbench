@@ -2362,7 +2362,7 @@ FS_TEXT = {
     "en": {"ad_hominem": "{p} proposes the {x}. But {p} failed a driving test twice, so the {x} is a bad idea.",
            "false_dilemma": "Either we introduce the {x} this year, or the town will be ruined. So we must introduce it.",
            "hasty_generalization": "I talked to two shop owners who dislike the {x}. So everyone in town is against it.",
-           "post_hoc": "The {x} started in May, and in June the river flooded. So the {x} caused the flood.",
+           "post_hoc": "The {x} took effect in May, and in June the river flooded. So the {x} caused the flood.",
            "slippery_slope": "If we allow the {x}, next they will tax every bicycle, then ban cars, and soon nobody "
                              "will be allowed to leave town.",
            "none": "The {x} costs 40,000 euros per year and the town budget has a reserve of 10,000 euros. So the town "
@@ -2373,8 +2373,8 @@ FS_TEXT = {
                             "einführen.",
            "hasty_generalization": "Ich habe mit zwei Ladenbesitzern gesprochen, die die {x} nicht mögen. Also ist die "
                                    "ganze Stadt dagegen.",
-           "post_hoc": "Die {x} begann im Mai, und im Juni trat der Fluss über die Ufer. Also hat die {x} das Hochwasser "
-                       "verursacht.",
+           "post_hoc": "Die {x} trat im Mai in Kraft, und im Juni trat der Fluss über die Ufer. Also hat die {x} das "
+                       "Hochwasser verursacht.",
            "slippery_slope": "Wenn wir die {x} erlauben, besteuern sie als Nächstes jedes Fahrrad, dann verbieten sie Autos, "
                              "und bald darf niemand mehr die Stadt verlassen.",
            "none": "Die {x} kostet 40.000 Euro im Jahr, und die Rücklage der Stadt beträgt 10.000 Euro. Also kann die "
@@ -2386,8 +2386,9 @@ FS_TOPIC = {"en": ["Zorvel parking rule", "Brimak market fee", "Telo night bus",
 FS_TEXT2 = {  # a second wording per kind, so one memorised sentence is not enough
     "en": {"ad_hominem": "Why listen to {p} about the {x}? {p} cannot even keep a garden tidy.",
            "false_dilemma": "You either support the {x} or you do not care about the town at all.",
-           "hasty_generalization": "The {x} was tried for one day last week and it rained. It will never work here.",
-           "post_hoc": "Since the {x} began, two shops have closed. Clearly the {x} is driving businesses away.",
+           "hasty_generalization": "Two of my neighbours tried the {x} once and found it confusing. So it will confuse "
+                                   "everyone.",
+           "post_hoc": "The week after the {x} took effect, the bakery closed. So the {x} closed the bakery.",
            "slippery_slope": "Today the {x}, tomorrow a permit for every garden party, and in a year a permit for "
                              "breathing.",
            "none": "The {x} needs ten volunteers, and only six have signed up. So the {x} cannot start with volunteers "
@@ -2395,9 +2396,10 @@ FS_TEXT2 = {  # a second wording per kind, so one memorised sentence is not enou
     "de": {"ad_hominem": "Warum sollte man {p} bei der {x} zuhören? {p} schafft es nicht einmal, den eigenen Garten "
                          "ordentlich zu halten.",
            "false_dilemma": "Entweder du unterstützt die {x}, oder dir ist die Stadt völlig egal.",
-           "hasty_generalization": "Die {x} wurde letzte Woche einen Tag lang getestet, und es hat geregnet. Das wird "
-                                   "hier nie funktionieren.",
-           "post_hoc": "Seit es die {x} gibt, haben zwei Läden geschlossen. Die {x} vertreibt also die Geschäfte.",
+           "hasty_generalization": "Zwei meiner Nachbarn haben die {x} einmal ausprobiert und fanden sie verwirrend. "
+                                   "Also wird sie alle verwirren.",
+           "post_hoc": "In der Woche, nachdem die {x} in Kraft trat, hat die Bäckerei geschlossen. Also hat die {x} die "
+                       "Bäckerei geschlossen.",
            "slippery_slope": "Heute die {x}, morgen eine Genehmigung für jedes Gartenfest, und in einem Jahr eine "
                              "Genehmigung zum Atmen.",
            "none": "Für die {x} braucht es zehn Freiwillige, und erst sechs haben sich gemeldet. Also kann die {x} noch "
@@ -2417,14 +2419,18 @@ def load_fallacy_spot(lang, n, seed):
         q = ("Which reasoning flaw does this argument contain?" if lang == "en"
              else "Welchen Denkfehler enthält dieses Argument?")
         items.append({"id": str(i), "lang": lang, "kind": kind, "gold": "ABCDEF"[labels.index(kind)],
+                      "letters": {k: "ABCDEF"[j] for j, k in enumerate(labels)},
                       "messages": [{"role": "user", "content": f"{arg}\n\n{q}\n{opts}\n" + ASK[lang]}]})
     return items
 
 
 def score_fallacy_spot(item, reply):
     line = (final_answer(reply["content"]) or "").strip()
-    m = re.match(r"\W*([A-F])\b", line) or re.search(r"\b([A-F])\)", line)
+    m = re.match(r"\W*([A-F])(?:[).:]|\s*$)", line) or re.search(r"\b([A-F])\)", line)
     pred = m.group(1) if m else None
+    if pred is None:  # the label text instead of the letter
+        hit = [k for k, lab in FS_LABEL[item["lang"]].items() if lab.split(" (")[0].lower() in line.lower()]
+        pred = item["letters"][hit[0]] if len(hit) == 1 else None
     ok = pred == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
@@ -2451,7 +2457,7 @@ def load_arith_length(lang, n, seed):
 
 def score_arith_length(item, reply):
     line = final_answer(reply["content"]) or ""
-    digits = re.sub(r"[\s.,'’ ]", "", line.split("=")[-1])
+    digits = re.sub(r"[\s.,'’ ]", "", re.sub(r"[.,]0+\b", "", line.split("=")[-1]))  # "494.0" is 494
     m = re.search(r"\d+", digits)
     ok = bool(m) and int(m.group()) == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": m.group() if m else None, "gold": item["gold"],
@@ -2475,15 +2481,15 @@ def nd_expr(r, d):
 
 
 def nd_brackets(r, d):
-    pairs = ["()", "[]", "{}"]
-    s = ""
-    for _ in range(r.randint(1, 2)):
-        inner = ""
-        for _ in range(d):
-            p = r.choice(pairs)
-            inner = p[0] + inner + p[1]
-        s += inner
-    return s
+    """A balanced string of depth d with siblings at random levels ("([]{})"), not only mirrored chains."""
+    p = r.choice(["()", "[]", "{}"])
+    if d == 1:
+        return p
+    inner = nd_brackets(r, d - 1)
+    if r.random() < 0.5:
+        sib = nd_brackets(r, r.randint(1, max(1, d - 2)))
+        inner = inner + sib if r.random() < 0.5 else sib + inner
+    return p[0] + inner + p[1]
 
 
 def load_nesting_depth(lang, n, seed):
@@ -2502,7 +2508,11 @@ def load_nesting_depth(lang, n, seed):
             if not ok:
                 k = r.randrange(len(s))
                 swap = {"(": "[", "[": "{", "{": "(", ")": "]", "]": "}", "}": ")"}
-                s = s[:k] + swap[s[k]] + s[k + 1:] if r.random() < 0.6 else s[:k] + s[k + 1:]
+                if r.random() < 0.6:  # a closer of the wrong type
+                    s = s[:k] + swap[s[k]] + s[k + 1:]
+                else:  # two neighbours exchanged: same length and counts, so length gives nothing away
+                    k = min(k, len(s) - 2)
+                    s = s[:k] + s[k + 1] + s[k] + s[k + 2:]
             gold = ("yes" if lang == "en" else "ja") if nd_balanced(s) else ("no" if lang == "en" else "nein")
             q = (f"Is this bracket string balanced (every bracket closed by its matching type, properly nested)? "
                  f"Answer yes or no.\n{s}" if lang == "en" else
@@ -2526,8 +2536,9 @@ def nd_balanced(s):
 def score_nesting_depth(item, reply):
     line = (final_answer(reply["content"]) or "").lower()
     if item["kind"] == "eval":
-        m = re.findall(r"[−-]?\d+", line.replace("−", "-").split("=")[-1])
-        ok = bool(m) and m[0] == item["gold"]
+        line = re.sub(r"\bminus\s+", "-", line.replace("−", "-"))
+        firsts = [re.findall(r"-?\d+", seg)[:1] for seg in line.split("=")]  # "-2 = 3 - 5" and "3 - 5 = -2"
+        ok = [item["gold"]] in firsts
     else:
         yn = [w for w in re.findall(r"[a-z]+", line) if w in ("yes", "no", "ja", "nein")]
         ok = yn[:1] == [item["gold"]]

@@ -1714,7 +1714,7 @@ def load_agreement_attractor(lang, n, seed):
 
 def score_agreement_attractor(item, reply):
     w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in ("is", "are", "ist", "sind")]
-    ok = w[-1:] == [item["gold"]]
+    ok = w[:1] == [item["gold"]]  # the first: "ist (Singular, nicht sind)" explains after the answer
     return {"correct": ok, "score": float(ok), "pred": w[-1:], "gold": item["gold"],
             "detail": {f"ok_attr{item['attractors']}": float(ok), "ok_plural" if item["plural"] else "ok_singular": float(ok)}}
 

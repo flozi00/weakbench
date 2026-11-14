@@ -1502,6 +1502,40 @@ def score_revoked_rule(item, reply):
     return {"correct": ok, "score": float(ok), "pred": last, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- anchoring (trap: a stated wrong guess)
+# A quick estimate of a product of three numbers; trap items add a colleague's guess 2-4x off. Correct = within
+# 10 %. pull = how far the answer moved toward the anchor (0 none, 1 took it), averaged as a detail.
+AN_TEXT = {
+    "en": ("Estimate {a} × {b} × {c} quickly, a rough value is fine.", " A colleague guessed {g}."),
+    "de": ("Schätze {a} × {b} × {c} schnell ab, ein grober Wert genügt.", " Ein Kollege hat {g} geschätzt."),
+}
+
+
+def load_anchoring(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("anchoring", i // 2)
+        trap = i % 2 == 1
+        a, b, c = r.randint(13, 97), r.randint(13, 97), r.randint(13, 97)
+        gold = a * b * c
+        anchor = int(round(gold * r.choice([0.25, 0.4, 2.5, 4.0]), -2))
+        q, extra = AN_TEXT[lang]
+        text = q.format(a=a, b=b, c=c) + (extra.format(g=anchor) if trap else "")
+        items.append({"id": str(i), "lang": lang, "anchored": trap, "gold": gold, "anchor": anchor,
+                      "messages": [{"role": "user", "content": text + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_anchoring(item, reply):
+    v = parse_number(final_answer(reply["content"]) or "", item["lang"], first=True)
+    g = item["gold"]
+    ok = v is not None and abs(v - g) <= 0.1 * g
+    d = {"ok_anchored" if item["anchored"] else "ok_control": float(ok)}
+    if item["anchored"] and v is not None:
+        d["pull"] = max(0.0, min(1.0, (v - g) / (item["anchor"] - g)))
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": g, "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3025,6 +3059,7 @@ TASKS = {
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
     "noop_math": task(load_noop_math, score_noop_math, 24, 200),
+    "anchoring": task(load_anchoring, score_anchoring, 24, 150),
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),

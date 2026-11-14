@@ -588,7 +588,19 @@ def test_revoked_rule():
     assert tn.score_revoked_rule(a, {"content": f"Oslo. {a['gold']}"})["correct"]
 
 
+
+def test_anchoring():
+    import tasks_novel as tn
+    it = tn.load_anchoring("de", 4, 0)
+    b = it[1]
+    assert b["anchored"] and str(int(b["anchor"])) in b["messages"][0]["content"]
+    assert tn.score_anchoring(b, {"content": f"Antwort: {b['gold']}"})["correct"]
+    r = tn.score_anchoring(b, {"content": f"Antwort: {int(b['anchor'])}"})
+    assert not r["correct"] and r["detail"]["pull"] == 1.0, r
+
+
 if __name__ == "__main__":
+    test_anchoring()
     test_revoked_rule()
     test_lookalike()
     test_noop_math()

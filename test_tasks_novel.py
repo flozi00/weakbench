@@ -1210,6 +1210,9 @@ def test_conclusion_spot():
     assert "Also braucht diese Pflanze" in " ".join(x["messages"][0]["content"] for x in it)
     for x in it:
         assert tn.score_conclusion_spot(x, {"content": f"Antwort: ({x['gold']})"})["correct"]
+        assert tn.score_conclusion_spot(x, {"content": f"Antwort: Linie 7 ... Satz {x['gold']}"})["correct"]
+    pos = [x["gold"] for x in tn.load_conclusion_spot("en", 120, 0)]
+    assert all(25 <= pos.count(k) <= 35 for k in (1, 2, 3, 4)), [pos.count(k) for k in (1, 2, 3, 4)]
 
 
 
@@ -1222,6 +1225,9 @@ def test_sunk_cost():
     r = tn.score_sunk_cost(trap, {"content": f"Antwort: {trap['cont']}"})
     assert not r["correct"] and r["detail"]["took_sunk"] == 1.0
     assert {x["gold"] for x in it} == {"A", "B"}
+    g = trap["gold"]
+    assert tn.score_sunk_cost(trap, {"content": f"Answer: A company should pick {g}"})["correct"]
+    assert tn.score_sunk_cost(trap, {"content": f"Answer: Option {g}, not {trap['cont']}"})["correct"]
 
 
 if __name__ == "__main__":

@@ -3970,7 +3970,7 @@ CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a mem
                   ("All brimak plants need shade.", "This plant is a brimak plant.", "This plant needs shade.",
                    "Brimak plants grow slowly."),
                   ("Trains on line 7 never run after midnight.", "The last train tonight is a line 7 train.",
-                   "The last train tonight leaves before midnight.", "Line 7 was opened in 1998."),
+                   "The last train tonight does not run after midnight.", "Line 7 was opened in 1998."),
                   ("Anyone who passes the test gets a certificate.", "Tom passed the test.", "Tom gets a certificate.",
                    "The test takes two hours."),
                   ("No reptile in the zoo is fed on Mondays.", "Kiko is a reptile in the zoo.", "Kiko is not fed on Mondays.",
@@ -3986,7 +3986,7 @@ CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a mem
                   ("Alle Brimak-Pflanzen brauchen Schatten.", "Diese Pflanze ist eine Brimak-Pflanze.",
                    "Diese Pflanze braucht Schatten.", "Brimak-Pflanzen wachsen langsam."),
                   ("Züge der Linie 7 fahren nie nach Mitternacht.", "Der letzte Zug heute ist ein Zug der Linie 7.",
-                   "Der letzte Zug heute fährt vor Mitternacht.", "Die Linie 7 wurde 1998 eröffnet."),
+                   "Der letzte Zug heute fährt nicht nach Mitternacht.", "Die Linie 7 wurde 1998 eröffnet."),
                   ("Wer die Prüfung besteht, bekommt ein Zertifikat.", "Tom hat die Prüfung bestanden.",
                    "Tom bekommt ein Zertifikat.", "Die Prüfung dauert zwei Stunden."),
                   ("Kein Reptil im Zoo wird montags gefüttert.", "Kiko ist ein Reptil im Zoo.",
@@ -3998,11 +3998,11 @@ CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a mem
                   ("Nur eingetragene Wähler dürfen bei der Ratswahl wählen.", "Mira ist nicht eingetragen.",
                    "Mira darf bei der Ratswahl nicht wählen.", "Die Wahl findet im Frühling statt.")]}
 CS_MARKED = {"en": ["Therefore, Lena pays a fee.", "Therefore, this plant needs shade.",
-                    "Therefore, the last train tonight leaves before midnight.", "Therefore, Tom gets a certificate.",
+                    "Therefore, the last train tonight does not run after midnight.", "Therefore, Tom gets a certificate.",
                     "Therefore, Kiko is not fed on Mondays.", "Therefore, this invoice needs two signatures.",
                     "Therefore, the bus takes the detour today.", "Therefore, Mira may not vote in the council election."],
              "de": ["Also zahlt Lena einen Beitrag.", "Also braucht diese Pflanze Schatten.",
-                    "Also fährt der letzte Zug heute vor Mitternacht.", "Also bekommt Tom ein Zertifikat.",
+                    "Also fährt der letzte Zug heute nicht nach Mitternacht.", "Also bekommt Tom ein Zertifikat.",
                     "Also wird Kiko montags nicht gefüttert.", "Also braucht diese Rechnung zwei Unterschriften.",
                     "Also fährt der Bus heute die Umleitung.", "Also darf Mira bei der Ratswahl nicht wählen."]}
 
@@ -4011,15 +4011,16 @@ def load_conclusion_spot(lang, n, seed):
     items = []
     for i in range(n or 120):
         r = rng_of("conclusion_spot", i)
-        p1, p2, c, d = CS_ARGS[lang][i % len(CS_ARGS[lang])]
-        marked = (i // len(CS_ARGS[lang])) % 2 == 0
+        k = (i // 2) % len(CS_ARGS[lang])  # every argument appears marked and unmarked
+        p1, p2, c, d = CS_ARGS[lang][k]
+        marked = i % 2 == 0
         if marked:
-            c = CS_MARKED[lang][i % len(CS_ARGS[lang])]
-        sents = [p1, p2, c, d]
-        order = list(range(4))
-        r.shuffle(order)
-        shown = [sents[k] for k in order]
-        gold = order.index(2) + 1
+            c = CS_MARKED[lang][k]
+        rest = [p1, p2, d]
+        r.shuffle(rest)
+        slot = (i // 2 + i // 16) % 4  # the conclusion's position cycles 1..4 and shifts per round: no position bias
+        shown = rest[:slot] + [c] + rest[slot:]
+        gold = slot + 1
         text = " ".join(f"({k + 1}) {x}" for k, x in enumerate(shown))
         q = ("Which sentence is the conclusion that the others support? Answer with its number." if lang == "en" else
              "Welcher Satz ist die Schlussfolgerung, die von den anderen gestützt wird? Antworte mit seiner Nummer.")
@@ -4029,9 +4030,15 @@ def load_conclusion_spot(lang, n, seed):
 
 
 def score_conclusion_spot(item, reply):
-    m = re.search(r"\d", final_answer(reply["content"]) or "")
-    ok = bool(m) and int(m.group()) == item["gold"]
-    return {"correct": ok, "score": float(ok), "pred": m.group() if m else None, "gold": item["gold"],
+    line = final_answer(reply["content"]) or ""
+    m = re.search(r"\((\d)\)|(?:sentence|satz)\s*(\d)", line, re.I)
+    if m:
+        pred = int(m.group(1) or m.group(2))
+    else:
+        cands = set(re.findall(r"\b([1-4])\b", line))
+        pred = int(cands.pop()) if len(cands) == 1 else None
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
             "detail": {"ok_marked" if item["marked"] else "ok_unmarked": float(ok)}}
 
 
@@ -4060,8 +4067,8 @@ def load_sunk_cost(lang, n, seed):
                 else f"continue the current project: {fmt(rc)} euros still to spend, expected return {fmt(rv)} euros")
         swit = (f"auf ein neues Projekt umsteigen: {fmt(sc)} Euro Kosten, erwarteter Ertrag {fmt(sv)} Euro" if de
                 else f"switch to a new project: {fmt(sc)} euros cost, expected return {fmt(sv)} euros")
-        sunk = ((f" In das laufende Projekt sind bereits {fmt(spent)} Euro geflossen, die verloren wären, wenn man aufhört."
-                 if de else f" {fmt(spent)} euros have already gone into the current project and would be lost if it stops.")
+        sunk = ((f" In das laufende Projekt sind bereits {fmt(spent)} Euro geflossen; sie lassen sich nicht zurückholen."
+                 if de else f" {fmt(spent)} euros have already been spent on the current project and cannot be recovered.")
                 if trap else "")
         cont_first = (g // 2) % 2 == 0
         a, b = (cont, swit) if cont_first else (swit, cont)
@@ -4071,18 +4078,21 @@ def load_sunk_cost(lang, n, seed):
              "economically better? Answer A or B.")
         cont_label = "A" if cont_first else "B"
         gold = {"A": "B", "B": "A"}[cont_label] if switch_better else cont_label
-        items.append({"id": f"{g}-{trap}", "lang": lang, "trap": bool(trap), "gold": gold,
+        items.append({"id": f"{g}-{trap}", "lang": lang, "trap": bool(trap), "gold": gold, "switch_better": switch_better,
                       "cont": "A" if cont_first else "B", "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_sunk_cost(item, reply):
     line = (final_answer(reply["content"]) or "").strip()
-    m = re.match(r"\W*(?:option|wahl)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line)
-    lone = set(re.findall(r"\b([AB])\b", line))
+    line = re.split(r"\b(?:not|nicht)\b", line)[0]  # "Option A, not B"
+    m = re.search(r"\b(?:option|wahl|choose|wähle|würde)\s+([AB])\b", line, re.I) or re.match(r"\W*([AB])(?:\)|\W*$)", line)
+    lone = set(re.findall(r"(?<![A-Za-z])([AB])(?![a-z])", line))  # uppercase letters only: "A company" is no answer
+    lone = {x for x in lone if not re.search(r"\b" + x + r"\s+[a-z]", line)}
     pred = m.group(1).upper() if m else (lone.pop() if len(lone) == 1 else None)
     ok = pred == item["gold"]
-    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    cell = "trap" if item["trap"] else "control"
+    d = {f"ok_{cell}": float(ok), f"ok_{cell}_{'switch' if item.get('switch_better') else 'continue'}": float(ok)}
     if item["trap"] and item["gold"] != item["cont"]:  # the spent amount pulled toward the worse option
         d["took_sunk"] = float(pred == item["cont"])
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}

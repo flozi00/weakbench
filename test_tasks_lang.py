@@ -550,6 +550,7 @@ def test_de_relative():
     assert tl.score_de_relative(x, {"content": x["gold"].capitalize()})["correct"]
     m = next(y for y in it if y["gold"] == "den")
     assert tl.score_de_relative(m, {"content": "welchen"})["correct"] and not tl.score_de_relative(m, {"content": "dem"})["correct"]
+    assert tl.score_de_relative(m, {"content": "Das richtige Pronomen ist: den"})["correct"]
 
 
 if __name__ == "__main__":

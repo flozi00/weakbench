@@ -2879,14 +2879,15 @@ def score_regex_synth(item, reply):
 # A generated 8-10 sentence story establishes facts (a coat's colour, who owns the dog, a time, a count); one later
 # sentence contradicts one of them, or none does (control). Answer: the number of the contradicting sentence, or 0.
 CE_FACTS = {
-    "en": [("{a} wore a {c1} coat.", "{a} buttoned up the {c2} coat.", "{a} buttoned up the {c1} coat.",
+    "en": [("{a} owned only one coat, a {c1} one.", "{a} buttoned up the {c2} coat.", "{a} buttoned up the {c1} coat.",
             ["red", "green", "grey", "yellow"]),
            ("The dog belonged to {b}.", "{b} had never owned a dog.", "{a} took {b}'s dog for a walk.", None),
            ("The train left at {t1} o'clock.", "At {t2} o'clock the train was still waiting, as it always left at {t2}.",
             "Shortly after {t1} o'clock the train was gone.", None),
            ("{b} had baked {n1} rolls.", "All {n2} rolls {b} had baked were eaten.", "All {n1} rolls {b} had baked were eaten.",
             None)],
-    "de": [("{a} trug einen {c1} Mantel.", "{a} knöpfte den {c2} Mantel zu.", "{a} knöpfte den {c1} Mantel zu.",
+    "de": [("{a} besaß nur einen einzigen Mantel, einen {c1}.", "{a} knöpfte den {c2} Mantel zu.",
+            "{a} knöpfte den {c1} Mantel zu.",
             ["roten", "grünen", "grauen", "gelben"]),
            ("Der Hund gehörte {b}.", "{b} hatte noch nie einen Hund gehabt.", "{a} ging mit {b_gen} Hund spazieren.", None),
            ("Der Zug fuhr um {t1} Uhr ab.", "Um {t2} Uhr wartete der Zug noch, denn er fuhr immer um {t2} Uhr ab.",
@@ -2895,10 +2896,10 @@ CE_FACTS = {
             "Alle {n1} Brötchen, die {b} gebacken hatte, wurden gegessen.", None)]}
 CE_FILL = {"en": ["The sky was clear.", "Birds sang in the trees.", "The street was quiet.", "A bus drove past.",
                   "Someone laughed in the distance.", "The bakery smelled of bread.", "A cyclist rang a bell.",
-                  "The church clock was slow as usual.", "A cat slept on a wall.", "Two children argued about a ball."],
+                  "A dog barked twice.", "A cat slept on a wall.", "Two children argued about a ball."],
            "de": ["Der Himmel war klar.", "In den Bäumen sangen Vögel.", "Die Straße war ruhig.", "Ein Bus fuhr vorbei.",
                   "In der Ferne lachte jemand.", "Die Bäckerei duftete nach Brot.", "Ein Radfahrer klingelte.",
-                  "Die Kirchturmuhr ging wie immer nach.", "Eine Katze schlief auf einer Mauer.",
+                  "Ein Hund bellte zweimal.", "Eine Katze schlief auf einer Mauer.",
                   "Zwei Kinder stritten um einen Ball."]}
 # consistent sentences that touch the same fact in a way that looks suspicious but is not a contradiction
 CE_NEAR = {"en": ["{a} took off the {c1} coat and hung it up.", "{b} fed the dog before breakfast.",
@@ -2922,11 +2923,14 @@ def load_continuity_error(lang, n, seed):
         contra = (i // 4) % 3 != 0  # a third are clean controls
         fact = i % 4
         late = (f[1] if contra else (f[2] if (i // 12) % 2 else CE_NEAR[lang][fact])).format(**vals)
-        sents = [f[0].format(**vals)] + r.sample(CE_FILL[lang], 7)
-        at = r.randint(3, 7)  # the late sentence lands somewhere after a few fillers
+        decoy = r.random() < 0.5 if contra else (i // 12) % 2 == 0
+        sents = [f[0].format(**vals)] + r.sample(CE_FILL[lang], 7 - decoy)  # the same length with or without decoy
+        at = r.randint(3, 7 - decoy)  # the late sentence lands somewhere after a few fillers
         sents.insert(at, late)
-        if contra and r.random() < 0.5:  # a consistent near-miss elsewhere as a decoy
+        if decoy and contra:  # a consistent near-miss elsewhere as a decoy
             sents.insert(r.randint(1, at - 1), CE_NEAR[lang][fact].format(**vals))
+        elif decoy:  # controls whose late sentence is already the near-miss keep one more filler
+            sents.insert(r.randint(1, len(sents) - 1), r.choice([x for x in CE_FILL[lang] if x not in sents]))
         gold = sents.index(late) + 1 if contra else 0
         story = " ".join(f"({k + 1}) {x}" for k, x in enumerate(sents))
         q = ("Does any sentence contradict an earlier one? Answer with its number, or 0 if none does." if lang == "en" else
@@ -2983,8 +2987,13 @@ def load_number_compare(lang, n, seed):
 
 
 def score_number_compare(item, reply):
-    line = (final_answer(reply["content"]) or "").replace(" ", "").replace("−", "-")
-    g, o = item["gold"].replace(" ", ""), item["other"].replace(" ", "")
+    line = (final_answer(reply["content"]) or "").replace(" ", "").replace("−", "-").replace(",", ".")
+    g, o = item["gold"].replace(",", "."), item["other"].replace(",", ".")  # "9.9" is fine in a German answer
+    cmp = re.search(re.escape(g) + r"\s*([<>])\s*" + re.escape(o) + "|" + re.escape(o) + r"\s*([<>])\s*" + re.escape(g), line)
+    if cmp:  # "-3.2 < -3.15": the direction decides, not the order
+        ok = (cmp.group(1) == ">") if cmp.group(1) else (cmp.group(2) == "<")
+        return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
+                "detail": {f"ok_{item['kind']}": float(ok)}}
     at = lambda t: (m.start() if (m := re.search(r"(?<![\d.,/])" + re.escape(t) + r"(?![\d/]|[.,]\d)", line)) else None)  # noqa: E731
     pg, po = at(g), at(o)
     ok = pg is not None and (po is None or pg < po)  # "9.9 is larger than 9.11": the first one named

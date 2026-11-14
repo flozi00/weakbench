@@ -1992,11 +1992,9 @@ def load_de_relative(lang, n, seed):
 def score_de_relative(item, reply):
     w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
          if x in ("der", "die", "das", "den", "dem", "denen", "dessen", "deren", "welcher", "welche", "welches", "welchen",
-                  "welchem")]
+                  "welchem")][-1:]  # the last one: "Das richtige Pronomen ist: den"; the sentence echoed ends on others
     welch = {"der": "welcher", "die": "welche", "das": "welches", "den": "welchen", "dem": "welchem", "denen": "welchen"}
     ok = bool(w) and w[0] in (item["gold"], welch.get(item["gold"]))  # "welcher" is correct too (no genitive form)
-    if item["gold"] == "der" and item["case"] == "dat":
-        ok = bool(w) and w[0] in ("der", "welcher")
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_{item['case']}": float(ok)}}
 
 

@@ -939,6 +939,8 @@ def test_continuity_error():
     import tasks_novel as tn
     it = tn.load_continuity_error("de", 24, 0)
     assert {x["gold"] == 0 for x in it} == {True, False}
+    lens = {len(__import__("re").findall(r"\(\d+\)", x["messages"][0]["content"])) for x in tn.load_continuity_error("en", 120, 0)}
+    assert len(lens) == 1, lens  # the length gives nothing away
     for x in it:
         n = len(__import__("re").findall(r"\(\d+\)", x["messages"][0]["content"]))
         assert 0 <= x["gold"] <= n
@@ -959,6 +961,9 @@ def test_number_compare():
     x = next(y for y in tn.load_number_compare("en", 8, 0) if y["kind"] == "negatives")
     assert tn.score_number_compare(x, {"content": f"Answer: {x['gold']} is larger than {x['other']}"})["correct"]
     assert not tn.score_number_compare(x, {"content": f"Answer: {x['other']}, not {x['gold']}"})["correct"]
+    assert tn.score_number_compare(x, {"content": f"Answer: {x['other']} < {x['gold']}"})["correct"]
+    d = next(y for y in tn.load_number_compare("de", 8, 0) if y["kind"] == "decimals")
+    assert tn.score_number_compare(d, {"content": "Antwort: " + d["gold"].replace(",", ".")})["correct"]
 
 
 if __name__ == "__main__":

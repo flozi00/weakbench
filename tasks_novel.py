@@ -4282,6 +4282,59 @@ def score_table_join(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- dedup_records (how many distinct customers?)
+# Rows of (name, e-mail, phone). Some rows are the same customer written differently (case, extra spaces, phone with
+# spaces / dashes / +49, "Last, First"); one look-alike shares the name but has another e-mail and phone (a different
+# person). The question: how many distinct customers? naive = the number of rows.
+DR_FIRST = ["Anna", "Jonas", "Mira", "Paul", "Selin", "Konrad", "Ida", "Ben"]
+DR_LAST = ["Weber", "Haas", "Krüger", "Lindner", "Okafor", "Brandt", "Vogel", "Sommer"]
+
+
+def dr_variant(r, first, last, mail, phone):
+    kind = r.randrange(4)
+    if kind == 0:
+        return f"{first.upper()} {last.upper()}", mail.upper(), phone
+    if kind == 1:
+        return f"{last}, {first}", mail, phone.replace(" ", "-")
+    if kind == 2:
+        return f" {first}  {last} ", " " + mail, "+49 " + phone[1:]
+    return f"{first} {last}", mail.capitalize(), phone.replace(" ", "")
+
+
+def load_dedup_records(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("dedup_records", i)
+        k = r.randint(4, 6)
+        people = []
+        for first, last in zip(r.sample(DR_FIRST, k), r.sample(DR_LAST, k)):
+            mail = f"{first.lower()}.{last.lower()}@example.org".replace("ü", "ue")
+            phone = f"0{r.randint(150, 179)} {r.randint(1000000, 9999999)}"
+            people.append((first, last, mail, phone))
+        rows = [(f"{a} {b}", m, p) for a, b, m, p in people]
+        dups = r.randint(1, 3)
+        for a, b, m, p in r.sample(people, dups):
+            rows.append(dr_variant(r, a, b, m, p))
+        a, b, m, p = r.choice(people)  # a look-alike: same name, different e-mail and phone: another person
+        rows.append((f"{a} {b}", f"{a.lower()}{r.randint(1, 99)}@example.net", f"0{r.randint(150, 179)} {r.randint(1000000, 9999999)}"))
+        r.shuffle(rows)
+        table = "\n".join(f"| {x} | {y} | {z} |" for x, y, z in rows)
+        head = "| Name | E-Mail | Telefon |" if lang == "de" else "| Name | E-mail | Phone |"
+        q = ("Wie viele verschiedene Kunden enthält die Liste? Zeilen mit derselben E-Mail-Adresse oder Telefonnummer "
+             "(nur anders geschrieben) gehören zur selben Person." if lang == "de" else
+             "How many distinct customers does the list contain? Rows with the same e-mail address or phone number "
+             "(only written differently) belong to the same person.")
+        items.append({"id": str(i), "lang": lang, "gold": k + 1, "naive": len(rows),
+                      "messages": [{"role": "user", "content": f"{head}\n|---|---|---|\n{table}\n\n{q}\n" + ASK[lang]}]})
+    return items
+
+
+def score_dedup_records(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"naive": float(v == item["naive"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5851,6 +5904,7 @@ TASKS = {
     "regression_mean": task(load_regression_mean, score_regression_mean, 24, 120),
     "dim_analysis": task(load_dim_analysis, score_dim_analysis, 24, 120),
     "table_join": task(load_table_join, score_table_join, 24, 120),
+    "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -1265,7 +1265,20 @@ def test_table_join():
             assert tn.score_table_join(x, {"content": f"Antwort: {g}, nicht {other}"})["correct"]
 
 
+
+def test_dedup_records():
+    import tasks_novel as tn
+    for x in tn.load_dedup_records("de", 10, 0):
+        rows = [ln for ln in x["messages"][0]["content"].splitlines() if ln.startswith("| ") and "---" not in ln][1:]
+        assert len(rows) == x["naive"] > x["gold"]
+        norm = lambda s: __import__("re").sub(r"[^0-9]", "", s)[-7:]  # noqa: E731
+        phones = {norm(r.split("|")[3]) for r in rows}
+        assert len(phones) == x["gold"]  # every distinct person has one distinct phone
+        assert tn.score_dedup_records(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_dedup_records()
     test_table_join()
     test_dim_analysis()
     test_regression_mean()

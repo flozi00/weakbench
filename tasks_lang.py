@@ -1719,6 +1719,67 @@ def score_agreement_attractor(item, reply):
             "detail": {f"ok_attr{item['attractors']}": float(ok), "ok_plural" if item["plural"] else "ok_singular": float(ok)}}
 
 
+# ---------------------------------------------------------------- wug (morphology of invented words)
+# Berko's wug test, generated. EN: plural (-s / -es after s, x, z, ch, sh), past (-ed, doubling skipped: two-syllable
+# stems), 3rd person (-s / -es). DE: weak nonce verbs — 3rd person (-t / -et after d, t), Partizip II (ge-...-t; no ge-
+# for -ieren verbs and be-/ver-/zer- prefixes; -et after d/t). Exact form.
+WUG_EN_END = ["p", "k", "m", "n", "l", "sh", "ch", "x", "z", "s"]
+WUG_DE_END = ["pf", "ck", "mm", "ll", "nn", "d", "t", "rk", "mp"]
+
+
+def wug_en(r):  # rare onsets keep real words out ("snap", "trok")
+    return r.choice(["spl", "thr", "scr", "gl", "dw", "skw"]) + r.choice(["u", "e", "o"]) + r.choice(WUG_EN_END)
+
+
+def en_suffix(w):
+    return w + ("es" if w.endswith(("s", "x", "z", "ch", "sh")) else "s")
+
+
+def de_stem(r):  # rare onsets and umlauts keep real words out ("trocken")
+    return r.choice(["pfl", "schn", "kn", "spr", "gl", "schw"]) + r.choice(["ü", "ö", "au", "ei"]) + r.choice(WUG_DE_END)
+
+
+def load_wug(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = random.Random(f"wug:{i}")
+        if lang == "en":
+            kind = ("plural", "past", "third")[i % 3]
+            w = wug_en(r) + ("et" if kind == "past" else "")  # two-syllable verbs: no consonant doubling question
+            if kind == "plural":
+                q, gold = f"This is a {w}. Now there are two of them. There are two ___.", en_suffix(w)
+            elif kind == "past":
+                q, gold = f"To {w} means to tap a table twice. Yesterday he ___ the table.", w + "ed"
+            else:
+                q, gold = f"To {w} means to hum quietly. Every morning she ___.", en_suffix(w)
+            q = "Fill the gap with the right form of the made-up word. Answer with that word only.\n\n" + q
+        else:
+            kind = ("third", "part", "part_ieren", "part_prefix")[i % 4]
+            st = de_stem(r)
+            dt = st.endswith(("d", "t"))
+            if kind == "third":
+                inf, gold, frame = st + "en", st + ("et" if dt else "t"), "Jeden Morgen ___ sie leise."
+            elif kind == "part":
+                inf, gold, frame = st + "en", "ge" + st + ("et" if dt else "t"), "Gestern hat sie leise ___."
+            elif kind == "part_ieren":
+                inf, gold, frame = st + "ieren", st + "iert", "Gestern hat sie leise ___."
+            else:
+                pre = r.choice(["be", "ver", "zer"])
+                inf, gold, frame = pre + st + "en", pre + st + ("et" if dt else "t"), "Gestern hat sie den Brief ___."
+            q = (f"Das ausgedachte Verb „{inf}“ ist ein regelmäßiges (schwaches) Verb. Setze die richtige Form ein und "
+                 f"antworte nur mit diesem Wort.\n\n{frame}")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_wug(item, reply):
+    words = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    ok = item["gold"] in words[:3] or words[-1:] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": " ".join(words[:3]), "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1759,6 +1820,7 @@ TASKS = {
     "de_address": task(("de",), load_de_address, score_de_address, 256, 30, lang_check=False),
     "mixed_input": task(("de", "en"), load_mixed_input, score_mixed_input, 64, 30, lang_check=False),
     "agreement_attractor": task(("de", "en"), load_agreement_attractor, score_agreement_attractor, 16, 40, lang_check=False),
+    "wug": task(("de", "en"), load_wug, score_wug, 32, 40, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

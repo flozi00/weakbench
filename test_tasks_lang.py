@@ -487,7 +487,20 @@ def test_agreement_attractor():
     assert not tl.score_agreement_attractor(x, {"content": "are"})["correct"]
 
 
+def test_wug():
+    import tasks_lang as tl
+    assert tl.en_suffix("blach") == "blaches" and tl.en_suffix("frop") == "frops"
+    de = tl.load_wug("de", 8, 0)
+    assert [x["kind"] for x in de[:4]] == ["third", "part", "part_ieren", "part_prefix"]
+    assert de[2]["gold"].endswith("iert") and not de[2]["gold"].startswith("ge")
+    assert not de[3]["gold"].startswith("ge")
+    for x in de + tl.load_wug("en", 6, 0):
+        assert tl.score_wug(x, {"content": x["gold"]})["correct"]
+        assert not tl.score_wug(x, {"content": x["gold"] + "x"})["correct"]
+
+
 if __name__ == "__main__":
+    test_wug()
     test_agreement_attractor()
     test_mixed_input()
     test_de_address()

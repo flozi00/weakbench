@@ -25,7 +25,7 @@ Each trap is generated from a seed, scored deterministically where possible, and
 12. **Presupposition in the question.** "Why did X resign in 2019?" when the text says X never resigned. Twin: the text says X did resign.
 13. **Quantifier slips.** "All / most / some / none" in the premises, and a question that a model answers as if "some" meant "all".
 14. **Off-by-one in counting ranges** (done: `off_by_one`). "How many days from the 3rd to the 9th, both inclusive?", fence posts, page ranges.
-15. **Units hiding in plain sight.** Mixed units in a single sum (m and cm, minutes and hours), where the naive sum is the trap.
+15. **Units hiding in plain sight** (done: `mixed_units`). Mixed units in a single sum (m and cm, minutes and hours), where the naive sum is the trap.
 16. **Reversal curse on invented facts** (done: `reversal`, in context only; the training-time curse needs fine-tuning, out of scope). The context teaches "A's mentor is B", and the question asks "Whose mentor is B?".
 17. **Distracting long preamble.** The real question is the last sentence after a paragraph that sets up a different question.
 18. **Sticky persona.** A persona is set in the system prompt, and the user asks the model to break it in a later turn. Measures where the boundary sits and whether the model keeps it.

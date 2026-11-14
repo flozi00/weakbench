@@ -1823,6 +1823,57 @@ def score_off_by_one(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- mixed_units (trap: one value in another unit)
+# Three lengths / durations / masses to add, asked in the main unit; trap items state one of them in the smaller
+# or larger unit, control items state all in the main unit (same quantities). naive = the plain sum of the numbers.
+MU_KINDS = {
+    "len": {"en": ("board", "m", "cm", 100, "How long are the three boards together, in metres?"),
+            "de": ("Brett", "m", "cm", 100, "Wie lang sind die drei Bretter zusammen, in Metern?")},
+    "time": {"en": ("task", "h", "min", 60, "How long do the three tasks take together, in hours?"),
+             "de": ("Aufgabe", "h", "min", 60, "Wie lange dauern die drei Aufgaben zusammen, in Stunden?")},
+    "mass": {"en": ("parcel", "kg", "g", 1000, "How heavy are the three parcels together, in kilograms?"),
+             "de": ("Paket", "kg", "g", 1000, "Wie schwer sind die drei Pakete zusammen, in Kilogramm?")},
+}
+MU_ITEM = "{noun} {k}: {v} {u}"
+
+
+def load_mixed_units(lang, n, seed):
+    items = []
+    kinds = list(MU_KINDS)
+    for i in range(n or 200):
+        r = rng_of("mixed_units", i // 2)
+        trap = i % 2 == 1
+        kind = kinds[(i // 2) % 3]
+        noun, big, small, f, q = MU_KINDS[kind][lang]
+        vals = [r.randint(2, 9) * f // 4 for _ in range(3)]  # quarters of the big unit
+        k = r.randrange(3)
+        lines = []
+        for j, v in enumerate(vals):
+            if trap and j == k:
+                lines.append(MU_ITEM.format(noun=noun.capitalize(), k=j + 1, v=v, u=small))
+            else:
+                lines.append(MU_ITEM.format(noun=noun.capitalize(), k=j + 1, v=fmt_num(v / f, lang), u=big))
+        gold = sum(vals) / f
+        naive = sum(vals[j] / f for j in range(3) if j != k) + vals[k]
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": round(gold, 4), "naive": round(naive, 4),
+                      "messages": [{"role": "user", "content": "\n".join(lines) + "\n" + q + "\n" + ASK[lang]}]})
+    return items
+
+
+def fmt_num(x, lang):  # 1.5 -> '1,5' in German
+    t = f"{x:g}"
+    return t.replace(".", ",") if lang == "de" else t
+
+
+def score_mixed_units(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 1e-6
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    if item["trap"]:
+        d["naive_sum"] = float(v is not None and abs(v - item["naive"]) < 1e-6)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3352,6 +3403,7 @@ TASKS = {
     "rephrase_consistency": {**task(load_rephrase_consistency, score_rephrase_consistency, 24, 150), "grouped": True},
     "reversal": task(load_reversal, score_reversal, 24, 200),
     "off_by_one": task(load_off_by_one, score_off_by_one, 25, 200),
+    "mixed_units": task(load_mixed_units, score_mixed_units, 24, 150),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

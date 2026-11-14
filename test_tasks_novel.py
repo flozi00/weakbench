@@ -696,7 +696,20 @@ def test_off_by_one():
         assert not r["correct"] and r["detail"]["off_by_one"] == 1.0
 
 
+
+def test_mixed_units():
+    import tasks_novel as tn
+    it = tn.load_mixed_units("de", 6, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        assert a["gold"] == b["gold"] and not a["trap"] and b["trap"]
+    b = it[3]
+    assert tn.score_mixed_units(b, {"content": "Antwort: " + tn.fmt_num(b["gold"], "de") + " Stunden"})["correct"]
+    r = tn.score_mixed_units(b, {"content": "Antwort: " + tn.fmt_num(b["naive"], "de")})
+    assert not r["correct"] and r["detail"]["naive_sum"] == 1.0
+
+
 if __name__ == "__main__":
+    test_mixed_units()
     test_off_by_one()
     test_reversal()
     test_rephrase_consistency()

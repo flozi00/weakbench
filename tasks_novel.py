@@ -1296,50 +1296,6 @@ def score_math_missing(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": detail}
 
 
-# ---------------------------------------------------------------- noop_math (trap: irrelevant number)
-# GSM-NoOp style: the math_variants templates, every odd item with one plausible but irrelevant numeric
-# sentence after the first sentence. Even/odd pairs share a template and seed, so ok_clean - ok_noop is the trap.
-NOOP = {
-    "en": ["By the way, {k} of them were slightly smaller than usual, which does not change anything.",
-           "Last year the same thing had cost {k} dollars more, but that is no longer relevant.",
-           "{k} people watched while this happened, without taking part.",
-           "The instructions were printed on page {k} of a booklet."],
-    "de": ["Übrigens waren {k} davon etwas kleiner als üblich, was nichts ändert.",
-           "Letztes Jahr hätte dasselbe {k} Euro mehr gekostet, aber das spielt keine Rolle mehr.",
-           "{k} Leute sahen dabei zu, ohne mitzumachen.",
-           "Die Anleitung stand auf Seite {k} eines Hefts."],
-}
-
-
-def load_noop_math(lang, n, seed):
-    items, i = [], -1
-    templ = list(VAGUE)
-    while len(items) < (n or 200):
-        i += 1
-        base = i // 2
-        t = templ[base % len(templ)](rng_of("noop_math", base))
-        if t["ans"] is None or t["ans"] != int(t["ans"]):
-            continue
-        text, noop = t[lang], i % 2 == 1
-        if noop:
-            r = rng_of("noop_math_k", base)
-            m = re.search(r"[.!?] ", text)
-            if not m:
-                raise RuntimeError(f"noop_math: no sentence break in {text!r}")
-            extra = r.choice(NOOP[lang]).format(k=r.randint(2, 9))
-            text = text[:m.end()] + extra + " " + text[m.end():]
-        items.append({"id": str(i), "lang": lang, "noop": noop, "gold": int(t["ans"]),
-                      "messages": [{"role": "user", "content": text + "\n" + ASK[lang]}]})
-    return items
-
-
-def score_noop_math(item, reply):
-    v = last_int(final_answer(reply["content"]) or "")
-    ok = v == item["gold"]
-    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
-            "detail": {"ok_noop" if item["noop"] else "ok_clean": float(ok)}}
-
-
 # ---------------------------------------------------------------- puzzle_mutation (trap: famous riddle, one detail changed)
 # Each riddle twice: the original (control) and a mutation whose answer differs. ok_orig - ok_mut is the trap:
 # a model that recites the famous answer passes the control and fails the mutation. gold = regex on the answer line.
@@ -1353,12 +1309,12 @@ PUZZLES = [
             "Which is heavier: a kilogram of feathers or two kilograms of steel? Answer 'feathers', 'steel' or 'same'."),
      "de": ("Was ist schwerer: ein Kilogramm Federn oder ein Kilogramm Stahl? Antworte mit 'Federn', 'Stahl' oder 'gleich'.",
             "Was ist schwerer: ein Kilogramm Federn oder zwei Kilogramm Stahl? Antworte mit 'Federn', 'Stahl' oder 'gleich'."),
-     "gold": (r"same|gleich", r"steel|stahl")},
+     "gold": (r"\bsame\b|\bgleich", r"\bsteel\b|\bstahl\b")},
     {"en": ("Sally has 3 brothers. Each of her brothers has 2 sisters. How many sisters does Sally have?",
             "Sally has 3 brothers. Each of her brothers has exactly 1 sister. How many sisters does Sally have?"),
      "de": ("Sally hat 3 Brüder. Jeder ihrer Brüder hat 2 Schwestern. Wie viele Schwestern hat Sally?",
             "Sally hat 3 Brüder. Jeder ihrer Brüder hat genau 1 Schwester. Wie viele Schwestern hat Sally?"),
-     "gold": (r"^\D*1\b|\bone\b|\beine\b", r"^\D*0\b|\bnone\b|\bzero\b|\bkeine\b|\bnull\b")},
+     "gold": (r"^\D*1\b|\bone\b|\beine\b", r"^\D*0\b|\bnone\b|\bzero\b|\bno sisters?\b|\bkeine\b|\bnull\b")},
     {"en": ("A patch of lily pads doubles in size every day. It covers the whole lake on day 48. On which day did it cover half the lake?",
             "A patch of lily pads grows by the same area every day, starting from nothing on day 0. It covers the whole lake on day 48. On which day did it cover half the lake?"),
      "de": ("Ein Seerosenteppich verdoppelt jeden Tag seine Fläche. Am Tag 48 bedeckt er den ganzen See. An welchem Tag bedeckte er den halben See?",
@@ -1373,12 +1329,12 @@ PUZZLES = [
             "Game show: three doors, a car behind one, goats behind two. You pick door 1. The host does not know where the car is and opens one of the other two doors at random; by chance it is door 3 and shows a goat. Does switching to door 2 raise, lower or not change your chance of winning? Answer 'raise', 'lower' or 'same'."),
      "de": ("Spielshow: drei Türen, hinter einer ein Auto, hinter zweien Ziegen. Du wählst Tür 1. Der Moderator, der weiß, wo das Auto ist, öffnet immer eine andere Tür mit Ziege; er öffnet Tür 3. Erhöht, senkt oder ändert ein Wechsel zu Tür 2 deine Gewinnchance nicht? Antworte mit 'erhöht', 'senkt' oder 'gleich'.",
             "Spielshow: drei Türen, hinter einer ein Auto, hinter zweien Ziegen. Du wählst Tür 1. Der Moderator weiß nicht, wo das Auto ist, und öffnet zufällig eine der beiden anderen Türen; zufällig ist es Tür 3 mit einer Ziege. Erhöht, senkt oder ändert ein Wechsel zu Tür 2 deine Gewinnchance nicht? Antworte mit 'erhöht', 'senkt' oder 'gleich'."),
-     "gold": (r"raise|erh[öo]ht", r"same|gleich")},
+     "gold": (r"\braise|\berh[öo]h", r"\bsame\b|\bgleich|no change|unchanged|does(n.t| not) change|unver[äa]ndert|[äa]ndert nichts|1/2|50\s?%")},
     {"en": ("A doctor and a boy are fishing. The boy is the doctor's son, but the doctor is not the boy's father. Who is the doctor to the boy? Answer in one word.",
             "A doctor and a boy are fishing. The doctor, a man, is the boy's father. Who is the doctor to the boy? Answer in one word."),
-     "de": ("Eine Ärztin oder ein Arzt angelt mit einem Jungen. Der Junge ist das Kind dieser Person, aber die Person ist nicht sein Vater. Wer ist die Person für den Jungen? Antworte mit einem Wort.",
+     "de": ("Ein Junge hat einen Unfall. Der Chirurg im Krankenhaus sagt: \"Ich kann ihn nicht operieren, er ist mein Sohn.\" Der Chirurg ist nicht der Vater des Jungen. Wer ist der Chirurg für den Jungen? Antworte mit einem Wort.",
             "Ein Arzt angelt mit einem Jungen. Der Arzt, ein Mann, ist der Vater des Jungen. Wer ist der Arzt für den Jungen? Antworte mit einem Wort."),
-     "gold": (r"mother|mutter|mom|mama", r"father|vater|dad|papa")},
+     "gold": (r"\bmother|\bmutter|\bmom\b|\bmama\b", r"\bfather|\bvater|\bdad\b|\bpapa\b")},
     {"en": ("It takes 5 machines 5 minutes to make 5 widgets. How many minutes would it take 100 machines to make 100 widgets?",
             "It takes 5 machines 5 minutes to make 5 widgets. How many minutes would it take 1 machine to make 100 widgets?"),
      "de": ("5 Maschinen brauchen 5 Minuten für 5 Teile. Wie viele Minuten brauchen 100 Maschinen für 100 Teile?",
@@ -1394,7 +1350,7 @@ def load_puzzle_mutation(lang, n, seed):
     items = []
     for k, pz in enumerate(PUZZLES):
         for mut in (0, 1):
-            items.append({"id": f"{k}-{mut}", "lang": lang, "mutated": bool(mut), "pattern": pz["gold"][mut],
+            items.append({"id": f"{k}-{mut}", "lang": lang, "mutated": bool(mut), "pattern": pz["gold"][mut], "other": pz["gold"][1 - mut],
                           "gold": PZ_ANS[lang][k][mut],
                           "messages": [{"role": "user", "content": pz[lang][mut] + "\n" + ASK[lang]}]})
     return items[:n] if n else items
@@ -1402,7 +1358,9 @@ def load_puzzle_mutation(lang, n, seed):
 
 def score_puzzle_mutation(item, reply):
     line = (final_answer(reply["content"]) or "").strip().lower()
-    ok = bool(re.search(item["pattern"], line))
+    hit = re.search(item["pattern"], line)
+    neg = hit and re.search(r"\b(not|nicht|kein\w*)\s+(the\s+|die\s+|der\s+|das\s+)?$", line[:hit.start()])
+    ok = bool(hit) and not neg and not re.search(item["other"], line)
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"],
             "detail": {"ok_mutated" if item["mutated"] else "ok_original": float(ok)}}
 
@@ -1443,7 +1401,7 @@ def load_lookalike(lang, n, seed):
 
 
 def score_lookalike(item, reply):
-    v = last_int(final_answer(reply["content"]) or "")
+    v = answer_value(final_answer(reply["content"]), item["lang"])
     ok = v == item["gold"]
     d = {"ok_lookalike" if item["lookalike"] else "ok_control": float(ok)}
     if item["lookalike"]:
@@ -1506,9 +1464,29 @@ def score_revoked_rule(item, reply):
 # A quick estimate of a product of three numbers; trap items add a colleague's guess 2-4x off. Correct = within
 # 10 %. pull = how far the answer moved toward the anchor (0 none, 1 took it), averaged as a detail.
 AN_TEXT = {
-    "en": ("Estimate {a} × {b} × {c} quickly, a rough value is fine.", " A colleague guessed {g}."),
+    "en": ("Estimate {a} × {b} × {c} quickly; a rough value is fine.", " A colleague guessed {g}."),
     "de": ("Schätze {a} × {b} × {c} schnell ab, ein grober Wert genügt.", " Ein Kollege hat {g} geschätzt."),
 }
+
+
+AN_MAG = [(r"\s*(k|tsd\.?|tausend|thousand)\b", 1e3), (r"\s*(mio\.?|million(en)?|m)\b", 1e6)]
+
+
+def estimate_value(line, lang):
+    """The estimate a line states: after the last = / ≈ / ~, with k / Tausend / Mio and x 10^n applied."""
+    tail = re.split(r"[=≈~]", line)[-1]
+    v = parse_number(tail, lang, first=True)
+    if v is None:
+        return None
+    m = re.search(r"[×x*]\s*10\s*\^\s*(\d+)", tail)
+    if m:
+        return v * 10 ** int(m.group(1))
+    num = re.search(r"\d[\d.,  ]*", tail)
+    after = tail[num.end():].lower() if num else ""
+    for pat, mul in AN_MAG:
+        if re.match(pat, after):
+            return v * mul
+    return v
 
 
 def load_anchoring(lang, n, seed):
@@ -1527,9 +1505,9 @@ def load_anchoring(lang, n, seed):
 
 
 def score_anchoring(item, reply):
-    v = parse_number(final_answer(reply["content"]) or "", item["lang"], first=True)
+    v = estimate_value(final_answer(reply["content"]) or "", item["lang"])
     g = item["gold"]
-    ok = v is not None and abs(v - g) <= 0.1 * g
+    ok = v is not None and abs(v - g) <= 0.25 * g  # "rough" invites rounding 13 -> 10 (23 % off)
     d = {"ok_anchored" if item["anchored"] else "ok_control": float(ok)}
     if item["anchored"] and v is not None:
         d["pull"] = max(0.0, min(1.0, (v - g) / (item["anchor"] - g)))
@@ -3058,7 +3036,6 @@ TASKS = {
     "code_trace": task(load_code_trace, score_code_trace, 24, 240),
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
-    "noop_math": task(load_noop_math, score_noop_math, 24, 200),
     "anchoring": task(load_anchoring, score_anchoring, 24, 150),
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

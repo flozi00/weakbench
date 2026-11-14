@@ -534,20 +534,6 @@ if __name__ == "__main__":
     print("ok")
 
 
-def test_noop_math():
-    import tasks_novel as tn
-    for lang in ("en", "de"):
-        it = tn.load_noop_math(lang, 40, 0)
-        assert len(it) == 40
-        for a, b in zip(it[::2], it[1::2]):
-            assert not a["noop"] and b["noop"] and a["gold"] == b["gold"]
-            assert len(b["messages"][0]["content"]) > len(a["messages"][0]["content"])
-        g = it[1]["gold"]
-        assert tn.score_noop_math(it[1], {"content": f"...\nAnswer: {g}"})["correct"]
-        assert not tn.score_noop_math(it[1], {"content": f"Answer: {g + 3}"})["correct"]
-
-
-
 def test_puzzle_mutation():
     import tasks_novel as tn
     sc = tn.score_puzzle_mutation
@@ -561,6 +547,10 @@ def test_puzzle_mutation():
     assert not sc(en["7-0"], {"content": "Answer: 500"})["correct"]
     assert sc(en["7-1"], {"content": "Answer: 500 minutes"})["correct"]
     assert sc(en["2-1"], {"content": "Answer: 0"})["correct"]
+    assert sc(en["2-1"], {"content": "Answer: Sally has no sisters"})["correct"]
+    assert not sc(en["1-0"], {"content": "Answer: not the same"})["correct"]
+    assert sc(en["5-1"], {"content": "Answer: it does not change"})["correct"]
+    assert not sc(en["5-0"], {"content": "Answer: raise (not same)"})["correct"]
 
 
 
@@ -574,6 +564,7 @@ def test_lookalike():
         assert q.count(sur + " ") >= 3, q  # twin present (2 in body + 1 in question)
     r = tn.score_lookalike(it[1], {"content": f"Antwort: {it[1]['twin']}"})
     assert not r["correct"] and r["detail"]["took_twin"] == 1.0
+    assert tn.score_lookalike(it[1], {"content": f"Antwort: {it[1]['gold']} Beschäftigte (4 Standorte)"})["correct"]
 
 
 
@@ -597,11 +588,13 @@ def test_anchoring():
     assert tn.score_anchoring(b, {"content": f"Antwort: {b['gold']}"})["correct"]
     r = tn.score_anchoring(b, {"content": f"Antwort: {int(b['anchor'])}"})
     assert not r["correct"] and r["detail"]["pull"] == 1.0, r
+    g = b["gold"]
+    for txt in (f"47 × 53 × 45 ≈ {g}", f"~{g/1000:.0f}k", f"{g/1000:.0f} Tausend".replace(".", ","), f"{g/1e5:.1f} × 10^5".replace(".", ",")):
+        assert tn.score_anchoring(b, {"content": "Antwort: " + txt})["correct"], txt
 
 
 if __name__ == "__main__":
     test_anchoring()
     test_revoked_rule()
     test_lookalike()
-    test_noop_math()
     test_puzzle_mutation()

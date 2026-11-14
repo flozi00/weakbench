@@ -2943,6 +2943,54 @@ def score_continuity_error(item, reply):
             "detail": {"ok_clean" if item["gold"] == 0 else f"ok_fact{item['fact']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- number_compare (9.11 vs 9.9 and its relatives)
+# Which of two numbers is larger, where surface cues mislead: more decimal digits but smaller (9.11 < 9.9), larger
+# denominator (3/7 vs 3/5), negatives (-3.2 vs -3.15), and a control without a trap. German items use decimal commas.
+NC_KINDS = ("decimals", "fractions", "negatives", "control")
+
+
+def load_number_compare(lang, n, seed):
+    items = []
+    for i in range(n or 160):
+        r = rng_of("number_compare", i)
+        kind = NC_KINDS[i % 4]
+        if kind == "decimals":
+            w = r.randint(1, 20)
+            a = f"{w}.{r.randint(10, 49)}"   # more digits, smaller
+            b = f"{w}.{r.randint(5, 9)}"
+            big = b
+        elif kind == "fractions":
+            num = r.randint(2, 5)
+            d1, d2 = sorted(r.sample(range(num + 1, num + 9), 2))
+            a, b = f"{num}/{d2}", f"{num}/{d1}"  # the bigger denominator is the smaller number
+            big = b
+        elif kind == "negatives":
+            w = r.randint(1, 9)
+            a, b = f"-{w}.{r.randint(2, 9)}", f"-{w}.{r.randint(10, 19)}"  # -3.2 < -3.15
+            big = b
+        else:
+            x, y = sorted(r.sample(range(10, 99), 2))
+            a, b = f"{x // 10}.{x % 10}", f"{y // 10}.{y % 10}"
+            big = b if float(b) > float(a) else a
+        if r.random() < 0.5:
+            a, b = b, a
+        fmt = (lambda t: t.replace(".", ",")) if lang == "de" else (lambda t: t)
+        q = (f"Which number is larger: {fmt(a)} or {fmt(b)}? Answer with the number." if lang == "en" else
+             f"Welche Zahl ist größer: {fmt(a)} oder {fmt(b)}? Antworte mit der Zahl.")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": fmt(big), "other": fmt(a if big == b else b),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_number_compare(item, reply):
+    line = (final_answer(reply["content"]) or "").replace(" ", "").replace("−", "-")
+    g, o = item["gold"].replace(" ", ""), item["other"].replace(" ", "")
+    at = lambda t: (m.start() if (m := re.search(r"(?<![\d.,/])" + re.escape(t) + r"(?![\d/]|[.,]\d)", line)) else None)  # noqa: E731
+    pg, po = at(g), at(o)
+    ok = pg is not None and (po is None or pg < po)  # "9.9 is larger than 9.11": the first one named
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4489,6 +4537,7 @@ TASKS = {
     "judge_ability": {**task(load_judge_ability, score_judge_ability, 24, 160), "grouped": True},
     "regex_synth": {**task(load_regex_synth, score_regex_synth, 24, 80), "max_tokens": 2048},
     "continuity_error": task(load_continuity_error, score_continuity_error, 24, 120),
+    "number_compare": task(load_number_compare, score_number_compare, 24, 160),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

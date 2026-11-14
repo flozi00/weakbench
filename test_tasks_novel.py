@@ -946,7 +946,23 @@ def test_continuity_error():
         assert "{" not in x["messages"][0]["content"]
 
 
+
+def test_number_compare():
+    from fractions import Fraction
+    import tasks_novel as tn
+    for lang in ("en", "de"):
+        for x in tn.load_number_compare(lang, 40, 0):
+            val = lambda t: Fraction(t.replace(",", "."))  # noqa: E731
+            assert val(x["gold"]) > val(x["other"]), x
+            assert tn.score_number_compare(x, {"content": f"Answer: {x['gold']}"})["correct"]
+            assert not tn.score_number_compare(x, {"content": f"Answer: {x['other']}"})["correct"]
+    x = next(y for y in tn.load_number_compare("en", 8, 0) if y["kind"] == "negatives")
+    assert tn.score_number_compare(x, {"content": f"Answer: {x['gold']} is larger than {x['other']}"})["correct"]
+    assert not tn.score_number_compare(x, {"content": f"Answer: {x['other']}, not {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_number_compare()
     test_continuity_error()
     test_regex_synth()
     test_judge_ability()

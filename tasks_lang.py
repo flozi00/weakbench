@@ -2086,7 +2086,7 @@ def load_de_no_anglicisms(lang, n, seed):
         k = r.choice([80, 100, 120])
         items.append({"id": str(i), "lang": "de", "gold": None,
                       "messages": [{"role": "user", "content": f"Schreibe eine kurze interne Nachricht (etwa {k} Wörter) an "
-                                    f"dein Team über {topic}. Verwende ausschließlich deutsche Wörter, keine englischen "
+                                    f"deine Kolleginnen und Kollegen über {topic}. Verwende ausschließlich deutsche Wörter, keine englischen "
                                     "Lehnwörter wie Meeting, Deadline oder Feedback."}]})
     return items
 

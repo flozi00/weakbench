@@ -159,3 +159,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `de_compound_gender` | generated (mostly unattested) compounds of 2-3 nouns, the first part of another gender | de | 60 / 120 | off | der/die/das of the head; `ok_2parts` / `ok_3parts` |
 | `de_address` | generated: three English "you" sentences translated for a client (Sie) or a close friend (du) | de | 30 / 60 | off | right forms only, formal pronoun capitalised; `mixed` |
 | `mixed_input` | generated Denglisch chat messages with the facts split across both languages and a correction | de, en | 30 / 90 | off | final weekday + hour, decoy day rejected |
+| `counterfactual_world` | generated: a fictional world with one rule against reality (water freezes at 40 °C, adults at 25, 9-day weeks, light objects fall faster, sun rises in the west) | de, en | 25 / 200 | auto | yes/no by the stated rule; `ok_conflict` vs `ok_agree` |

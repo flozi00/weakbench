@@ -816,7 +816,19 @@ def test_ambiguous_ref():
         assert {x["ambiguous"] for x in it if x["variant"] in (1, 3)} == {True, False}
 
 
+
+def test_counterfactual_world():
+    import tasks_novel as tn
+    it = tn.load_counterfactual_world("en", 200, 0)
+    assert {x["conflict"] for x in it} == {True, False}
+    for k in range(5):
+        assert {x["gold"] for x in it if x["rule"] == k} == {"yes", "no"} or k == 3
+    x = next(x for x in it if x["rule"] == 0 and x["conflict"])
+    assert x["gold"] == "yes"  # e.g. 30 °C: frozen in Veloria
+
+
 if __name__ == "__main__":
+    test_counterfactual_world()
     test_ambiguous_ref()
     test_causal_graph()
     test_switched_question()

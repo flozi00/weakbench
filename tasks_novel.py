@@ -2277,6 +2277,62 @@ def score_ambiguous_ref(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:50], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- counterfactual_world (reason inside stated rules that contradict the real world)
+# A fictional world states one rule that differs from reality (water freezes at 40 °C there, adults are 25 ...). The
+# answer follows the stated rule; ok_conflict (rule and reality disagree: the trap) vs ok_agree (they agree: the
+# control, so 'always answer against reality' is no shortcut).
+CW_RULES = [  # (en rule, de rule, en q, de q, in-world truth fn(v), real truth fn(v), value range)
+    ("In Veloria, water freezes at 40 °C and boils at 180 °C.", "In Veloria gefriert Wasser bei 40 °C und kocht bei 180 °C.",
+     "A lake in Veloria is at {v} °C. Is its water frozen?", "Ein See in Veloria hat {v} °C. Ist sein Wasser gefroren?",
+     lambda v: v <= 40, lambda v: v <= 0, (-10, 60)),
+    ("In Veloria, people come of age at 25.", "In Veloria wird man mit 25 volljährig.",
+     "Mira lives in Veloria and is {v}. Is she of age?", "Mira lebt in Veloria und ist {v}. Ist sie volljährig?",
+     lambda v: v >= 25, lambda v: v >= 18, (14, 32)),
+    ("In Veloria, a week has 9 days.", "In Veloria hat eine Woche 9 Tage.",
+     "In Veloria, is a stay of {v} days longer than two weeks?", "Ist in Veloria ein Aufenthalt von {v} Tagen länger als zwei Wochen?",
+     lambda v: v > 18, lambda v: v > 14, (10, 24)),
+    ("In Veloria, heavier objects fall more slowly than light ones.", "In Veloria fallen schwere Gegenstände langsamer als leichte.",
+     "In Veloria, a {v} kg stone and a 1 kg ball are dropped together from a tower. Does the ball land first?",
+     "In Veloria werden ein {v}-kg-Stein und ein 1-kg-Ball gleichzeitig von einem Turm fallen gelassen. Landet der Ball zuerst?",
+     lambda v: True, lambda v: False, (5, 50)),
+    ("In Veloria, the sun rises in the west.", "In Veloria geht die Sonne im Westen auf.",
+     "In Veloria, a house faces the {v} side. Does it get the morning sun?",
+     "In Veloria zeigt ein Haus zur {v}seite. Bekommt es die Morgensonne?",
+     None, None, None),
+]
+
+
+def load_counterfactual_world(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("counterfactual_world", i)
+        k = i % len(CW_RULES)
+        en_r, de_r, en_q, de_q, world, real, rng = CW_RULES[k]
+        if rng is None:  # the sun rule: east vs west
+            side_en, side_de = r.choice([("east", "Ost"), ("west", "West")])
+            ans = side_en == "west"
+            q = (en_q if lang == "en" else de_q).format(v=side_en if lang == "en" else side_de)
+            conflict = True
+        else:
+            v = r.randint(*rng)
+            ans = world(v)
+            conflict = world(v) != real(v)
+            q = (en_q if lang == "en" else de_q).format(v=v)
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        items.append({"id": str(i), "lang": lang, "rule": k, "conflict": conflict, "gold": yes if ans else no,
+                      "messages": [{"role": "user", "content": (en_r if lang == "en" else de_r) + " " + q
+                                    + ("\nAnswer yes or no." if lang == "en" else "\nAntworte mit ja oder nein.")
+                                    + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_counterfactual_world(item, reply):
+    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
+    ok = yn[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"],
+            "detail": {f"ok_rule{item['rule']}": float(ok), "ok_conflict" if item["conflict"] else "ok_agree": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3814,6 +3870,7 @@ TASKS = {
     "switched_question": task(load_switched_question, score_switched_question, 24, 200),
     "causal_graph": task(load_causal_graph, score_causal_graph, 24, 200),
     "ambiguous_ref": task(load_ambiguous_ref, score_ambiguous_ref, 24, 200),
+    "counterfactual_world": task(load_counterfactual_world, score_counterfactual_world, 25, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -2071,7 +2071,7 @@ def score_form_writing(item, reply):
 # A workplace text where English terms are the habit (Meeting, Deadline, Feedback, Release, Bug ...). The instruction
 # asks for German words only; scored on a list of common anglicisms (inflected and in compounds) and the language.
 NA_WORDS = ["meeting", "deadline", "feedback", "team", "update", "call", "workshop", "download", "tool", "feature",
-            "release", "bug", "deployment", "manager", "briefing", "email", "e-mail", "homeoffice", "office", "kickoff",
+            "release", "bug", "deployment", "manager", "briefing", "homeoffice", "office", "kickoff",
             "kick-off", "slot", "slides", "onboarding", "teamlead", "workflow", "know-how", "event", "job", "ticket"]
 NA_TOPICS = ["die Planung der nächsten Softwareversion", "ein Projekttreffen mit Rückmeldungen zum Zwischenstand",
              "die Einarbeitung einer neuen Kollegin", "einen Fehler in der Kundensoftware und den Zeitplan zur Behebung",

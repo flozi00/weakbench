@@ -671,7 +671,11 @@ def test_rephrase_consistency():
     rec = lambda i, ok: {"id": i, "error": None, "correct": ok}
     g = quality.group_consistency([rec("0-0", True), rec("0-1", True), rec("0-2", True),
                                    rec("1-0", True), rec("1-1", False), rec("1-2", True)])
-    assert g == {"group_agree": 0.5, "group_all": 0.5}, g
+    assert g == {"group_agree": 0.5, "group_all": 0.5, "group_all_of_any": 0.5}, g
+    w = it[2]
+    other = w["y"] if w["gold"] == w["x"] else w["x"]
+    assert sc(w, {"content": f"Antwort: {other} ist jünger, also {w['gold']}"})["correct"]
+    assert sc(w, {"content": f"Antwort: {w['gold']} ist älter als {other}"})["correct"]
 
 
 
@@ -684,6 +688,8 @@ def test_reversal():
     assert tn.score_reversal(b, {"content": f"Antwort: Die Mentorin von {b['gold']}"})["correct"]
     assert tn.score_reversal(b, {"content": f"Antwort: {b['gold']}"})["correct"]
     assert not tn.score_reversal(b, {"content": f"Antwort: {a['gold']}"})["correct"]
+    assert tn.score_reversal(b, {"content": f"Answer: {a['gold']} is the mentor of {b['gold']}"})["correct"]
+    assert tn.score_reversal(a, {"content": f"Answer: The mentor of {b['gold']} is {a['gold']}"})["correct"]
 
 
 
@@ -704,6 +710,7 @@ def test_mixed_units():
         assert a["gold"] == b["gold"] and not a["trap"] and b["trap"]
     b = it[3]
     assert tn.score_mixed_units(b, {"content": "Antwort: " + tn.fmt_num(b["gold"], "de") + " Stunden"})["correct"]
+    assert tn.score_mixed_units(it[2], {"content": "Antwort: 4 h 15 min"})["correct"] == (it[2]["gold"] == 4.25)
     r = tn.score_mixed_units(b, {"content": "Antwort: " + tn.fmt_num(b["naive"], "de")})
     assert not r["correct"] and r["detail"]["naive_sum"] == 1.0
 

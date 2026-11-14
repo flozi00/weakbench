@@ -1183,11 +1183,17 @@ def group_consistency(rs):
     groups = collections.defaultdict(list)
     for r in rs:
         groups[str(r["id"]).rsplit("-", 1)[0]].append(r)
-    full = [g for g in groups.values() if len(g) > 1 and all(not r["error"] and isinstance(r["correct"], bool) for r in g)]
+    size = max((len(g) for g in groups.values()), default=0)  # a group cut by --limit is incomplete
+    full = [g for g in groups.values() if size > 1 and len(g) == size
+            and all(not r["error"] and isinstance(r["correct"], bool) for r in g)]
     if not full:
         return {}
-    return {"group_agree": round(statistics.fmean(len({r["correct"] for r in g}) == 1 for g in full), 4),
-            "group_all": round(statistics.fmean(all(r["correct"] for r in g) for g in full), 4)}
+    out = {"group_agree": round(statistics.fmean(len({r["correct"] for r in g}) == 1 for g in full), 4),
+           "group_all": round(statistics.fmean(all(r["correct"] for r in g) for g in full), 4)}
+    any_ok = [g for g in full if any(r["correct"] for r in g)]
+    if any_ok:  # always wrong is consistent too: of the groups known at all, how many fully
+        out["group_all_of_any"] = round(statistics.fmean(all(r["correct"] for r in g) for g in any_ok), 4)
+    return out
 
 
 def cross_lingual(cells, task_name):

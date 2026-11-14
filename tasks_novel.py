@@ -1716,7 +1716,7 @@ def load_rephrase_consistency(lang, n, seed):
         gold = (("yes" if lang == "en" else "ja") if x_older else ("no" if lang == "en" else "nein")) if f != "who" \
             else (x if x_older else y)
         q = " ".join(facts) + "\n" + RC_TEXT[lang][f].format(x=x, y=y)
-        items.append({"id": f"{g}-{form}", "lang": lang, "form": f, "gold": gold,
+        items.append({"id": f"{g}-{form}", "lang": lang, "form": f, "gold": gold, "x": x, "y": y,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
@@ -1726,8 +1726,11 @@ def score_rephrase_consistency(item, reply):
     words = re.findall(r"[a-zäöüß]+", line)
     gold = item["gold"].lower()
     if item["form"] == "who":
-        names = [w for w in words if w.capitalize() in NAMES]
-        ok = names[:1] == [gold]
+        pair = {item["x"].lower(), item["y"].lower()}
+        names = [w for w in words if w in pair]
+        older = re.search(r"([a-zäöüß]+)\s+(is|ist)\s+(the\s+)?(older|älter)", line)
+        pick = older.group(1) if older and older.group(1) in pair else (names[-1] if names else None)
+        ok = pick == gold
     else:
         yn = [w for w in words if w in ("yes", "no", "ja", "nein")]
         ok = yn[:1] == [gold]
@@ -1748,25 +1751,25 @@ def load_reversal(lang, n, seed):
         r = rng_of("reversal", i // 2)
         back = i % 2 == 1
         names = []
-        while len(names) < 12:
-            w = ch_word(r, 2, 3).capitalize()
-            if w not in names:
+        while len(names) < 12:  # 3 syllables: fewer real words; no name a prefix of another
+            w = ch_word(r, 3, 3).capitalize()
+            if not any(w.startswith(o) or o.startswith(w) for o in names):
                 names.append(w)
         pairs = list(zip(names[:6], names[6:]))  # every person appears once: no chains
         k = r.randrange(6)
         fact, fwd, bwd = RV2_TEXT[lang]
         a, b = pairs[k]
         q = "\n".join(fact.format(a=x, b=y) for x, y in pairs) + "\n" + (bwd.format(b=b) if back else fwd.format(a=a))
-        items.append({"id": str(i), "lang": lang, "backward": back, "gold": a if back else b,
+        items.append({"id": str(i), "lang": lang, "backward": back, "gold": a if back else b, "names": names,
+                      "asked": b if back else a,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_reversal(item, reply):
     line = final_answer(reply["content"]) or ""
-    names = re.findall(r"[A-ZÄÖÜ][a-zäöüß]+", line)
-    cand = [w for w in names if w.lower() not in ("die", "der", "the", "mentor", "mentorin", "antwort", "answer")]
-    ok = cand[:1] == [item["gold"]]
+    said = {w for w in re.findall(r"[A-Za-zäöüß]+", line) if w in item["names"]} - {item["asked"]}
+    ok = said == {item["gold"]}
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
             "detail": {"ok_backward" if item["backward"] else "ok_forward": float(ok)}}
 
@@ -1825,7 +1828,7 @@ def score_off_by_one(item, reply):
 
 # ---------------------------------------------------------------- mixed_units (trap: one value in another unit)
 # Three lengths / durations / masses to add, asked in the main unit; trap items state one of them in the smaller
-# or larger unit, control items state all in the main unit (same quantities). naive = the plain sum of the numbers.
+# unit, control items state all in the main unit (same quantities). naive = the plain sum of the numbers.
 MU_KINDS = {
     "len": {"en": ("board", "m", "cm", 100, "How long are the three boards together, in metres?"),
             "de": ("Brett", "m", "cm", 100, "Wie lang sind die drei Bretter zusammen, in Metern?")},
@@ -1866,7 +1869,9 @@ def fmt_num(x, lang):  # 1.5 -> '1,5' in German
 
 
 def score_mixed_units(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    line = final_answer(reply["content"]) or ""
+    hm = re.search(r"(\d+)\s*(h|std\.?|stunden?|hours?)\s*(und|and)?\s*(\d+)\s*min", line, re.I)
+    v = int(hm.group(1)) + int(hm.group(4)) / 60 if hm else answer_value(line, item["lang"])
     ok = v is not None and abs(v - item["gold"]) < 1e-6
     d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
     if item["trap"]:
@@ -1881,10 +1886,10 @@ def score_mixed_units(item, reply):
 DN_TEXT = {
     "en": {"base": [("{x} is on the team", "{x} is on the team"), ("{x} is not on the team", "{x} is not on the team")],
            "wrap": [("It is not true that {c}", "it is not true that {c}"), ("It is false that {c}", "it is false that {c}")],
-           "q": ["Is {x} on the team? Answer yes or no.", "Is {x} not on the team? Answer yes or no."]},
+           "q": ["Is {x} on the team? Answer yes or no.", "Is it true that {x} is not on the team? Answer yes or no."]},
     "de": {"base": [("{x} ist im Team", "{x} im Team ist"), ("{x} ist nicht im Team", "{x} nicht im Team ist")],
            "wrap": [("Es stimmt nicht, dass {c}", "es nicht stimmt, dass {c}"), ("Es ist falsch, dass {c}", "es falsch ist, dass {c}")],
-           "q": ["Ist {x} im Team? Antworte mit ja oder nein.", "Ist {x} nicht im Team? Antworte mit ja oder nein."]},
+           "q": ["Ist {x} im Team? Antworte mit ja oder nein.", "Stimmt es, dass {x} nicht im Team ist? Antworte mit ja oder nein."]},
 }
 
 

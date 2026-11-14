@@ -3196,6 +3196,58 @@ def score_knapsack(item, reply):
             "detail": {"ok_trap" if item["greedy_trap"] else "ok_plain": float(ok), "over_budget": float(cost > item["budget"])}}
 
 
+# ---------------------------------------------------------------- cipher (infer a simple code from examples, then apply it)
+# Two or three encoded examples of a hidden rule (Caesar shift, reversal + shift, swapping letter pairs, vowel
+# rotation), then a new word to encode or a code word to decode. The rule is never named.
+CI_WORDS = {"en": ["garden", "window", "silver", "planet", "rocket", "pencil", "basket", "candle", "forest", "bridge"],
+            "de": ["garten", "fenster", "silber", "planet", "rakete", "kerze", "korb", "wolke", "bruecke", "wald"]}
+
+
+def ci_rule(r):
+    kind = r.choice(["shift", "revshift", "pairs", "vowels"])
+    k = r.randint(1, 5)
+    def shift(w, d):
+        return "".join(chr((ord(c) - 97 + d) % 26 + 97) for c in w)
+    if kind == "shift":
+        return kind, (lambda w: shift(w, k)), (lambda w: shift(w, -k))
+    if kind == "revshift":
+        return kind, (lambda w: shift(w[::-1], k)), (lambda w: shift(w, -k)[::-1])
+    if kind == "pairs":
+        sw = lambda w: "".join(w[i + 1] + w[i] for i in range(0, len(w) - 1, 2)) + (w[-1] if len(w) % 2 else "")  # noqa: E731
+        return kind, sw, sw
+    vow = "aeiou"
+    rot = lambda w, d: "".join(vow[(vow.index(c) + d) % 5] if c in vow else c for c in w)  # noqa: E731
+    return kind, (lambda w: rot(w, 1)), (lambda w: rot(w, -1))
+
+
+def load_cipher(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("cipher", i)
+        kind, enc, dec = ci_rule(r)
+        words = r.sample(CI_WORDS[lang], 4)
+        ex = "\n".join(f"{w} -> {enc(w)}" for w in words[:2 + i % 2])
+        target = words[3]
+        decode = (i // 2) % 2 == 1
+        if decode:
+            q, gold = (f"A code turns words into code words:\n{ex}\nWhich word becomes {enc(target)}?" if lang == "en" else
+                       f"Ein Code macht aus Wörtern Codewörter:\n{ex}\nWelches Wort wird zu {enc(target)}?"), target
+        else:
+            q, gold = (f"A code turns words into code words:\n{ex}\nWhat is the code word for {target}?" if lang == "en" else
+                       f"Ein Code macht aus Wörtern Codewörter:\n{ex}\nWie lautet das Codewort für {target}?"), enc(target)
+        assert dec(enc(target)) == target
+        items.append({"id": str(i), "lang": lang, "kind": kind, "decode": decode, "gold": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cipher(item, reply):
+    words = re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower())
+    ok = item["gold"] in words[-2:] if words else False
+    return {"correct": ok, "score": float(ok), "pred": " ".join(words[-2:]), "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "ok_decode" if item["decode"] else "ok_encode": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4746,6 +4798,7 @@ TASKS = {
     "unit_chain": task(load_unit_chain, score_unit_chain, 24, 150),
     "fake_entity": {**task(load_fake_entity, score_fake_entity, 24, 120), "think": False, "max_tokens": 512},
     "knapsack": task(load_knapsack, score_knapsack, 24, 120),
+    "cipher": task(load_cipher, score_cipher, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

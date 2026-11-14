@@ -1017,7 +1017,17 @@ def test_knapsack():
             assert tn.score_knapsack(x, {"content": f"Answer: {ans} (not the {rest[0]})"})["correct"]
 
 
+
+def test_cipher():
+    import tasks_novel as tn
+    it = tn.load_cipher("de", 40, 0)
+    assert {x["kind"] for x in it} == {"shift", "revshift", "pairs", "vowels"} and {x["decode"] for x in it} == {True, False}
+    for x in it:
+        assert tn.score_cipher(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_cipher()
     test_knapsack()
     test_fake_entity()
     test_unit_chain()

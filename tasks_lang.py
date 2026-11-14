@@ -2409,7 +2409,9 @@ def load_en_reported(lang, n, seed):
 def score_en_reported(item, reply):
     text = re.sub(r"[\"“”][^\"“”]*[\"“”]", " ", reply["content"] or "").lower().replace("’", "'")  # drop a copied quote
     after = text.split("said", 1)[-1]
-    ok = bool(re.search(r"\b(" + item["gold"] + r")\b", after)) and not re.search(r"\bi (am|will|can|have)\b", after)
+    after = re.sub(r"'d\s+(come)\b", r" would \1", after)  # she'd come = she would come
+    after = re.sub(r"'d\s+(been|finished)\b", r" had \1", after)  # she'd been = she had been
+    ok = bool(re.search(r"\b(" + item["gold"] + r")\b", after)) and not re.search(r"\bi\b|\bi'", after)  # no "I" left
     return {"correct": ok, "score": float(ok), "pred": after[:60], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
 
 

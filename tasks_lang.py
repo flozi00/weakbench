@@ -1499,6 +1499,64 @@ def score_glossary_mt(item, reply):
             "detail": {"terms_used": sum(used) / len(used), "forbidden_used": float(bool(bad))}}
 
 
+# ---------------------------------------------------------------- de_separable (trennbare Verben: main clause, subordinate clause, perfect)
+# An infinitive and a sentence with gaps; the model writes the sentence. Main clause: prefix to the end ("ruft ... an");
+# subordinate clause: joined, verb-final ("dass sie ... anruft"); perfect: ge- inside ("angerufen"); zu-infinitive:
+# zu inside ("anzurufen"). Scored on the verb pieces in the right slots.
+SV_VERBS = [  # infinitive, prefix, 3sg stem form, participle
+    ("anrufen", "an", "ruft", "angerufen"), ("einkaufen", "ein", "kauft", "eingekauft"),
+    ("aufräumen", "auf", "räumt", "aufgeräumt"), ("abholen", "ab", "holt", "abgeholt"),
+    ("mitbringen", "mit", "bringt", "mitgebracht"), ("vorbereiten", "vor", "bereitet", "vorbereitet"),
+    ("zurückgeben", "zurück", "gibt", "zurückgegeben"), ("ausschalten", "aus", "schaltet", "ausgeschaltet"),
+]
+SV_OBJ = {"anrufen": "die Großmutter", "einkaufen": "für das Wochenende", "aufräumen": "die Küche",
+          "abholen": "die Kinder", "mitbringen": "einen Kuchen", "vorbereiten": "die Präsentation",
+          "zurückgeben": "das Buch", "ausschalten": "das Licht"}
+SV_FORMS = ("main", "sub", "perfect", "zu")
+
+
+def sv_mid(subj):  # "Mein Bruder" -> "mein Bruder" inside a sentence
+    return subj[0].lower() + subj[1:] if subj.split()[0] in ("Mein", "Die") else subj
+
+
+def sv_gold(verb, form, subj):
+    inf, pre, fin, part = verb
+    o = SV_OBJ[inf]
+    if form == "main":
+        return f"{subj} {fin} heute {o} {pre}."
+    if form == "sub":
+        return f"Ich glaube, dass {sv_mid(subj)} heute {o} {pre}{fin}."
+    if form == "perfect":
+        return f"{subj} hat gestern {o} {part}."
+    return f"{subj} hat vergessen, {o} {pre}zu{inf[len(pre):]}."
+
+
+SV_FRAME = {"main": "{s} ___ heute {o} ___.", "sub": "Ich glaube, dass {s} heute {o} ___.",
+            "perfect": "{s} hat gestern {o} ___.", "zu": "{s} hat vergessen, {o} ___."}
+
+
+def load_de_separable(lang, n, seed):
+    items = []
+    for i in range(n or len(SV_VERBS) * len(SV_FORMS)):
+        r = random.Random(f"de_separable:{i}")
+        verb = SV_VERBS[(i // len(SV_FORMS)) % len(SV_VERBS)]
+        form = SV_FORMS[i % len(SV_FORMS)]
+        subj = r.choice(["Anna", "Mein Bruder", "Die Nachbarin", "Herr Yilmaz"])
+        frame = SV_FRAME[form].format(s=sv_mid(subj) if form == "sub" else subj, o=SV_OBJ[verb[0]])
+        items.append({"id": str(i), "lang": "de", "form": form, "gold": sv_gold(verb, form, subj),
+                      "messages": [{"role": "user", "content": f"Setze das Verb „{verb[0]}“ in der richtigen Form in die "
+                                    "Lücken ein und schreibe den ganzen Satz. Antworte nur mit dem Satz.\n\n" + frame}]})
+    return items
+
+
+def score_de_separable(item, reply):
+    lines = [x.strip().strip("„“\"*") for x in (reply["content"] or "").splitlines() if x.strip()]
+    norm = lambda t: re.findall(r"[a-zäöüß]+", t.lower())  # noqa: E731
+    ok = any(norm(x) == norm(item["gold"]) for x in lines)
+    return {"correct": ok, "score": float(ok), "pred": (lines[-1] if lines else "")[:80], "gold": item["gold"],
+            "detail": {f"ok_{item['form']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1534,6 +1592,7 @@ TASKS = {
     "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 24, lang_check=False),
     "en_homophones": task(("en",), load_en_homophones, score_en_homophones, 32, 40, lang_check=False),
     "glossary_mt": task(("de", "en"), load_glossary_mt, score_glossary_mt, 256, 12),
+    "de_separable": task(("de",), load_de_separable, score_de_separable, 128, 32, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

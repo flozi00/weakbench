@@ -430,7 +430,18 @@ def test_glossary_mt():
     assert not _re.search(tl.gl_form("issue"), "the issued bill") and _re.search(tl.gl_form("bill"), "two bills")
 
 
+def test_de_separable():
+    import tasks_lang as tl
+    it = tl.load_de_separable("de", None, 0)
+    assert len(it) == 32 and "dass Mein" not in " ".join(x["gold"] for x in it)
+    for x in it:
+        assert tl.score_de_separable(x, {"content": "„" + x["gold"] + "“"})["correct"]
+    m = next(x for x in it if x["form"] == "main")
+    assert not tl.score_de_separable(m, {"content": m["gold"].replace(" an.", ".").replace(" ruft ", " anruft ")})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_separable()
     test_glossary_mt()
     test_en_homophones()
     test_de_reported()

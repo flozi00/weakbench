@@ -4271,10 +4271,12 @@ def load_table_join(lang, n, seed):
 
 def score_table_join(item, reply):
     line = final_answer(reply["content"]) or ""
-    if item["kind"] == "max":
-        named = [c for c in TJ_CITIES if re.search(r"\b" + c + r"\b", line)]
-        ok = named[:1] == [item["gold"]]
+    if item["kind"] == "max":  # the city named first in the reply ("Basel, nicht Kiel")
+        hits = [(m.start(), c) for c in TJ_CITIES if (m := re.search(r"\b" + c + r"\b", line))]
+        ok = bool(hits) and min(hits)[1] == item["gold"]
     else:
+        line = re.sub(r"\b(keine?r?|niemand|none|no one|nobody)\b", "0", line, flags=re.I)
+        line = re.sub(r"(\d+)\s*(?:k|tsd\.?|tausend)\b", lambda m: str(int(m.group(1)) * 1000), line, flags=re.I)
         v = answer_value(re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", line), item["lang"])
         ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": line[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}

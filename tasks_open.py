@@ -1133,7 +1133,11 @@ TM_CASES = {
                 "de": "Schreibe eine kurze Antwort an deine Freundin {name} und sage die Einladung zur Hochzeit am {day} ab, "
                       "weil du dann im Ausland bist. Höchstens {k} Wörter."}}
 TM_NAMES = ["Hanna", "Sofia", "Leonie", "Amira", "Clara", "Ida"]
-TM_DAYS = {"en": ["Saturday", "the 14th", "Friday", "the 22nd"], "de": ["Samstag", "14.", "Freitag", "22."]}
+TM_DAYS = {"en": ["Saturday", "March 14", "Friday", "June 22"], "de": ["Samstag", "14. März", "Freitag", "22. Juni"]}
+TM_STEM = {"Projektleiterin": "projektleit", "Buchhalterin": "buchhalt", "Grafikerin": "grafik",
+           "project manager": "project manag", "accountant": "account", "designer": "design"}
+TM_NUM = {2: ("zwei", "two"), 3: ("drei", "three"), 4: ("vier", "four"), 5: ("fünf", "five"), 6: ("sechs", "six"),
+          7: ("sieben", "seven"), 8: ("acht", "eight"), 9: ("neun", "nine")}
 TM_JUDGE = """Evaluate a short message written for this situation:
 {task}
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
@@ -1145,7 +1149,8 @@ CRITERIA:
 1. The tone fits the situation and the relationship (warm where personal, polite and clear where professional).
 2. It is honest: no false promise or invented reason.
 3. It is not a pile of stock phrases; it says something specific.
-4. It does not shift blame onto the recipient (or, for the apology, does not hide behind excuses)."""
+4. It takes responsibility where appropriate and does not blame the recipient.
+5. It contains every piece of content the task asks for (e.g. the offer, the reason, the help)."""
 
 
 def load_tactful_message(lang, n, seed):
@@ -1161,9 +1166,14 @@ def load_tactful_message(lang, n, seed):
              "skill": r.choice(["Python", "SAP", "Personalführung"] if lang == "de" else ["Python", "SAP", "team leadership"]),
              "num": r.randint(10000, 99999), "d": r.randint(2, 9)}
         task_text = TM_CASES[kind][lang].format(**v)
-        day = v["day"].rstrip(".").replace("the ", "")  # "14th" / "14" / "Samstag"
-        facts = {"condolence": [name, day], "rejection": [name, v["role"]],
-                 "apology": [name, str(v["num"]), str(v["d"])], "decline": [name, day]}[kind]
+        dm = re.search(r"\d+", v["day"])
+        day = dm.group() if dm else v["day"]  # "14" from "14. März" / "March 14", else the weekday
+        # facts as regexes: whole-word name (also possessive), the day number or weekday, a role stem, the delay
+        fd = r"\b" + re.escape(day) + r"\b"
+        fname = r"\b" + re.escape(name) + r"s?\b"
+        fdays = r"\b(" + str(v["d"]) + "|" + "|".join(TM_NUM[v["d"]]) + r")\b"
+        facts = {"condolence": [fname, fd], "rejection": [fname, TM_STEM[v["role"]]],
+                 "apology": [fname, r"\b" + str(v["num"]) + r"\b", fdays], "decline": [fname, fd]}[kind]
         items.append({"id": str(i), "lang": lang, "kind": kind, "facts": facts, "limit": v["k"],
                       "messages": [{"role": "user", "content": task_text}]})
     return items
@@ -1173,11 +1183,11 @@ def score_tactful_message(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     words = len([w for w in text.split() if re.search(r"\w", w)])
-    facts_ok = all(f.lower() in text.lower() for f in item["facts"]) and words <= item["limit"]
+    facts_ok = all(re.search(f, text, re.I) for f in item["facts"]) and words <= item["limit"]
     out = tasks_judge.judge("", TM_JUDGE.format(task=item["messages"][0]["content"], reply=text or "(empty)"), max_tokens=96)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")
-    if not isinstance(v, list) or len(v) != 4:
+    if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable tactful verdict {out[:120]!r}")
     met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [facts_ok]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,

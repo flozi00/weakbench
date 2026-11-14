@@ -362,13 +362,17 @@ def test_howto_steps():
 
 
 def test_tactful_message():
-    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 4}), "finish_reason": "stop"})
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 5}), "finish_reason": "stop"})
     try:
         tasks_judge.configure(url, "mock", 32768)
         it = to.load_tactful_message("de", 4, 0)
         assert [x["kind"] for x in it] == ["condolence", "rejection", "apology", "decline"]
         ap = it[2]
-        good = f"Liebe {ap['facts'][0]}, Ihre Bestellung {ap['facts'][1]} kommt leider {ap['facts'][2]} Tage später."
+        import re as _re
+        name = _re.sub(r"[^A-Za-z]", "", ap["facts"][0].replace("\\b", "").replace("s?", ""))
+        num = _re.search(r"\d+", ap["facts"][1]).group()
+        d = _re.search(r"\d", ap["facts"][2]).group()
+        good = f"Liebe {name}, Ihre Bestellung {num} kommt leider {d} Tage später."
         assert to.score_tactful_message(ap, {"content": good})["detail"]["facts_ok"] == 1.0
         assert to.score_tactful_message(ap, {"content": "Entschuldigung."})["detail"]["facts_ok"] == 0.0
     finally:

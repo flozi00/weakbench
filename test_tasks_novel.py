@@ -1260,6 +1260,9 @@ def test_table_join():
         g = x["gold"]
         txt = f"{g:,}".replace(",", ".") if isinstance(g, int) and g >= 1000 else str(g)
         assert tn.score_table_join(x, {"content": f"Antwort: {txt}"})["correct"], (x["kind"], txt)
+        if x["kind"] == "max":
+            other = next(c for c in tn.TJ_CITIES if c != g)
+            assert tn.score_table_join(x, {"content": f"Antwort: {g}, nicht {other}"})["correct"]
 
 
 if __name__ == "__main__":

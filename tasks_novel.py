@@ -3816,6 +3816,57 @@ def score_base_rate(item, reply):
                        "naive": float(v is not None and abs(v - item["naive"]) <= 1.0)}}
 
 
+# ---------------------------------------------------------------- simpson (per-group vs overall: Simpson's paradox)
+# Success counts of treatments A and B in two hospitals. Half the items are built so that A wins in both hospitals
+# but B wins overall (Simpson's paradox), half have no reversal. The question asks either "which is better in each
+# hospital" or "which has the higher overall success rate". Exact letter.
+
+
+def sp_draw(r, paradox):
+    while True:
+        # (successes, patients) for A and B in hospital 1 (easy cases) and 2 (hard cases)
+        a1n, b1n = r.randint(10, 40), r.randint(60, 200)
+        a2n, b2n = r.randint(60, 200), r.randint(10, 40)
+        a1, b1 = round(a1n * r.uniform(.8, .97)), round(b1n * r.uniform(.6, .9))
+        a2, b2 = round(a2n * r.uniform(.3, .6)), round(b2n * r.uniform(.1, .45))
+        within = a1 / a1n > b1 / b1n and a2 / a2n > b2 / b2n
+        overall_a = (a1 + a2) / (a1n + a2n) > (b1 + b2) / (b1n + b2n)
+        if within and (not overall_a) == paradox and abs((a1 + a2) / (a1n + a2n) - (b1 + b2) / (b1n + b2n)) > .02:
+            return (a1, a1n, b1, b1n, a2, a2n, b2, b2n), "A", ("A" if overall_a else "B")
+
+
+def load_simpson(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("simpson", i)
+        paradox = (i // 2) % 2 == 0
+        (a1, a1n, b1, b1n, a2, a2n, b2, b2n), within, overall = sp_draw(r, paradox)
+        ask_overall = i % 2 == 1
+        if lang == "en":
+            t = (f"Hospital 1: treatment A helped {a1} of {a1n} patients, treatment B helped {b1} of {b1n}. "
+                 f"Hospital 2: A helped {a2} of {a2n}, B helped {b2} of {b2n}. ")
+            q = ("Counting all patients together, which treatment has the higher success rate? Answer A or B." if ask_overall
+                 else "Which treatment has the higher success rate within each hospital? Answer A or B.")
+        else:
+            t = (f"Klinik 1: Behandlung A half {a1} von {a1n} Patienten, Behandlung B half {b1} von {b1n}. "
+                 f"Klinik 2: A half {a2} von {a2n}, B half {b2} von {b2n}. ")
+            q = ("Welche Behandlung hat über alle Patienten zusammen die höhere Erfolgsquote? Antworte mit A oder B."
+                 if ask_overall else "Welche Behandlung hat innerhalb jeder Klinik die höhere Erfolgsquote? Antworte mit A oder B.")
+        items.append({"id": str(i), "lang": lang, "gold": overall if ask_overall else within, "paradox": paradox,
+                      "ask": "overall" if ask_overall else "within",
+                      "messages": [{"role": "user", "content": t + q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_simpson(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*([AB])\b", line) or re.search(r"\b(?:treatment|behandlung)\s+([AB])\b", line, re.I)
+    pred = m.group(1).upper() if m else None
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
+            "detail": {f"ok_{item['ask']}": float(ok), "ok_paradox" if item["paradox"] else "ok_control": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5377,6 +5428,7 @@ TASKS = {
     "percent_traps": task(load_percent_traps, score_percent_traps, 24, 120),
     "clock_angle": task(load_clock_angle, score_clock_angle, 24, 120),
     "base_rate": task(load_base_rate, score_base_rate, 24, 120),
+    "simpson": task(load_simpson, score_simpson, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

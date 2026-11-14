@@ -1160,7 +1160,19 @@ def test_base_rate():
     assert tn.score_base_rate(dict(it[0], gold=8.3), {"content": "Answer: 1/12"})["correct"]
 
 
+
+def test_simpson():
+    import tasks_novel as tn
+    it = tn.load_simpson("de", 16, 0)
+    assert {(x["paradox"], x["ask"]) for x in it} == {(p, a) for p in (True, False) for a in ("within", "overall")}
+    for x in it:
+        if x["paradox"] and x["ask"] == "overall":
+            assert x["gold"] == "B"
+        assert tn.score_simpson(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_simpson()
     test_base_rate()
     test_clock_angle()
     test_percent_traps()

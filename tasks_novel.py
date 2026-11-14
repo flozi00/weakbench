@@ -2162,9 +2162,12 @@ def load_causal_graph(lang, n, seed):
             a, b = sorted(r.sample(range(6), 2))  # a < b: acyclic
             edges.add((a, b))
         edges = sorted(edges)
-        kind = ("any", "fix")[i % 2]
-        want = (i // 2) % 2 == 0  # balanced yes / no
-        pairs = [(x, y) for x in range(6) for y in range(6) if x != y]
+        k = len(items)  # kind and answer follow the items made, so skipped draws keep the balance
+        kind = ("any", "fix")[k % 2]
+        want = (k // 2) % 2 == 0  # balanced yes / no
+        used = {v for e in edges for v in e}
+        # never a direct edge X -> Y: "yes if there is a direct link" must not be a shortcut
+        pairs = [(x, y) for x in used for y in used if x != y and (x, y) not in edges]
         r.shuffle(pairs)
         pick = None
         for x, y in pairs:
@@ -2181,6 +2184,7 @@ def load_causal_graph(lang, n, seed):
         if pick is None:
             continue
         x, y, z = pick
+        assert (x, y) not in edges
         T = CG_TEXT[lang]
         lines = [T["edge"].format(a=names[a], b=names[b]) for a, b in edges]
         # a confounded pair without a causal path between them
@@ -2212,10 +2216,15 @@ AR_PLACE = {"en": ["on the shelf", "on the desk", "by the window", "under the be
             "de": ["im Regal", "auf dem Schreibtisch", "am Fenster", "unter dem Bett", "im Flur", "auf dem Sofa", "in der Küche"]}
 AR_TEXT = {"en": ("There is a {c} {k} {p}.", "Where is the {d}? If the description fits more than one object, answer "
                   "\"ambiguous\"."),
-           "de": ("{p_cap} steht ein{e} {c}{end} {k}.", "Wo steht {art} {d}? Wenn die Beschreibung auf mehr als einen "
-                  "Gegenstand passt, antworte \"mehrdeutig\".")}
+           "de": ("{p_cap} befindet sich ein{e} {c}{end} {k}.", "Wo ist {art} {d}? Wenn die Beschreibung auf mehr als "
+                  "einen Gegenstand passt, antworte \"mehrdeutig\".")}
 AR_GENDER = {"Tasse": "f", "Buch": "n", "Lampe": "f", "Tasche": "f", "Pflanze": "f"}
-AR_ABSTAIN = re.compile(r"ambiguous|unclear|more than one|mehrdeutig|unklar|mehr als ein|nicht eindeutig", re.I)
+AR_ABSTAIN = re.compile(r"ambiguous|unclear|more than one|\btwo\b|\bboth\b|which one|mehrdeutig|unklar|mehr als ein|"
+                        r"nicht eindeutig|\bzwei\b|\bbeide|welche[nrs]?\b", re.I)
+AR_NOT_ABSTAIN = re.compile(r"not ambiguous|nicht mehrdeutig|eindeutig", re.I)
+# variants: 0 bare kind, two of it (ambiguous) / 1 colour + kind, two of it in other colours (unique) /
+#           2 bare kind, only one of it (unique) / 3 colour + kind, two identical (ambiguous)
+AR_VARIANTS = ((True, False, 2), (False, True, 2), (False, False, 1), (True, True, 2))
 
 
 def ar_obj(lang, c, k, p):
@@ -2231,11 +2240,11 @@ def ar_obj(lang, c, k, p):
 def load_ambiguous_ref(lang, n, seed):
     items = []
     for i in range(n or 200):
-        r = rng_of("ambiguous_ref", i // 2)
-        amb = i % 2 == 1
+        r = rng_of("ambiguous_ref", i // 4)
+        amb, coloured, count = AR_VARIANTS[i % 4]
         places = r.sample(range(7), 6)
         k, c, c2 = r.randrange(5), *r.sample(range(4), 2)
-        objs = [(c, k), (c2, k)]  # the same kind in two colours: "the cup" is ambiguous, "the red cup" is not
+        objs = [(c, k), (c if amb and coloured else c2, k)][:count]
         while len(objs) < 6:
             o = (r.randrange(4), r.randrange(5))
             if o[1] != k and o not in objs:
@@ -2244,27 +2253,27 @@ def load_ambiguous_ref(lang, n, seed):
         r.shuffle(lines)
         kind = AR_KIND[lang][k]
         if lang == "en":
-            d = kind if amb else f"{AR_COL['en'][c]} {kind}"
+            d = f"{AR_COL['en'][c]} {kind}" if coloured else kind
             q = AR_TEXT["en"][1].format(d=d)
         else:
-            g = AR_GENDER[kind]
-            d = kind if amb else f"{AR_COL['de'][c]}e {kind}"  # "die rote Tasse", "das rote Buch"
-            q = AR_TEXT["de"][1].format(art="die" if g == "f" else "das", d=d)
+            d = f"{AR_COL['de'][c]}e {kind}" if coloured else kind  # "die rote Tasse", "das rote Buch"
+            q = AR_TEXT["de"][1].format(art="die" if AR_GENDER[kind] == "f" else "das", d=d)
         gold = None if amb else AR_PLACE[lang][places[0]]
-        items.append({"id": str(i), "lang": lang, "ambiguous": amb, "gold": gold,
+        items.append({"id": str(i), "lang": lang, "ambiguous": amb, "variant": i % 4, "gold": gold,
                       "messages": [{"role": "user", "content": " ".join(lines) + "\n" + q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_ambiguous_ref(item, reply):
     line = (final_answer(reply["content"]) or "").lower()
-    abst = bool(AR_ABSTAIN.search(line))
+    abst = bool(AR_ABSTAIN.search(AR_NOT_ABSTAIN.sub(" ", line)))
     if item["ambiguous"]:
         ok = abst
-        d = {"ok_ambiguous": float(ok)}
+        d = {"ok_ambiguous": float(ok), f"ok_v{item['variant']}": float(ok)}
     else:
-        ok = not abst and re.sub(r"^(in|im|on|auf|am|unter|by)\s+", "", item["gold"].lower()) in line
-        d = {"ok_unique": float(ok)}
+        noun = item["gold"].lower().split()[-1]  # "shelf", "regal", "schreibtisch": the place noun is enough
+        ok = not abst and re.search(r"\b" + re.escape(noun), line) is not None
+        d = {"ok_unique": float(ok), f"ok_v{item['variant']}": float(ok)}
     return {"correct": ok, "score": float(ok), "pred": line[:50], "gold": item["gold"], "detail": d}
 
 

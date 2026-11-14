@@ -792,8 +792,9 @@ def test_causal_graph():
     assert tn.cg_reach(e, 0, 2) and tn.cg_reach(e, 0, 2, avoid=1) and not tn.cg_reach(e, 2, 0)
     assert not tn.cg_reach([(0, 1), (1, 2)], 0, 2, avoid=1)
     for lang in ("en", "de"):
-        it = tn.load_causal_graph(lang, 24, 0)
-        assert len(it) == 24 and {x["kind"] for x in it} == {"any", "fix"}
+        it = tn.load_causal_graph(lang, 40, 0)
+        assert sum(x["gold"] in ("yes", "ja") for x in it) == 20
+        assert len(it) == 40 and {x["kind"] for x in it} == {"any", "fix"}
         assert sorted({x["gold"] for x in it}) == (["no", "yes"] if lang == "en" else ["ja", "nein"])
 
 
@@ -801,13 +802,18 @@ def test_causal_graph():
 def test_ambiguous_ref():
     import tasks_novel as tn
     for lang in ("en", "de"):
-        it = tn.load_ambiguous_ref(lang, 10, 0)
-        for a, b in zip(it[::2], it[1::2]):
-            assert a["messages"][0]["content"].split("\n")[0] == b["messages"][0]["content"].split("\n")[0]
-            assert a["gold"].lower() in a["messages"][0]["content"].lower() and b["gold"] is None
-            assert tn.score_ambiguous_ref(a, {"content": f"Answer: {a['gold']}"})["correct"]
-            assert tn.score_ambiguous_ref(b, {"content": "Antwort: mehrdeutig"})["correct"]
-            assert not tn.score_ambiguous_ref(b, {"content": f"Answer: {a['gold']}"})["correct"]
+        it = tn.load_ambiguous_ref(lang, 16, 0)
+        assert [x["ambiguous"] for x in it[:4]] == [True, False, False, True]
+        for x in it:
+            q = x["messages"][0]["content"].split("\n")[1]
+            if x["gold"]:
+                assert x["gold"].lower() in x["messages"][0]["content"].lower()
+                assert tn.score_ambiguous_ref(x, {"content": f"Answer: {x['gold']} (not ambiguous)"})["correct"]
+                assert not tn.score_ambiguous_ref(x, {"content": "Antwort: mehrdeutig"})["correct"]
+            else:
+                assert tn.score_ambiguous_ref(x, {"content": "Answer: there are two, one here and one there"})["correct"]
+        # colour in the question no longer gives the answer away
+        assert {x["ambiguous"] for x in it if x["variant"] in (1, 3)} == {True, False}
 
 
 if __name__ == "__main__":

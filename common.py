@@ -312,7 +312,7 @@ def hf_list(repo, revision, repo_type="datasets"):
 
 
 # our own hand-written / translated sets, private, pinned
-DATA_REPO, DATA_REV = "flozi00/weakbench-data", "f1e03cf38bf23b286a25f539b9744d7393d1e076"
+DATA_REPO, DATA_REV = "flozi00/weakbench-data", "ff2457f2d3c1f921861ed922fd9df344c19d8e49"
 
 
 class OwnSet:

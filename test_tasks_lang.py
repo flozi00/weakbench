@@ -425,6 +425,9 @@ def test_glossary_mt():
     en = tl.load_glossary_mt("en", 6, 0)[0]
     assert tl.score_glossary_mt(en, {"content": f"Please close the {en['gold'][0]} once the {en['gold'][1]} is done."})["correct"]
     assert not tl.score_glossary_mt(en, {"content": f"Please close the ticket ({en['gold'][0]}) once the {en['gold'][1]} is done."})["correct"]
+    import re as _re
+    assert _re.search(tl.gl_form("Vorgang"), "zwei vorgänge") and _re.search(tl.gl_form("Zugang"), "die zugänge")
+    assert not _re.search(tl.gl_form("issue"), "the issued bill") and _re.search(tl.gl_form("bill"), "two bills")
 
 
 if __name__ == "__main__":

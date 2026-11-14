@@ -1463,7 +1463,7 @@ GL_SENT = common.OwnSet("tasks_lang.GL_SENT")  # private: flozi00/weakbench-data
 def load_glossary_mt(lang, n, seed):
     """lang = target language: de items translate English into German, en items German into English."""
     items = []
-    for i in range(n or 60):
+    for i in range(n or 2 * len(GL_SENT)):  # every sentence twice, with a fresh glossary target
         r = random.Random(f"glossary_mt:{i}")
         en_s, de_s, terms = GL_SENT[i % len(GL_SENT)]
         T = [GL_TERMS[t] for t in terms]
@@ -1481,11 +1481,19 @@ def load_glossary_mt(lang, n, seed):
     return items
 
 
+def gl_form(term):
+    """The term with its inflections, incl. the umlaut plural (Vorgang -> Vorgänge, Zugang -> Zugänge)."""
+    t = term.lower()
+    uml = re.sub(r"([aou])(?=[^aou]*$)", lambda m: {"a": "ä", "o": "ö", "u": "ü"}[m[1]], t, count=1)
+    return r"\b(" + re.escape(t) + "|" + re.escape(uml) + r")(s|es|e|en|n|er|ern)?\b"
+
+
 def score_glossary_mt(item, reply):
     text = (reply["content"] or "").lower()
-    used = [bool(re.search(r"\b" + re.escape(t.lower()), text)) for t in item["gold"]]
+    used = [bool(re.search(gl_form(t), text)) for t in item["gold"]]
     # the usual word is forbidden as its own word or an inflection of it ("Rechnungen"), not inside a compound
-    bad = [f for f in item["forbid"] if re.search(r"\b" + re.escape(f.lower()) + r"(s|n|en|e|es)?\b", text)]
+    bad = [f for f in item["forbid"] if re.search(r"\b" + re.escape(f.lower()) + r"(s|n|en|e|es)?\b", text)
+           or f == "Konto" and re.search(r"\bkonten\b", text)]
     ok = all(used) and not bad
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["gold"],
             "detail": {"terms_used": sum(used) / len(used), "forbidden_used": float(bool(bad))}}
@@ -1525,7 +1533,7 @@ TASKS = {
     "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 40, lang_check=False),
     "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 24, lang_check=False),
     "en_homophones": task(("en",), load_en_homophones, score_en_homophones, 32, 40, lang_check=False),
-    "glossary_mt": task(("de", "en"), load_glossary_mt, score_glossary_mt, 256, 30),
+    "glossary_mt": task(("de", "en"), load_glossary_mt, score_glossary_mt, 256, 12),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

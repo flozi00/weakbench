@@ -1407,6 +1407,50 @@ def score_puzzle_mutation(item, reply):
             "detail": {"ok_mutated" if item["mutated"] else "ok_original": float(ok)}}
 
 
+# ---------------------------------------------------------------- lookalike (trap: near-identical names in context)
+# A short report on four firms; the asked firm has a near twin (Müller GmbH / Müller AG) in the trap items and
+# only distinct names in the control twin. ok_control - ok_lookalike is the confusion cost.
+LA_BASE = ["Müller", "Schmidt", "Weber", "Fischer", "Becker", "Hoffmann", "Wagner", "Koch"]
+LA_FORMS = ["GmbH", "AG", "KG", "Holding"]
+LOOK_TEXT = {
+    "en": ("{f} reported {e} employees and opened {o} new offices this year.",
+           "How many employees did {f} report? Answer with the number."),
+    "de": ("{f} meldete {e} Beschäftigte und eröffnete dieses Jahr {o} neue Standorte.",
+           "Wie viele Beschäftigte meldete {f}? Antworte mit der Zahl."),
+}
+
+
+def load_lookalike(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        base = i // 2
+        r = rng_of("lookalike", base)
+        trap = i % 2 == 1
+        names = r.sample(LA_BASE, 4)
+        forms = r.sample(LA_FORMS, 2)
+        if trap:  # target and its twin share the surname
+            firms = [f"{names[0]} {forms[0]}", f"{names[0]} {forms[1]}", f"{names[1]} {forms[0]}", f"{names[2]} {forms[1]}"]
+        else:
+            firms = [f"{names[0]} {forms[0]}", f"{names[3]} {forms[1]}", f"{names[1]} {forms[0]}", f"{names[2]} {forms[1]}"]
+        emps = r.sample(range(40, 990), 4)
+        order = list(range(4))
+        r.shuffle(order)
+        sent, ask = LOOK_TEXT[lang]
+        body = " ".join(sent.format(f=firms[k], e=emps[k], o=r.randint(1, 9)) for k in order)
+        items.append({"id": str(i), "lang": lang, "lookalike": trap, "gold": emps[0], "twin": emps[1],
+                      "messages": [{"role": "user", "content": body + "\n" + ask.format(f=firms[0]) + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_lookalike(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    d = {"ok_lookalike" if item["lookalike"] else "ok_control": float(ok)}
+    if item["lookalike"]:
+        d["took_twin"] = float(v == item["twin"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -2930,6 +2974,7 @@ TASKS = {
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
     "noop_math": task(load_noop_math, score_noop_math, 24, 200),
+    "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),
     "meeting_actions": {**task(load_meeting_actions, score_meeting_actions, 24, 150), "think": False,
                         "max_tokens": 512},

@@ -13,7 +13,7 @@ sycophancy (the user pushes back on a correct answer), math_missing (an unsolvab
 5. **Counting and letters.** Counting characters or words in invented words, reversing them, letters at given positions.
 6. **Self-consistency.** Ask the same fact in three phrasings and score the answers as consistent or not.
 7. **Mistaken authority.** "As Professor X showed, ...", where the claim is wrong and must be corrected.
-8. **Lookalike distractors.** Two entities with nearly the same name in the context (Müller GmbH and Müller AG).
+8. **Lookalike distractors** (done: `lookalike`). Two entities with nearly the same name in the context (Müller GmbH and Müller AG).
 9. **Unanswerable-but-tempting.** A question whose answer is not in the document, with a close match present.
 10. **Format bait.** The instruction says JSON only, and the content invites prose.
 

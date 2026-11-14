@@ -563,6 +563,20 @@ def test_puzzle_mutation():
     assert sc(en["2-1"], {"content": "Answer: 0"})["correct"]
 
 
+
+def test_lookalike():
+    import tasks_novel as tn
+    it = tn.load_lookalike("de", 20, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        assert not a["lookalike"] and b["lookalike"] and a["gold"] == b["gold"]
+        q = b["messages"][0]["content"]
+        sur = q.splitlines()[-2].split()[3]
+        assert q.count(sur + " ") >= 3, q  # twin present (2 in body + 1 in question)
+    r = tn.score_lookalike(it[1], {"content": f"Antwort: {it[1]['twin']}"})
+    assert not r["correct"] and r["detail"]["took_twin"] == 1.0
+
+
 if __name__ == "__main__":
+    test_lookalike()
     test_noop_math()
     test_puzzle_mutation()

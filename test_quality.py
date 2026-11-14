@@ -680,3 +680,13 @@ if __name__ == "__main__":
         fn()
         print("ok", name)
     print(f"{len(tests)} tests passed ({TMP})")
+
+
+def test_groups_known():
+    import quality as q
+    assert all(t in q.TASKS for g in q.GROUPS.values() for t in g)
+    assert not set(q.GROUPS) & set(q.TASKS)  # a group never shadows a task name
+
+
+if __name__ == "__main__":
+    test_groups_known()

@@ -1252,6 +1252,23 @@ def print_table(manifest, info, rows):
             print(f"| {r['lang']} | {r['n_docs']} | {r['n_tokens']} | {fmt(r['ppl'], 4)} | {r['skipped'] or '-'} |")
 
 
+# named groups for --tasks (they expand; mix freely with task names): "--tasks traps,de_grammar"
+GROUPS = {
+    "traps": ["puzzle_mutation", "lookalike", "revoked_rule", "anchoring", "false_authority", "near_miss_qa", "format_bait",
+              "false_premise", "option_order", "source_trust", "switched_question", "mixed_units", "double_negation",
+              "counterfactual_world", "fake_entity", "number_compare", "judge_ability", "math_missing", "sycophancy"],
+    "generalization": ["rule_induction", "invented_ops", "mini_language", "arith_length", "nesting_depth", "grid_transform",
+                       "blocks_plan", "regex_synth", "unit_chain", "cipher", "prop_logic", "causal_graph", "knapsack",
+                       "maze_path", "reversal", "char_ops", "off_by_one", "rephrase_consistency", "continuity_error"],
+    "de_grammar": ["de_case", "de_verbs", "de_commas", "de_homophones", "de_reported", "de_separable", "de_compound_gender",
+                   "de_relative", "de_grammar_fix", "agreement_attractor", "wug", "time_prep", "tense_order"],
+    "language": ["lang_switch", "polyglot_switch", "mixed_input", "bilingual_notice", "glossary_mt", "de_address",
+                 "de_variety", "en_variety", "de_no_anglicisms", "form_writing", "irony", "revise_on_feedback"],
+    "judge": ["open_checklist", "tutor_feedback", "persona_guard", "human_persona", "self_model", "memory_dialog",
+              "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor"],
+}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--url")
@@ -1291,7 +1308,7 @@ def main(argv=None):
         ap.error("--url and --arm are required (unless --resume)")
 
     langs, known = args.langs.split(","), [*TASKS, "drift"]
-    names = args.tasks.split(",") if args.tasks else [
+    names = [x for n in args.tasks.split(",") for x in GROUPS.get(n, [n])] if args.tasks else [
         n for n, t in TASKS.items() if n != "image" and not t.get("opt_in")
         and any(t["counts"][args.tier].get(x, 0) != 0 for x in t["langs"] if x in langs)] + ["drift"]
     if bad := [n for n in names if n not in known]:

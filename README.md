@@ -14,7 +14,8 @@ Any OpenAI-compatible chat server works:
 ```sh
 uv run quality.py --url http://host:8000 --arm mymodel --tier quick
 uv run quality.py --url ... --arm mymodel --tasks rule_induction,coref --langs de,en
-uv run quality.py --dry-run --tasks all            # list items without a server
+uv run quality.py --url ... --arm mymodel --tasks traps,de_grammar   # named groups: traps, generalization,
+                                                   # de_grammar, language, judge (see GROUPS in quality.py)
 ```
 
 Judge tasks need a judge server: `--judge-url URL --judge-model ID`.

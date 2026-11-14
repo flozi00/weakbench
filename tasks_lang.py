@@ -1550,9 +1550,9 @@ def load_de_separable(lang, n, seed):
 
 
 def score_de_separable(item, reply):
-    lines = [x.strip().strip("„“\"*") for x in (reply["content"] or "").splitlines() if x.strip()]
+    lines = [re.sub(r"^\w+:\s*", "", x.strip()).strip("„“\"*") for x in (reply["content"] or "").splitlines() if x.strip()]
     norm = lambda t: re.findall(r"[a-zäöüß]+", t.lower())  # noqa: E731
-    ok = any(norm(x) == norm(item["gold"]) for x in lines)
+    ok = bool(lines) and norm(lines[-1]) == norm(item["gold"])  # the last line only: listing candidates is no answer
     return {"correct": ok, "score": float(ok), "pred": (lines[-1] if lines else "")[:80], "gold": item["gold"],
             "detail": {f"ok_{item['form']}": float(ok)}}
 

@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -727,7 +727,21 @@ def test_double_negation():
     assert {x["gold"] for x in it if x["negs"] == 0} == {"yes", "no"}  # parity is no shortcut
 
 
+
+def test_false_premise():
+    import tasks_novel as tn
+    it = tn.load_false_premise("en", 6, 0)
+    a, b = it[0], it[1]
+    assert isinstance(a["gold"], int) and f"resigned in {a['gold']}" in a["messages"][0]["content"]
+    sc = tn.score_false_premise
+    assert sc(a, {"content": f"Answer: {a['gold']}"})["correct"]
+    assert sc(b, {"content": "Answer: She never resigned; she still works there."})["correct"]
+    r = sc(b, {"content": f"Answer: {a['gold']}"})
+    assert not r["correct"] and r["detail"]["took_premise"] == 1.0
+
+
 if __name__ == "__main__":
+    test_false_premise()
     test_double_negation()
     test_mixed_units()
     test_off_by_one()

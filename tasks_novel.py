@@ -1930,6 +1930,56 @@ def score_double_negation(item, reply):
             "detail": {f"ok_neg{item['negs']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- false_premise (trap: the question presupposes an event)
+# Three short careers; the question asks in which year the target resigned. Control: the target did resign (gold =
+# the year). Trap: the target is stated to still be there, another person resigned (gold = reject the premise).
+FP_TEXT = {
+    "en": {"join": "{x} joined the company in {a}.", "promo": "{x} became team lead in {b}.",
+           "quit": "{x} resigned in {c}.", "stay": "{x} still works there today.",
+           "q": "In which year did {x} resign?"},
+    "de": {"join": "{x} kam {a} in die Firma.", "promo": "{x} übernahm {b} die Teamleitung.",
+           "quit": "{x} kündigte {c}.", "stay": "{x} arbeitet bis heute dort.",
+           "q": "In welchem Jahr kündigte {x}?"},
+}
+FP_REJECT = re.compile(r"\b(never|not|did ?n.t|no year|false premise|still|nie|niemals|nicht|gar nicht|kein\w*|noch)\b", re.I)
+
+
+def load_false_premise(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("false_premise", i // 2)
+        trap = i % 2 == 1
+        people = r.sample(NAMES, 3)
+        T = FP_TEXT[lang]
+        blocks, quit_year = [], {}
+        for j, x in enumerate(people):
+            a = r.randint(2003, 2012)
+            b = a + r.randint(2, 5)
+            c = b + r.randint(1, 6)
+            quits = (not trap, True, False)[j]  # the target quits only in control; person 1 always quits
+            blocks.append(" ".join([T["join"].format(x=x, a=a), T["promo"].format(x=x, b=b),
+                                    T["quit"].format(x=x, c=c) if quits else T["stay"].format(x=x)]))
+            quit_year[x] = c if quits else None
+        x = people[0]
+        r.shuffle(blocks)  # drawn in both twins: same order
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": "-" if trap else quit_year[x],
+                      "messages": [{"role": "user", "content": " ".join(blocks) + "\n" + T["q"].format(x=x)
+                                    + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_false_premise(item, reply):
+    line = final_answer(reply["content"]) or ""
+    rejected = bool(FP_REJECT.search(line))
+    if item["trap"]:
+        ok = rejected
+        d = {"ok_trap": float(ok), "took_premise": float(not rejected and re.search(r"\b(19|20)\d\d\b", line) is not None)}
+    else:
+        ok = not rejected and last_int(line) == item["gold"]
+        d = {"ok_control": float(ok)}
+    return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3461,6 +3511,7 @@ TASKS = {
     "off_by_one": task(load_off_by_one, score_off_by_one, 25, 200),
     "mixed_units": task(load_mixed_units, score_mixed_units, 24, 150),
     "double_negation": task(load_double_negation, score_double_negation, 24, 200),
+    "false_premise": task(load_false_premise, score_false_premise, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

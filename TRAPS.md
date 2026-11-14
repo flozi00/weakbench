@@ -22,7 +22,7 @@ Each trap is generated from a seed, scored deterministically where possible, and
 ## Round 2 — brainstorm
 
 11. **Order bias.** The same multiple-choice item with the options shuffled. The model is caught when it prefers a position, which shows as answers that are not invariant under permutation.
-12. **Presupposition in the question.** "Why did X resign in 2019?" when the text says X never resigned. Twin: the text says X did resign.
+12. **Presupposition in the question** (done: `false_premise`). "Why did X resign in 2019?" when the text says X never resigned. Twin: the text says X did resign.
 13. **Quantifier slips.** "All / most / some / none" in the premises, and a question that a model answers as if "some" meant "all".
 14. **Off-by-one in counting ranges** (done: `off_by_one`). "How many days from the 3rd to the 9th, both inclusive?", fence posts, page ranges.
 15. **Units hiding in plain sight** (done: `mixed_units`). Mixed units in a single sum (m and cm, minutes and hours), where the naive sum is the trap.

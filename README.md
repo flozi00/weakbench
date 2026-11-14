@@ -34,6 +34,10 @@ Results go to `runs/<timestamp>-<arm>/` (jsonl per task plus `summary.json`).
 - Public datasets are downloaded at pinned revisions and cached in `~/.cache/weakbench`.
 - Datasets we write ourselves (hand-written idioms, coreference twins, judge checklists, personas, riddles, the German XSTest translation, ...) live in the private dataset `flozi00/weakbench-data` (`sets/<module>.<NAME>.py`, Python literals), pinned by `common.DATA_REV`. `common.OwnSet` fetches one on first use with the `hf auth login` token; without access only the tasks that need it fail, loudly. To change a set: edit the file there, then bump `DATA_REV`.
 
+## Shortcut check
+
+`uv run shortcut_check.py` scores every generated task against constant replies ("yes", "A", "die", "cannot be determined", ...). A task where a constant reaches 0.6 or more has a shortcut. 0.5 on a trap/control-twin task is the expected ceiling of always abstaining.
+
 ## Tests
 
 ```sh

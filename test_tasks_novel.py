@@ -739,6 +739,7 @@ def test_false_premise():
     for txt in ("There is no such year", "Paul arbeitet bis heute dort", "-"):
         assert sc(b, {"content": "Answer: " + txt})["correct"], txt
     assert not sc(b, {"content": "Answer: 2015 (not sure)"})["correct"]
+    assert not sc(b, {"content": "Answer: yes"})["correct"]  # no year is not yet a rejection
     assert sc(a, {"content": f"Answer: {a['gold']}, not 2001"})["correct"]
     r = sc(b, {"content": f"Answer: {a['gold']}"})
     assert not r["correct"] and r["detail"]["took_premise"] == 1.0

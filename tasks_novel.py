@@ -1973,9 +1973,9 @@ def load_false_premise(lang, n, seed):
 def score_false_premise(item, reply):
     line = final_answer(reply["content"]) or ""
     year = FP_YEAR.search(line)
-    if item["trap"]:  # right: no year, or a rejection before the first year ("never; she still works there since 2010")
+    if item["trap"]:  # right: a rejection, before the first year if one is named ("never; still there since 2010")
         rej = FP_REJECT.search(line)
-        ok = bool(line.strip()) and (not year or bool(rej) and rej.start() < year.start())
+        ok = bool(rej) and (not year or rej.start() < year.start())
         d = {"ok_trap": float(ok), "took_premise": float(bool(year) and not ok)}
     else:  # the first year stated is the answer ("2013, not 2011")
         ok = bool(year) and int(year.group()) == item["gold"]

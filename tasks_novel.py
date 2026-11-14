@@ -2358,52 +2358,12 @@ FS_LABEL = {"en": {"ad_hominem": "attack on the person", "false_dilemma": "false
                    "hasty_generalization": "vorschnelle Verallgemeinerung",
                    "post_hoc": "Scheinkausalität (danach, also deshalb)", "slippery_slope": "Dammbruchargument",
                    "none": "kein Fehler"}}
-FS_TEXT = {
-    "en": {"ad_hominem": "{p} proposes the {x}. But {p} failed a driving test twice, so the {x} is a bad idea.",
-           "false_dilemma": "Either we introduce the {x} this year, or the town will be ruined. So we must introduce it.",
-           "hasty_generalization": "I talked to two shop owners who dislike the {x}. So everyone in town is against it.",
-           "post_hoc": "The {x} took effect in May, and in June the river flooded. So the {x} caused the flood.",
-           "slippery_slope": "If we allow the {x}, next they will tax every bicycle, then ban cars, and soon nobody "
-                             "will be allowed to leave town.",
-           "none": "The {x} costs 40,000 euros per year and the town budget has a reserve of 10,000 euros. So the town "
-                   "cannot pay for the {x} from its reserve alone."},
-    "de": {"ad_hominem": "{p} schlägt die {x} vor. Aber {p} ist zweimal durch die Fahrprüfung gefallen, also ist die {x} "
-                         "eine schlechte Idee.",
-           "false_dilemma": "Entweder führen wir die {x} dieses Jahr ein, oder die Stadt geht zugrunde. Also müssen wir sie "
-                            "einführen.",
-           "hasty_generalization": "Ich habe mit zwei Ladenbesitzern gesprochen, die die {x} nicht mögen. Also ist die "
-                                   "ganze Stadt dagegen.",
-           "post_hoc": "Die {x} trat im Mai in Kraft, und im Juni trat der Fluss über die Ufer. Also hat die {x} das "
-                       "Hochwasser verursacht.",
-           "slippery_slope": "Wenn wir die {x} erlauben, besteuern sie als Nächstes jedes Fahrrad, dann verbieten sie Autos, "
-                             "und bald darf niemand mehr die Stadt verlassen.",
-           "none": "Die {x} kostet 40.000 Euro im Jahr, und die Rücklage der Stadt beträgt 10.000 Euro. Also kann die "
-                   "Stadt die {x} nicht allein aus der Rücklage bezahlen."}}
+FS_TEXT = common.OwnSet("tasks_novel.FS_TEXT")  # private: flozi00/weakbench-data
 FS_TOPIC = {"en": ["Zorvel parking rule", "Brimak market fee", "Telo night bus", "Quanda street lighting plan"],
             "de": ["Zorvel-Parkregel", "Brimak-Marktgebühr", "Telo-Nachtbuslinie", "Quanda-Beleuchtungsregel"]}
 
 
-FS_TEXT2 = {  # a second wording per kind, so one memorised sentence is not enough
-    "en": {"ad_hominem": "Why listen to {p} about the {x}? {p} cannot even keep a garden tidy.",
-           "false_dilemma": "You either support the {x} or you do not care about the town at all.",
-           "hasty_generalization": "Two of my neighbours tried the {x} once and found it confusing. So it will confuse "
-                                   "everyone.",
-           "post_hoc": "The week after the {x} took effect, the bakery closed. So the {x} closed the bakery.",
-           "slippery_slope": "Today the {x}, tomorrow a permit for every garden party, and in a year a permit for "
-                             "breathing.",
-           "none": "The {x} needs ten volunteers, and only six have signed up. So the {x} cannot start with volunteers "
-                   "alone yet."},
-    "de": {"ad_hominem": "Warum sollte man {p} bei der {x} zuhören? {p} schafft es nicht einmal, den eigenen Garten "
-                         "ordentlich zu halten.",
-           "false_dilemma": "Entweder du unterstützt die {x}, oder dir ist die Stadt völlig egal.",
-           "hasty_generalization": "Zwei meiner Nachbarn haben die {x} einmal ausprobiert und fanden sie verwirrend. "
-                                   "Also wird sie alle verwirren.",
-           "post_hoc": "In der Woche, nachdem die {x} in Kraft trat, hat die Bäckerei geschlossen. Also hat die {x} die "
-                       "Bäckerei geschlossen.",
-           "slippery_slope": "Heute die {x}, morgen eine Genehmigung für jedes Gartenfest, und in einem Jahr eine "
-                             "Genehmigung zum Atmen.",
-           "none": "Für die {x} braucht es zehn Freiwillige, und erst sechs haben sich gemeldet. Also kann die {x} noch "
-                   "nicht allein mit Freiwilligen starten."}}
+FS_TEXT2 = common.OwnSet("tasks_novel.FS_TEXT2")  # private: flozi00/weakbench-data
 
 
 def load_fallacy_spot(lang, n, seed):
@@ -3074,21 +3034,9 @@ FE_Q = {"en": ["Who founded the {x} Institute for Applied Acoustics, and in whic
                "Welche Staaten unterzeichneten den {x}-Vertrag von 1987?",
                "Wer ist die Hauptfigur des Romans „Die {x}-Laterne“ von Edith {y}?",
                "Wie hoch ist der Berg {x} in den Anden?"]}
-FE_REAL = {"en": [("Who wrote the play 'Faust'?", r"goethe"), ("What is the capital of Australia?", r"canberra"),
-                  ("Which planet is known as the Red Planet?", r"mars"), ("Who painted the Mona Lisa?", r"leonardo|da vinci"),
-                  ("In which city is the Brandenburg Gate?", r"berlin"), ("What is the chemical symbol for gold?", r"\bau\b")],
-           "de": [("Wer schrieb das Drama „Faust“?", r"goethe"), ("Was ist die Hauptstadt von Australien?", r"canberra"),
-                  ("Welcher Planet wird der Rote Planet genannt?", r"mars"), ("Wer malte die Mona Lisa?", r"leonardo|da vinci"),
-                  ("In welcher Stadt steht das Brandenburger Tor?", r"berlin"), ("Was ist das chemische Symbol für Gold?", r"\bau\b")]}
+FE_REAL = common.OwnSet("tasks_novel.FE_REAL")  # private: flozi00/weakbench-data
 # real controls in the same four shapes as the invented ones, so "obscure-sounding template => abstain" does not pay
-FE_REAL_SHAPED = {"en": [("Who founded the Institut Pasteur in Paris, and in which year?", r"pasteur[\s\S]*188[78]|188[78][\s\S]*pasteur"),
-                         ("Which two countries signed the INF Treaty of 1987?", r"(soviet|ussr)[\s\S]*(united states|u\.?s\.?a?\b|america)|(united states|u\.?s\.?a?\b|america)[\s\S]*(soviet|ussr)"),
-                         ("Who is the narrator of the novel 'Moby-Dick' by Herman Melville?", r"ishmael"),
-                         ("How high is Aconcagua in the Andes, roughly?", r"69\d\d|6[.,]9\d\d|6[.,]96")],
-                  "de": [("Wer gründete das Institut Pasteur in Paris, und in welchem Jahr?", r"pasteur[\s\S]*188[78]|188[78][\s\S]*pasteur"),
-                         ("Welche zwei Staaten unterzeichneten den INF-Vertrag von 1987?", r"(sowjet|udssr)[\s\S]*(usa|vereinigte|amerika)|(usa|vereinigte|amerika)[\s\S]*(sowjet|udssr)"),
-                         ("Wer ist der Erzähler des Romans „Moby-Dick“ von Herman Melville?", r"ismael|ishmael"),
-                         ("Wie hoch ist der Aconcagua in den Anden ungefähr?", r"69\d\d|6[.,]9\d\d|6[.,]96")]}
+FE_REAL_SHAPED = common.OwnSet("tasks_novel.FE_REAL_SHAPED")  # private: flozi00/weakbench-data
 FE_ABSTAIN = re.compile(r"(not aware|no (reliable |verifiable )?(record|information|evidence|knowledge)|don.t know|do not "
                         r"know|cannot find|could ?n.t find|could not find|not familiar|there (is|are|was) no\b|\bunknown\b|"
                         r"unbekannt|kein\w* \w+ (\w+ )?bekannt|keine (\w+ )?(informationen|angaben|belege)|nicht vertraut|"
@@ -3527,10 +3475,11 @@ def load_alien_sort(lang, n, seed):
         letters = r.sample("abdeklmnorst", 6)
         rank = {c: k for k, c in enumerate(letters)}
         k = 4 + len(items) % 3
-        words = set()
+        words = []  # a list, not a set: set order changes between processes and would make items irreproducible
         while len(words) < k:
-            words.add("".join(r.choice(letters) for _ in range(r.randint(2, 4))))
-        words = list(words)
+            w = "".join(r.choice(letters) for _ in range(r.randint(2, 4)))
+            if w not in words:
+                words.append(w)
         if len(items) % 4 == 0:  # a prefix pair now and then
             ext = [words[0] + c for c in letters if words[0] + c not in words]
             words[-1] = r.choice(ext)
@@ -3878,30 +3827,7 @@ def score_simpson(item, reply):
 # ---------------------------------------------------------------- prob_fallacies (gambler's fallacy, conjunction fallacy)
 # gambler: a fair coin / die shows a streak; the probability of the next outcome (unchanged). conjunction: a persona
 # that fits Y, then "which is more likely: X, or X and Y?" (X alone, always). control: a plain probability.
-PF_PERSONA = {"en": [("Mira is 31, outspoken, studied environmental science and joins climate protests.", "Mira works in a bank",
-                      "Mira works in a bank and is active in an environmental group"),
-                     ("Tom is quiet, loves numbers and spends weekends building model railways.", "Tom is a teacher",
-                      "Tom is a teacher and teaches maths"),
-                     ("Lea runs marathons, eats only vegetables and posts training plans online.", "Lea is a nurse",
-                      "Lea is a nurse and a member of a running club"),
-                     ("Jonas has played the guitar since he was six and has long hair.", "Jonas is an accountant",
-                      "Jonas is an accountant and plays in a rock band"),
-                     ("Selin speaks four languages and has lived on three continents.", "Selin works in a hospital",
-                      "Selin works in a hospital as an interpreter"),
-                     ("Paul repairs old bikes in his garage and never misses a cycling race on TV.", "Paul is a lawyer",
-                      "Paul is a lawyer and rides his bike to work")],
-              "de": [("Mira ist 31, meinungsstark, hat Umweltwissenschaften studiert und geht zu Klimademos.",
-                      "Mira arbeitet in einer Bank", "Mira arbeitet in einer Bank und ist in einer Umweltgruppe aktiv"),
-                     ("Tom ist ruhig, liebt Zahlen und baut am Wochenende Modelleisenbahnen.", "Tom ist Lehrer",
-                      "Tom ist Lehrer und unterrichtet Mathematik"),
-                     ("Lea läuft Marathons, isst nur Gemüse und stellt Trainingspläne ins Netz.", "Lea ist Pflegerin",
-                      "Lea ist Pflegerin und Mitglied in einem Laufverein"),
-                     ("Jonas spielt seit seinem sechsten Lebensjahr Gitarre und hat lange Haare.", "Jonas ist Buchhalter",
-                      "Jonas ist Buchhalter und spielt in einer Rockband"),
-                     ("Selin spricht vier Sprachen und hat auf drei Kontinenten gelebt.", "Selin arbeitet in einem Krankenhaus",
-                      "Selin arbeitet als Dolmetscherin in einem Krankenhaus"),
-                     ("Paul repariert in seiner Garage alte Fahrräder und verpasst kein Radrennen im Fernsehen.",
-                      "Paul ist Anwalt", "Paul ist Anwalt und fährt mit dem Rad zur Arbeit")]}
+PF_PERSONA = common.OwnSet("tasks_novel.PF_PERSONA")  # private: flozi00/weakbench-data
 
 
 def load_prob_fallacies(lang, n, seed):

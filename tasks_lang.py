@@ -1801,42 +1801,11 @@ def score_wug(item, reply):
 # ---------------------------------------------------------------- irony (the same praise word, sincere or ironic by context)
 # One context sentence, then a remark that starts with the same praise ("Great", "Na super") and names the event.
 # The event is good (sincere) or bad (ironic); the context decides, the words of the remark barely differ.
-IR_EVENTS = {"en": [("the train is on time for once", "the train is late again"),
-                    ("the heating works again", "the heating broke down again"),
-                    ("my flight got upgraded", "my flight got cancelled"),
-                    ("the printer printed everything", "the printer jammed on page one"),
-                    ("it stopped raining for the picnic", "it started pouring at the picnic")],
-             "de": [("der Zug ist ausnahmsweise pünktlich", "der Zug hat schon wieder Verspätung"),
-                    ("die Heizung geht wieder", "die Heizung ist schon wieder kaputt"),
-                    ("mein Flug wurde hochgestuft", "mein Flug wurde gestrichen"),
-                    ("der Drucker hat alles gedruckt", "der Drucker hat sich auf Seite eins verklemmt"),
-                    ("zum Picknick hat der Regen aufgehört", "zum Picknick fing es an zu schütten")]}
+IR_EVENTS = common.OwnSet("tasks_lang.IR_EVENTS")  # private: flozi00/weakbench-data
 IR_PRAISE = {"en": ["Great, {e}.", "Wonderful, {e}. Just what I needed.", "Oh perfect, {e}."],
              "de": ["Super, {e}.", "Wunderbar, {e}. Genau das, was ich gebraucht habe.", "Toll, {e}."]}  # not "Na super": sarcastic by default
 # harder: the identical remark, only the context before it decides (wanted vs dreaded)
-IR_CONTEXT = {"en": [("My garden is completely dried out.", "We planned the picnic for weeks.", "Great, it's raining."),
-                     ("I really didn't want to go to that concert my colleague booked.",
-                      "I was so looking forward to the concert tonight.", "Wonderful, the concert got cancelled."),
-                     ("I have been trying to sell that old car for months.", "I loved that old car and never wanted to sell it.",
-                      "Oh perfect, my partner sold the car today."),
-                     ("I dreaded presenting in today's meeting.", "I prepared my talk for today's meeting all week.",
-                      "Great, the meeting got cancelled."),
-                     ("My kids begged for a snow day.", "I have to drive two hours to the airport this morning.",
-                      "Wonderful, it snowed half a metre overnight."),
-                     ("I wanted the house to myself tonight.", "I cooked dinner for six people tonight.",
-                      "Great, my guests just cancelled.")],
-              "de": [("Mein Garten ist völlig ausgetrocknet.", "Wir haben das Picknick seit Wochen geplant.",
-                      "Super, es regnet."),
-                     ("Ich wollte überhaupt nicht auf das Konzert, das mein Kollege gebucht hat.",
-                      "Ich habe mich so auf das Konzert heute Abend gefreut.", "Wunderbar, das Konzert wurde abgesagt."),
-                     ("Ich versuche seit Monaten, das alte Auto zu verkaufen.", "Ich habe das alte Auto geliebt und wollte "
-                      "es nie verkaufen.", "Toll, mein Partner hat heute das Auto verkauft."),
-                     ("Mir graute vor meinem Vortrag im heutigen Meeting.", "Ich habe die ganze Woche meinen Vortrag für "
-                      "das heutige Meeting vorbereitet.", "Super, das Meeting wurde abgesagt."),
-                     ("Meine Kinder haben sich so einen schneefreien Schultag gewünscht.", "Ich muss heute früh zwei Stunden "
-                      "zum Flughafen fahren.", "Wunderbar, über Nacht kam ein halber Meter Schnee."),
-                     ("Ich wollte heute Abend die Wohnung für mich haben.", "Ich habe heute Abend für sechs Leute gekocht.",
-                      "Toll, meine Gäste haben gerade abgesagt.")]}
+IR_CONTEXT = common.OwnSet("tasks_lang.IR_CONTEXT")  # private: flozi00/weakbench-data
 IR_ASK = {"en": "Is the speaker being ironic or sincere? Answer with one word: ironic or sincere.",
           "de": "Meint die Person das ironisch oder ernst? Antworte mit einem Wort: ironisch oder ernst."}
 
@@ -1880,9 +1849,7 @@ def score_irony(item, reply):
 # Write a short text that must use four given concepts, in British or American spelling. Scored exactly: every concept
 # appears in the requested spelling (any inflection) and no word in the other spelling appears anywhere.
 # no organise/realise: -ize is also correct British (Oxford) spelling; analyse/analyze is strict
-EV_WORDS = [("colour", "color"), ("favourite", "favorite"), ("centre", "center"), ("analyse", "analyze"),
-            ("theatre", "theater"), ("travell", "travel"), ("neighbour", "neighbor"), ("catalogue", "catalog"),
-            ("defence", "defense"), ("grey", "gray"), ("litre", "liter")]  # not cheque/check: "check" is a British verb too
+EV_WORDS = common.OwnSet("tasks_lang.EV_WORDS")  # private: flozi00/weakbench-data
 EV_SHOW = {"travell": "travelling", "travel": "traveling"}
 
 
@@ -1920,8 +1887,7 @@ def score_en_variety(item, reply):
 # ---------------------------------------------------------------- de_variety (Swiss Standard German: no ß, held throughout)
 # Four sentences about a market, written for Germany or for Switzerland, with four given words that contain ß in
 # Germany. Swiss spelling uses ss everywhere (Strasse, gross); Germany keeps ß after long vowels and diphthongs.
-DV_WORDS = [("Straße", "Strasse"), ("groß", "gross"), ("Fuß", "Fuss"), ("heißen", "heissen"), ("außerdem", "ausserdem"),
-            ("Spaß", "Spass"), ("süß", "süss"), ("Grüße", "Grüsse"), ("weiß", "weiss"), ("draußen", "draussen")]
+DV_WORDS = common.OwnSet("tasks_lang.DV_WORDS")  # private: flozi00/weakbench-data
 # every stem an inflected form may start with (umlaut and ablaut change the stem: groß -> größer, heißen -> hieß)
 DV_STEMS = {"Straße": (["straß"], ["strass"]), "groß": (["groß", "größ"], ["gross", "gröss"]),
             "Fuß": (["fuß", "füß"], ["fuss", "füss"]), "heißen": (["heiß", "hieß"], ["heiss", "hiess"]),
@@ -2073,9 +2039,7 @@ def score_form_writing(item, reply):
 NA_WORDS = ["meeting", "deadline", "feedback", "team", "update", "call", "workshop", "download", "tool", "feature",
             "release", "bugfix", "bugs", "deployment", "manager", "briefing", "homeoffice", "office", "kickoff",
             "kick-off", "slot", "slides", "onboarding", "teamlead", "workflow", "know-how", "event", "ticket"]  # not "job": in the Duden, and Jobcenter is an office name
-NA_TOPICS = ["die Planung der nächsten Softwareversion", "ein Projekttreffen mit Rückmeldungen zum Zwischenstand",
-             "die Einarbeitung einer neuen Kollegin", "einen Fehler in der Kundensoftware und den Zeitplan zur Behebung",
-             "die Vorbereitung einer Präsentation für die Geschäftsführung", "die Umstellung auf das Arbeiten von zu Hause"]
+NA_TOPICS = common.OwnSet("tasks_lang.NA_TOPICS")  # private: flozi00/weakbench-data
 
 
 def load_de_no_anglicisms(lang, n, seed):
@@ -2235,8 +2199,7 @@ def score_de_grammar_fix(item, reply):
 # ---------------------------------------------------------------- bilingual_notice (the same notice in German and English)
 # Generated facts (event, weekday, date, time, room, price) to announce in two sections "DE:" and "EN:". Each section
 # must be in its language (no mixing) and carry every fact; numbers must agree between the sections.
-BN_EVENTS = [("Sommerfest", "summer party"), ("Erste-Hilfe-Kurs", "first aid course"), ("Infoabend", "information evening"),
-             ("Flohmarkt", "flea market"), ("Lesung", "reading")]
+BN_EVENTS = common.OwnSet("tasks_lang.BN_EVENTS")  # private: flozi00/weakbench-data
 
 
 def load_bilingual_notice(lang, n, seed):
@@ -2472,11 +2435,7 @@ def score_de_plural_adj(item, reply):
 # A small Python function to write, requested in one language with comments required in the other (an English request
 # for German comments, a German request for English comments). Scored: the code parses and defines the function,
 # and the comments + docstring (at least 12 words) are in the requested language.
-CC_FUNCS = [("count_vowels", "counts the vowels in a string", "die Vokale in einem String zählt"),
-            ("is_leap_year", "checks whether a year is a leap year", "prüft, ob ein Jahr ein Schaltjahr ist"),
-            ("median", "returns the median of a list of numbers", "den Median einer Zahlenliste zurückgibt"),
-            ("chunk", "splits a list into chunks of size n", "eine Liste in Stücke der Größe n teilt"),
-            ("word_freq", "counts how often each word occurs in a text", "zählt, wie oft jedes Wort in einem Text vorkommt")]
+CC_FUNCS = common.OwnSet("tasks_lang.CC_FUNCS")  # private: flozi00/weakbench-data
 
 
 def load_code_comments_lang(lang, n, seed):

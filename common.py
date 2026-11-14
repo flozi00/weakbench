@@ -14,6 +14,7 @@ that is committed). compare.py pairs two run directories item by item.
 import ast
 import functools
 import collections
+import collections.abc
 import datetime
 import fcntl
 import hashlib
@@ -312,7 +313,7 @@ def hf_list(repo, revision, repo_type="datasets"):
 
 
 # our own hand-written / translated sets, private, pinned
-DATA_REPO, DATA_REV = "flozi00/weakbench-data", "5a0c00d5c0895b899658e3a7891d35a10feeeac0"
+DATA_REPO, DATA_REV = "flozi00/weakbench-data", "cd2b08fcd3aaa3bca3a4fb02227a2aad4dd8c0f2"
 
 
 def distinct(load, pool=600):
@@ -336,7 +337,7 @@ def distinct(load, pool=600):
     return wrapped
 
 
-class OwnSet:
+class OwnSet(collections.abc.Sequence):
     """A hand-written set from the private DATA_REPO (`sets/<module>.<NAME>.py`, a Python literal), fetched on
     first use so a run without access fails loudly only in the tasks that need it."""
 
@@ -355,6 +356,11 @@ class OwnSet:
 
     def __iter__(self):
         return iter(self.value)
+
+    def __getattr__(self, attr):  # dict methods (.items, .keys) of a dict-valued set
+        if attr in ("name", "value") or attr.startswith("__"):
+            raise AttributeError(attr)
+        return getattr(self.value, attr)
 
 
 def hf_file(repo, revision, filename, repo_type="datasets"):

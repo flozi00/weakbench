@@ -1348,7 +1348,7 @@ PUZZLES = [
             "A bat and a ball cost $1.10 in total. The bat costs $1.00. How many cents does the ball cost?"),
      "de": ("Ein Schläger und ein Ball kosten zusammen 1,10 €. Der Schläger kostet 1,00 € mehr als der Ball. Wie viele Cent kostet der Ball?",
             "Ein Schläger und ein Ball kosten zusammen 1,10 €. Der Schläger kostet 1,00 €. Wie viele Cent kostet der Ball?"),
-     "gold": (r"^\D*5\b", r"^\D*10\b")},
+     "gold": (r"^\D*(0[.,]0)?5\b", r"^\D*(0[.,])?10\b")},
     {"en": ("Which is heavier: a kilogram of feathers or a kilogram of steel? Answer 'feathers', 'steel' or 'same'.",
             "Which is heavier: a kilogram of feathers or two kilograms of steel? Answer 'feathers', 'steel' or 'same'."),
      "de": ("Was ist schwerer: ein Kilogramm Federn oder ein Kilogramm Stahl? Antworte mit 'Federn', 'Stahl' oder 'gleich'.",
@@ -1386,19 +1386,23 @@ PUZZLES = [
      "gold": (r"^\D*5\b", r"^\D*500\b")},
 ]
 
+PZ_ANS = {"en": [('5', '10'), ('same', 'steel'), ('1', '0'), ('47', '24'), ('7', '1'), ('raise', 'same'), ('mother', 'father'), ('5', '500')],
+          "de": [('5', '10'), ('gleich', 'Stahl'), ('1', '0'), ('47', '24'), ('7', '1'), ('erhöht', 'gleich'), ('Mutter', 'Vater'), ('5', '500')]}
+
 
 def load_puzzle_mutation(lang, n, seed):
     items = []
     for k, pz in enumerate(PUZZLES):
         for mut in (0, 1):
-            items.append({"id": f"{k}-{mut}", "lang": lang, "mutated": bool(mut), "gold": pz["gold"][mut],
+            items.append({"id": f"{k}-{mut}", "lang": lang, "mutated": bool(mut), "pattern": pz["gold"][mut],
+                          "gold": PZ_ANS[lang][k][mut],
                           "messages": [{"role": "user", "content": pz[lang][mut] + "\n" + ASK[lang]}]})
     return items[:n] if n else items
 
 
 def score_puzzle_mutation(item, reply):
     line = (final_answer(reply["content"]) or "").strip().lower()
-    ok = bool(re.search(item["gold"], line))
+    ok = bool(re.search(item["pattern"], line))
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"],
             "detail": {"ok_mutated" if item["mutated"] else "ok_original": float(ok)}}
 

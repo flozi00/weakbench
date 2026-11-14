@@ -2056,6 +2056,50 @@ def score_source_trust(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- switched_question (trap: the preamble sets up another question)
+# A shopping list with prices. Trap: a long preamble builds up to the total ("we need the total for the budget,
+# add everything up carefully ...") and the last sentence asks something else (how many items cost more than X).
+# Control: only the last question. took_total = answered the preamble's question.
+SQ_ITEMS = {"en": ["paint", "brushes", "tape", "ladder", "gloves", "sponges", "rollers", "buckets"],
+            "de": ["Farbe", "Pinsel", "Klebeband", "Leiter", "Handschuhe", "Schwämme", "Rollen", "Eimer"]}
+SQ_TEXT = {
+    "en": {"pre": "We are planning the renovation budget and the treasurer needs the total cost of this list, so "
+                  "please be careful with the sum, last time an item was forgotten and the total was wrong. The total "
+                  "goes straight into the budget sheet.",
+           "q": "But before that, just tell me: how many items cost more than {x} euros?"},
+    "de": {"pre": "Wir planen das Renovierungsbudget, und der Kassenwart braucht die Gesamtkosten dieser Liste. Bitte "
+                  "rechne die Summe sorgfältig, letztes Mal wurde ein Posten vergessen und die Summe stimmte nicht. Die "
+                  "Summe kommt direkt in die Budgettabelle.",
+           "q": "Aber vorher sag mir nur: Wie viele Posten kosten mehr als {x} Euro?"},
+}
+
+
+def load_switched_question(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("switched_question", i // 2)
+        trap = i % 2 == 1
+        names = r.sample(SQ_ITEMS[lang], 6)
+        prices = [r.randint(3, 90) for _ in names]
+        x = r.choice([20, 30, 40, 50])
+        lst = "\n".join(f"- {a}: {p} €" for a, p in zip(names, prices))
+        q = (SQ_TEXT[lang]["pre"] + "\n" if trap else "") + lst + "\n" + SQ_TEXT[lang]["q"].format(x=x)
+        if not trap:
+            q = q.replace("But before that, just tell me: h", "H").replace("Aber vorher sag mir nur: W", "W")
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": sum(p > x for p in prices), "total": sum(prices),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_switched_question(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    if item["trap"]:
+        d["took_total"] = float(v == item["total"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3590,6 +3634,7 @@ TASKS = {
     "false_premise": task(load_false_premise, score_false_premise, 24, 200),
     "option_order": {**task(load_option_order, score_option_order, 24, 200), "grouped": True},
     "source_trust": task(load_source_trust, score_source_trust, 24, 200),
+    "switched_question": task(load_switched_question, score_switched_question, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -764,7 +764,20 @@ def test_source_trust():
     assert tn.score_source_trust(b, {"content": f"Answer: {b['gold']} g (lab)"})["correct"]
 
 
+
+def test_switched_question():
+    import tasks_novel as tn
+    for lang in ("en", "de"):
+        it = tn.load_switched_question(lang, 4, 0)
+        a, b = it[0], it[1]
+        assert a["gold"] == b["gold"] and len(b["messages"][0]["content"]) > len(a["messages"][0]["content"]) + 150
+        assert "vorher" not in a["messages"][0]["content"] and "before that" not in a["messages"][0]["content"]
+        r = tn.score_switched_question(b, {"content": f"Answer: {b['total']}"})
+        assert not r["correct"] and r["detail"]["took_total"] == 1.0
+
+
 if __name__ == "__main__":
+    test_switched_question()
     test_source_trust()
     test_option_order()
     test_false_premise()

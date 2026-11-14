@@ -152,3 +152,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `de_reported` | direct quote to indirect speech: Konjunktiv I / Ersatzform | de | 24 / 24 | off | finite verb; `ok_singular` / `ok_plural` |
 | `ambiguous_ref` | generated room: the asked object is unique (control) or has a same-kind twin (ambiguous) | de, en | 24 / 200 | auto | place vs "ambiguous"; `ok_unique` / `ok_ambiguous` |
 | `en_homophones` | generated gap sentences: its/it's, their/there/they're, then/than, affect/effect | en | 40 / 56 | off | word at the gap; `ok_<pair>` |
+| `glossary_mt` | own sentences (private set): EN->DE / DE->EN with a client glossary overriding the usual word | de, en | 30 / 60 | off | every glossary term used, no usual rendering; `terms_used`, `forbidden_used` |

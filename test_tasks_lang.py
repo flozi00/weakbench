@@ -415,7 +415,20 @@ def test_en_homophones():
             assert not tl.score_en_homophones(x, {"content": w})["correct"]
 
 
+def test_glossary_mt():
+    import tasks_lang as tl
+    de = tl.load_glossary_mt("de", 6, 0)[0]
+    ok = f"Bitte schließe den {de['gold'][0]}, sobald die {de['gold'][1]} bearbeitet ist."
+    assert tl.score_glossary_mt(de, {"content": ok})["correct"], (ok, de)
+    r = tl.score_glossary_mt(de, {"content": "Bitte schließe das Ticket, sobald die Rückerstattung bearbeitet ist."})
+    assert not r["correct"] and r["detail"]["forbidden_used"] == 1.0
+    en = tl.load_glossary_mt("en", 6, 0)[0]
+    assert tl.score_glossary_mt(en, {"content": f"Please close the {en['gold'][0]} once the {en['gold'][1]} is done."})["correct"]
+    assert not tl.score_glossary_mt(en, {"content": f"Please close the ticket ({en['gold'][0]}) once the {en['gold'][1]} is done."})["correct"]
+
+
 if __name__ == "__main__":
+    test_glossary_mt()
     test_en_homophones()
     test_de_reported()
     test_de_homophones()

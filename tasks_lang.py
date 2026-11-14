@@ -1452,6 +1452,45 @@ def score_en_homophones(item, reply):
             "detail": {f"ok_{item['pair']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- glossary_mt (translation that must follow a client glossary)
+# Two-sentence support texts translated EN->DE / DE->EN with a glossary that overrides the usual word
+# ("ticket" -> "Vorgang", not "Ticket"). Scored exactly: every glossary target used, no forbidden usual rendering.
+# term: (English word, usual German word, required German options, required English options for the German word)
+GL_TERMS = common.OwnSet("tasks_lang.GL_TERMS")  # private: flozi00/weakbench-data
+GL_SENT = common.OwnSet("tasks_lang.GL_SENT")  # private: flozi00/weakbench-data
+
+
+def load_glossary_mt(lang, n, seed):
+    """lang = target language: de items translate English into German, en items German into English."""
+    items = []
+    for i in range(n or 60):
+        r = random.Random(f"glossary_mt:{i}")
+        en_s, de_s, terms = GL_SENT[i % len(GL_SENT)]
+        T = [GL_TERMS[t] for t in terms]
+        if lang == "de":
+            src, gloss = en_s, [(t[0], r.choice(t[2])) for t in T]
+            forbid = [t[1] for t in T]
+            ask = "Übersetze ins Deutsche. Halte dich strikt an das Glossar des Kunden. Antworte nur mit der Übersetzung."
+        else:
+            src, gloss = de_s, [(t[1], r.choice(t[3])) for t in T]
+            forbid = [t[0] for t in T]
+            ask = "Translate into English. Follow the client's glossary strictly. Reply with the translation only."
+        g = "\n".join(f"{a} -> {b}" for a, b in gloss)
+        items.append({"id": str(i), "lang": lang, "gold": [b for _, b in gloss], "forbid": forbid,
+                      "messages": [{"role": "user", "content": f"{ask}\n\nGlossar / glossary:\n{g}\n\n{src}"}]})
+    return items
+
+
+def score_glossary_mt(item, reply):
+    text = (reply["content"] or "").lower()
+    used = [bool(re.search(r"\b" + re.escape(t.lower()), text)) for t in item["gold"]]
+    # the usual word is forbidden as its own word or an inflection of it ("Rechnungen"), not inside a compound
+    bad = [f for f in item["forbid"] if re.search(r"\b" + re.escape(f.lower()) + r"(s|n|en|e|es)?\b", text)]
+    ok = all(used) and not bad
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["gold"],
+            "detail": {"terms_used": sum(used) / len(used), "forbidden_used": float(bool(bad))}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1486,6 +1525,7 @@ TASKS = {
     "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 40, lang_check=False),
     "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 24, lang_check=False),
     "en_homophones": task(("en",), load_en_homophones, score_en_homophones, 32, 40, lang_check=False),
+    "glossary_mt": task(("de", "en"), load_glossary_mt, score_glossary_mt, 256, 30),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

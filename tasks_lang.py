@@ -2171,7 +2171,7 @@ def score_tense_order(item, reply):
 def gf_sources(r, i):
     kind = ("agree", "relative", "dass", "separable")[i % 4]
     if kind == "agree":
-        x = load_agreement_attractor("de", 160, 0)[r.randrange(160)]
+        x = load_agreement_attractor("de", 160, 0)[(i // 4 * 7) % 160]  # walk the pool, no seed collisions
         gold = x["messages"][0]["content"].split("\n\n")[1].replace("___", x["gold"])
         bad = gold.replace(f" {x['gold']} ", f" {'sind' if x['gold'] == 'ist' else 'ist'} ", 1)
         # the other valid fix: keep the verb, change the subject's number ("Der Zettel ... ist")
@@ -2179,7 +2179,7 @@ def gf_sources(r, i):
         alt = (sg + bad[len(pl):]) if gold.startswith(pl + " ") else (pl + bad[len(sg):])
         return kind, gold, bad, [alt]
     elif kind == "relative":
-        x = load_de_relative("de", None, 0)[r.randrange(32)]
+        x = load_de_relative("de", None, 0)[(i // 4 * 5) % 32]
         gold = x["messages"][0]["content"].split("\n\n")[1].replace("___", x["gold"])
         wrong = {"der": "den", "den": "dem", "dem": "den", "die": "der", "das": "dem", "denen": "die", "dessen": "deren",
                  "deren": "dessen"}[x["gold"]]
@@ -2187,7 +2187,8 @@ def gf_sources(r, i):
         return kind, gold, bad, []
     elif kind == "dass":
         x = load_de_homophones("de", None, 0)
-        x = [y for y in x if y["pair"] == "das_dass"][r.randrange(len([y for y in x if y["pair"] == "das_dass"]))]
+        pool = [y for y in x if y["pair"] == "das_dass"]
+        x = pool[(i // 4 * 3) % len(pool)]
         gold = x["sent"].replace("___", x["gold"])
         gold = gold[0].upper() + gold[1:]
         bad_word = "dass" if x["gold"] == "das" else "das"
@@ -2195,7 +2196,7 @@ def gf_sources(r, i):
         bad = bad[0].upper() + bad[1:]
         return kind, gold, bad, []
     else:
-        x = [y for y in load_de_separable("de", None, 0) if y["form"] == "main"][r.randrange(8)]
+        x = [y for y in load_de_separable("de", None, 0) if y["form"] == "main"][(i // 4) % 8]
         gold = x["gold"]
         w = gold.split()
         pre = w[-1].rstrip(".")
@@ -2222,9 +2223,11 @@ def load_de_grammar_fix(lang, n, seed):
 
 
 def score_de_grammar_fix(item, reply):
-    norm = lambda t: re.sub(r"\s+", " ", t.strip().strip("„“\"*").strip())  # noqa: E731
-    lines = [norm(x) for x in (reply["content"] or "").splitlines() if norm(x)]
-    ok = bool(lines) and norm(re.sub(r"^\w+:\s*", "", lines[-1])) in {norm(g) for g in [item["gold"], *item.get("alts", [])]}
+    norm = lambda t: re.sub(r"\s+", " ", t.strip().lstrip(">").strip().strip("„“\"*`").strip())  # noqa: E731
+    golds = {norm(g) for g in [item["gold"], *item.get("alts", [])]}
+    lines = [norm(re.sub(r"^[^:„\"]{1,40}:\s*", "", norm(x))) for x in (reply["content"] or "").splitlines() if norm(x)]
+    lines = [re.sub(r"\s*\([^)]*\)$", "", ln) for ln in lines]  # a trailing "(sind statt ist)" note
+    ok = any(ln in golds for ln in lines[:2])  # the sentence first; an explanation may follow
     return {"correct": ok, "score": float(ok), "pred": (lines[-1] if lines else "")[:80], "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok)}}
 

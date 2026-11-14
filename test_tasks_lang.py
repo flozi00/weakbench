@@ -603,6 +603,9 @@ def test_de_grammar_fix():
         assert tl.score_de_grammar_fix(x, {"content": shown})["correct"] == (x["kind"] == "clean")
         for a in x["alts"]:
             assert tl.score_de_grammar_fix(x, {"content": a})["correct"]
+        assert tl.score_de_grammar_fix(x, {"content": "Korrigierter Satz: " + x["gold"] + "\n\nDas Verb war falsch."})["correct"]
+    shown = [x["messages"][0]["content"] for x in tl.load_de_grammar_fix("de", 120, 0)]
+    assert len(set(shown)) >= 90, len(set(shown))  # the separable pool has 8 sentences
 
 
 if __name__ == "__main__":

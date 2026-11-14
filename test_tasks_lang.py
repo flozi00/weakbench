@@ -372,3 +372,17 @@ def test_de_commas():
 
 if __name__ == "__main__":
     test_de_commas()
+
+
+def test_de_homophones():
+    import tasks_lang as tl
+    it = tl.load_de_homophones("de", 28, 0)
+    for x in it:
+        assert "___" in x["messages"][0]["content"] and "{" not in x["messages"][0]["content"]
+        assert tl.score_de_homophones(x, {"content": x["gold"].capitalize()})["correct"]
+        other = {"das": "dass", "dass": "das", "seit": "seid", "seid": "seit", "wieder": "wider", "wider": "wieder"}
+        assert not tl.score_de_homophones(x, {"content": other[x["gold"]]})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_homophones()

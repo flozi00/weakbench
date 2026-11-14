@@ -1285,6 +1285,51 @@ def score_de_commas(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "words_changed": float(not same_words)}}
 
 
+# ---------------------------------------------------------------- de_homophones (das/dass, seit/seid, wieder/wider)
+# Generated sentences with one gap; the model names the word. Each template's gold is fixed by grammar, the fillers
+# vary. Sub-metric per pair.
+HO_FILL = {"n": ["Buch", "Auto", "Fahrrad", "Radio", "Sofa"], "p": ["Anna", "mein Bruder", "die Chefin", "Herr Kaya"],
+           "t": ["drei Wochen", "letztem Montag", "zwei Jahren", "dem Umzug"]}
+HO_TEMPL = [
+    ("das_dass", "das", "Das {n}, ___ ich gestern gekauft habe, ist schon kaputt."),
+    ("das_dass", "dass", "{P} hofft, ___ das {n} bald fertig ist."),
+    ("das_dass", "das", "Ich finde ___ {n} wirklich gelungen."),
+    ("das_dass", "dass", "Es ist wichtig, ___ {p} morgen pünktlich kommt."),
+    ("das_dass", "das", "Ist ___ wirklich wahr, was {p} erzählt?"),
+    ("das_dass", "dass", "___ {p} gewonnen hat, überrascht niemanden."),
+    ("seit_seid", "seit", "Wir wohnen ___ {t} in dieser Stadt."),
+    ("seit_seid", "seid", "Ihr ___ heute aber früh dran!"),
+    ("seit_seid", "seid", "___ bitte leise, das Baby schläft."),
+    ("seit_seid", "seit", "{P} arbeitet ___ {t} im Homeoffice."),
+    ("wieder_wider", "wieder", "Morgen regnet es schon ___."),
+    ("wieder_wider", "wider", "Die Mannschaft gewann ___ Erwarten das Finale."),
+    ("wieder_wider", "wieder", "{P} hat das {n} ___ zurückgebracht."),
+    ("wieder_wider", "wider", "Er handelte ___ besseres Wissen."),
+]
+HO_ASK = ("Welches Wort gehört in die Lücke ___? Antworte nur mit dem Wort, genau in der Schreibweise, die in den Satz "
+          "passt (die Großschreibung am Satzanfang zählt nicht).\n\n{s}")
+
+
+def load_de_homophones(lang, n, seed):
+    items = []
+    for i in range(n or 140):
+        r = random.Random(f"de_homophones:{i}")
+        pair, gold, t = HO_TEMPL[i % len(HO_TEMPL)]
+        p = r.choice(HO_FILL["p"])
+        sent = t.format(n=r.choice(HO_FILL["n"]), p=p, P=p[0].upper() + p[1:], t=r.choice(HO_FILL["t"]))
+        items.append({"id": str(i), "lang": "de", "pair": pair, "gold": gold,
+                      "messages": [{"role": "user", "content": HO_ASK.format(s=sent)}]})
+    return items
+
+
+def score_de_homophones(item, reply):
+    words = re.findall(r"[a-zäöüß]+", (tasks_novel.final_answer(reply["content"]) or reply["content"] or "").lower())
+    cand = [w for w in words if w in {"das", "dass", "seit", "seid", "wieder", "wider"}]
+    ok = cand[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": cand[:1], "gold": item["gold"],
+            "detail": {f"ok_{item['pair']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1316,6 +1361,7 @@ TASKS = {
     "roundtrip": task(("de", "en"), load_roundtrip, score_roundtrip, 1024, 60, lang_check=False),
     "de_verbs": task(("de",), load_de_verbs, score_de_verbs, 64, 120, lang_check=False),
     "de_case": task(("de",), load_de_case, score_de_case, 64, 120, lang_check=False),
+    "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 56, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

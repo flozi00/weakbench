@@ -690,6 +690,10 @@ def test_code_comments_lang():
     bad = good.replace("Zählt die Vokale in dem übergebenen Text und gibt die Anzahl zurück.", "Counts the vowels in the text and returns the number.").replace(
         "Wir gehen jeden Buchstaben durch und prüfen, ob er ein Vokal ist", "We go through each letter and check whether it is a vowel")
     assert not tl.score_code_comments_lang(x, {"content": bad})["correct"]
+    assert tl.score_code_comments_lang(x, {"content": good.replace("```python", "```Python3")})["correct"]
+    eng_doc = good.replace("Zählt die Vokale in dem übergebenen Text und gibt die Anzahl zurück.",
+                           "Counts the vowels in the given text and returns the number of them.")
+    assert not tl.score_code_comments_lang(x, {"content": eng_doc})["correct"]
 
 
 if __name__ == "__main__":

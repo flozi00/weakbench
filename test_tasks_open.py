@@ -354,6 +354,7 @@ def test_howto_steps():
         assert len(it) == 6
         r = to.score_howto_steps(it[1], {"content": "Schritte ..."})
         assert r["detail"]["safety_ok"] == 0.0 and r["score"] < 0.5  # a missing safety step halves the score
+        assert "two-pole" in it[1]["safety"] and "never boiled" in it[2]["safety"]
     finally:
         stop()
         tasks_judge.configure(None, None, None)

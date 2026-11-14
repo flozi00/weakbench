@@ -1195,36 +1195,46 @@ def score_triage_advice(item, reply):
 # (in substance, any wording), the order where it matters, and the safety step; missing safety is the costly miss.
 HS_TASKS = [
     {"en": "How do I patch the inner tube of a bike tyre?", "de": "Wie flicke ich den Schlauch eines Fahrradreifens?",
-     "steps": ["take the wheel off / remove the tyre from the rim", "take the tube out", "find the hole (pump up, water or "
-               "listening)", "roughen the area and apply glue, let it dry briefly", "press on the patch",
-               "check the tyre for the cause (glass, thorn) before refitting", "refit tube and tyre, inflate"],
-     "safety": "check the inside of the tyre for the sharp object before refitting"},
+     "steps": ["take the wheel off / lever the tyre off the rim", "take the tube out", "find the hole (pump up; water or "
+               "listening)", "roughen the area, apply rubber cement and let it dry until matt (or use a self-adhesive patch)",
+               "press the patch on firmly", "refit tube and tyre and inflate"],
+     "safety": "check the inside of the tyre (and the rim tape) for the sharp object before refitting",
+     "order": "the patch goes on only after the hole is found and prepared"},
     {"en": "How do I replace a ceiling lamp?", "de": "Wie tausche ich eine Deckenlampe aus?",
-     "steps": ["switch off the circuit breaker / fuse", "check that no voltage is present (voltage tester)",
-               "remove the old lamp and note the wires", "connect live, neutral and earth correctly", "mount the new lamp",
-               "switch the breaker back on and test"],
-     "safety": "switch off the breaker and verify no voltage before touching wires"},
+     "steps": ["remove the old lamp and note which wire goes where",
+               "connect L (brown/black) and N (blue) to the matching terminals, PE (green-yellow) to the earth terminal if "
+               "the lamp has one (insulate it otherwise)", "mount the new lamp", "switch the breaker back on and test"],
+     "safety": "switch off the circuit breaker (the wall switch is not enough), secure it against being switched on again "
+               "and verify there is no voltage with a two-pole voltage tester before touching wires",
+     "order": "breaker off and voltage checked before any wire is touched"},
     {"en": "How do I descale an electric kettle?", "de": "Wie entkalke ich einen Wasserkocher?",
-     "steps": ["fill with water and vinegar or citric acid", "heat it / let it act", "let it soak", "pour out",
+     "steps": ["fill with water and vinegar or citric acid", "warm it up and let it act (soak)", "pour out",
                "rinse and boil fresh water once or twice before use"],
-     "safety": "do not boil citric acid (or rinse and boil clean water afterwards); unplug before wiping the base"},
+     "safety": "citric acid is only warmed, never boiled",
+     "order": "rinsing and boiling fresh water come after the descaler is poured out"},
     {"en": "How do I bleed a radiator?", "de": "Wie entlüfte ich einen Heizkörper?",
-     "steps": ["turn the heating on so the system warms up, then switch the pump off / wait", "hold a cloth and container under the valve",
-               "open the bleed valve with the radiator key until water comes out", "close the valve",
-               "check the system pressure and top up if needed"],
-     "safety": "let the circulation pump stop first and expect hot water"},
-    {"en": "How do I jump-start a car with another car?", "de": "Wie gebe ich einem Auto Starthilfe mit einem anderen Auto?",
+     "steps": ["open the thermostat valve fully", "hold a cloth and container under the bleed valve",
+               "open the bleed valve with the radiator key until water comes out, then close it",
+               "switch the pump back on and check the system pressure, top up if needed"],
+     "safety": "let the heating warm up, then switch the circulation pump off and wait (or wait until the heating is off) "
+               "before bleeding; expect hot water",
+     "order": "pump off and waiting before the valve is opened"},
+    {"en": "How do I jump-start a car with another car?", "de": "Wie gebe ich mit einem anderen Auto Starthilfe?",
      "steps": ["both engines off", "red cable: plus of the flat battery to plus of the good battery",
-               "black cable: minus of the good battery to bare metal / earth point of the car with the flat battery",
-               "start the helper car, then the other car", "remove the cables in reverse order"],
-     "safety": "connect black to a metal earth point, not to the flat battery's minus terminal, and keep cables away from fans"},
+               "black cable: minus of the good battery to bare metal / an earth point (or the jump-start terminal) of the car "
+               "with the flat battery", "start the helper car, then the other car", "remove the cables in reverse order"],
+     "safety": "the black cable goes to an earth point, not to the flat battery's minus terminal",
+     "order": "red cable first (flat plus, then good plus), black last at the earth point; removal in reverse"},
     {"en": "How do I change a windscreen wiper blade?", "de": "Wie wechsle ich ein Scheibenwischerblatt?",
-     "steps": ["lift the wiper arm away from the windscreen", "press the clip and slide the old blade off",
-               "slide the new blade on until it clicks", "lower the arm gently"],
-     "safety": "hold the arm so it does not snap back onto the glass (put a cloth on the glass)"},
+     "steps": ["put the wipers in the service position if the arms sit under the bonnet", "lift the wiper arm",
+               "release the clip / catch of the mount and take the old blade off", "fit the new blade until it clicks",
+               "lower the arm gently"],
+     "safety": "hold the arm so it does not snap back onto the glass (or put a cloth on the glass)",
+     "order": "the arm is lowered only after the new blade is locked"},
 ]
 HS_JUDGE = """Evaluate instructions for this task: {task}
-For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+The instructions may be in German; steps may be merged or worded freely. For each criterion answer YES or NO.
+Reply with ONLY {{"verdicts": [...]}}.
 
 INSTRUCTIONS:
 {reply}
@@ -1235,7 +1245,7 @@ CRITERIA:
 
 def load_howto_steps(lang, n, seed):
     tasks_judge.check_judge()
-    items = [{"id": str(k), "lang": lang, "steps": t["steps"], "safety": t["safety"],
+    items = [{"id": str(k), "lang": lang, "steps": t["steps"], "safety": t["safety"], "order": t["order"],
               "messages": [{"role": "user", "content": t[lang]}]} for k, t in enumerate(HS_TASKS)]
     return items if n is None else items[:n]
 
@@ -1244,7 +1254,8 @@ def score_howto_steps(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     crit = [f"It contains this step (any wording): {s}." for s in item["steps"]] + [
-        "The steps are in a workable order.", f"It states the safety point: {item['safety']}."]
+        f"The order is right where it matters: {item['order']}.",
+        "It contains no wrong or unsafe instruction.", f"It states the safety point: {item['safety']}."]
     out = tasks_judge.judge("", HS_JUDGE.format(task=item["messages"][0]["content"], reply=text or "(empty)",
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))), max_tokens=192)
     m = re.search(r"\{.*\}", out, re.S)
@@ -1253,10 +1264,12 @@ def score_howto_steps(item, reply):
         raise ValueError(f"unusable howto verdict {out[:120]!r}")
     met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
     steps = met[:len(item["steps"])]
-    return {"correct": None, "score": round(sum(met) / len(met), 4) if met[-1] else round(sum(met) / len(met) / 2, 4),
-            "pred": text[:200], "gold": None,
-            "detail": {"steps_found": round(sum(steps) / len(steps), 4), "order_ok": float(met[-2]),
-                       "safety_ok": float(met[-1]), "all_met": float(all(met))}}
+    base = sum(met) / len(met)
+    base *= 1.0 if met[-1] else 0.5  # the safety point missing
+    base *= 1.0 if met[-2] else 0.5  # an unsafe or wrong instruction
+    return {"correct": None, "score": round(base, 4), "pred": text[:200], "gold": None,
+            "detail": {"steps_found": round(sum(steps) / len(steps), 4), "order_ok": float(met[-3]),
+                       "no_unsafe": float(met[-2]), "safety_ok": float(met[-1]), "all_met": float(all(met))}}
 
 
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,

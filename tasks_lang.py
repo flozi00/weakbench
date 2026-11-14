@@ -2494,24 +2494,48 @@ def load_code_comments_lang(lang, n, seed):
     return items
 
 
+def cc_parts(code):
+    """(comments, docstrings, names, tree) via tokenize/ast: a '#' inside a string is no comment."""
+    import ast as _ast
+    import io
+    import tokenize
+    comments = []
+    for tok in tokenize.generate_tokens(io.StringIO(code).readline):
+        if tok.type == tokenize.COMMENT:
+            body = tok.string.lstrip("#").strip()
+            if not re.search(r"[()=\[\]:]|\w+_\w+|\.\w", body):  # a commented-out code line is no comment
+                comments.append(body)
+    tree = _ast.parse(code)
+    docs = [_ast.get_docstring(tree) or ""] + [_ast.get_docstring(nd) or "" for nd in _ast.walk(tree)
+                                               if isinstance(nd, _ast.FunctionDef)]
+    names = {nd.id for nd in _ast.walk(tree) if isinstance(nd, _ast.Name)} | {
+        nd.name for nd in _ast.walk(tree) if isinstance(nd, _ast.FunctionDef)}
+    return comments, [d for d in docs if d], names, tree
+
+
 def score_code_comments_lang(item, reply):
     import ast as _ast
     text = reply["content"] or ""
-    m = re.findall(r"```(?:python|py)?\s*\n(.*?)```", text, re.S)
+    m = re.findall(r"```[\w+-]*\s*\n(.*?)(?:```|\Z)", text, re.S)
     code = m[-1] if m else text
     try:
-        tree = _ast.parse(code)
-        defined = any(isinstance(nd, _ast.FunctionDef) and nd.name == item["func"] for nd in _ast.walk(tree))
-        docs = " ".join(_ast.get_docstring(nd) or "" for nd in _ast.walk(tree) if isinstance(nd, _ast.FunctionDef))
-    except SyntaxError:
-        defined, docs = False, ""
-    comments = " ".join(re.findall(r"#\s*(.*)", code)) + " " + docs
-    words = len(re.findall(r"[^\W\d_]{2,}", comments))
-    comments_ok = words >= 12 and common.lang_ok(comments, item["lang"], min_words=10) is True
+        comments, docs, names, tree = cc_parts(code)
+    except Exception:  # noqa: BLE001 - prose before unfenced code: retry from the first def/import
+        k = re.search(r"^(def |import |from |\"\"\")", code, re.M)
+        try:
+            comments, docs, names, tree = cc_parts(code[k.start():]) if k else ([], [], set(), None)
+        except Exception:  # noqa: BLE001
+            comments, docs, names, tree = [], [], set(), None
+    defined = tree is not None and any(isinstance(nd, _ast.FunctionDef) and nd.name == item["func"]
+                                       for nd in _ast.walk(tree))
+    strip = lambda t: " ".join(w for w in re.findall(r"\S+", t) if w.strip("`'\".,:;") not in names)  # noqa: E731
+    pooled = strip(" ".join(comments + docs))
+    words = len(re.findall(r"[^\W\d_]{2,}", pooled))
+    doc_ok = bool(docs) and common.lang_ok(strip(" ".join(docs)), item["lang"], min_words=4) is not False
+    comments_ok = words >= 12 and doc_ok and common.lang_ok(pooled, item["lang"], min_words=10) is True
     ok = defined and comments_ok
-    return {"correct": ok, "score": float(ok), "pred": comments[:80], "gold": None,
-            "detail": {"parses": float(defined), "comments_ok": float(comments_ok)}}
-
+    return {"correct": ok, "score": float(ok), "pred": pooled[:80], "gold": None,
+            "detail": {"parses": float(defined), "comments_ok": float(comments_ok), "docstring_ok": float(doc_ok)}}
 
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,

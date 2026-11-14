@@ -1451,6 +1451,57 @@ def score_lookalike(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- revoked_rule (trap: an instruction replaced mid-dialogue)
+# Turn 1 sets a sign-off word; in trap items a later user turn replaces it, in control items it stays.
+# The last reply must end with the word that is in force now. took_old = still the revoked word.
+RV_WORDS = ["Pineapple", "Lighthouse", "Marmalade", "Compass", "Velvet", "Thunder", "Origami", "Saffron"]
+RV_TEXT = {
+    "en": {"set": "From now on, end every answer with the single word '{w}' on its own last line.",
+           "swap": "Change of plan: stop using '{old}'. From now on end every answer with '{w}' on its own last line instead.",
+           "ok": "Understood.",
+           "qs": ["What is the capital of Norway?", "Name a prime number between 20 and 30.", "What colour do you get by mixing blue and yellow?",
+                  "How many legs does a spider have?", "Which planet is closest to the sun?", "What is 12 times 12?"],
+           "as": ["Oslo.", "23.", "Green.", "Eight.", "Mercury.", "144."]},
+    "de": {"set": "Beende ab jetzt jede Antwort mit dem einzelnen Wort '{w}' in einer eigenen letzten Zeile.",
+           "swap": "Planänderung: Benutze '{old}' nicht mehr. Beende ab jetzt jede Antwort stattdessen mit '{w}' in einer eigenen letzten Zeile.",
+           "ok": "Verstanden.",
+           "qs": ["Was ist die Hauptstadt von Norwegen?", "Nenne eine Primzahl zwischen 20 und 30.", "Welche Farbe entsteht aus Blau und Gelb?",
+                  "Wie viele Beine hat eine Spinne?", "Welcher Planet ist der Sonne am nächsten?", "Was ist 12 mal 12?"],
+           "as": ["Oslo.", "23.", "Grün.", "Acht.", "Merkur.", "144."]},
+}
+
+
+def load_revoked_rule(lang, n, seed):
+    items, T = [], RV_TEXT[lang]
+    for i in range(n or 200):
+        r = rng_of("revoked_rule", i // 2)
+        trap = i % 2 == 1
+        old, new = r.sample(RV_WORDS, 2)
+        qi = r.sample(range(len(T["qs"])), 4)
+        swap_at = r.randint(1, 2)  # after that many answered questions
+        msgs = [{"role": "user", "content": T["set"].format(w=old)}, {"role": "assistant", "content": T["ok"] + "\n" + old}]
+        word = old
+        for k, q in enumerate(qi[:3]):
+            if trap and k == swap_at:
+                msgs += [{"role": "user", "content": T["swap"].format(old=old, w=new)},
+                         {"role": "assistant", "content": T["ok"] + "\n" + new}]
+                word = new
+            msgs += [{"role": "user", "content": T["qs"][q]}, {"role": "assistant", "content": T["as"][q] + "\n" + word}]
+        msgs.append({"role": "user", "content": T["qs"][qi[3]]})
+        items.append({"id": str(i), "lang": lang, "revoked": trap, "gold": new if trap else old, "old": old, "messages": msgs})
+    return items
+
+
+def score_revoked_rule(item, reply):
+    last = re.sub(r"[\W_]+$", "", (reply["content"] or "").strip()).rsplit(None, 1)
+    last = re.sub(r"^\W+", "", last[-1]) if last else ""
+    ok = last.lower() == item["gold"].lower()
+    d = {"ok_revoked" if item["revoked"] else "ok_control": float(ok)}
+    if item["revoked"]:
+        d["took_old"] = float(last.lower() == item["old"].lower())
+    return {"correct": ok, "score": float(ok), "pred": last, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -2974,6 +3025,7 @@ TASKS = {
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
     "noop_math": task(load_noop_math, score_noop_math, 24, 200),
+    "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),
     "meeting_actions": {**task(load_meeting_actions, score_meeting_actions, 24, 150), "think": False,

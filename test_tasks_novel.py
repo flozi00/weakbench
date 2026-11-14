@@ -576,7 +576,20 @@ def test_lookalike():
     assert not r["correct"] and r["detail"]["took_twin"] == 1.0
 
 
+
+def test_revoked_rule():
+    import tasks_novel as tn
+    it = tn.load_revoked_rule("en", 10, 0)
+    a, b = it[0], it[1]
+    assert a["gold"] == a["old"] and b["gold"] != b["old"]
+    assert tn.score_revoked_rule(b, {"content": f"Oslo.\n**{b['gold']}**."})["correct"]
+    r = tn.score_revoked_rule(b, {"content": f"Oslo.\n{b['old']}"})
+    assert not r["correct"] and r["detail"]["took_old"] == 1.0
+    assert tn.score_revoked_rule(a, {"content": f"Oslo. {a['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_revoked_rule()
     test_lookalike()
     test_noop_math()
     test_puzzle_mutation()

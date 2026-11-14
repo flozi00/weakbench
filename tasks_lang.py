@@ -2421,7 +2421,9 @@ def score_en_reported(item, reply):
 PA_STRONG = ["Viele", "Einige", "Mehrere", "Wenige", ""]
 PA_WEAK = ["Alle", "Beide", "Keine", "Diese", "Meine"]
 PA_ADJ = ["gut", "alt", "neu", "klein", "freundlich", "teuer", "dunkel"]
-PA_NOUN = ["Freunde", "Häuser", "Bücher", "Lampen", "Nachbarn", "Autos", "Ideen"]
+PA_NOUN = [("Freunde", "kamen gestern zu Besuch"), ("Häuser", "stehen am Fluss"), ("Bücher", "liegen auf dem Tisch"),
+           ("Lampen", "hängen im Flur"), ("Nachbarn", "grüßen uns jeden Morgen"), ("Autos", "parken vor der Tür"),
+           ("Ideen", "gefallen mir")]
 
 
 def pa_form(adj, ending):
@@ -2433,16 +2435,25 @@ def pa_form(adj, ending):
 
 
 def load_de_plural_adj(lang, n, seed):
-    items = []
-    for i in range(n or 120):
-        r = random.Random(f"de_plural_adj:{i}")
-        strong = i % 2 == 0
-        det = r.choice(PA_STRONG if strong else PA_WEAK)
-        adj, noun = r.choice(PA_ADJ), r.choice(PA_NOUN)
+    import itertools
+    combos = list(itertools.product(range(len(PA_ADJ)), range(len(PA_NOUN)), range(5)))
+    random.Random("de_plural_adj").shuffle(combos)
+    items, seen, j = [], set(), -1
+    while len(items) < (n or 120):
+        j += 1
+        if j > 50 * len(combos):
+            raise RuntimeError("de_plural_adj: not enough distinct prompts")  # never loop forever
+        i = len(items)
+        a, nn, d = combos[j % len(combos)]
+        kind = i % 4  # 0: no article (strong), 1: quantifier (strong), 2-3: weak determiner
+        strong = kind < 2
+        det = "" if kind == 0 else (PA_STRONG[d % 4] if kind == 1 else PA_WEAK[d])
+        adj, (noun, pred) = PA_ADJ[a], PA_NOUN[nn]
         gold = pa_form(adj, "e" if strong else "en")
-        lead = f"{det} " if det else ""
-        sent = f"{lead}___ {noun} waren gestern hier." if det else f"___ {noun} waren gestern hier."
-        sent = sent[0].upper() + sent[1:] if not det else sent
+        sent = f"{det} ___ {noun} {pred}." if det else f"___ {noun} {pred}."
+        if (adj, sent) in seen:  # the adjective is part of the prompt, not of the sentence
+            continue
+        seen.add((adj, sent))
         items.append({"id": str(i), "lang": "de", "gold": gold, "strong": strong,
                       "messages": [{"role": "user", "content": f"Setze das Adjektiv „{adj}“ in der richtigen Form ein. "
                                     f"Antworte nur mit dem Wort.\n\n{sent}"}]})
@@ -2451,7 +2462,8 @@ def load_de_plural_adj(lang, n, seed):
 
 def score_de_plural_adj(item, reply):
     w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
-    ok = item["gold"] in w[:2]
+    other = item["gold"][:-1] if item["gold"].endswith("en") else item["gold"] + "n"
+    ok = item["gold"] in w[:2] and other not in w  # "gute oder guten" is no answer
     return {"correct": ok, "score": float(ok), "pred": w[:2], "gold": item["gold"],
             "detail": {"ok_strong" if item["strong"] else "ok_weak": float(ok)}}
 

@@ -1184,12 +1184,14 @@ def group_consistency(rs):
     for r in rs:
         groups[str(r["id"]).rsplit("-", 1)[0]].append(r)
     size = max((len(g) for g in groups.values()), default=0)  # a group cut by --limit is incomplete
+    # a task without a right answer (framing) puts the compared choice in detail.group_key; others compare correct
+    val = lambda r: (r.get("detail") or {}).get("group_key", r["correct"])  # noqa: E731
     full = [g for g in groups.values() if size > 1 and len(g) == size
-            and all(not r["error"] and isinstance(r["correct"], bool) for r in g)]
+            and all(not r["error"] and isinstance(val(r), bool) for r in g)]
     if not full:
         return {}
-    out = {"group_agree": round(statistics.fmean(len({r["correct"] for r in g}) == 1 for g in full), 4),
-           "group_all": round(statistics.fmean(all(r["correct"] for r in g) for g in full), 4)}
+    out = {"group_agree": round(statistics.fmean(len({val(r) for r in g}) == 1 for g in full), 4),
+           "group_all": round(statistics.fmean(all(val(r) for r in g) for g in full), 4)}
     any_ok = [g for g in full if any(r["correct"] for r in g)]
     if any_ok:  # always wrong is consistent too: of the groups known at all, how many fully
         out["group_all_of_any"] = round(statistics.fmean(all(r["correct"] for r in g) for g in any_ok), 4)

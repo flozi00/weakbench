@@ -3990,14 +3990,17 @@ FR_TXT = {"en": [("{x} people will be saved", "all {n} people will be saved", "n
                   "gehen alle {n} Arbeitsplätze verloren")]}
 
 
+FR_COMBOS = [(k, tot, frac) for k in range(3) for tot in (240, 300, 480, 600, 720, 900, 1200, 1500) for frac in (3, 4, 5)
+             if tot % frac == 0]
+random.Random("framing").shuffle(FR_COMBOS)
+
+
 def load_framing(lang, n, seed):
     items = []
     for i in range(n or 120):
         g, loss = divmod(i, 2)
-        r = rng_of("framing", g)
-        k = r.randrange(3)
-        tot = r.choice([300, 600, 900, 1200])
-        frac = r.choice([3, 4])  # sure part = tot/frac; gamble = 1/frac chance of all
+        combos = FR_COMBOS
+        k, tot, frac = combos[g % len(combos)]  # dealt out: no two groups share topic, size and odds before all are used
         sure = tot // frac
         topic = FR_TOPIC[lang][k].format(n=tot)
         sg, gb, gw, sl, lb, lw = FR_TXT[lang][k]
@@ -4024,13 +4027,13 @@ def load_framing(lang, n, seed):
 def score_framing(item, reply):
     line = (final_answer(reply["content"]) or "").strip()
     m = re.match(r"\W*(?:plan|option)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line)
-    pred = m.group(1).upper() if m else None
+    lone = set(re.findall(r"\b([AB])\b", line))
+    pred = m.group(1).upper() if m else (lone.pop() if len(lone) == 1 else None)  # "Ich wähle B"
     # no right answer: "correct" records the choice (True = the sure option), so the grouped group_agree is the share of
     # pairs whose choice survives the reframing; None when the reply names no option
     chose_sure = None if pred is None else pred == item["sure"]
-    d = {} if pred is None else {"sure_loss" if item["loss"] else "sure_gain": float(chose_sure)}
-    return {"correct": chose_sure, "score": None if chose_sure is None else float(chose_sure), "pred": pred, "gold": None,
-            "detail": d}
+    d = {} if pred is None else {"sure_loss" if item["loss"] else "sure_gain": float(chose_sure), "group_key": chose_sure}
+    return {"correct": None, "score": None, "pred": pred, "gold": None, "detail": d}  # no right answer: not an accuracy
 
 
 # ---------------------------------------------------------------- table_qa

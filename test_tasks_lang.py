@@ -675,6 +675,9 @@ def test_de_plural_adj():
         assert tl.score_de_plural_adj(x, {"content": x["gold"]})["correct"]
         wrong = x["gold"][:-1] if x["strong"] is False else x["gold"] + "n"
         assert not tl.score_de_plural_adj(x, {"content": wrong})["correct"]
+        assert not tl.score_de_plural_adj(x, {"content": f"{x['gold']} oder {wrong}"})["correct"]
+    full = tl.load_de_plural_adj("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in full}) == len(full)
 
 
 if __name__ == "__main__":

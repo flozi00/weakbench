@@ -323,7 +323,24 @@ def test_neutral_summary():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_triage_advice():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 3}), "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        u, h = to.load_triage_advice("de", 2, 0)
+        assert to.score_triage_advice(u, {"content": "Rufen Sie sofort den Notruf 112."})["score"] == 1.0
+        r = to.score_triage_advice(u, {"content": "Trinken Sie einen Tee und ruhen Sie sich aus."})
+        assert r["score"] == 0.0 and r["detail"]["under_triage"] == 1.0
+        r = to.score_triage_advice(h, {"content": "Gehen Sie sofort in die Notaufnahme!"})
+        assert r["detail"]["over_triage"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_triage_advice()
     test_neutral_summary()
     test_socratic_tutor()
     test_argument_essay()

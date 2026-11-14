@@ -667,7 +667,18 @@ def test_en_reported():
     assert sc(it[4], "Anna said that she had been ill the week before.") and not sc(it[4], "Anna said that she was ill.")
 
 
+def test_de_plural_adj():
+    import tasks_lang as tl
+    assert tl.pa_form("teuer", "en") == "teuren" and tl.pa_form("dunkel", "e") == "dunkle"
+    it = tl.load_de_plural_adj("de", 20, 0)
+    for x in it:
+        assert tl.score_de_plural_adj(x, {"content": x["gold"]})["correct"]
+        wrong = x["gold"][:-1] if x["strong"] is False else x["gold"] + "n"
+        assert not tl.score_de_plural_adj(x, {"content": wrong})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_plural_adj()
     test_en_reported()
     test_time_prep()
     test_revise_on_feedback()

@@ -2415,6 +2415,47 @@ def score_en_reported(item, reply):
     return {"correct": ok, "score": float(ok), "pred": after[:60], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_plural_adj (adjective endings after plural determiners)
+# Nominative plural: after viele/einige/mehrere/wenige and with no article the adjective takes the strong ending -e
+# ("viele gute Freunde"); after alle/beide/keine/diese/meine the weak ending -en ("alle guten Freunde").
+PA_STRONG = ["Viele", "Einige", "Mehrere", "Wenige", ""]
+PA_WEAK = ["Alle", "Beide", "Keine", "Diese", "Meine"]
+PA_ADJ = ["gut", "alt", "neu", "klein", "freundlich", "teuer", "dunkel"]
+PA_NOUN = ["Freunde", "Häuser", "Bücher", "Lampen", "Nachbarn", "Autos", "Ideen"]
+
+
+def pa_form(adj, ending):
+    if adj == "teuer":
+        return "teure" if ending == "e" else "teuren"
+    if adj == "dunkel":
+        return "dunkle" if ending == "e" else "dunklen"
+    return adj + ending
+
+
+def load_de_plural_adj(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = random.Random(f"de_plural_adj:{i}")
+        strong = i % 2 == 0
+        det = r.choice(PA_STRONG if strong else PA_WEAK)
+        adj, noun = r.choice(PA_ADJ), r.choice(PA_NOUN)
+        gold = pa_form(adj, "e" if strong else "en")
+        lead = f"{det} " if det else ""
+        sent = f"{lead}___ {noun} waren gestern hier." if det else f"___ {noun} waren gestern hier."
+        sent = sent[0].upper() + sent[1:] if not det else sent
+        items.append({"id": str(i), "lang": "de", "gold": gold, "strong": strong,
+                      "messages": [{"role": "user", "content": f"Setze das Adjektiv „{adj}“ in der richtigen Form ein. "
+                                    f"Antworte nur mit dem Wort.\n\n{sent}"}]})
+    return items
+
+
+def score_de_plural_adj(item, reply):
+    w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    ok = item["gold"] in w[:2]
+    return {"correct": ok, "score": float(ok), "pred": w[:2], "gold": item["gold"],
+            "detail": {"ok_strong" if item["strong"] else "ok_weak": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2468,6 +2509,7 @@ TASKS = {
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
+    "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

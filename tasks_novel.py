@@ -3823,6 +3823,7 @@ def score_base_rate(item, reply):
 
 
 def sp_draw(r, paradox):
+    ts_agree = r.random() < 0.5  # does "more successes in total" point to the overall winner? half the time
     while True:
         # (successes, patients) for A and B in hospital 1 (easy cases) and 2 (hard cases)
         a1n, b1n = r.randint(10, 40), r.randint(60, 200)
@@ -3832,7 +3833,9 @@ def sp_draw(r, paradox):
         within = a1 / a1n > b1 / b1n and a2 / a2n > b2 / b2n
         overall_a = (a1 + a2) / (a1n + a2n) > (b1 + b2) / (b1n + b2n)
         gaps = (abs(a1 / a1n - b1 / b1n), abs(a2 / a2n - b2 / b2n), abs((a1 + a2) / (a1n + a2n) - (b1 + b2) / (b1n + b2n)))
-        if within and (not overall_a) == paradox and min(gaps) > .02:  # every comparison clear by 2 points
+        more_a = a1 + a2 > b1 + b2
+        if (within and (not overall_a) == paradox and min(gaps) > .02  # every comparison clear by 2 points
+                and (more_a == overall_a) == ts_agree and a1 + a2 != b1 + b2):
             return (a1, a1n, b1, b1n, a2, a2n, b2, b2n), "A", ("A" if overall_a else "B")
 
 
@@ -3947,7 +3950,9 @@ def score_prob_fallacies(item, reply):
         m = (re.match(r"\W*(?:option|möglichkeit|antwort)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line))
         ok = bool(m) and m.group(1).upper() == g
     elif g == "50":
-        ok = bool(re.search(r"(?<!\d)(?<!\d[.,])50(?:[.,]0+)?%?(?!\d)|1/2|0[.,]5\b|half|hälfte|fifty|fünfzig", line, re.I))
+        other = [x for x in re.findall(r"\d+(?:[.,]\d+)?", line) if x.replace(",", ".") not in ("50", "50.0", "1", "2", "0.5")]
+        ok = not other and bool(re.search(r"(?<!\d)(?<!\d[.,])50(?:[.,]0+)?%?(?!\d)|1/2|0[.,]5\b|half|hälfte|fifty|fünfzig",
+                                          line, re.I))  # "between 0 and 50%" names other numbers
     else:
         a, b = g.split("/")
         dec = int(a) / int(b)

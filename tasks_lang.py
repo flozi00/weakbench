@@ -1780,6 +1780,47 @@ def score_wug(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- irony (the same praise word, sincere or ironic by context)
+# One context sentence, then a remark that starts with the same praise ("Great", "Na super") and names the event.
+# The event is good (sincere) or bad (ironic); the context decides, the words of the remark barely differ.
+IR_EVENTS = {"en": [("the train is on time for once", "the train is late again"),
+                    ("the heating works again", "the heating broke down again"),
+                    ("my flight got upgraded", "my flight got cancelled"),
+                    ("the printer printed everything", "the printer jammed on page one"),
+                    ("it stopped raining for the picnic", "it started pouring at the picnic")],
+             "de": [("der Zug ist ausnahmsweise pünktlich", "der Zug hat schon wieder Verspätung"),
+                    ("die Heizung geht wieder", "die Heizung ist schon wieder kaputt"),
+                    ("mein Flug wurde hochgestuft", "mein Flug wurde gestrichen"),
+                    ("der Drucker hat alles gedruckt", "der Drucker hat sich auf Seite eins verklemmt"),
+                    ("zum Picknick hat der Regen aufgehört", "zum Picknick fing es an zu schütten")]}
+IR_PRAISE = {"en": ["Great, {e}.", "Wonderful, {e}. Just what I needed.", "Oh perfect, {e}."],
+             "de": ["Na super, {e}.", "Wunderbar, {e}. Genau das, was ich gebraucht habe.", "Oh perfekt, {e}."]}
+IR_ASK = {"en": "Is the speaker being ironic or sincere? Answer with one word: ironic or sincere.",
+          "de": "Meint die Person das ironisch oder ernst? Antworte mit einem Wort: ironisch oder ernst."}
+
+
+def load_irony(lang, n, seed):
+    items = []
+    for i in range(n or 60):
+        r = random.Random(f"irony:{i}")
+        good, bad = r.choice(IR_EVENTS[lang])
+        ironic = i % 2 == 1
+        remark = r.choice(IR_PRAISE[lang]).format(e=bad if ironic else good)
+        gold = ("ironic" if ironic else "sincere") if lang == "en" else ("ironisch" if ironic else "ernst")
+        items.append({"id": str(i), "lang": lang, "ironic": ironic, "gold": gold,
+                      "messages": [{"role": "user", "content": f"„{remark}“\n\n{IR_ASK[lang]}"}]})
+    return items
+
+
+def score_irony(item, reply):
+    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+         if x in ("ironic", "sincere", "ironisch", "ernst", "ernstgemeint", "aufrichtig")]
+    pred = {"ernstgemeint": "ernst", "aufrichtig": "ernst"}.get(w[0], w[0]) if w else None
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
+            "detail": {"ok_ironic" if item["ironic"] else "ok_sincere": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1821,6 +1862,7 @@ TASKS = {
     "mixed_input": task(("de", "en"), load_mixed_input, score_mixed_input, 64, 30, lang_check=False),
     "agreement_attractor": task(("de", "en"), load_agreement_attractor, score_agreement_attractor, 16, 40, lang_check=False),
     "wug": task(("de", "en"), load_wug, score_wug, 32, 40, lang_check=False),
+    "irony": task(("de", "en"), load_irony, score_irony, 16, 30, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

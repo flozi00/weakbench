@@ -499,7 +499,17 @@ def test_wug():
         assert not tl.score_wug(x, {"content": x["gold"] + "x"})["correct"]
 
 
+def test_irony():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        it = tl.load_irony(lang, 10, 0)
+        assert {x["ironic"] for x in it} == {True, False}
+        for x in it:
+            assert tl.score_irony(x, {"content": x["gold"].capitalize() + "."})["correct"]
+
+
 if __name__ == "__main__":
+    test_irony()
     test_wug()
     test_agreement_attractor()
     test_mixed_input()

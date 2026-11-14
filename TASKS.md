@@ -167,3 +167,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `constrained_plan` ** | generated requests (meals / day trip / training week) with 3-4 drawn constraints | de, en | 18 / 60 | off | judge per constraint + usefulness; `constraints_met`, `all_met` |
 | `memory_dialog` ** | generated 5-turn chat: age, allergy, budget and a dislike dropped among small talk, then a gift + cake request | de, en | 16 / 48 | off | judge per fact + no re-asking; `kept_<fact>`, `no_reask` |
 | `wug` | generated nonce words (Berko): EN plural / past / 3rd person, DE weak verbs 3rd person and Partizip II (ge-, -ieren, be-/ver-/zer-, -et after d/t) | de, en | 40 / 120 | off | exact form; `ok_<kind>` |
+| `irony` | generated: the same praise ("Na super", "Great") over a good or a bad event | de, en | 30 / 60 | off | ironic/sincere; `ok_ironic` / `ok_sincere` |

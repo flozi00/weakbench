@@ -3841,6 +3841,9 @@ def load_simpson(lang, n, seed):
         r = rng_of("simpson", i)
         paradox = (i // 2) % 2 == 0
         (a1, a1n, b1, b1n, a2, a2n, b2, b2n), within, overall = sp_draw(r, paradox)
+        if r.random() < 0.5:  # swap the labels: the winner within the hospitals is A or B equally often
+            a1, a1n, b1, b1n, a2, a2n, b2, b2n = b1, b1n, a1, a1n, b2, b2n, a2, a2n
+            within, overall = {"A": "B", "B": "A"}[within], {"A": "B", "B": "A"}[overall]
         ask_overall = i % 2 == 1
         if lang == "en":
             t = (f"Hospital 1: treatment A helped {a1} of {a1n} patients, treatment B helped {b1} of {b1n}. "

@@ -829,7 +829,19 @@ def test_counterfactual_world():
     assert 0.4 <= sum(x["conflict"] for x in it) / len(it) <= 0.8
 
 
+
+def test_fallacy_spot():
+    import tasks_novel as tn
+    for lang in ("en", "de"):
+        it = tn.load_fallacy_spot(lang, 12, 0)
+        assert [x["kind"] for x in it[:6]] == tn.FS_KINDS
+        for x in it:
+            assert "{" not in x["messages"][0]["content"]
+            assert tn.score_fallacy_spot(x, {"content": f"Answer: {x['gold']}) ..."})["correct"]
+
+
 if __name__ == "__main__":
+    test_fallacy_spot()
     test_counterfactual_world()
     test_ambiguous_ref()
     test_causal_graph()

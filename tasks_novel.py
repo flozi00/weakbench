@@ -2347,6 +2347,67 @@ def score_counterfactual_world(item, reply):
             "detail": {f"ok_rule{item['rule']}": float(ok), f"ok_{c}": float(ok), f"ok_{c}_rule{item['rule']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- fallacy_spot (name the reasoning flaw in a generated argument)
+# Arguments about invented proposals, each built on one fallacy, plus a sound control argument. The model names the
+# flaw from a fixed list (or "none"). Topics are invented, so knowing the debate does not help.
+FS_KINDS = ["ad_hominem", "false_dilemma", "hasty_generalization", "post_hoc", "slippery_slope", "none"]
+FS_LABEL = {"en": {"ad_hominem": "attack on the person", "false_dilemma": "false either-or",
+                   "hasty_generalization": "hasty generalization", "post_hoc": "false cause (after, therefore because)",
+                   "slippery_slope": "slippery slope", "none": "no flaw"},
+            "de": {"ad_hominem": "Angriff auf die Person", "false_dilemma": "falsches Entweder-oder",
+                   "hasty_generalization": "vorschnelle Verallgemeinerung",
+                   "post_hoc": "Scheinkausalität (danach, also deshalb)", "slippery_slope": "Dammbruchargument",
+                   "none": "kein Fehler"}}
+FS_TEXT = {
+    "en": {"ad_hominem": "{p} proposes the {x}. But {p} failed a driving test twice, so the {x} is a bad idea.",
+           "false_dilemma": "Either we introduce the {x} this year, or the town will be ruined. So we must introduce it.",
+           "hasty_generalization": "I talked to two shop owners who dislike the {x}. So everyone in town is against it.",
+           "post_hoc": "The {x} started in May, and in June the river flooded. So the {x} caused the flood.",
+           "slippery_slope": "If we allow the {x}, next they will tax every bicycle, then ban cars, and soon nobody "
+                             "will be allowed to leave town.",
+           "none": "The {x} costs 40,000 euros per year and the town budget has a reserve of 10,000 euros. So the town "
+                   "cannot pay for the {x} from its reserve alone."},
+    "de": {"ad_hominem": "{p} schlägt die {x} vor. Aber {p} ist zweimal durch die Fahrprüfung gefallen, also ist die {x} "
+                         "eine schlechte Idee.",
+           "false_dilemma": "Entweder führen wir die {x} dieses Jahr ein, oder die Stadt geht zugrunde. Also müssen wir sie "
+                            "einführen.",
+           "hasty_generalization": "Ich habe mit zwei Ladenbesitzern gesprochen, die die {x} nicht mögen. Also ist die "
+                                   "ganze Stadt dagegen.",
+           "post_hoc": "Die {x} begann im Mai, und im Juni trat der Fluss über die Ufer. Also hat die {x} das Hochwasser "
+                       "verursacht.",
+           "slippery_slope": "Wenn wir die {x} erlauben, besteuern sie als Nächstes jedes Fahrrad, dann verbieten sie Autos, "
+                             "und bald darf niemand mehr die Stadt verlassen.",
+           "none": "Die {x} kostet 40.000 Euro im Jahr, und die Rücklage der Stadt beträgt 10.000 Euro. Also kann die "
+                   "Stadt die {x} nicht allein aus der Rücklage bezahlen."}}
+FS_TOPIC = {"en": ["Zorvel parking rule", "Brimak market fee", "Telo night bus", "Quanda street lighting plan"],
+            "de": ["Zorvel-Parkregel", "Brimak-Marktgebühr", "Telo-Nachtbuslinie", "Quanda-Beleuchtungsregel"]}
+
+
+def load_fallacy_spot(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("fallacy_spot", i)
+        kind = FS_KINDS[i % len(FS_KINDS)]
+        labels = list(FS_KINDS)
+        r.shuffle(labels)
+        arg = FS_TEXT[lang][kind].format(x=r.choice(FS_TOPIC[lang]), p=r.choice(["Ms Arden", "Mr Kolb"] if lang == "en"
+                                                                                   else ["Frau Arden", "Herr Kolb"]))
+        opts = "\n".join(f"{'ABCDEF'[j]}) {FS_LABEL[lang][k]}" for j, k in enumerate(labels))
+        q = ("Which reasoning flaw does this argument contain?" if lang == "en"
+             else "Welchen Denkfehler enthält dieses Argument?")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": "ABCDEF"[labels.index(kind)],
+                      "messages": [{"role": "user", "content": f"{arg}\n\n{q}\n{opts}\n" + ASK[lang]}]})
+    return items
+
+
+def score_fallacy_spot(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*([A-F])\b", line) or re.search(r"\b([A-F])\)", line)
+    pred = m.group(1) if m else None
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3885,6 +3946,7 @@ TASKS = {
     "causal_graph": task(load_causal_graph, score_causal_graph, 24, 200),
     "ambiguous_ref": task(load_ambiguous_ref, score_ambiguous_ref, 24, 200),
     "counterfactual_world": task(load_counterfactual_world, score_counterfactual_world, 25, 200),
+    "fallacy_spot": task(load_fallacy_spot, score_fallacy_spot, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

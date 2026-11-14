@@ -568,7 +568,20 @@ def test_form_writing():
     assert tl.score_form_writing(co, {"content": words})["detail"]["form_only"] == 1.0
 
 
+def test_de_no_anglicisms():
+    import tasks_lang as tl
+    x = tl.load_de_no_anglicisms("de", 1, 0)[0]
+    clean = ("Liebe Kolleginnen und Kollegen, wir treffen uns am Montag zur Besprechung, um die nächste Version der "
+             "Software zu planen. Bitte schickt mir bis Freitag eure Rückmeldungen und Fragen, damit wir den Zeitplan und "
+             "die Aufgaben gemeinsam festlegen können. Viele Grüße")
+    assert tl.score_de_no_anglicisms(x, {"content": clean})["correct"]
+    r = tl.score_de_no_anglicisms(x, {"content": clean.replace("Besprechung", "Teammeeting")})
+    assert not r["correct"] and r["detail"]["anglicisms"] >= 1
+    assert tl.score_de_no_anglicisms(x, {"content": clean + " Unsere Strategie bleibt eventuell gleich."})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_no_anglicisms()
     test_form_writing()
     test_de_relative()
     test_de_variety()

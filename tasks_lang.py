@@ -2067,6 +2067,42 @@ def score_form_writing(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "form_only": float(form)}}
 
 
+# ---------------------------------------------------------------- de_no_anglicisms (German without English loanwords, on request)
+# A workplace text where English terms are the habit (Meeting, Deadline, Feedback, Release, Bug ...). The instruction
+# asks for German words only; scored on a list of common anglicisms (inflected and in compounds) and the language.
+NA_WORDS = ["meeting", "deadline", "feedback", "team", "update", "call", "workshop", "download", "tool", "feature",
+            "release", "bug", "deployment", "manager", "briefing", "email", "e-mail", "homeoffice", "office", "kickoff",
+            "kick-off", "slot", "slides", "onboarding", "teamlead", "workflow", "know-how", "event", "job", "ticket"]
+NA_TOPICS = ["die Planung der nächsten Softwareversion", "ein Projekttreffen mit Rückmeldungen zum Zwischenstand",
+             "die Einarbeitung einer neuen Kollegin", "einen Fehler in der Kundensoftware und den Zeitplan zur Behebung",
+             "die Vorbereitung einer Präsentation für die Geschäftsführung", "die Umstellung auf Arbeit von zu Hause"]
+
+
+def load_de_no_anglicisms(lang, n, seed):
+    items = []
+    for i in range(n or 30):
+        r = random.Random(f"de_no_anglicisms:{i}")
+        topic = NA_TOPICS[i % len(NA_TOPICS)]
+        k = r.choice([80, 100, 120])
+        items.append({"id": str(i), "lang": "de", "gold": None,
+                      "messages": [{"role": "user", "content": f"Schreibe eine kurze interne Nachricht (etwa {k} Wörter) an "
+                                    f"dein Team über {topic}. Verwende ausschließlich deutsche Wörter, keine englischen "
+                                    "Lehnwörter wie Meeting, Deadline oder Feedback."}]})
+    return items
+
+
+def score_de_no_anglicisms(item, reply):
+    text = reply["content"] or ""
+    low = text.lower()
+    # at a word edge (Team, Teamsitzung, Projektteam), never inside unrelated German words (eventuell, Strategie)
+    low = re.sub(r"\beventuell\w*", " ", low)
+    hits = sorted({w for w in NA_WORDS if re.search(r"\b" + re.escape(w) + r"|" + re.escape(w) + r"\b", low)})
+    lang_ok = common.lang_ok(text, "de", min_words=20) is True
+    ok = not hits and lang_ok
+    return {"correct": ok, "score": float(ok), "pred": ", ".join(hits)[:80], "gold": None,
+            "detail": {"anglicisms": len(hits), "ok_clean": float(not hits)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2113,6 +2149,7 @@ TASKS = {
     "de_variety": task(("de",), load_de_variety, score_de_variety, 512, 20),
     "de_relative": task(("de",), load_de_relative, score_de_relative, 16, 32, lang_check=False),
     "form_writing": task(("de", "en"), load_form_writing, score_form_writing, 512, 30, lang_check=False),
+    "de_no_anglicisms": task(("de",), load_de_no_anglicisms, score_de_no_anglicisms, 512, 12, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

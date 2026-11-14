@@ -3456,6 +3456,63 @@ def score_ascii_chart(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- maze_path (shortest path in an ASCII maze, BFS gold)
+# A 6x6 to 9x9 grid of '.' and '#' with S and E; moves up/down/left/right. The question: the minimum number of
+# steps from S to E, or "none" if E cannot be reached (a fifth of the items). Gold by breadth-first search.
+
+
+def mz_bfs(g, s, e):
+    from collections import deque
+    q, seen = deque([(s, 0)]), {s}
+    while q:
+        (y, x), d = q.popleft()
+        if (y, x) == e:
+            return d
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < len(g) and 0 <= nx < len(g[0]) and g[ny][nx] != "#" and (ny, nx) not in seen:
+                seen.add((ny, nx))
+                q.append(((ny, nx), d + 1))
+    return None
+
+
+def load_maze_path(lang, n, seed):
+    items, i = [], -1
+    while len(items) < (n or 120):
+        i += 1
+        r = rng_of("maze_path", i)
+        size = 6 + i % 4
+        g = [["#" if r.random() < 0.3 else "." for _ in range(size)] for _ in range(size)]
+        cells = [(y, x) for y in range(size) for x in range(size) if g[y][x] == "."]
+        if len(cells) < 2:
+            continue
+        s, e = r.sample(cells, 2)
+        g[s[0]][s[1]], g[e[0]][e[1]] = "S", "E"
+        d = mz_bfs(g, s, e)
+        want_none = len(items) % 5 == 4
+        if (d is None) != want_none or (d is not None and d < 4):
+            continue  # a fifth unreachable; no trivial neighbours
+        grid = "\n".join("".join(row) for row in g)
+        q = (f"Maze ('#' = wall, '.' = free; move up, down, left or right):\n```\n{grid}\n```\nWhat is the minimum number "
+             "of steps from S to E? If E cannot be reached, answer 'none'." if lang == "en" else
+             f"Labyrinth ('#' = Wand, '.' = frei; Schritte nach oben, unten, links oder rechts):\n```\n{grid}\n```\nWie viele "
+             "Schritte braucht man mindestens von S nach E? Wenn E nicht erreichbar ist, antworte 'keine'.")
+        items.append({"id": str(i), "lang": lang, "size": size, "gold": d if d is not None else "none",
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_maze_path(item, reply):
+    line = (final_answer(reply["content"]) or "").lower()
+    if item["gold"] == "none":
+        ok = bool(re.search(r"\b(none|no path|unreachable|keine|nicht erreichbar|unmöglich|impossible)\b", line)) and not re.search(r"\d", line)
+    else:
+        m = re.search(r"\d+", line)
+        ok = bool(m) and int(m.group()) == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
+            "detail": {f"ok_size{item['size']}": float(ok), "ok_none" if item["gold"] == "none" else "ok_path": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5010,6 +5067,7 @@ TASKS = {
     "prop_logic": task(load_prop_logic, score_prop_logic, 24, 160),
     "table_build": {**task(load_table_build, score_table_build, 24, 100), "think": False, "max_tokens": 1024},
     "ascii_chart": task(load_ascii_chart, score_ascii_chart, 24, 120),
+    "maze_path": task(load_maze_path, score_maze_path, 25, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

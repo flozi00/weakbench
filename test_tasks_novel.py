@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -1068,7 +1068,20 @@ def test_ascii_chart():
                 assert tn.score_ascii_chart(x, {"content": f"Antwort: {x['gold']}, so wie gezeigt"})["correct"]
 
 
+
+def test_maze_path():
+    import tasks_novel as tn
+    g = [list("S.#"), list(".##"), list("..E")]
+    assert tn.mz_bfs(g, (0, 0), (2, 2)) == 4
+    assert tn.mz_bfs([list("S#E")], (0, 0), (0, 2)) is None
+    it = tn.load_maze_path("de", 25, 0)
+    assert sum(x["gold"] == "none" for x in it) == 5
+    for x in it:
+        assert tn.score_maze_path(x, {"content": f"Antwort: {'keine' if x['gold'] == 'none' else x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_maze_path()
     test_ascii_chart()
     test_table_build()
     test_prop_logic()

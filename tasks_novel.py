@@ -3876,11 +3876,27 @@ def score_simpson(item, reply):
 PF_PERSONA = {"en": [("Mira is 31, outspoken, studied environmental science and joins climate protests.", "Mira works in a bank",
                       "Mira works in a bank and is active in an environmental group"),
                      ("Tom is quiet, loves numbers and spends weekends building model railways.", "Tom is a teacher",
-                      "Tom is a teacher and teaches maths")],
+                      "Tom is a teacher and teaches maths"),
+                     ("Lea runs marathons, eats only vegetables and posts training plans online.", "Lea is a nurse",
+                      "Lea is a nurse and a member of a running club"),
+                     ("Jonas has played the guitar since he was six and has long hair.", "Jonas is an accountant",
+                      "Jonas is an accountant and plays in a rock band"),
+                     ("Selin speaks four languages and has lived on three continents.", "Selin works in a hospital",
+                      "Selin works in a hospital as an interpreter"),
+                     ("Paul repairs old bikes in his garage and never misses a cycling race on TV.", "Paul is a lawyer",
+                      "Paul is a lawyer and rides his bike to work")],
               "de": [("Mira ist 31, meinungsstark, hat Umweltwissenschaften studiert und geht zu Klimademos.",
                       "Mira arbeitet in einer Bank", "Mira arbeitet in einer Bank und ist in einer Umweltgruppe aktiv"),
                      ("Tom ist ruhig, liebt Zahlen und baut am Wochenende Modelleisenbahnen.", "Tom ist Lehrer",
-                      "Tom ist Lehrer und unterrichtet Mathematik")]}
+                      "Tom ist Lehrer und unterrichtet Mathematik"),
+                     ("Lea läuft Marathons, isst nur Gemüse und stellt Trainingspläne ins Netz.", "Lea ist Pflegerin",
+                      "Lea ist Pflegerin und Mitglied in einem Laufverein"),
+                     ("Jonas spielt seit seinem sechsten Lebensjahr Gitarre und hat lange Haare.", "Jonas ist Buchhalter",
+                      "Jonas ist Buchhalter und spielt in einer Rockband"),
+                     ("Selin spricht vier Sprachen und hat auf drei Kontinenten gelebt.", "Selin arbeitet in einem Krankenhaus",
+                      "Selin arbeitet in einem Krankenhaus als Dolmetscherin"),
+                     ("Paul repariert in seiner Garage alte Fahrräder und verpasst kein Radrennen im Fernsehen.",
+                      "Paul ist Anwalt", "Paul ist Anwalt und fährt mit dem Rad zur Arbeit")]}
 
 
 def load_prob_fallacies(lang, n, seed):

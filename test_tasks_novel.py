@@ -1054,7 +1054,18 @@ def test_table_build():
     assert not r["correct"] and r["detail"]["rows_right_but_order"] == 1.0
 
 
+
+def test_ascii_chart():
+    import tasks_novel as tn
+    for lang in ("de", "en"):
+        it = tn.load_ascii_chart(lang, 12, 0)
+        assert {x["kind"] for x in it} == {"value", "diff", "second"}
+        for x in it:
+            assert tn.score_ascii_chart(x, {"content": f"Answer: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_ascii_chart()
     test_table_build()
     test_prop_logic()
     test_cipher()

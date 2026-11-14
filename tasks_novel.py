@@ -3403,6 +3403,51 @@ def score_table_build(item, reply):
             "detail": {"header_ok": float(header_ok), "rows_right_but_order": float(same_set and not cells_ok)}}
 
 
+# ---------------------------------------------------------------- ascii_chart (read a text bar chart without numbers)
+# 4-7 bars drawn with '#' (one per unit), no numbers printed. Questions: the value of one bar, the difference between
+# two, or which bar is the second largest. Values within a chart are distinct, often close (14 vs 15).
+AC_LABELS = {"en": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "de": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]}
+
+
+def load_ascii_chart(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("ascii_chart", i)
+        k = 4 + i % 4
+        labels = AC_LABELS[lang][:k]
+        vals = r.sample(range(5, 26), k)
+        width = max(len(x) for x in labels)
+        chart = "\n".join(f"{lb.ljust(width)} | {'#' * v}" for lb, v in zip(labels, vals))
+        kind = ("value", "diff", "second")[i % 3]
+        a, b = r.sample(range(k), 2)
+        if kind == "value":
+            q, gold = ((f"How many units does {labels[a]} have?", str(vals[a])) if lang == "en" else
+                       (f"Wie viele Einheiten hat {labels[a]}?", str(vals[a])))
+        elif kind == "diff":
+            q, gold = ((f"By how many units is the larger of {labels[a]} and {labels[b]} bigger than the smaller?",
+                        str(abs(vals[a] - vals[b]))) if lang == "en" else
+                       (f"Um wie viele Einheiten ist der größere von {labels[a]} und {labels[b]} größer als der kleinere?",
+                        str(abs(vals[a] - vals[b]))))
+        else:
+            second = sorted(range(k), key=lambda j: -vals[j])[1]
+            q, gold = (("Which bar is the second largest? Answer with its label.", labels[second]) if lang == "en" else
+                       ("Welcher Balken ist der zweitgrößte? Antworte mit seiner Beschriftung.", labels[second]))
+        head = "Each # is one unit." if lang == "en" else "Jedes # ist eine Einheit."
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": f"{head}\n```\n{chart}\n```\n{q}\n" + ASK[lang]}]})
+    return items
+
+
+def score_ascii_chart(item, reply):
+    line = final_answer(reply["content"]) or ""
+    if item["kind"] == "second":
+        labs = [w for w in re.findall(r"[A-Za-z]+", line) if w.lower() in [x.lower() for x in AC_LABELS[item["lang"]]]]
+        ok = bool(labs) and labs[-1].lower() == item["gold"].lower()
+    else:
+        ok = last_int(line) == int(item["gold"])
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4956,6 +5001,7 @@ TASKS = {
     "cipher": task(load_cipher, score_cipher, 24, 120),
     "prop_logic": task(load_prop_logic, score_prop_logic, 24, 160),
     "table_build": {**task(load_table_build, score_table_build, 24, 100), "think": False, "max_tokens": 1024},
+    "ascii_chart": task(load_ascii_chart, score_ascii_chart, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

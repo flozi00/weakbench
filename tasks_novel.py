@@ -3972,7 +3972,15 @@ CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a mem
                   ("Trains on line 7 never run after midnight.", "The last train tonight is a line 7 train.",
                    "The last train tonight leaves before midnight.", "Line 7 was opened in 1998."),
                   ("Anyone who passes the test gets a certificate.", "Tom passed the test.", "Tom gets a certificate.",
-                   "The test takes two hours.")],
+                   "The test takes two hours."),
+                  ("No reptile in the zoo is fed on Mondays.", "Kiko is a reptile in the zoo.", "Kiko is not fed on Mondays.",
+                   "The zoo opened in 1965."),
+                  ("Every invoice above 500 euros needs two signatures.", "This invoice is for 720 euros.",
+                   "This invoice needs two signatures.", "Invoices are archived for ten years."),
+                  ("Whenever the road is icy, the bus takes the detour.", "The road is icy today.",
+                   "The bus takes the detour today.", "The bus company has 40 drivers."),
+                  ("Only registered voters may vote in the council election.", "Mira is not registered.",
+                   "Mira may not vote in the council election.", "The election is held in spring.")],
            "de": [("Jedes Mitglied im Zorvel-Club zahlt einen Beitrag.", "Lena ist Mitglied im Zorvel-Club.",
                    "Lena zahlt einen Beitrag.", "Der Club trifft sich freitags."),
                   ("Alle Brimak-Pflanzen brauchen Schatten.", "Diese Pflanze ist eine Brimak-Pflanze.",
@@ -3980,11 +3988,23 @@ CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a mem
                   ("Züge der Linie 7 fahren nie nach Mitternacht.", "Der letzte Zug heute ist ein Zug der Linie 7.",
                    "Der letzte Zug heute fährt vor Mitternacht.", "Die Linie 7 wurde 1998 eröffnet."),
                   ("Wer die Prüfung besteht, bekommt ein Zertifikat.", "Tom hat die Prüfung bestanden.",
-                   "Tom bekommt ein Zertifikat.", "Die Prüfung dauert zwei Stunden.")]}
+                   "Tom bekommt ein Zertifikat.", "Die Prüfung dauert zwei Stunden."),
+                  ("Kein Reptil im Zoo wird montags gefüttert.", "Kiko ist ein Reptil im Zoo.",
+                   "Kiko wird montags nicht gefüttert.", "Der Zoo wurde 1965 eröffnet."),
+                  ("Jede Rechnung über 500 Euro braucht zwei Unterschriften.", "Diese Rechnung lautet über 720 Euro.",
+                   "Diese Rechnung braucht zwei Unterschriften.", "Rechnungen werden zehn Jahre lang archiviert."),
+                  ("Immer wenn die Straße glatt ist, fährt der Bus die Umleitung.", "Heute ist die Straße glatt.",
+                   "Heute fährt der Bus die Umleitung.", "Das Busunternehmen hat 40 Fahrer."),
+                  ("Nur eingetragene Wähler dürfen bei der Ratswahl wählen.", "Mira ist nicht eingetragen.",
+                   "Mira darf bei der Ratswahl nicht wählen.", "Die Wahl findet im Frühling statt.")]}
 CS_MARKED = {"en": ["Therefore, Lena pays a fee.", "Therefore, this plant needs shade.",
-                    "Therefore, the last train tonight leaves before midnight.", "Therefore, Tom gets a certificate."],
+                    "Therefore, the last train tonight leaves before midnight.", "Therefore, Tom gets a certificate.",
+                    "Therefore, Kiko is not fed on Mondays.", "Therefore, this invoice needs two signatures.",
+                    "Therefore, the bus takes the detour today.", "Therefore, Mira may not vote in the council election."],
              "de": ["Also zahlt Lena einen Beitrag.", "Also braucht diese Pflanze Schatten.",
-                    "Also fährt der letzte Zug heute vor Mitternacht.", "Also bekommt Tom ein Zertifikat."]}
+                    "Also fährt der letzte Zug heute vor Mitternacht.", "Also bekommt Tom ein Zertifikat.",
+                    "Also wird Kiko montags nicht gefüttert.", "Also braucht diese Rechnung zwei Unterschriften.",
+                    "Also fährt der Bus heute die Umleitung.", "Also darf Mira bei der Ratswahl nicht wählen."]}
 
 
 def load_conclusion_spot(lang, n, seed):

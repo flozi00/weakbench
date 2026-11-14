@@ -580,7 +580,18 @@ def test_de_no_anglicisms():
     assert tl.score_de_no_anglicisms(x, {"content": clean + " Unsere Strategie bleibt eventuell gleich, wir bugsieren das Projekt durch jeden Eventualfall."})["correct"]
 
 
+def test_tense_order():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        it = tl.load_tense_order(lang, 30, 0)
+        assert {x["form"] for x in it} == {0, 1, 2} and len({x["gold"] for x in it}) > 3
+        for x in it:
+            assert tl.score_tense_order(x, {"content": "Antwort: " + " ".join(x["gold"])})["correct"]
+            assert "{" not in x["messages"][0]["content"]
+
+
 if __name__ == "__main__":
+    test_tense_order()
     test_de_no_anglicisms()
     test_form_writing()
     test_de_relative()

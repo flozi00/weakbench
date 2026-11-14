@@ -2103,6 +2103,62 @@ def score_de_no_anglicisms(item, reply):
             "detail": {"anglicisms": len(hits), "ok_clean": float(not hits)}}
 
 
+# ---------------------------------------------------------------- tense_order (event order from tense and connectives)
+# Three events told out of order with nachdem/bevor + Plusquamperfekt (before/after + past perfect in English);
+# the model gives the real order. Surface order never equals the real order, so reading left to right fails.
+TO_EV = {"de": [("den Brief schreiben", "den Brief schrieb", "den Brief geschrieben hatte"),
+                ("die Pflanzen gießen", "die Pflanzen goss", "die Pflanzen gegossen hatte"),
+                ("den Zug nehmen", "den Zug nahm", "den Zug genommen hatte"),
+                ("das Fenster öffnen", "das Fenster öffnete", "das Fenster geöffnet hatte"),
+                ("die Rechnung bezahlen", "die Rechnung bezahlte", "die Rechnung bezahlt hatte")],
+         "en": [("write the letter", "wrote the letter", "had written the letter"),
+                ("water the plants", "watered the plants", "had watered the plants"),
+                ("take the train", "took the train", "had taken the train"),
+                ("open the window", "opened the window", "had opened the window"),
+                ("pay the bill", "paid the bill", "had paid the bill")]}
+
+
+# main-clause verb-second forms ("schrieb den Brief"), split as verb + rest for inversion after "Danach"
+TO_DE_V2 = {"den Brief schreiben": "schrieb den Brief", "die Pflanzen gießen": "goss die Pflanzen",
+            "den Zug nehmen": "nahm den Zug", "das Fenster öffnen": "öffnete das Fenster",
+            "die Rechnung bezahlen": "bezahlte die Rechnung"}
+
+
+def load_tense_order(lang, n, seed):
+    items = []
+    for i in range(n or 90):
+        r = random.Random(f"tense_order:{i}")
+        evs = r.sample(TO_EV[lang], 3)  # true order: 0, 1, 2
+        x = r.choice(["Lea", "Tim", "Nora", "Ben"])
+        L = "ABC"
+        labels = dict(zip(range(3), r.sample(L, 3)))
+        e, lb = evs, labels
+        form = i % 3  # surface orders: reversed, mixed, forward (so neither reading direction is a shortcut)
+        if lang == "de":
+            sent = [f"Bevor {x} {e[2][1]} ({lb[2]}), hatte {x} {e[1][2].replace(' hatte', '')} ({lb[1]}). Das war erst, "
+                    f"nachdem {x} {e[0][2]} ({lb[0]}).",
+                    f"{x} {TO_DE_V2[e[1][0]]} ({lb[1]}), nachdem {x} {e[0][2]} ({lb[0]}). Danach "
+                    f"{TO_DE_V2[e[2][0]].split(' ', 1)[0]} {x} {TO_DE_V2[e[2][0]].split(' ', 1)[1]} ({lb[2]}).",
+                    f"Nachdem {x} {e[0][2]} ({lb[0]}), {TO_DE_V2[e[1][0]].split(' ', 1)[0]} {x} "
+                    f"{TO_DE_V2[e[1][0]].split(' ', 1)[1]} ({lb[1]}). Zuletzt {TO_DE_V2[e[2][0]].split(' ', 1)[0]} {x} "
+                    f"{TO_DE_V2[e[2][0]].split(' ', 1)[1]} ({lb[2]})."][form]
+        else:
+            sent = [f"Before {x} {e[2][1]} ({lb[2]}), {x} {e[1][2]} ({lb[1]}). That was only after {x} {e[0][2]} ({lb[0]}).",
+                    f"{x} {e[1][1]} ({lb[1]}) after {x} {e[0][2]} ({lb[0]}). Then {x} {e[2][1]} ({lb[2]}).",
+                    f"After {x} {e[0][2]} ({lb[0]}), {x} {e[1][1]} ({lb[1]}). Finally {x} {e[2][1]} ({lb[2]})."][form]
+        q = ("In welcher Reihenfolge geschahen A, B und C? Antworte mit den drei Buchstaben in zeitlicher Reihenfolge." if
+             lang == "de" else "In what order did A, B and C happen? Answer with the three letters in time order.")
+        items.append({"id": str(i), "lang": lang, "gold": "".join(labels[k] for k in range(3)),
+                      "form": form, "messages": [{"role": "user", "content": f"{sent}\n{q}\n" + tasks_novel.ASK[lang]}]})
+    return items
+
+
+def score_tense_order(item, reply):
+    got = "".join(re.findall(r"\b[ABC]\b", tasks_novel.final_answer(reply["content"]) or ""))
+    ok = got[-3:] == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2150,6 +2206,7 @@ TASKS = {
     "de_relative": task(("de",), load_de_relative, score_de_relative, 16, 32, lang_check=False),
     "form_writing": task(("de", "en"), load_form_writing, score_form_writing, 512, 30, lang_check=False),
     "de_no_anglicisms": task(("de",), load_de_no_anglicisms, score_de_no_anglicisms, 512, 12, lang_check=False),
+    "tense_order": task(("de", "en"), load_tense_order, score_tense_order, 512, 30),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

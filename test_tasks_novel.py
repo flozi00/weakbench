@@ -736,6 +736,10 @@ def test_false_premise():
     sc = tn.score_false_premise
     assert sc(a, {"content": f"Answer: {a['gold']}"})["correct"]
     assert sc(b, {"content": "Answer: She never resigned; she still works there."})["correct"]
+    for txt in ("There is no such year", "Paul arbeitet bis heute dort", "-"):
+        assert sc(b, {"content": "Answer: " + txt})["correct"], txt
+    assert not sc(b, {"content": "Answer: 2015 (not sure)"})["correct"]
+    assert sc(a, {"content": f"Answer: {a['gold']}, not 2001"})["correct"]
     r = sc(b, {"content": f"Answer: {a['gold']}"})
     assert not r["correct"] and r["detail"]["took_premise"] == 1.0
 
@@ -751,6 +755,8 @@ def test_option_order():
         opts = [int(v) for v in re.findall(r"^[ABCD]\) (\d+)", x["messages"][0]["content"], re.M)]
         assert [v % k == 0 for v in opts].count(True) == 1 and opts["ABCD".index(x["gold"])] % k == 0
     assert tn.score_option_order(it[2], {"content": "Antwort: **C**"})["correct"]
+    assert tn.score_option_order(it[1], {"content": "Answer: A number divisible by 7 is B"})["correct"]
+    assert tn.score_option_order(it[1], {"content": "Answer: b"})["correct"]
 
 
 
@@ -762,6 +768,8 @@ def test_source_trust():
     r = tn.score_source_trust(b, {"content": f"Answer: {b['majority']} g"})
     assert not r["correct"] and r["detail"]["took_majority"] == 1.0
     assert tn.score_source_trust(b, {"content": f"Answer: {b['gold']} g (lab)"})["correct"]
+    assert tn.score_source_trust(b, {"content": f"Answer: ignoring 3 blogs, {b['gold']} g"})["correct"]
+    assert a["messages"][0]["content"].count(f": {a['majority']} g.") == 1
 
 
 
@@ -772,6 +780,7 @@ def test_switched_question():
         a, b = it[0], it[1]
         assert a["gold"] == b["gold"] and len(b["messages"][0]["content"]) > len(a["messages"][0]["content"]) + 150
         assert "vorher" not in a["messages"][0]["content"] and "before that" not in a["messages"][0]["content"]
+        assert tn.score_switched_question(b, {"content": f"Answer: Items over 30 euros: {b['gold']}"})["correct"]
         r = tn.score_switched_question(b, {"content": f"Answer: {b['total']}"})
         assert not r["correct"] and r["detail"]["took_total"] == 1.0
 

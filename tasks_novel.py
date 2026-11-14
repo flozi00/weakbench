@@ -1941,7 +1941,9 @@ FP_TEXT = {
            "quit": "{x} kündigte {c}.", "stay": "{x} arbeitet bis heute dort.",
            "q": "In welchem Jahr kündigte {x}?"},
 }
-FP_REJECT = re.compile(r"\b(never|not|did ?n.t|no year|false premise|still|nie|niemals|nicht|gar nicht|kein\w*|noch)\b", re.I)
+FP_REJECT = re.compile(r"\b(never|not|did ?n.t|has ?n.t|has not|no such|no year|false premise|still|to this day|nowhere|"
+                       r"nie|niemals|nicht|gar nicht|kein\w*|noch|bis heute|weiterhin)\b|^\s*(-|n/?a)\s*$", re.I)
+FP_YEAR = re.compile(r"\b(19|20)\d\d\b")
 
 
 def load_false_premise(lang, n, seed):
@@ -1970,12 +1972,13 @@ def load_false_premise(lang, n, seed):
 
 def score_false_premise(item, reply):
     line = final_answer(reply["content"]) or ""
-    rejected = bool(FP_REJECT.search(line))
-    if item["trap"]:
-        ok = rejected
-        d = {"ok_trap": float(ok), "took_premise": float(not rejected and re.search(r"\b(19|20)\d\d\b", line) is not None)}
-    else:
-        ok = not rejected and last_int(line) == item["gold"]
+    year = FP_YEAR.search(line)
+    if item["trap"]:  # right: no year, or a rejection before the first year ("never; she still works there since 2010")
+        rej = FP_REJECT.search(line)
+        ok = bool(line.strip()) and (not year or bool(rej) and rej.start() < year.start())
+        d = {"ok_trap": float(ok), "took_premise": float(bool(year) and not ok)}
+    else:  # the first year stated is the answer ("2013, not 2011")
+        ok = bool(year) and int(year.group()) == item["gold"]
         d = {"ok_control": float(ok)}
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": d}
 
@@ -1983,8 +1986,8 @@ def score_false_premise(item, reply):
 # ---------------------------------------------------------------- option_order (trap: position bias in multiple choice)
 # One question, four options, asked four times with the right option at A, B, C and D (ids "<group>-<pos>",
 # "grouped": group_agree = the verdict survives reordering). Sub-metric ok_pos<A-D> exposes a favourite letter.
-OO_TEXT = {"en": {"div": "Which of these numbers is divisible by {k}?", "ans": "Answer with the letter only."},
-           "de": {"div": "Welche dieser Zahlen ist durch {k} teilbar?", "ans": "Antworte nur mit dem Buchstaben."}}
+OO_TEXT = {"en": {"div": "Which of these numbers is divisible by {k}?", "ans": "The answer is a single letter."},
+           "de": {"div": "Welche dieser Zahlen ist durch {k} teilbar?", "ans": "Die Antwort ist ein einzelner Buchstabe."}}
 
 
 def load_option_order(lang, n, seed):
@@ -2008,8 +2011,13 @@ def load_option_order(lang, n, seed):
 
 
 def score_option_order(item, reply):
-    m = re.search(r"\b([ABCD])\b", final_answer(reply["content"]) or "")
-    pred = m.group(1) if m else None
+    line = (final_answer(reply["content"]) or "").strip()
+    m = (re.fullmatch(r"\(?([abcdABCD])\)?\.?", line) or re.match(r"\(?([ABCD])\)", line)
+         or re.search(r"(?:option|antwort|answer)\s+\(?([ABCD])\b", line, re.I) or re.search(r"\b([ABCD])\)", line))
+    if not m:
+        caps = re.findall(r"\b([ABCD])\b", line)
+        m = re.match(r"(.*)", caps[-1]) if caps else None
+    pred = m.group(1).upper() if m else None
     ok = pred == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
             "detail": {f"ok_pos{item['gold']}": float(ok), **({f"chose_{pred}": 1.0} if pred else {})}}
@@ -2039,7 +2047,8 @@ def load_source_trust(lang, n, seed):
         true = r.randint(120, 950)
         wrong = true + r.choice([-1, 1]) * r.randint(15, 80)
         who = r.sample(T["who"], 3)
-        srcs = [T["blog"].format(who=w, v=wrong if trap else true) for w in who]
+        # trap: the three others agree on a wrong value; control: two agree with the lab, one is off
+        srcs = [T["blog"].format(who=w, v=wrong if trap or k == 2 else true) for k, w in enumerate(who)]
         srcs.insert(r.randrange(4), T["lab"].format(v=true))
         q = T["rule"] + "\n" + "\n".join(srcs) + "\n" + T["q"]
         items.append({"id": str(i), "lang": lang, "trap": trap, "gold": true, "majority": wrong,
@@ -2048,7 +2057,9 @@ def load_source_trust(lang, n, seed):
 
 
 def score_source_trust(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    line = final_answer(reply["content"]) or ""
+    g = re.findall(r"(\d[\d.,]*)\s*(?:g\b|gramm|grams?)", line, re.I)
+    v = parse_number(g[-1], item["lang"]) if g else answer_value(line, item["lang"])
     ok = v == item["gold"]
     d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
     if item["trap"]:
@@ -2082,6 +2093,7 @@ def load_switched_question(lang, n, seed):
         names = r.sample(SQ_ITEMS[lang], 6)
         prices = [r.randint(3, 90) for _ in names]
         x = r.choice([20, 30, 40, 50])
+        prices = [p + 1 if p == x else p for p in prices]  # no price exactly at the threshold
         lst = "\n".join(f"- {a}: {p} €" for a, p in zip(names, prices))
         q = (SQ_TEXT[lang]["pre"] + "\n" if trap else "") + lst + "\n" + SQ_TEXT[lang]["q"].format(x=x)
         if not trap:
@@ -2091,8 +2103,15 @@ def load_switched_question(lang, n, seed):
     return items
 
 
+SQ_WORDS = {w: k for k, ws in enumerate([("zero", "null", "keine", "keiner", "none"), ("one", "eins", "einer", "ein"),
+                                         ("two", "zwei"), ("three", "drei"), ("four", "vier"), ("five", "fünf"),
+                                         ("six", "sechs")]) for w in ws}
+
+
 def score_switched_question(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    tail = (final_answer(reply["content"]) or "").rsplit(":", 1)[-1]
+    word = re.match(r"\s*\**([a-zäöü]+)", tail.lower())
+    v = SQ_WORDS[word.group(1)] if word and word.group(1) in SQ_WORDS else answer_value(tail, item["lang"])
     ok = v == item["gold"]
     d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
     if item["trap"]:

@@ -2292,7 +2292,7 @@ RV_CHANGES = {
               lambda t, it: len([w for w in t.split() if re.search(r"\w", w)]) <= 50),
     "fact": ("Ergänze, dass es Getränke gibt und man {x} mitbringen soll.",
              "Add that there will be drinks and people should bring {x}.",
-             lambda t, it: it["extra"][0 if it["lang"] == "de" else 1].lower() in t.lower()),
+             lambda t, it: it["extra"][0 if it["lang"] == "de" else 1].split()[-1].lower()[:5] in t.lower()),  # Decke(n), plates
     "noexcl": ("Entferne alle Ausrufezeichen.", "Remove all exclamation marks.", lambda t, it: "!" not in t),
     "question": ("Beende den Text mit einer Frage an die Leser.", "End the text with a question to the readers.",
                  lambda t, it: t.rstrip().rstrip("*_\"“”").endswith("?")),

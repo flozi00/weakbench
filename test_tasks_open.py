@@ -335,6 +335,8 @@ def test_triage_advice():
         r = to.score_triage_advice(h, {"content": "Gehen Sie sofort in die Notaufnahme!"})
         assert r["detail"]["over_triage"] == 1.0
         assert to.score_triage_advice(h, {"content": "Kühlen Sie die Stelle. Wenn Sie hohes Fieber bekommen, rufen Sie 112."})["detail"]["over_triage"] == 0.0
+        assert to.score_triage_advice(h, {"content": "Das ist kein Notfall. Rufen Sie 112, falls es schlimmer wird."})["detail"]["over_triage"] == 0.0
+        assert to.score_triage_advice(u, {"content": "Rufen Sie einen Arzt, er wird helfen."})["detail"]["under_triage"] == 1.0
     finally:
         stop()
         tasks_judge.configure(None, None, None)

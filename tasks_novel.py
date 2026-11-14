@@ -3252,6 +3252,89 @@ def score_cipher(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "ok_decode" if item["decode"] else "ok_encode": float(ok)}}
 
 
+# ---------------------------------------------------------------- prop_logic (does the conclusion follow? truth-table checked)
+# 2-4 premises over invented statements (if-then, or, not), a conclusion, valid or not. Forms include the classic
+# traps (affirming the consequent, denying the antecedent) next to valid ones (modus tollens, disjunctive syllogism,
+# chains). Gold by brute force over all truth assignments, so every item is exactly decidable.
+# German needs three word orders per atom: main clause, verb-final (after wenn/dass), verb-first (after dann)
+PL_ATOMS = {"en": [("the zorn is lit",) * 3, ("the blick hums",) * 3, ("the trell is open",) * 3, ("the vonn is cold",) * 3],
+            "de": [("der Zorn leuchtet", "der Zorn leuchtet", "leuchtet der Zorn"),
+                   ("der Blick summt", "der Blick summt", "summt der Blick"),
+                   ("das Trell ist offen", "das Trell offen ist", "ist das Trell offen"),
+                   ("der Vonn ist kalt", "der Vonn kalt ist", "ist der Vonn kalt")]}
+
+
+def pl_render(f, A, lang, ctx="main"):
+    """ctx: main (a statement), sub (after wenn/dass, verb last), inv (after dann, verb first)."""
+    op = f[0]
+    k = {"main": 0, "sub": 1, "inv": 2}[ctx]
+    if op == "atom":
+        return A[f[1]][k]
+    if op == "not":
+        inner = pl_render(f[1], A, lang, "sub")
+        if lang == "en":
+            return f"it is not the case that {inner}"
+        return {"main": f"es stimmt nicht, dass {inner}", "sub": f"es nicht stimmt, dass {inner}",
+                "inv": f"stimmt es nicht, dass {inner}"}[ctx]
+    if op == "if":
+        if lang == "en":
+            return f"if {pl_render(f[1], A, lang)}, then {pl_render(f[2], A, lang)}"
+        return f"wenn {pl_render(f[1], A, lang, 'sub')}, dann {pl_render(f[2], A, lang, 'inv')}"
+    a, b = pl_render(f[1], A, lang, ctx if ctx != "inv" else "main"), pl_render(f[2], A, lang, ctx if ctx != "inv" else "main")
+    return f"{a} or {b} (or both)" if lang == "en" else f"{a} oder {b} (oder beides)"
+
+
+def pl_eval(f, v):
+    op = f[0]
+    if op == "atom":
+        return v[f[1]]
+    if op == "not":
+        return not pl_eval(f[1], v)
+    a, b = pl_eval(f[1], v), pl_eval(f[2], v)
+    return (not a or b) if op == "if" else (a or b)
+
+
+def pl_valid(prem, concl, n):
+    from itertools import product
+    return all(pl_eval(concl, dict(enumerate(v))) for v in product([False, True], repeat=n)
+               if all(pl_eval(p, dict(enumerate(v))) for p in prem))
+
+
+def load_prop_logic(lang, n, seed):
+    items, i = [], -1
+    while len(items) < (n or 160):
+        i += 1
+        r = rng_of("prop_logic", i)
+        a, b, c = (("atom", k) for k in r.sample(range(4), 3))
+        forms = [  # (premises, conclusion)
+            ([("if", a, b), a], b), ([("if", a, b), ("not", b)], ("not", a)),          # modus ponens / tollens
+            ([("if", a, b), b], a), ([("if", a, b), ("not", a)], ("not", b)),          # the two fallacies
+            ([("or", a, b), ("not", a)], b), ([("if", a, b), ("if", b, c)], ("if", a, c)),
+            ([("if", a, b), ("if", b, c), ("not", c)], ("not", a)), ([("or", a, b), a], ("not", b))]
+        prem, concl = forms[i % len(forms)]
+        want = len(items) % 2 == 0
+        valid = pl_valid(prem, concl, 4)
+        if valid != want:
+            continue  # keep valid / invalid balanced
+        A = r.sample(PL_ATOMS[lang], 4)
+        A = {k: A[k] for k in range(4)}
+        ps = "\n".join(f"- {pl_render(p, A, lang)[0].upper()}{pl_render(p, A, lang)[1:]}." for p in prem)
+        cs = pl_render(concl, A, lang)
+        cs = cs[0].upper() + cs[1:] + "."
+        q = (f"Premises:\n{ps}\nDoes this follow: \"{cs}\"? Answer yes or no." if lang == "en" else
+             f"Prämissen:\n{ps}\nFolgt daraus: „{cs}“? Antworte mit ja oder nein.")
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        items.append({"id": str(i), "lang": lang, "form": i % len(forms), "gold": yes if valid else no,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_prop_logic(item, reply):
+    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
+    ok = yn[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4803,6 +4886,7 @@ TASKS = {
     "fake_entity": {**task(load_fake_entity, score_fake_entity, 24, 120), "think": False, "max_tokens": 512},
     "knapsack": task(load_knapsack, score_knapsack, 24, 120),
     "cipher": task(load_cipher, score_cipher, 24, 120),
+    "prop_logic": task(load_prop_logic, score_prop_logic, 24, 160),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

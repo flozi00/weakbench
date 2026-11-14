@@ -1029,7 +1029,18 @@ def test_cipher():
         assert tn.score_cipher(b, {"content": "Antwort: Brücke"})["correct"]
 
 
+
+def test_prop_logic():
+    import tasks_novel as tn
+    a, b = ("atom", 0), ("atom", 1)
+    assert tn.pl_valid([("if", a, b), ("not", b)], ("not", a), 2) and not tn.pl_valid([("if", a, b), b], a, 2)
+    it = tn.load_prop_logic("de", 32, 0)
+    assert sum(x["gold"] == "ja" for x in it) == 16
+    assert "Wenn das Trell ist offen" not in " ".join(x["messages"][0]["content"] for x in it)
+
+
 if __name__ == "__main__":
+    test_prop_logic()
     test_cipher()
     test_knapsack()
     test_fake_entity()

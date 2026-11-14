@@ -279,7 +279,23 @@ def test_audience_explain():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_argument_essay():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "grammar_errors": 2}),
+                                                      "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_argument_essay("de", None, 0)
+        assert len(it) == 6 and "Erörterung" in it[0]["messages"][0]["content"]
+        r = to.score_argument_essay(it[0], {"content": "Wort " * 100})
+        assert r["score"] == 1.0 and r["detail"]["grammar_errors_per_100w"] == 2.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_argument_essay()
     test_audience_explain()
     test_memory_dialog()
     test_constrained_plan()

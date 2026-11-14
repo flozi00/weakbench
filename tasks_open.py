@@ -897,6 +897,61 @@ def score_audience_explain(item, reply):
                        "within_limit": float(met[3]), "words": words}}
 
 
+# ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
+# A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
+# limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
+AR_TOPICS = {"en": ["Should schools start an hour later?", "Should cities ban cars from their centres?",
+                    "Should homework be abolished in primary school?", "Should there be a four-day working week?",
+                    "Should voting be compulsory?", "Should plastic packaging in supermarkets be banned?"],
+             "de": ["Sollte die Schule eine Stunde später beginnen?", "Sollten Städte Autos aus der Innenstadt verbannen?",
+                    "Sollten Hausaufgaben in der Grundschule abgeschafft werden?", "Sollte es eine Viertagewoche geben?",
+                    "Sollte es eine Wahlpflicht geben?", "Sollten Plastikverpackungen im Supermarkt verboten werden?"]}
+AR_ASK = {"en": "Write a short argumentative essay (at most 250 words) on: {t} Give arguments for and against, then your "
+                "own reasoned conclusion.",
+          "de": "Schreibe eine kurze Erörterung (höchstens 250 Wörter) zur Frage: {t} Nenne Argumente dafür und dagegen und "
+                "komm dann zu einem begründeten eigenen Urteil."}
+AR_JUDGE = """Evaluate a short argumentative essay. Answer each criterion YES or NO, and count clear grammar or spelling
+errors (not style). Reply with ONLY {{"verdicts": [...], "grammar_errors": <int>}}.
+
+TASK: {task}
+
+ESSAY:
+{essay}
+
+CRITERIA:
+1. An introduction states the question or thesis.
+2. At least two distinct arguments FOR, each with a reason or example.
+3. At least two distinct arguments AGAINST, each with a reason or example.
+4. The other side is presented fairly (no straw man).
+5. The conclusion weighs the arguments and follows from them (it is not a new claim).
+6. Paragraphs and connectives (however, therefore, einerseits/andererseits ...) make the structure clear."""
+
+
+def load_argument_essay(lang, n, seed):
+    tasks_judge.check_judge()
+    items = [{"id": str(k), "lang": lang, "messages": [{"role": "user", "content": AR_ASK[lang].format(t=t)}]}
+             for k, t in enumerate(AR_TOPICS[lang])]
+    return items if n is None else items[:n]
+
+
+def score_argument_essay(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    out = tasks_judge.judge("", AR_JUDGE.format(task=item["messages"][0]["content"], essay=text or "(empty)"),
+                            max_tokens=192)
+    m = re.search(r"\{.*\}", out, re.S)
+    j = json.loads(m[0]) if m else {}
+    v, ge = j.get("verdicts"), j.get("grammar_errors")
+    if not isinstance(v, list) or len(v) != 6 or not isinstance(ge, int):
+        raise ValueError(f"unusable essay verdict {out[:120]!r}")
+    words = len([w for w in text.split() if re.search(r"\w", w)])
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= 250]
+    per100 = ge / max(words, 1) * 100
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
+            "detail": {"all_met": float(all(met)), "grammar_errors_per_100w": round(per100, 3),
+                       "within_limit": float(met[-1]), "fair_other_side": float(met[3])}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -931,6 +986,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                               "think": False, "max_tokens": 512,
                               "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
                               "lang_check": True, "opt_in": True, "needs_judge": True},
+         "argument_essay": {"langs": ("de", "en"), "load": load_argument_essay, "score": score_argument_essay,
+                            "think": False, "max_tokens": 1024,
+                            "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
+                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

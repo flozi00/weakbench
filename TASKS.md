@@ -179,3 +179,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `number_compare` | generated pairs where surface cues mislead (9.11 vs 9.9, 3/7 vs 3/5, -3.2 vs -3.15) plus a control; German with decimal commas | de, en | 24 / 160 | auto | the larger number named first; `ok_decimals/fractions/negatives/control` |
 | `de_relative` | generated: relative pronoun by gender, number and case (der/den/dem/dessen, die/der/deren, denen) | de | 32 / 32 | off | exact; `ok_nom/acc/dat/gen` |
 | `form_writing` | generated: acrostic poem, lipogram (three sentences without a common letter), exact word count | de, en | 30 / 60 | off | exact form + right language; `ok_acrostic/lipogram/count`, `form_only` |
+| `argument_essay` ** | six debatable everyday questions, a short Erörterung / argumentative essay (pro, contra, conclusion, <= 250 words) | de, en | 6 / 6 | off | 6 judge criteria + word limit; `grammar_errors_per_100w`, `fair_other_side` |

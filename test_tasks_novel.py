@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -797,7 +797,21 @@ def test_causal_graph():
         assert sorted({x["gold"] for x in it}) == (["no", "yes"] if lang == "en" else ["ja", "nein"])
 
 
+
+def test_ambiguous_ref():
+    import tasks_novel as tn
+    for lang in ("en", "de"):
+        it = tn.load_ambiguous_ref(lang, 10, 0)
+        for a, b in zip(it[::2], it[1::2]):
+            assert a["messages"][0]["content"].split("\n")[0] == b["messages"][0]["content"].split("\n")[0]
+            assert a["gold"].lower() in a["messages"][0]["content"].lower() and b["gold"] is None
+            assert tn.score_ambiguous_ref(a, {"content": f"Answer: {a['gold']}"})["correct"]
+            assert tn.score_ambiguous_ref(b, {"content": "Antwort: mehrdeutig"})["correct"]
+            assert not tn.score_ambiguous_ref(b, {"content": f"Answer: {a['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_ambiguous_ref()
     test_causal_graph()
     test_switched_question()
     test_source_trust()

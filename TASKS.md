@@ -150,3 +150,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `causal_graph` | generated causal DAG + a confounded pair; influence with / without Z held fixed | de, en | 24 / 200 | auto | yes/no; `ok_any` / `ok_fix` |
 | `de_homophones` | generated gap sentences: das/dass, seit/seid, wieder/wider | de | 40 / 75 | off | word at the gap; `ok_<pair>` |
 | `de_reported` | direct quote to indirect speech: Konjunktiv I / Ersatzform | de | 24 / 24 | off | finite verb; `ok_singular` / `ok_plural` |
+| `ambiguous_ref` | generated room: the asked object is unique (control) or has a same-kind twin (ambiguous) | de, en | 24 / 200 | auto | place vs "ambiguous"; `ok_unique` / `ok_ambiguous` |

@@ -2203,6 +2203,71 @@ def score_causal_graph(item, reply):
     return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- ambiguous_ref (notice when a reference has two matches)
+# A room with 6 objects (colour, kind, place). The question names an object; in half of the items the description
+# fits two objects (gold: "ambiguous"), otherwise exactly one (gold: its place). The near-twin makes guessing tempting.
+AR_KIND = {"en": ["cup", "book", "lamp", "bag", "plant"], "de": ["Tasse", "Buch", "Lampe", "Tasche", "Pflanze"]}
+AR_COL = {"en": ["red", "blue", "green", "black"], "de": ["rot", "blau", "grün", "schwarz"]}
+AR_PLACE = {"en": ["on the shelf", "on the desk", "by the window", "under the bed", "in the hallway", "on the sofa", "in the kitchen"],
+            "de": ["im Regal", "auf dem Schreibtisch", "am Fenster", "unter dem Bett", "im Flur", "auf dem Sofa", "in der Küche"]}
+AR_TEXT = {"en": ("There is a {c} {k} {p}.", "Where is the {d}? If the description fits more than one object, answer "
+                  "\"ambiguous\"."),
+           "de": ("{p_cap} steht ein{e} {c}{end} {k}.", "Wo steht {art} {d}? Wenn die Beschreibung auf mehr als einen "
+                  "Gegenstand passt, antworte \"mehrdeutig\".")}
+AR_GENDER = {"Tasse": "f", "Buch": "n", "Lampe": "f", "Tasche": "f", "Pflanze": "f"}
+AR_ABSTAIN = re.compile(r"ambiguous|unclear|more than one|mehrdeutig|unklar|mehr als ein|nicht eindeutig", re.I)
+
+
+def ar_obj(lang, c, k, p):
+    if lang == "en":
+        return AR_TEXT["en"][0].format(c=AR_COL["en"][c], k=AR_KIND["en"][k], p=AR_PLACE["en"][p])
+    kind = AR_KIND["de"][k]
+    g = AR_GENDER[kind]
+    place = AR_PLACE["de"][p]
+    return AR_TEXT["de"][0].format(p_cap=place[0].upper() + place[1:], e="e" if g == "f" else "", c=AR_COL["de"][c],
+                                   end="e" if g == "f" else "es", k=kind)
+
+
+def load_ambiguous_ref(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("ambiguous_ref", i // 2)
+        amb = i % 2 == 1
+        places = r.sample(range(7), 6)
+        k, c, c2 = r.randrange(5), *r.sample(range(4), 2)
+        objs = [(c, k), (c2, k)]  # the same kind in two colours: "the cup" is ambiguous, "the red cup" is not
+        while len(objs) < 6:
+            o = (r.randrange(4), r.randrange(5))
+            if o[1] != k and o not in objs:
+                objs.append(o)
+        lines = [ar_obj(lang, oc, ok, pl) for (oc, ok), pl in zip(objs, places)]
+        r.shuffle(lines)
+        kind = AR_KIND[lang][k]
+        if lang == "en":
+            d = kind if amb else f"{AR_COL['en'][c]} {kind}"
+            q = AR_TEXT["en"][1].format(d=d)
+        else:
+            g = AR_GENDER[kind]
+            d = kind if amb else f"{AR_COL['de'][c]}e {kind}"  # "die rote Tasse", "das rote Buch"
+            q = AR_TEXT["de"][1].format(art="die" if g == "f" else "das", d=d)
+        gold = None if amb else AR_PLACE[lang][places[0]]
+        items.append({"id": str(i), "lang": lang, "ambiguous": amb, "gold": gold,
+                      "messages": [{"role": "user", "content": " ".join(lines) + "\n" + q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_ambiguous_ref(item, reply):
+    line = (final_answer(reply["content"]) or "").lower()
+    abst = bool(AR_ABSTAIN.search(line))
+    if item["ambiguous"]:
+        ok = abst
+        d = {"ok_ambiguous": float(ok)}
+    else:
+        ok = not abst and re.sub(r"^(in|im|on|auf|am|unter|by)\s+", "", item["gold"].lower()) in line
+        d = {"ok_unique": float(ok)}
+    return {"correct": ok, "score": float(ok), "pred": line[:50], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3739,6 +3804,7 @@ TASKS = {
     "source_trust": task(load_source_trust, score_source_trust, 24, 200),
     "switched_question": task(load_switched_question, score_switched_question, 24, 200),
     "causal_graph": task(load_causal_graph, score_causal_graph, 24, 200),
+    "ambiguous_ref": task(load_ambiguous_ref, score_ambiguous_ref, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

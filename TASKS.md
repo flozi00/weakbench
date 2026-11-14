@@ -160,3 +160,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `de_address` | generated: three English "you" sentences translated for a client (Sie) or a close friend (du) | de | 30 / 60 | off | right forms only, formal pronoun capitalised; `mixed` |
 | `mixed_input` | generated Denglisch chat messages with the facts split across both languages and a correction | de, en | 30 / 90 | off | final weekday + hour, decoy day rejected |
 | `counterfactual_world` | generated: a fictional world with one rule against reality (water freezes at 40 °C, adults at 25, 9-day weeks, light objects fall faster, sun rises in the west) | de, en | 25 / 200 | auto | yes/no by the stated rule; `ok_conflict` vs `ok_agree` |
+| `agreement_attractor` | generated: subject and verb split by 1-2 attractor phrases of the other number | de, en | 40 / 160 | off | is/are, ist/sind; `ok_attr1/2`, singular/plural |

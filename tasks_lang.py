@@ -1680,6 +1680,45 @@ def score_mixed_input(item, reply):
             "detail": {"day_ok": float(day_ok), "hour_ok": float(hour_ok)}}
 
 
+# ---------------------------------------------------------------- agreement_attractor (subject-verb agreement across distractors)
+# The subject and the finite verb are separated by a prepositional phrase or relative clause whose noun has the other
+# number (Linzen-style attractors, 1-2 of them). The model picks is/are (en) or ist/sind (de). Generated.
+AA_SUBJ = {"en": [("The key", "The keys"), ("The label", "The labels"), ("The report", "The reports"),
+                  ("The note", "The notes")],
+           "de": [("Der Schlüssel", "Die Schlüssel"), ("Das Etikett", "Die Etiketten"), ("Der Bericht", "Die Berichte"),
+                  ("Der Zettel", "Die Zettel")]}
+AA_ATTR = {"en": [("for the cabinet", "for the cabinets"), ("on the box", "on the boxes"),
+                  ("from the office", "from the offices"), ("near the old window", "near the old windows")],
+           "de": [("für den Schrank", "für die Schränke"), ("auf der Kiste", "auf den Kisten"),
+                  ("aus dem Büro", "aus den Büros"), ("neben dem alten Fenster", "neben den alten Fenstern")]}
+AA_PRED = {"en": "missing.", "de": "verschwunden."}
+
+
+def load_agreement_attractor(lang, n, seed):
+    items = []
+    for i in range(n or 160):
+        r = random.Random(f"agreement_attractor:{i}")
+        plural = i % 2 == 1
+        subj = r.choice(AA_SUBJ[lang])[plural]
+        attrs = r.sample(AA_ATTR[lang], 1 + (i // 2) % 2)
+        mid = " ".join(a[not plural] for a in attrs)  # attractors take the other number
+        gold = ("are" if plural else "is") if lang == "en" else ("sind" if plural else "ist")
+        opts = "is / are" if lang == "en" else "ist / sind"
+        sent = f"{subj} {mid} ___ {AA_PRED[lang]}"
+        ask = (f"Fill the gap with {opts}. Answer with the word only.\n\n{sent}" if lang == "en" else
+               f"Setze {opts} in die Lücke ein. Antworte nur mit dem Wort.\n\n{sent}")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "plural": plural, "attractors": len(attrs),
+                      "messages": [{"role": "user", "content": ask}]})
+    return items
+
+
+def score_agreement_attractor(item, reply):
+    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in ("is", "are", "ist", "sind")]
+    ok = w[-1:] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": w[-1:], "gold": item["gold"],
+            "detail": {f"ok_attr{item['attractors']}": float(ok), "ok_plural" if item["plural"] else "ok_singular": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1719,6 +1758,7 @@ TASKS = {
     "de_compound_gender": task(("de",), load_de_compound_gender, score_de_compound_gender, 16, 60, lang_check=False),
     "de_address": task(("de",), load_de_address, score_de_address, 256, 30, lang_check=False),
     "mixed_input": task(("de", "en"), load_mixed_input, score_mixed_input, 64, 30, lang_check=False),
+    "agreement_attractor": task(("de", "en"), load_agreement_attractor, score_agreement_attractor, 16, 40, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

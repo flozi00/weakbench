@@ -476,7 +476,19 @@ def test_mixed_input():
         assert tl.score_mixed_input(x, {"content": f"Von {x['decoy'][0]} auf {x['day'][0]} verschoben, {x['hour']} Uhr."})["correct"]
 
 
+def test_agreement_attractor():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        it = tl.load_agreement_attractor(lang, 8, 0)
+        assert {x["attractors"] for x in it} == {1, 2} and {x["plural"] for x in it} == {True, False}
+        for x in it:
+            assert tl.score_agreement_attractor(x, {"content": x["gold"]})["correct"]
+    x = tl.load_agreement_attractor("en", 1, 0)[0]
+    assert not tl.score_agreement_attractor(x, {"content": "are"})["correct"]
+
+
 if __name__ == "__main__":
+    test_agreement_attractor()
     test_mixed_input()
     test_de_address()
     test_de_compound_gender()

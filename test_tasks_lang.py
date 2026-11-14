@@ -384,5 +384,18 @@ def test_de_homophones():
         assert not tl.score_de_homophones(x, {"content": other[x["gold"]]})["correct"]
 
 
+def test_de_reported():
+    import tasks_lang as tl
+    it = tl.load_de_reported("de", 24, 0)
+    assert {x["plural"] for x in it} == {True, False}
+    sg = next(x for x in it if x["verb"] == "haben" and not x["plural"])
+    pl = next(x for x in it if x["verb"] == "haben" and x["plural"])
+    assert tl.score_de_reported(sg, {"content": "Anna sagt, sie habe keine Zeit."})["correct"]
+    assert not tl.score_de_reported(sg, {"content": "Anna sagt, sie hat keine Zeit."})["correct"]
+    assert tl.score_de_reported(pl, {"content": "Die Gäste sagen, sie hätten keine Zeit."})["correct"]
+    assert not tl.score_de_reported(pl, {"content": "Die Gäste sagen, sie haben keine Zeit."})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_reported()
     test_de_homophones()

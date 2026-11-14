@@ -1330,6 +1330,52 @@ def score_de_homophones(item, reply):
             "detail": {f"ok_{item['pair']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_reported (indirect speech: Konjunktiv I / Ersatzform)
+# A direct quote in the first person; the model rewrites it as indirect speech. Singular speakers need Konjunktiv I
+# (er habe, sie sei, er könne); plural speakers need the Konjunktiv II Ersatzform where Konjunktiv I equals the
+# indicative (sie hätten, sie kämen) — "sie seien" stays Konjunktiv I. Scored on the finite verb form.
+RP_VERBS = {  # quote (1st person sg / pl), 3rd sg form, 3rd pl form
+    "haben": ("habe keine Zeit", "haben keine Zeit", "habe", "hätten"),
+    "sein": ("bin müde", "sind müde", "sei", "seien"),
+    "können": ("kann nicht kommen", "können nicht kommen", "könne", "könnten"),
+    "kommen": ("komme morgen", "kommen morgen", "komme", "kämen"),
+    "wissen": ("weiß es nicht", "wissen es nicht", "wisse", "wüssten"),
+    "müssen": ("muss früh gehen", "müssen früh gehen", "müsse", "müssten"),
+}
+RP_SPK = [("Anna", "sie", False), ("Der Trainer", "er", False), ("Die Gäste", "sie", True), ("Meine Eltern", "sie", True)]
+
+
+def load_de_reported(lang, n, seed):
+    items = []
+    verbs = list(RP_VERBS)
+    for i in range(n or 144):
+        r = random.Random(f"de_reported:{i}")
+        verb = verbs[i % len(verbs)]
+        spk, pron, plural = RP_SPK[(i // len(verbs)) % len(RP_SPK)]
+        sg_q, pl_q, sg, pl = RP_VERBS[verb]
+        quote = ("Wir " + pl_q if plural else "Ich " + sg_q) + "."
+        gold = pl if plural else sg
+        says = "sagen" if plural else "sagt"
+        items.append({"id": str(i), "lang": "de", "verb": verb, "plural": plural, "gold": gold,
+                      "messages": [{"role": "user", "content": "Gib diese Aussage in indirekter Rede wieder, wie in einem "
+                                    f"Zeitungsbericht (\"{spk} {says}, ...\"). Antworte nur mit dem Satz.\n\n"
+                                    f"{spk} {says}: \"{quote}\""}]})
+    return items
+
+
+def score_de_reported(item, reply):
+    text = (reply["content"] or "").lower()
+    forms = {f for v in RP_VERBS.values() for f in (v[2], v[3])} | {"haben", "hat", "ist", "sind", "kann", "können",
+                                                                      "kommt", "kommen", "weiß", "wissen", "muss", "müssen",
+                                                                      "würden", "würde"}
+    after = re.split(r"\bsag(?:t|en)\b", text, maxsplit=1)[-1]
+    found = [w for w in re.findall(r"[a-zäöüß]+", after) if w in forms]
+    # plural: "sie würden kommen" is an accepted Ersatzform too; singular "würde" is not Konjunktiv I
+    ok = item["gold"] in found or item["plural"] and found[:1] == ["würden"]
+    return {"correct": ok, "score": float(ok), "pred": found[:2], "gold": item["gold"],
+            "detail": {"ok_plural" if item["plural"] else "ok_singular": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1362,6 +1408,7 @@ TASKS = {
     "de_verbs": task(("de",), load_de_verbs, score_de_verbs, 64, 120, lang_check=False),
     "de_case": task(("de",), load_de_case, score_de_case, 64, 120, lang_check=False),
     "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 56, lang_check=False),
+    "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 48, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

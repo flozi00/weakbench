@@ -561,6 +561,9 @@ def test_form_writing():
     poem = "\n".join(c + line[1:] for c, line in zip(ac["spec"], poem.splitlines()))
     assert tl.score_form_writing(ac, {"content": poem})["detail"]["form_only"] == 1.0
     assert tl.score_form_writing(li, {"content": "x"})["correct"] is False
+    assert not tl.score_form_writing(co, {"content": " ".join(["w"] * co["spec"])})["correct"]  # gibberish
+    titled = "Sea Poem\n\n" + "\n".join("„" + ln for ln in poem.splitlines())
+    assert tl.score_form_writing(ac, {"content": titled})["detail"]["form_only"] == 1.0
     words = " ".join(["word"] * (co["spec"] - 1)) + " end."
     assert tl.score_form_writing(co, {"content": words})["detail"]["form_only"] == 1.0
 

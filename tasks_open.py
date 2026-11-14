@@ -909,9 +909,10 @@ AR_TOPICS = {"en": ["Should schools start an hour later?", "Should cities ban ca
 AR_ASK = {"en": "Write a short argumentative essay (at most 250 words) on: {t} Give arguments for and against, then your "
                 "own reasoned conclusion.",
           "de": "Schreibe eine kurze Erörterung (höchstens 250 Wörter) zur Frage: {t} Nenne Argumente dafür und dagegen und "
-                "komm dann zu einem begründeten eigenen Urteil."}
-AR_JUDGE = """Evaluate a short argumentative essay. Answer each criterion YES or NO, and count clear grammar or spelling
-errors (not style). Reply with ONLY {{"verdicts": [...], "grammar_errors": <int>}}.
+                "gelange dann zu einem begründeten eigenen Urteil."}
+AR_JUDGE = """Evaluate a short argumentative essay. Answer each criterion YES or NO, in order, and list every clear grammar
+or spelling error (not style) as the exact erroneous words. Reply with ONLY
+{{"verdicts": ["YES"|"NO", ... 6 entries], "errors": ["<exact words>", ...]}}.
 
 TASK: {task}
 
@@ -922,9 +923,9 @@ CRITERIA:
 1. An introduction states the question or thesis.
 2. At least two distinct arguments FOR, each with a reason or example.
 3. At least two distinct arguments AGAINST, each with a reason or example.
-4. The other side is presented fairly (no straw man).
-5. The conclusion weighs the arguments and follows from them (it is not a new claim).
-6. Paragraphs and connectives (however, therefore, einerseits/andererseits ...) make the structure clear."""
+4. The counterarguments are stated in their strongest plausible form (no straw man).
+5. The conclusion takes a clear position and names which arguments tip the balance.
+6. Paragraphs and connectives (e.g. however, therefore, einerseits/andererseits) make the structure clear."""
 
 
 def load_argument_essay(lang, n, seed):
@@ -941,11 +942,14 @@ def score_argument_essay(item, reply):
                             max_tokens=192)
     m = re.search(r"\{.*\}", out, re.S)
     j = json.loads(m[0]) if m else {}
-    v, ge = j.get("verdicts"), j.get("grammar_errors")
-    if not isinstance(v, list) or len(v) != 6 or not isinstance(ge, int):
+    v, errs = j.get("verdicts"), j.get("errors")
+    if not isinstance(v, list) or len(v) != 6 or not isinstance(errs, list):
         raise ValueError(f"unusable essay verdict {out[:120]!r}")
+    errs = [e for e in errs if isinstance(e, str) and e.strip() and e.strip().lower() in text.lower()]  # verified spans
+    ge = len(errs)
     words = len([w for w in text.split() if re.search(r"\w", w)])
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= 250]
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [
+        words <= 250 and reply.get("finish_reason") != "length"]
     per100 = ge / max(words, 1) * 100
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
             "detail": {"all_met": float(all(met)), "grammar_errors_per_100w": round(per100, 3),

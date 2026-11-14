@@ -2024,7 +2024,7 @@ def load_form_writing(lang, n, seed):
             q = (f"Write three sentences about {topic} without using the letter '{letter}' anywhere (upper or lower case). "
                  "Reply with the sentences only." if lang == "en" else
                  f"Schreibe drei Sätze über {topic}, ohne irgendwo den Buchstaben „{letter}“ zu verwenden (weder groß noch "
-                 "klein). Antworte nur mit den Sätzen.")
+                 "klein; Umlaute wie ä zählen nicht als a). Antworte nur mit den Sätzen.")
             spec = letter
         else:
             k = r.choice([17, 23, 31])
@@ -2037,19 +2037,31 @@ def load_form_writing(lang, n, seed):
     return items
 
 
+FW_ABBR = re.compile(r"\b(z\.\s?B|d\.\s?h|u\.\s?a|usw|bzw|ca|Nr|e\.\s?g|i\.\s?e|etc)\.", re.I)
+
+
+def fw_clean_line(ln):
+    ln = re.sub(r"^\s*(?:[-*#>]+|\d+[.)])\s*", "", ln)
+    return ln.strip().strip("*_\"'„“”»«").strip()
+
+
 def score_form_writing(item, reply):
     text = (reply["content"] or "").strip()
-    lang_ok = common.lang_ok(text, item["lang"], min_words=8) is not False
+    words = re.findall(r"[^\W\d_]{2,}", text.lower())
+    # real language: the detector must say yes (None = too short / no function words fails too), and no word salad
+    lang_ok = common.lang_ok(text, item["lang"], min_words=8) is True and len(set(words)) >= 0.5 * max(len(words), 1)
+    flat = FW_ABBR.sub("", text).replace("...", "…")
     if item["kind"] == "acrostic":
-        lines = [ln.strip().lstrip("*#-0123456789. ").strip() for ln in text.splitlines() if ln.strip()]
-        form = len(lines) == len(item["spec"]) and all(
-            ln[:1].upper() == c and len(ln.split()) >= 4 for ln, c in zip(lines, item["spec"]))
-    elif item["kind"] == "lipogram":
-        sents = [x for x in re.split(r"(?<=[.!?])\s+", text) if x.strip()]
-        form = item["spec"] not in text.lower() and len(sents) == 3
-    else:
+        lines = [fw_clean_line(ln) for ln in text.splitlines() if fw_clean_line(ln)]
+        fits = lambda ls: len(ls) == len(item["spec"]) and all(  # noqa: E731
+            ln[:1].upper() == c and len(ln.split()) >= 4 for ln, c in zip(ls, item["spec"]))
+        form = fits(lines) or (len(lines) == len(item["spec"]) + 1 and fits(lines[1:]))  # a title line first
+    elif item["kind"] == "lipogram":  # umlauts are other letters (the prompt says so); the whole reply counts
+        sents = [x for x in re.split(r"(?<=[.!?])\s+", flat) if x.strip()]
+        form = item["spec"] not in text.lower() and len(sents) == 3 and all(len(x.split()) >= 4 for x in sents)
+    else:  # words = whitespace tokens with a letter or digit; one sentence = one terminal mark, at the end
         form = len([w for w in text.split() if re.search(r"\w", w)]) == item["spec"] and len(
-            re.findall(r"[.!?](\s|$)", text)) <= 1
+            re.findall(r"[.!?](?:\s|$)", flat)) <= 1
     ok = form and lang_ok
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["spec"],
             "detail": {f"ok_{item['kind']}": float(ok), "form_only": float(form)}}

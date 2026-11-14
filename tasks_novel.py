@@ -1474,6 +1474,63 @@ def score_anchoring(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": g, "detail": d}
 
 
+# ---------------------------------------------------------------- char_ops (trap: tokenization — letters of invented words)
+# Pronounceable invented words, so no memorized spelling helps. Kinds: count a letter, reverse, the n-th letter,
+# count the words in a phrase that contain a letter. Exact string / integer answers.
+CH_SYL = ["ra", "mo", "ste", "lin", "ka", "pru", "zel", "fo", "bri", "nat", "rel", "dou", "smi", "tar", "vek", "ol"]
+CH_TEXT = {
+    "en": {"count": "How many times does the letter '{c}' occur in the word '{w}'?",
+           "reverse": "Write the word '{w}' backwards, letter by letter.",
+           "nth": "Counting from 1, what is letter number {k} of the word '{w}'? Answer with the letter only.",
+           "words": "In the phrase '{p}', how many words contain the letter '{c}'?"},
+    "de": {"count": "Wie oft kommt der Buchstabe '{c}' im Wort '{w}' vor?",
+           "reverse": "Schreibe das Wort '{w}' rückwärts, Buchstabe für Buchstabe.",
+           "nth": "Was ist der {k}. Buchstabe des Wortes '{w}'? Antworte nur mit dem Buchstaben.",
+           "words": "Wie viele Wörter in der Wortgruppe '{p}' enthalten den Buchstaben '{c}'?"},
+}
+CH_KINDS = ("count", "reverse", "nth", "words")
+
+
+def ch_word(r, lo, hi):
+    return "".join(r.choice(CH_SYL) for _ in range(r.randint(lo, hi)))
+
+
+def load_char_ops(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("char_ops", i)
+        kind = CH_KINDS[i % 4]
+        w = ch_word(r, 4, 6)
+        if kind == "count":
+            rep = sorted(x for x in set(w) if w.count(x) > 1)  # a repeated letter where there is one
+            c = r.choice(rep or sorted(set(w)))
+            q, gold = CH_TEXT[lang][kind].format(c=c, w=w), str(w.count(c))
+        elif kind == "reverse":
+            q, gold = CH_TEXT[lang][kind].format(w=w), w[::-1]
+        elif kind == "nth":
+            k = r.randint(3, len(w))
+            q, gold = CH_TEXT[lang][kind].format(k=k, w=w), w[k - 1]
+        else:
+            words = [ch_word(r, 2, 3) for _ in range(r.randint(5, 8))]
+            c = r.choice(sorted(set("".join(words))))
+            q, gold = CH_TEXT[lang][kind].format(p=" ".join(words), c=c), str(sum(c in x for x in words))
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_char_ops(item, reply):
+    line = (final_answer(reply["content"]) or "").strip().lower()
+    if item["kind"] in ("count", "words"):
+        v = answer_value(line, item["lang"])
+        ok = v is not None and v == int(item["gold"])
+    else:  # "r-o-m-a" and "R O M A" are the same letters
+        letters = re.sub(r"[^a-zäöüß]", "", line)
+        ok = letters == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": line[:40], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -2997,6 +3054,7 @@ TASKS = {
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
     "anchoring": task(load_anchoring, score_anchoring, 24, 150),
+    "char_ops": task(load_char_ops, score_char_ops, 24, 200),
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),

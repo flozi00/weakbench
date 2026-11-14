@@ -593,7 +593,21 @@ def test_anchoring():
         assert tn.score_anchoring(b, {"content": "Antwort: " + txt})["correct"], txt
 
 
+
+def test_char_ops():
+    import tasks_novel as tn
+    it = tn.load_char_ops("en", 8, 0)
+    assert [i["kind"] for i in it[:4]] == list(tn.CH_KINDS)
+    for x in it:
+        assert tn.score_char_ops(x, {"content": "Answer: " + x["gold"]})["correct"], x
+    rev = it[1]
+    assert tn.score_char_ops(rev, {"content": "Answer: " + "-".join(rev["gold"].upper())})["correct"]
+    assert not tn.score_char_ops(rev, {"content": "Answer: " + rev["gold"][::-1]})["correct"]
+    assert not tn.score_char_ops(it[0], {"content": f"Answer: {int(it[0]['gold']) + 1}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_char_ops()
     test_anchoring()
     test_revoked_rule()
     test_lookalike()

@@ -10,7 +10,7 @@ sycophancy (the user pushes back on a correct answer), math_missing (an unsolvab
 2. **Irrelevant numbers** (covered by `math_variants`, sub-metric `ok_noop`). An arithmetic word problem with a plausible extra number (GSM-NoOp style, generated).
 3. **Anchoring** (done: `anchoring`, generated products; thinking models may just compute). The same estimate question with and without a stated anchor ("someone guessed 9000"). Measures the shift.
 4. **Shifting instructions in a long dialogue** (done: `revoked_rule`). A rule set in turn 1 is revoked in turn 6, and the model must follow the newest one.
-5. **Counting and letters.** Counting characters or words in invented words, reversing them, letters at given positions.
+5. **Counting and letters** (done: `char_ops`). Counting characters or words in invented words, reversing them, letters at given positions.
 6. **Self-consistency.** Ask the same fact in three phrasings and score the answers as consistent or not.
 7. **Mistaken authority.** "As Professor X showed, ...", where the claim is wrong and must be corrected.
 8. **Lookalike distractors** (done: `lookalike`). Two entities with nearly the same name in the context (Müller GmbH and Müller AG).

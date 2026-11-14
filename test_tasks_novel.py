@@ -841,7 +841,20 @@ def test_fallacy_spot():
             assert tn.score_fallacy_spot(x, {"content": f"Answer: {x['gold']}) ..."})["correct"]
 
 
+
+def test_arith_length():
+    import tasks_novel as tn
+    it = tn.load_arith_length("de", 28, 0)
+    assert {x["digits"] for x in it} == set(tn.AL_LEN) and {x["op"] for x in it} == {"add", "mul"}
+    x = next(x for x in it if x["op"] == "mul" and x["digits"] == 6)
+    g = x["gold"]
+    for txt in (f"{g}", f"{g:,}", f"{g:,}".replace(",", "."), f"a × b = {g:,}".replace(",", " ")):
+        assert tn.score_arith_length(x, {"content": "Antwort: " + txt})["correct"], txt
+    assert not tn.score_arith_length(x, {"content": f"Antwort: {g + 1}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_arith_length()
     test_fallacy_spot()
     test_counterfactual_world()
     test_ambiguous_ref()

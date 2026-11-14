@@ -162,3 +162,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `counterfactual_world` | generated: a fictional world with one rule against reality (water freezes at 40 °C, adults at 25, 9-day weeks, light objects fall faster, sun rises in the west) | de, en | 25 / 200 | auto | yes/no by the stated rule; `ok_conflict` vs `ok_agree` |
 | `agreement_attractor` | generated: subject and verb split by 1-2 attractor phrases of the other number | de, en | 40 / 160 | off | is/are, ist/sind; `ok_attr1/2`, singular/plural |
 | `fallacy_spot` | generated arguments about invented town proposals, five fallacies + a sound control, shuffled options | de, en | 24 / 120 | auto | letter; `ok_<fallacy>` |
+| `arith_length` | generated exact addition / multiplication of 2- to 8-digit numbers | de, en | 28 / 140 | auto | exact integer; `ok_d2..8`, `ok_add*` / `ok_mul*` (the length where exactness breaks) |

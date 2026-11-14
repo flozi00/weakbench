@@ -2429,6 +2429,35 @@ def score_fallacy_spot(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- arith_length (where exact arithmetic breaks, by length)
+# Exact addition and multiplication of n-digit numbers, n = 2..8, no calculator. The per-length sub-metrics show the
+# length at which a model stops being exact: a generalisation cliff, not a single score.
+AL_LEN = (2, 3, 4, 5, 6, 7, 8)
+
+
+def load_arith_length(lang, n, seed):
+    items = []
+    for i in range(n or 140):
+        r = rng_of("arith_length", i)
+        d = AL_LEN[i % len(AL_LEN)]
+        op = ("+", "×")[(i // len(AL_LEN)) % 2]
+        a, b = (r.randint(10 ** (d - 1), 10 ** d - 1) for _ in range(2))
+        gold = a + b if op == "+" else a * b
+        q = (f"Compute exactly: {a} {op} {b}" if lang == "en" else f"Berechne exakt: {a} {op} {b}")
+        items.append({"id": str(i), "lang": lang, "digits": d, "op": "add" if op == "+" else "mul", "gold": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_arith_length(item, reply):
+    line = final_answer(reply["content"]) or ""
+    digits = re.sub(r"[\s.,'’ ]", "", line.split("=")[-1])
+    m = re.search(r"\d+", digits)
+    ok = bool(m) and int(m.group()) == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": m.group() if m else None, "gold": item["gold"],
+            "detail": {f"ok_{item['op']}{item['digits']}": float(ok), f"ok_d{item['digits']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3968,6 +3997,7 @@ TASKS = {
     "ambiguous_ref": task(load_ambiguous_ref, score_ambiguous_ref, 24, 200),
     "counterfactual_world": task(load_counterfactual_world, score_counterfactual_world, 25, 200),
     "fallacy_spot": task(load_fallacy_spot, score_fallacy_spot, 24, 120),
+    "arith_length": task(load_arith_length, score_arith_length, 28, 140),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

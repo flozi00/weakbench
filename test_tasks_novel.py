@@ -1230,7 +1230,18 @@ def test_sunk_cost():
     assert tn.score_sunk_cost(trap, {"content": f"Answer: Option {g}, not {trap['cont']}"})["correct"]
 
 
+
+def test_regression_mean():
+    import tasks_novel as tn
+    it = tn.load_regression_mean("de", 8, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        assert not a["control"] and b["control"] and "Vergleichsgruppe" in b["messages"][0]["content"]
+    for x in it:
+        assert tn.score_regression_mean(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_regression_mean()
     test_sunk_cost()
     test_conclusion_spot()
     test_framing()

@@ -4098,6 +4098,67 @@ def score_sunk_cost(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- regression_mean (an "effect" that is regression to the mean)
+# The worst (or best) scorers of a noisy first test get some treatment and move toward the average on a retest, with no
+# comparison group: the best explanation is regression to the mean. Control twins add a randomised comparison group
+# whose extreme scorers did NOT move as much, so the treatment explanation is right. Options shuffled.
+RM_DOM = {"en": [("pupils", "a spelling test", "extra tutoring"), ("drivers", "a reaction test", "a coffee"),
+                 ("sales reps", "a monthly sales ranking", "a motivational workshop"),
+                 ("players", "a free-throw test", "a new shoe")],
+          "de": [("Schüler", "einem Rechtschreibtest", "Nachhilfe"), ("Fahrer", "einem Reaktionstest", "einen Kaffee"),
+                 ("Vertreter", "einem Monatsranking im Verkauf", "ein Motivationsseminar"),
+                 ("Spieler", "einem Freiwurftest", "einen neuen Schuh")]}
+RM_OPT = {"en": {"treat": "The {t} caused the change.", "regress": "Extreme first scores tend to move toward the average "
+                 "on a retest anyway (regression to the mean).", "worse": "The second test was easier.",
+                 "none": "The groups were mixed up."},
+          "de": {"treat": "{T} hat die Veränderung bewirkt.", "regress": "Extreme Werte im ersten Test nähern sich bei einer "
+                 "Wiederholung ohnehin dem Durchschnitt an (Regression zur Mitte).", "worse": "Der zweite Test war leichter.",
+                 "none": "Die Gruppen wurden vertauscht."}}
+
+
+def load_regression_mean(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        g, ctrl = divmod(i, 2)
+        r = rng_of("regression_mean", g)
+        who, test, treat = RM_DOM[lang][g % len(RM_DOM[lang])]
+        low = r.randint(10, 25)
+        after = low + r.randint(10, 20)
+        if lang == "en":
+            story = (f"Among 200 {who}, the 20 with the lowest results on {test} (average {low} points; the overall average "
+                     f"was 50) got {treat}. On a retest they averaged {after} points.")
+            if ctrl:
+                story += (f" A randomly chosen comparison group of 20 equally low scorers without {treat} averaged only "
+                          f"{low + 2} points on the retest.")
+            q = "What is the best explanation for the improvement?"
+        else:
+            story = (f"Von 200 {who}n bekamen die 20 mit den schlechtesten Ergebnissen in {test} (Durchschnitt {low} Punkte; "
+                     f"der Gesamtdurchschnitt lag bei 50) {treat}. Bei einer Wiederholung erreichten sie im Schnitt {after} Punkte.")
+            if ctrl:
+                story += (f" Eine zufällig gewählte Vergleichsgruppe von 20 ebenso schwachen Teilnehmern ohne {treat} kam bei "
+                          f"der Wiederholung nur auf {low + 2} Punkte.")
+            q = "Was erklärt die Verbesserung am besten?"
+        O = RM_OPT[lang]
+        keys = ["treat", "regress", "worse", "none"]
+        r.shuffle(keys)
+        tt = treat[0].upper() + treat[1:]
+        opts = "\n".join(f"{'ABCD'[k]}) {O[key].format(t=treat, T=tt)}" for k, key in enumerate(keys))
+        gold = "ABCD"[keys.index("treat" if ctrl else "regress")]
+        items.append({"id": f"{g}-{ctrl}", "lang": lang, "control": bool(ctrl), "gold": gold,
+                      "messages": [{"role": "user", "content": f"{story}\n{q}\n{opts}\n" + ASK[lang]}]})
+    return items
+
+
+def score_regression_mean(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*([A-D])(?:\)|\W*$|\s*[-:.])", line) or re.search(r"\b([A-D])\)", line)
+    lone = set(re.findall(r"(?<![A-Za-z])([A-D])(?![a-z])", line))
+    pred = m.group(1) if m else (lone.pop() if len(lone) == 1 else None)
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
+            "detail": {"ok_control" if item["control"] else "ok_regression": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5664,6 +5725,7 @@ TASKS = {
     "framing": {**task(load_framing, score_framing, 24, 120), "grouped": True},
     "conclusion_spot": task(load_conclusion_spot, score_conclusion_spot, 24, 120),
     "sunk_cost": task(load_sunk_cost, score_sunk_cost, 24, 120),
+    "regression_mean": task(load_regression_mean, score_regression_mean, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

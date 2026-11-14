@@ -4159,6 +4159,58 @@ def score_regression_mean(item, reply):
             "detail": {"ok_control" if item["control"] else "ok_regression": float(ok)}}
 
 
+# ---------------------------------------------------------------- dim_analysis (dimensional analysis over invented quantities)
+# Invented quantities p, q, r, w with SI units (exponents of m, s, kg). Four candidate expressions; exactly one has the
+# target unit. The quantities are made up, so only the unit arithmetic answers it.
+DA_UNITS = {(1, 0, 0): "m", (0, 1, 0): "s", (0, 0, 1): "kg", (1, -1, 0): "m/s", (1, -2, 0): "m/s²",
+            (2, 0, 0): "m²", (0, -1, 0): "1/s", (1, -2, 1): "kg·m/s²", (2, -2, 1): "kg·m²/s²", (3, 0, 0): "m³",
+            (-3, 0, 1): "kg/m³", (0, 0, 0): "1"}
+
+
+def da_mul(a, b, sign=1):
+    return tuple(x + sign * y for x, y in zip(a, b))
+
+
+def load_dim_analysis(lang, n, seed):
+    import itertools
+    items, i = [], -1
+    base = [u for u in DA_UNITS if u != (0, 0, 0)]
+    while len(items) < (n or 120):
+        i += 1
+        r = rng_of("dim_analysis", i)
+        names = ["p", "q", "w", "z"]
+        units = dict(zip(names, r.sample(base, 4)))
+        exprs = {}
+        for a, b in itertools.permutations(names, 2):
+            exprs[f"{a}·{b}"] = da_mul(units[a], units[b])
+            exprs[f"{a}/{b}"] = da_mul(units[a], units[b], -1)
+        target_expr = r.choice(sorted(exprs))
+        target = exprs[target_expr]
+        if target not in DA_UNITS:
+            continue
+        wrong = sorted({e for e, u in exprs.items() if u != target})
+        if len(wrong) < 3:
+            continue
+        opts = r.sample(wrong, 3) + [target_expr]
+        r.shuffle(opts)
+        defs = ", ".join(f"{k} in {DA_UNITS[u]}" for k, u in units.items())
+        q = (f"Invented quantities: {defs}. Which expression has the unit {DA_UNITS[target]}?" if lang == "en" else
+             f"Erfundene Größen: {defs}. Welcher Ausdruck hat die Einheit {DA_UNITS[target]}?")
+        q += "\n" + "\n".join(f"{'ABCD'[k]}) {e}" for k, e in enumerate(opts))
+        items.append({"id": str(i), "lang": lang, "gold": "ABCD"[opts.index(target_expr)],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_dim_analysis(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*([A-D])(?:\)|\W*$|\s*[-:.])", line) or re.search(r"\b([A-D])\)", line)
+    lone = set(re.findall(r"(?<![A-Za-z])([A-D])(?![a-z])", line))
+    pred = m.group(1) if m else (lone.pop() if len(lone) == 1 else None)
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5726,6 +5778,7 @@ TASKS = {
     "conclusion_spot": task(load_conclusion_spot, score_conclusion_spot, 24, 120),
     "sunk_cost": task(load_sunk_cost, score_sunk_cost, 24, 120),
     "regression_mean": task(load_regression_mean, score_regression_mean, 24, 120),
+    "dim_analysis": task(load_dim_analysis, score_dim_analysis, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

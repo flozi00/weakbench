@@ -1240,7 +1240,19 @@ def test_regression_mean():
         assert tn.score_regression_mean(x, {"content": f"Antwort: {x['gold']}"})["correct"]
 
 
+
+def test_dim_analysis():
+    import tasks_novel as tn
+    assert tn.da_mul((1, -1, 0), (0, 1, 0)) == (1, 0, 0)
+    it = tn.load_dim_analysis("en", 30, 0)
+    golds = [x["gold"] for x in it]
+    assert len(set(golds)) == 4
+    for x in it:
+        assert tn.score_dim_analysis(x, {"content": f"Answer: {x['gold']})"})["correct"]
+
+
 if __name__ == "__main__":
+    test_dim_analysis()
     test_regression_mean()
     test_sunk_cost()
     test_conclusion_spot()

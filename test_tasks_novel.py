@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path", "stale_answer") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -1094,7 +1094,18 @@ def test_alien_sort():
         sorted(x["words"]) == x["gold"].split(", ")
 
 
+
+def test_stale_answer():
+    import tasks_novel as tn
+    x = tn.load_stale_answer("de", 1, 0)[0]
+    assert len(x["turns"]) == 2 and x["gold"] != x["first"]
+    r = tn.score_stale_answer(x, {"content": "", "turns": [f"Antwort: {x['first']}", f"Antwort: {x['first']}"]})
+    assert not r["correct"] and r["detail"]["repeated_old"] == 1.0
+    assert tn.score_stale_answer(x, {"content": "", "turns": [f"Antwort: {x['first']}", f"Antwort: {x['gold']}"]})["correct"]
+
+
 if __name__ == "__main__":
+    test_stale_answer()
     test_alien_sort()
     test_maze_path()
     test_ascii_chart()

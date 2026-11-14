@@ -198,3 +198,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `neutral_summary` ** | generated two-sided disputes (tenant/landlord, neighbours, colleagues) with facts and loaded claims, summarised for a mediator | de, en | 12 / 30 | off | judge: both sides, facts right, accusations attributed, no verdict, nothing invented; word limit |
 | `en_reported` | generated: direct quotes into reported speech with an explicit one-step backshift (am->was, will->would, have->had, was->had been, do->did) | en | 32 / 32 | off | the backshifted verb, copied quotes and first person rejected |
 | `alien_sort` | generated: an invented order of 6 letters, sort 4-6 words written in them | de, en | 24 / 120 | auto | the exact order; `ok_n4..6` |
+| `stale_answer` | generated two-turn word problem: the second turn repeats it with one number changed | de, en | 24 / 120 | auto | turn 2 exact; `repeated_old` (turn 1 answer given again), `ok_turn1` |

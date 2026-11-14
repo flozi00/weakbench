@@ -3556,6 +3556,38 @@ def score_alien_sort(item, reply):
             "detail": {f"ok_n{item['n']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- stale_answer (trap: the follow-up changes one number)
+# Turn 1: a word problem. Turn 2: "And if ..." — the same problem with one quantity changed, phrased briefly. The
+# second answer is scored; repeated_old = the model gave the first answer again (it did not recompute).
+SA_TEXT = {"en": ("A school orders {a} boxes of {b} pencils. {c} pencils break. How many pencils are left?",
+                  "And if the school orders {a2} boxes instead, with everything else the same?"),
+           "de": ("Eine Schule bestellt {a} Kartons mit je {b} Stiften. {c} Stifte gehen kaputt. Wie viele Stifte bleiben "
+                  "übrig?", "Und wenn die Schule stattdessen {a2} Kartons bestellt, sonst alles gleich?")}
+
+
+def load_stale_answer(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("stale_answer", i)
+        a, b, c = r.randint(3, 12), r.choice([6, 8, 10, 12, 24]), r.randint(2, 15)
+        a2 = a + r.choice([-2, -1, 1, 2, 3])
+        q1, q2 = SA_TEXT[lang]
+        first, second = a * b - c, a2 * b - c
+        turns = [[{"role": "user", "content": q1.format(a=a, b=b, c=c) + "\n" + ASK[lang]}],
+                 [{"role": "user", "content": q2.format(a2=a2) + "\n" + ASK[lang]}]]
+        items.append({"id": str(i), "lang": lang, "gold": second, "first": first, "turns": turns, "messages": turns[0]})
+    return items
+
+
+def score_stale_answer(item, reply):
+    answers = reply.get("turns") or [reply["content"]]
+    v2 = last_int(final_answer(answers[-1]) or "")
+    v1 = last_int(final_answer(answers[0]) or "") if len(answers) > 1 else None
+    ok = v2 == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v2, "gold": item["gold"],
+            "detail": {"repeated_old": float(v2 == item["first"]), "ok_turn1": float(v1 == item["first"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5112,6 +5144,7 @@ TASKS = {
     "ascii_chart": task(load_ascii_chart, score_ascii_chart, 24, 120),
     "maze_path": task(load_maze_path, score_maze_path, 25, 120),
     "alien_sort": task(load_alien_sort, score_alien_sort, 24, 120),
+    "stale_answer": task(load_stale_answer, score_stale_answer, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

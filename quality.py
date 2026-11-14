@@ -1256,7 +1256,8 @@ def print_table(manifest, info, rows):
 GROUPS = {
     "traps": ["puzzle_mutation", "lookalike", "revoked_rule", "anchoring", "false_authority", "near_miss_qa", "format_bait",
               "false_premise", "option_order", "source_trust", "switched_question", "mixed_units", "double_negation",
-              "counterfactual_world", "fake_entity", "number_compare", "judge_ability", "math_missing", "sycophancy"],
+              "counterfactual_world", "fake_entity", "number_compare", "judge_ability", "math_missing", "sycophancy",
+              "stale_answer"],
     "generalization": ["rule_induction", "invented_ops", "mini_language", "arith_length", "nesting_depth", "grid_transform",
                        "blocks_plan", "regex_synth", "unit_chain", "cipher", "prop_logic", "causal_graph", "knapsack",
                        "maze_path", "reversal", "char_ops", "off_by_one", "rephrase_consistency", "continuity_error"],

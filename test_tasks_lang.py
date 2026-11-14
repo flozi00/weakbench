@@ -513,7 +513,21 @@ def test_irony():
     assert tl.score_irony(x, {"content": "Nicht ironisch, sondern ernst."})["correct"]
 
 
+def test_en_variety():
+    import re as _re
+    import tasks_lang as tl
+    for a, b in tl.EV_WORDS:  # no spelling matches the other one
+        assert not _re.search(tl.ev_form(a), b) and not _re.search(tl.ev_form(b), a), (a, b)
+    assert _re.search(tl.ev_form("organise"), "they organised it") and _re.search(tl.ev_form("colour"), "colourful") is None
+    it = tl.load_en_variety("en", 2, 0)
+    br = it[0]
+    good = " ".join(w[0] for w in br["words"]) + "."
+    assert tl.score_en_variety(br, {"content": good})["correct"]
+    assert not tl.score_en_variety(br, {"content": good + " The color was nice."})["correct"]
+
+
 if __name__ == "__main__":
+    test_en_variety()
     test_irony()
     test_wug()
     test_agreement_attractor()

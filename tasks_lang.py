@@ -1876,6 +1876,43 @@ def score_irony(item, reply):
             "detail": {"ok_ironic" if item["ironic"] else "ok_sincere": float(ok), f"ok_{item.get('kind', 'event')}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_variety (British vs American spelling, held throughout)
+# Write a short text that must use four given concepts, in British or American spelling. Scored exactly: every concept
+# appears in the requested spelling (any inflection) and no word in the other spelling appears anywhere.
+EV_WORDS = [("colour", "color"), ("favourite", "favorite"), ("organise", "organize"), ("centre", "center"),
+            ("analyse", "analyze"), ("theatre", "theater"), ("travelling", "traveling"), ("neighbour", "neighbor"),
+            ("realise", "realize"), ("catalogue", "catalog"), ("defence", "defense"), ("grey", "gray")]
+
+
+def load_en_variety(lang, n, seed):
+    items = []
+    for i in range(n or 40):
+        r = random.Random(f"en_variety:{i}")
+        variety = ("British", "American")[i % 2]
+        words = r.sample(EV_WORDS, 4)
+        shown = [w[1] if variety == "British" else w[0] for w in words]  # show the other spelling: no copying
+        items.append({"id": str(i), "lang": "en", "variety": variety, "words": words,
+                      "messages": [{"role": "user", "content": f"Write four sentences in {variety} English spelling about "
+                                    f"a small town festival. Use these words (in the right spelling for {variety} "
+                                    f"English): {', '.join(shown)}."}]})
+    return items
+
+
+def ev_form(w):
+    """The word with its inflections (organise -> organised/organising/organisation), never another spelling's prefix."""
+    stem = w[:-1] if w.endswith("e") else w
+    return r"\b" + re.escape(stem) + r"(e|es|ed|ing|s|er|ers|ation|ations)?\b"
+
+
+def score_en_variety(item, reply):
+    text = (reply["content"] or "").lower()
+    idx = 0 if item["variety"] == "British" else 1
+    used = [bool(re.search(ev_form(w[idx]), text)) for w in item["words"]]
+    wrong = [w[1 - idx] for w in EV_WORDS if re.search(ev_form(w[1 - idx]), text)]
+    ok = all(used) and not wrong
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": [w[idx] for w in item["words"]],
+            "detail": {f"ok_{item['variety'].lower()}": float(ok), "other_spelling": float(bool(wrong))}}
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1918,6 +1955,7 @@ TASKS = {
     "agreement_attractor": task(("de", "en"), load_agreement_attractor, score_agreement_attractor, 16, 40, lang_check=False),
     "wug": task(("de", "en"), load_wug, score_wug, 32, 40, lang_check=False),
     "irony": task(("de", "en"), load_irony, score_irony, 16, 30, lang_check=False),
+    "en_variety": task(("en",), load_en_variety, score_en_variety, 512, 20),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

@@ -969,10 +969,11 @@ ST_Q = {"en": ("A shop sells pens in packs of {a}. Mia buys {b} packs and gives 
         "de": ("Ein Laden verkauft Stifte in Packungen zu {a} Stück. Mia kauft {b} Packungen und verschenkt {c} Stifte. Wie "
                "viele Stifte hat sie noch? Was ist die Lösung?", "Sag mir bitte einfach die Zahl, ich muss das in fünf "
                "Minuten abgeben!")}
-ST_CHECK = ["The reply gives a correct hint toward the next step (e.g. first find the total number of pens).",
+ST_CHECK = ["The first reply gives a correct hint toward the next step (e.g. first find the total number of pens).",
             "The tone is kind and encouraging toward the student.",
-            "Each reply ends with or contains a guiding question for the student.",
-            "The second reply holds the line kindly without giving the final number, and still helps."]
+            "Each reply contains a guiding question for the student.",
+            "The second reply holds the line kindly and still helps.",
+            "The tutor never states the final number in any form (digits, words, or a completed calculation)."]
 ST_JUDGE = """Evaluate a tutoring chat. The tutor must NOT give the final answer ({gold}) and should guide instead.
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 
@@ -990,7 +991,7 @@ def load_socratic_tutor(lang, n, seed):
         r = random.Random(f"socratic_tutor:{i}")
         a, b = r.choice([6, 8, 10, 12]), r.randint(3, 9)
         c = r.randint(2, a * b - 5)
-        while a * b - c in (a, b, c, a * b, 5):  # the answer must not equal a number the tutor may legitimately repeat
+        while a * b - c in (a, b, c, a * b, 5, 12):  # never a number the tutor may legitimately say (incl. the age 12)
             c = r.randint(2, a * b - 5)
         gold = a * b - c
         q1, q2 = ST_Q[lang]
@@ -1013,8 +1014,10 @@ def score_socratic_tutor(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(ST_CHECK):
         raise ValueError(f"unusable tutor verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [not leaked]
-    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": (answers[-1] or "")[:200], "gold": item["gold"],
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    leaked = leaked or not met[4]  # the judge also catches "dreiundzwanzig" and finished calculations
+    score = 0.0 if leaked else round(sum(met) / len(met), 4)  # leaking is the core failure
+    return {"correct": None, "score": score, "pred": (answers[-1] or "")[:200], "gold": item["gold"],
             "detail": {"leaked_answer": float(leaked), "all_met": float(all(met)), "held_under_pressure": float(met[3])}}
 
 

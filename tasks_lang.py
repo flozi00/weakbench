@@ -2292,16 +2292,29 @@ RV_CHANGES = {
               lambda t, it: len([w for w in t.split() if re.search(r"\w", w)]) <= 50),
     "fact": ("Ergänze, dass es Getränke gibt und man {x} mitbringen soll.",
              "Add that there will be drinks and people should bring {x}.",
-             lambda t, it: it["extra"][0 if it["lang"] == "de" else 1].split()[-1].lower()[:5] in t.lower()),  # Decke(n), plates
+             lambda t, it: bool(re.search(RV_ITEM[it["extra"][1]], t, re.I))
+             and bool(re.search(r"getränk|\bdrinks?\b|\bbeverages?\b", t, re.I))),
     "noexcl": ("Entferne alle Ausrufezeichen.", "Remove all exclamation marks.", lambda t, it: "!" not in t),
-    "question": ("Beende den Text mit einer Frage an die Leser.", "End the text with a question to the readers.",
-                 lambda t, it: t.rstrip().rstrip("*_\"“”").endswith("?")),
+    "question": ("Beende den Text mit einer Frage an die Leser (danach nur noch Gruß und Name).",
+                 "End the text with a question to the readers (only a greeting and name may follow).",
+                 lambda t, it: rv_last_sentence(t).endswith("?")),
     "formal": ("Schreibe ihn in der Sie-Form.", "Make it formal (no 'hey', no contractions like 'we're').",
-               lambda t, it: (not re.search(r"\b([Dd]u|[Dd]ich|[Dd]ir|[Dd]ein\w*|[Ee]uch|[Ee]uer\w*|ihr)\b", t)  # "Ihr" is formal
-                              and re.search(r"\b(Sie|Ihnen|Ihr\w*)\b", t)) if it["lang"] == "de" else
-               not re.search(r"\bhey\b|\b\w+'(re|ll|ve|s|d)\b|n't\b", t, re.I)),
+               lambda t, it: (not re.search(r"\b([Dd]u|[Dd]ich|[Dd]ir|[Dd]ein\w*|[Ee]uch|[Ee]uer\w*)\b", t)
+                              and re.search(r"\b(Ihnen|Ihr\w*)\b|(?<![.!?]\s)(?<!^)\bSie\b", t)) if it["lang"] == "de" else
+               not re.search(r"\bhey\b|\b(i|you|we|they|he|she|it|that|there|what|let)['’](m|re|ll|ve|s|d)\b|n['’]t\b",
+                             t, re.I)),
 }
-RV_EXTRA = [("eine Decke", "a blanket"), ("einen Teller", "a plate"), ("gute Laune", "a good mood")]
+RV_EXTRA = [("eine Decke", "a blanket"), ("einen Teller", "a plate"), ("einen Becher", "a cup")]
+RV_ITEM = {"a blanket": r"\b\w*decken?\b(?<!entdecken)|\bblankets?\b", "a plate": r"\b\w*teller(n)?\b|\bplates?\b",
+           "a cup": r"\b\w*becher(n)?\b|\bcups?\b"}
+
+
+def rv_last_sentence(t):
+    """The text without a closing greeting / signature (short lines without '?') at the end."""
+    lines = [ln.strip() for ln in t.strip().splitlines() if ln.strip()]
+    while len(lines) > 1 and "?" not in lines[-1] and len(lines[-1].split()) <= 4:
+        lines.pop()
+    return lines[-1].rstrip("*_\"“” ") if lines else ""
 
 
 def load_revise_on_feedback(lang, n, seed):
@@ -2328,7 +2341,9 @@ def load_revise_on_feedback(lang, n, seed):
 def score_revise_on_feedback(item, reply):
     text = ((reply.get("turns") or [reply["content"]])[-1] or "").strip()
     applied = {c: bool(RV_CHANGES[c][2](text, item)) for c in item["changes"]}
-    kept = all(f in re.findall(r"\d+", text) for f in item["facts"])
+    nums = re.findall(r"\d+", text)
+    hh = int(item["facts"][1])
+    kept = item["facts"][0] in nums and (str(hh) in nums or (item["lang"] == "en" and str(hh - 12) in nums))
     ok = all(applied.values()) and kept
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": None,
             "detail": {"facts_kept": float(kept), "changes_applied": sum(applied.values()) / 3,

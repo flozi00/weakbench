@@ -633,6 +633,10 @@ def test_revise_on_feedback():
         d, h = x["facts"]
         good = f"Picknick am {d}. Juni um {h} Uhr. Kommt ihr?"
         assert tl.score_revise_on_feedback(x, {"content": good, "turns": ["a", good]})["correct"]
+    q = tl.RV_CHANGES["question"][2]
+    assert q("Kommen Sie auch?\nViele Grüße\nAnna", {}) and not q("Kommen Sie. Bis bald!", {})
+    fe = tl.RV_CHANGES["formal"][2]
+    assert fe("We invite you to Anna's garden.", {"lang": "en"}) and not fe("We’re happy to see you.", {"lang": "en"})
     formal = tl.RV_CHANGES["formal"][2]
     assert formal("Wir laden Sie herzlich ein und freuen uns auf Ihre Antwort.", {"lang": "de"})
     assert not formal("Wir laden dich ein, Sie wissen ja.", {"lang": "de"})

@@ -296,14 +296,14 @@ def test_argument_essay():
 
 
 def test_socratic_tutor():
-    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 4}), "finish_reason": "stop"})
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 5}), "finish_reason": "stop"})
     try:
         tasks_judge.configure(url, "mock", 32768)
         x = to.load_socratic_tutor("de", 1, 0)[0]
         ok = to.score_socratic_tutor(x, {"content": "b", "turns": ["Wie viele Stifte sind es insgesamt?", "Du schaffst das!"]})
         assert ok["score"] == 1.0 and ok["detail"]["leaked_answer"] == 0.0
         bad = to.score_socratic_tutor(x, {"content": "b", "turns": ["Hmm", f"Na gut: {x['gold']}."]})
-        assert bad["detail"]["leaked_answer"] == 1.0 and bad["score"] == 0.8
+        assert bad["detail"]["leaked_answer"] == 1.0 and bad["score"] == 0.0
     finally:
         stop()
         tasks_judge.configure(None, None, None)

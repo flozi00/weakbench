@@ -1184,6 +1184,9 @@ def test_prob_fallacies():
         assert tn.score_prob_fallacies(six, {"content": "Answer: " + txt})["correct"], txt
     coin = next(x for x in it if x["gold"] == "50")
     assert tn.score_prob_fallacies(coin, {"content": "Answer: unchanged, 50%"})["correct"]
+    k = __import__("re").search(r"(\d+) times", coin["messages"][0]["content"]).group(1)
+    assert tn.score_prob_fallacies(coin, {"content": f"Answer: after {k} heads still 50%"})["correct"]
+    assert not tn.score_prob_fallacies(coin, {"content": "Answer: between 0 and 50%"})["correct"]
 
 
 if __name__ == "__main__":

@@ -3950,7 +3950,8 @@ def score_prob_fallacies(item, reply):
         m = (re.match(r"\W*(?:option|möglichkeit|antwort)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line))
         ok = bool(m) and m.group(1).upper() == g
     elif g == "50":
-        other = [x for x in re.findall(r"\d+(?:[.,]\d+)?", line) if x.replace(",", ".") not in ("50", "50.0", "1", "2", "0.5")]
+        allowed = {"50", "50.0", "1", "2", "0.5", *re.findall(r"\d+", item["messages"][0]["content"].split("\n")[0])}
+        other = [x for x in re.findall(r"\d+(?:[.,]\d+)?", line) if x.replace(",", ".") not in allowed]
         ok = not other and bool(re.search(r"(?<!\d)(?<!\d[.,])50(?:[.,]0+)?%?(?!\d)|1/2|0[.,]5\b|half|hälfte|fifty|fünfzig",
                                           line, re.I))  # "between 0 and 50%" names other numbers
     else:

@@ -3726,12 +3726,13 @@ def ca_angle(h, m, frozen=False):
 
 
 def load_clock_angle(lang, n, seed):
-    items = []
+    items, seen = [], set()
     for i in range(n or 120):
         r = rng_of("clock_angle", i)
         while True:
-            h, m = r.randint(1, 12), r.choice(range(5, 60, 5)) if i % 2 == 0 else r.randint(1, 59)
-            if ca_angle(h, m) != ca_angle(h, m, frozen=True):
+            h, m = r.randint(1, 12), (r.choice(range(5, 60, 5)) if i % 2 == 0 else r.randint(1, 59))
+            if ca_angle(h, m) != ca_angle(h, m, frozen=True) and (h, m) not in seen:
+                seen.add((h, m))
                 break
         q = (f"What is the smaller angle, in degrees, between the hour hand and the minute hand of an analogue clock at "
              f"{h}:{m:02d}?" if lang == "en" else
@@ -3743,7 +3744,7 @@ def load_clock_angle(lang, n, seed):
 
 
 def score_clock_angle(item, reply):
-    line = re.sub(r"\([^)]*\)", "", final_answer(reply["content"]) or "")
+    line = re.sub(r"\([^)]*\)", "", final_answer(reply["content"]) or "").replace("½", ".5")
     m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:°|grad|degrees?)", line, re.I)
     v = float(m.group(1).replace(",", ".")) if m else answer_value(line, item["lang"])
     ok = v is not None and abs(v - item["gold"]) <= 0.1
@@ -3757,40 +3758,57 @@ def score_clock_angle(item, reply):
 # give percentages. naive = the sensitivity (the classic base-rate neglect).
 
 
+def br_combos():
+    """Every (prevalence %, sensitivity %, false-positive %) with whole people per 10,000, in a fixed shuffled order."""
+    import itertools
+    out = []
+    for prev, sens, fpr in itertools.product([0.2, 0.5, 1, 2, 3, 5], [70, 80, 85, 90, 95, 99], [1, 2, 5, 8, 10, 15]):
+        sick = 10000 * prev / 100
+        tp, fp = sick * sens / 100, (10000 - sick) * fpr / 100
+        if tp == int(tp) and fp == int(fp):
+            out.append((prev, sens, fpr))
+    random.Random("base_rate").shuffle(out)
+    return out
+
+
 def load_base_rate(lang, n, seed):
+    combos = br_combos()
+    de = lang == "de"
+    num = (lambda x: f"{x:,.0f}".replace(",", ".")) if de else (lambda x: f"{x:,.0f}")  # noqa: E731
+    pc = (lambda x: f"{x:g}".replace(".", ",")) if de else (lambda x: f"{x:g}")  # noqa: E731
     items = []
-    for i in range(n or 120):
-        r = rng_of("base_rate", i)
-        while True:  # whole people in the frequency version
-            prev, sens, fpr = r.choice([0.5, 1, 2, 5]), r.choice([80, 90, 95, 99]), r.choice([2, 5, 9, 10])
-            sick = 10000 * prev / 100
-            tp, fp = sick * sens / 100, (10000 - sick) * fpr / 100
-            if tp == int(tp) and fp == int(fp):
-                break
+    for i in range(n or min(120, 2 * len(combos))):
+        prev, sens, fpr = combos[(i // 2) % len(combos)]  # the percent and the frequency version share the numbers
+        sick = 10000 * prev / 100
+        tp, fp = sick * sens / 100, (10000 - sick) * fpr / 100
         gold = round(100 * tp / (tp + fp), 1)
         freq = i % 2 == 1
-        if lang == "en":
-            facts = (f"Of 10,000 people, {sick:g} have the condition. Of those, {tp:g} test positive. Of the {10000 - sick:g} "
-                     f"without it, {fp:g} also test positive." if freq else
-                     f"{prev:g} % of people have the condition. The test detects {sens} % of them, and {fpr} % of healthy "
+        if not de:
+            facts = (f"Of 10,000 people, {num(sick)} have the condition. Of those, {num(tp)} test positive. Of the "
+                     f"{num(10000 - sick)} without it, {num(fp)} also test positive." if freq else
+                     f"{pc(prev)} % of people have the condition. The test detects {sens} % of them, and {fpr} % of healthy "
                      "people also test positive.")
             q = f"{facts} A person tests positive. How likely, in percent, is it that they have the condition?"
         else:
-            facts = (f"Von 10.000 Menschen haben {sick:g} die Krankheit. Davon werden {tp:g} positiv getestet. Von den "
-                     f"{10000 - sick:g} Gesunden werden {fp:g} ebenfalls positiv getestet." if freq else
-                     f"{prev:g} % der Menschen haben die Krankheit. Der Test erkennt {sens} % von ihnen, und {fpr} % der "
+            facts = (f"Von 10.000 Menschen haben {num(sick)} die Krankheit. Davon werden {num(tp)} positiv getestet. Von "
+                     f"den {num(10000 - sick)} Gesunden werden {num(fp)} ebenfalls positiv getestet." if freq else
+                     f"{pc(prev)} % der Menschen haben die Krankheit. Der Test erkennt {sens} % von ihnen, und {fpr} % der "
                      "Gesunden werden ebenfalls positiv getestet.")
             q = f"{facts} Eine Person wird positiv getestet. Wie wahrscheinlich ist es in Prozent, dass sie die Krankheit hat?"
         items.append({"id": str(i), "lang": lang, "gold": gold, "naive": sens, "freq": freq,
-                      "messages": [{"role": "user", "content": q.replace(".0 ", " ") + "\n" + ASK[lang]}]})
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_base_rate(item, reply):
     line = re.sub(r"\([^)]*\)", "", final_answer(reply["content"]) or "")
     m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:%|prozent|percent)", line, re.I)
-    v = float(m.group(1).replace(",", ".")) if m else answer_value(line, item["lang"])
-    if v is not None and v <= 1 and item["gold"] > 1 and not m:
+    fr = re.search(r"\b(\d+)\s*/\s*(\d+)\b", line)
+    if fr and not m and int(fr.group(2)):
+        v = 100 * int(fr.group(1)) / int(fr.group(2))  # "1/12"
+    else:
+        v = float(m.group(1).replace(",", ".")) if m else answer_value(line, item["lang"])
+    if v is not None and v <= 1 and item["gold"] > 1 and not m and not fr:
         v *= 100  # "0.15"
     ok = v is not None and abs(v - item["gold"]) <= 1.0
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],

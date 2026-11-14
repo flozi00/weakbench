@@ -548,6 +548,8 @@ def test_puzzle_mutation():
     assert sc(en["7-1"], {"content": "Answer: 500 minutes"})["correct"]
     assert sc(en["2-1"], {"content": "Answer: 0"})["correct"]
     assert sc(en["2-1"], {"content": "Answer: Sally has no sisters"})["correct"]
+    assert sc(en["0-1"], {"content": "Answer: not 5, but 10"})["correct"]
+    assert sc(en["6-1"], {"content": "Answer: his father, not his mother"})["correct"]
     assert not sc(en["1-0"], {"content": "Answer: not the same"})["correct"]
     assert sc(en["5-1"], {"content": "Answer: it does not change"})["correct"]
     assert not sc(en["5-0"], {"content": "Answer: raise (not same)"})["correct"]
@@ -591,6 +593,8 @@ def test_anchoring():
     g = b["gold"]
     for txt in (f"47 × 53 × 45 ≈ {g}", f"~{g/1000:.0f}k", f"{g/1000:.0f} Tausend".replace(".", ","), f"{g/1e5:.1f} × 10^5".replace(".", ",")):
         assert tn.score_anchoring(b, {"content": "Antwort: " + txt})["correct"], txt
+    assert tn.score_anchoring(b, {"content": f"Antwort: ~{g} (statt ~{b['anchor']})"})["correct"]
+    assert tn.score_anchoring(b, {"content": f"Antwort: {g:.2e}"})["correct"]
 
 
 
@@ -604,6 +608,9 @@ def test_char_ops():
     assert tn.score_char_ops(rev, {"content": "Answer: " + "-".join(rev["gold"].upper())})["correct"]
     assert not tn.score_char_ops(rev, {"content": "Answer: " + rev["gold"][::-1]})["correct"]
     assert not tn.score_char_ops(it[0], {"content": f"Answer: {int(it[0]['gold']) + 1}"})["correct"]
+    nth = it[2]
+    assert tn.score_char_ops(nth, {"content": f"Answer: The letter is '{nth['gold'].upper()}'."})["correct"]
+    assert tn.score_char_ops(rev, {"content": f"Answer: The reversed word is {rev['gold']}"})["correct"]
 
 
 
@@ -616,6 +623,7 @@ def test_false_authority():
     r = tn.score_false_authority(it[1], {"content": f"Antwort: {it[1]['took']}"})
     assert not r["correct"] and r["detail"]["took_claim"] == 1.0
     assert tn.score_false_authority(it[1], {"content": f"Antwort: {it[1]['gold']}"})["correct"]
+    assert tn.score_false_authority(it[1], {"content": f"Antwort: {it[1]['gold']} (Hinweis: a × b = 1)"})["correct"]
 
 
 
@@ -628,6 +636,8 @@ def test_near_miss_qa():
         assert f": {a['gold']}\n" in fa + "\n"
     sc = tn.score_near_miss_qa
     assert sc(it[1], {"content": "Answer: cannot be determined"})["correct"]
+    for txt in ("not stated in the text", "The 2021 value is not given", "unknown"):
+        assert sc(it[1], {"content": "Answer: " + txt})["correct"], txt
     assert not sc(it[1], {"content": "Answer: 412"})["correct"]
     assert sc(it[0], {"content": f"Answer: {it[0]['gold']}"})["correct"]
 

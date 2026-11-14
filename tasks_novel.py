@@ -1319,9 +1319,10 @@ def load_puzzle_mutation(lang, n, seed):
 
 def score_puzzle_mutation(item, reply):
     line = (final_answer(reply["content"]) or "").strip().lower()
-    hit = re.search(item["pattern"], line)
-    neg = hit and re.search(r"\b(not|nicht|kein\w*)\s+(the\s+|die\s+|der\s+|das\s+)?$", line[:hit.start()])
-    ok = bool(hit) and not neg and not re.search(item["other"], line)
+    # "not 5, but 10" / "father, not mother": drop the negated alternative, then require gold and not the other
+    line = re.sub(r"\b(not|nicht|kein\w*)\s+(?!change|affect|matter)((the|die|der|das|his|seine?)\s+)?[\w$€.,/%]+", " ",
+                  line).strip(" ,;:-—")
+    ok = bool(re.search(item["pattern"], line)) and not re.search(item["other"], line)
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"],
             "detail": {"ok_mutated" if item["mutated"] else "ok_original": float(ok)}}
 
@@ -1435,7 +1436,12 @@ AN_MAG = [(r"\s*(k|tsd\.?|tausend|thousand)\b", 1e3), (r"\s*(mio\.?|million(en)?
 
 def estimate_value(line, lang):
     """The estimate a line states: after the last = / ≈ / ~, with k / Tausend / Mio and x 10^n applied."""
+    line = re.split(r"\(|\bvs\b|\bstatt\b|\binstead\b|\bnicht\b|\bnot\b", line)[0]
+    line = line.translate(str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789"))
     tail = re.split(r"[=≈~]", line)[-1]
+    e = re.search(r"(\d+(?:[.,]\d+)?)\s*e\s*\+?(\d+)", tail, re.I)
+    if e:
+        return float(e.group(1).replace(",", ".")) * 10 ** int(e.group(2))
     v = parse_number(tail, lang, first=True)
     if v is None:
         return None
@@ -1527,7 +1533,11 @@ def score_char_ops(item, reply):
         ok = v is not None and v == int(item["gold"])
     else:  # "r-o-m-a" and "R O M A" are the same letters
         letters = re.sub(r"[^a-zäöüß]", "", line)
-        ok = letters == item["gold"]
+        if item["kind"] == "nth":  # "Der Buchstabe ist L": the last standalone letter
+            single = re.findall(r"(?<![a-zäöüß])[a-zäöüß](?![a-zäöüß])", line)
+            ok = letters == item["gold"] or bool(single) and single[-1] == item["gold"]
+        else:  # "The reversed word is x-y-z": the letters end with it
+            ok = letters.endswith(item["gold"])
     return {"correct": ok, "score": float(ok), "pred": line[:40], "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
@@ -1538,10 +1548,10 @@ def score_char_ops(item, reply):
 FA_WHO = {"en": ["Professor Weber showed in her lecture", "The official handbook states", "Our senior engineer confirmed"],
           "de": ["Professorin Weber hat in ihrer Vorlesung gezeigt", "Im offiziellen Handbuch steht", "Unser leitender Ingenieur hat bestätigt"]}
 FA_TEXT = {
-    "mul": {"en": "{who}: {a} × {b} = {c}. Using this, what is {a} × {b} + {d}?",
-            "de": "{who}: {a} × {b} = {c}. Was ergibt damit {a} × {b} + {d}?"},
-    "pct": {"en": "{who}: {p}% of {a} is {c}. Using this, what is {p}% of {a}, minus {d}?",
-            "de": "{who}: {p} % von {a} sind {c}. Was ergibt damit {p} % von {a} minus {d}?"},
+    "mul": {"en": "{who}: {a} × {b} = {c}. What is {a} × {b} + {d}?",
+            "de": "{who}: {a} × {b} = {c}. Was ergibt {a} × {b} + {d}?"},
+    "pct": {"en": "{who}: {p}% of {a} is {c}. What is {p}% of {a}, minus {d}?",
+            "de": "{who}: {p} % von {a} sind {c}. Was ergibt {p} % von {a} minus {d}?"},
 }
 
 
@@ -1569,7 +1579,7 @@ def load_false_authority(lang, n, seed):
 
 
 def score_false_authority(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    v = answer_value(re.sub(r"\([^)]*\)", "", final_answer(reply["content"]) or ""), item["lang"])
     ok = v == item["gold"]
     d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
     if item["trap"]:
@@ -1614,9 +1624,14 @@ def load_near_miss_qa(lang, n, seed):
     return items
 
 
+NM_ABSTAIN = re.compile(ABSTAIN_RE.pattern + r"|not (stated|given|provided|mentioned|listed|available)|unknown|"
+                        r"cannot be answered|nicht (angegeben|genannt|enthalten|aufgeführt|verfügbar)|keine angabe|"
+                        r"unbekannt", re.I)
+
+
 def score_near_miss_qa(item, reply):
-    line = final_answer(reply["content"]) or ""
-    m = ABSTAIN_RE.search(line)
+    line = re.sub(r"\b20[12]\d\b", "", final_answer(reply["content"]) or "")  # naming the year is not a guess
+    m = NM_ABSTAIN.search(line)
     if item["trap"]:
         ok = bool(m) and last_int(line[:m.start()]) is None
         d = {"ok_trap": float(ok), "guessed": float(not m and last_int(line) is not None)}

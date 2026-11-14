@@ -1116,7 +1116,22 @@ def test_pii_redact():
     assert tn.score_pii_redact(x, {"content": clean + " IBAN " + spaced})["detail"]["leaked_iban"] == 1.0
 
 
+
+def test_percent_traps():
+    import tasks_novel as tn
+    it = tn.load_percent_traps("de", 8, 0)
+    assert [x["kind"] for x in it[:4]] == list(tn.PT_KINDS)
+    for x in it:
+        g = x["gold"]
+        assert tn.score_percent_traps(x, {"content": f"Antwort: {g:g}".replace(".", ",")})["correct"], x
+        r = tn.score_percent_traps(x, {"content": f"Antwort: {x['naive']:g}".replace(".", ",")})
+        assert not r["correct"] and r["detail"]["naive"] == 1.0
+    ud = it[1]
+    assert tn.score_percent_traps(ud, {"content": f"Antwort: {abs(ud['gold']):g} % niedriger".replace(".", ",")})["correct"]
+
+
 if __name__ == "__main__":
+    test_percent_traps()
     test_pii_redact()
     test_stale_answer()
     test_alien_sort()

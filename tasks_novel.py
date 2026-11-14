@@ -3655,6 +3655,59 @@ def score_pii_redact(item, reply):
                        **{f"leaked_{k}": float(v) for k, v in leaked.items()}}}
 
 
+# ---------------------------------------------------------------- percent_traps (percentage points, up-then-down, reverse %)
+# Kinds: "rate from 4 % to 6 %: by how many percent did it rise?" (50, not 2), "+20 % then -20 %: net change in %"
+# (-4, not 0), "after 25 % off it costs 60: the original price?" (80, not 75), and "by how many percentage points"
+# (2) as the control. naive = the intuitive wrong answer.
+PT_KINDS = ("relative", "updown", "reverse", "points")
+
+
+def load_percent_traps(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("percent_traps", i)
+        kind = PT_KINDS[i % 4]
+        if kind in ("relative", "points"):
+            a = r.choice([2, 4, 5, 8, 10])
+            b = a + r.choice([1, 2, 3, 4, 5])
+            if kind == "relative":
+                gold, naive = round((b - a) / a * 100, 2), b - a
+                q = (f"An interest rate rises from {a} % to {b} %. By how many percent did the rate rise?" if lang == "en" else
+                     f"Ein Zinssatz steigt von {a} % auf {b} %. Um wie viel Prozent ist der Zinssatz gestiegen?")
+            else:
+                gold, naive = b - a, round((b - a) / a * 100, 2)
+                q = (f"An interest rate rises from {a} % to {b} %. By how many percentage points did it rise?" if lang == "en"
+                     else f"Ein Zinssatz steigt von {a} % auf {b} %. Um wie viele Prozentpunkte ist er gestiegen?")
+        elif kind == "updown":
+            p = r.choice([10, 20, 25, 30, 40, 50])
+            gold, naive = round(((1 + p / 100) * (1 - p / 100) - 1) * 100, 2), 0
+            q = (f"A price first rises by {p} % and then falls by {p} %. By how many percent does the final price differ "
+                 "from the starting price? (Negative if lower.)" if lang == "en" else
+                 f"Ein Preis steigt erst um {p} % und sinkt dann um {p} %. Um wie viel Prozent weicht der Endpreis vom "
+                 "Anfangspreis ab? (Negativ, wenn niedriger.)")
+        else:
+            p = r.choice([20, 25, 40, 50])
+            orig = r.choice([40, 60, 80, 100, 120, 200])
+            after = orig * (100 - p) / 100
+            gold, naive = orig, round(after * (1 + p / 100), 2)
+            q = (f"After a {p} % discount a jacket costs {after:g} euros. What was the original price in euros?" if lang == "en"
+                 else f"Nach {p} % Rabatt kostet eine Jacke {after:g} Euro. Wie hoch war der ursprüngliche Preis in Euro?")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold, "naive": naive,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_percent_traps(item, reply):
+    line = (final_answer(reply["content"]) or "").replace("−", "-")
+    v = answer_value(line, item["lang"])
+    neg = re.search(r"-\s*\d", line) or re.search(r"\b(minus|weniger|niedriger|lower|less|decrease|gesunken|fell)\b", line, re.I)
+    if v is not None and item["gold"] < 0 and v > 0 and neg:
+        v = -v
+    ok = v is not None and abs(v - item["gold"]) <= 0.05
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "naive": float(v is not None and abs(v - item["naive"]) <= 0.05)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5213,6 +5266,7 @@ TASKS = {
     "alien_sort": task(load_alien_sort, score_alien_sort, 24, 120),
     "stale_answer": task(load_stale_answer, score_stale_answer, 24, 120),
     "pii_redact": {**task(load_pii_redact, score_pii_redact, 24, 80), "think": False, "max_tokens": 768},
+    "percent_traps": task(load_percent_traps, score_percent_traps, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

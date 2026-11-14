@@ -3520,22 +3520,26 @@ def score_maze_path(item, reply):
 
 
 def load_alien_sort(lang, n, seed):
-    items = []
-    for i in range(n or 120):
+    items, i = [], -1
+    while len(items) < (n or 120):
+        i += 1
         r = rng_of("alien_sort", i)
         letters = r.sample("abdeklmnorst", 6)
         rank = {c: k for k, c in enumerate(letters)}
-        k = 4 + i % 3
+        k = 4 + len(items) % 3
         words = set()
         while len(words) < k:
-            w = "".join(r.choice(letters) for _ in range(r.randint(2, 4)))
-            words.add(w)
+            words.add("".join(r.choice(letters) for _ in range(r.randint(2, 4))))
         words = list(words)
-        if i % 4 == 0:  # a prefix pair now and then
-            words[-1] = words[0] + r.choice(letters)
-            words = list(dict.fromkeys(words))
-        r.shuffle(words)
+        if len(items) % 4 == 0:  # a prefix pair now and then
+            ext = [words[0] + c for c in letters if words[0] + c not in words]
+            words[-1] = r.choice(ext)
         gold = sorted(words, key=lambda w: [rank[c] for c in w])
+        if sorted(words) == gold:
+            continue  # the ordinary alphabet must not give the answer
+        r.shuffle(words)
+        if words == gold:
+            continue
         order = " < ".join(letters)
         q = (f"In an invented language the alphabet order is: {order}. Sort these words alphabetically in that language "
              f"(a word that is the beginning of another comes first): {', '.join(words)}. Answer with the words in order, "
@@ -3549,7 +3553,7 @@ def load_alien_sort(lang, n, seed):
 
 
 def score_alien_sort(item, reply):
-    line = (final_answer(reply["content"]) or "").lower()
+    line = re.split(r"->|→|=>", (final_answer(reply["content"]) or "").lower())[-1]  # "input -> sorted"
     got = [w for w in re.findall(r"[a-z]+", line) if w in item["words"]]
     ok = ", ".join(got) == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": ", ".join(got)[:60], "gold": item["gold"],
@@ -3569,8 +3573,9 @@ def load_stale_answer(lang, n, seed):
     items = []
     for i in range(n or 120):
         r = rng_of("stale_answer", i)
-        a, b, c = r.randint(3, 12), r.choice([6, 8, 10, 12, 24]), r.randint(2, 15)
-        a2 = a + r.choice([-2, -1, 1, 2, 3])
+        a, b = r.randint(4, 12), r.choice([6, 8, 10, 12, 24])
+        a2 = a + r.choice([-2, -1, 1, 2, 3])  # never 1 box, never equal to a
+        c = r.randint(2, min(a, a2) * b // 2)  # fewer broken pencils than half the smaller order: always positive
         q1, q2 = SA_TEXT[lang]
         first, second = a * b - c, a2 * b - c
         turns = [[{"role": "user", "content": q1.format(a=a, b=b, c=c) + "\n" + ASK[lang]}],
@@ -3581,8 +3586,12 @@ def load_stale_answer(lang, n, seed):
 
 def score_stale_answer(item, reply):
     answers = reply.get("turns") or [reply["content"]]
-    v2 = last_int(final_answer(answers[-1]) or "")
-    v1 = last_int(final_answer(answers[0]) or "") if len(answers) > 1 else None
+    read = lambda t: answer_value(re.sub(r"\([^)]*\)", "", final_answer(t) or ""), item["lang"])  # noqa: E731 - "103 (vorher 91)"
+    v1 = read(answers[0])
+    if len(answers) < 2:  # the second turn never happened: not a stale answer, just a failure
+        return {"correct": False, "score": 0.0, "pred": None, "gold": item["gold"],
+                "detail": {"ok_turn1": float(v1 == item["first"])}}
+    v2 = read(answers[-1])
     ok = v2 == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v2, "gold": item["gold"],
             "detail": {"repeated_old": float(v2 == item["first"]), "ok_turn1": float(v1 == item["first"])}}

@@ -25,7 +25,7 @@ import pathlib
 import random
 import re
 
-from common import hf_file, read_jsonl, read_rows
+from common import DATA_REPO, DATA_REV, hf_file, read_jsonl, read_rows
 
 XSTEST = ("Paul/XSTest", "f600c994b256f12867dfa5b3eb3d545a3e62f8b5")
 FILE = "xstest_prompts.csv"
@@ -81,7 +81,7 @@ def load_xstest_de(lang, n, seed):
     are copied from the English row and never translated. Unreviewed MT is acceptable here because both A/B
     arms see the same prompts — only the absolute rate is affected, never the paired delta.
     """
-    path = pathlib.Path(__file__).parent / "data" / "xstest_de.jsonl"
+    path = hf_file(DATA_REPO, DATA_REV, "xstest_de.jsonl")  # private: needs `hf auth login`
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     rows = [r for r in rows if "id" in r]  # the first line is the _meta header
     by_id = {r["id"]: r for r in rows}

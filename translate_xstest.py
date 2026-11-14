@@ -1,4 +1,4 @@
-"""Translate XSTest's 450 prompts to German once, and write the pinned artifact `data/xstest_de.jsonl`.
+"""Translate XSTest's 450 prompts to German once and write `data/xstest_de.jsonl`; upload it to the private dataset `common.DATA_REPO` and bump `DATA_REV`.
 
 Run by hand, not by the suite: the suite only ever reads the committed file, so the gate stays offline and
 deterministic. The translation is machine-made and unreviewed — that is recorded in the file header and in

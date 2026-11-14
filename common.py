@@ -309,6 +309,10 @@ def hf_list(repo, revision, repo_type="datasets"):
     return json.loads(cached.read_text())
 
 
+# our own hand-written / translated sets, private, pinned
+DATA_REPO, DATA_REV = "flozi00/weakbench-data", "d526a41f581187d2bcbc1a5286a6978f1fff0903"
+
+
 def hf_file(repo, revision, filename, repo_type="datasets"):
     """One file of a Hugging Face repo at a pinned revision, downloaded once
     into the cache (gated repos use the local `hf auth login` token)."""

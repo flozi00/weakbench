@@ -553,7 +553,20 @@ def test_de_relative():
     assert tl.score_de_relative(m, {"content": "Das richtige Pronomen ist: den"})["correct"]
 
 
+def test_form_writing():
+    import tasks_lang as tl
+    it = tl.load_form_writing("en", 3, 0)
+    ac, li, co = it
+    poem = "\n".join(f"{c}ittle waves keep rolling over the sand" for c in ac["spec"])
+    poem = "\n".join(c + line[1:] for c, line in zip(ac["spec"], poem.splitlines()))
+    assert tl.score_form_writing(ac, {"content": poem})["detail"]["form_only"] == 1.0
+    assert tl.score_form_writing(li, {"content": "x"})["correct"] is False
+    words = " ".join(["word"] * (co["spec"] - 1)) + " end."
+    assert tl.score_form_writing(co, {"content": words})["detail"]["form_only"] == 1.0
+
+
 if __name__ == "__main__":
+    test_form_writing()
     test_de_relative()
     test_de_variety()
     test_en_variety()

@@ -1998,6 +1998,63 @@ def score_de_relative(item, reply):
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_{item['case']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- form_writing (writing under form constraints, checked exactly)
+# Three kinds: an acrostic (line initials spell a word), a lipogram (three sentences without one common letter), and
+# an exact word count. The text must also be in the right language (common.lang_ok), so gibberish does not pass.
+FW_TOPICS = {"en": ["the sea", "a train journey", "autumn", "a city at night", "a small bakery"],
+             "de": ["das Meer", "eine Zugfahrt", "den Herbst", "eine Stadt bei Nacht", "eine kleine Bäckerei"]}
+FW_WORDS = {"en": ["LIGHT", "RIVER", "STONE", "CLOUD", "MAPLE"], "de": ["LICHT", "WOLKE", "STEIN", "BLATT", "HAFEN"]}
+
+
+def load_form_writing(lang, n, seed):
+    items = []
+    for i in range(n or 60):
+        r = random.Random(f"form_writing:{i}")
+        kind = ("acrostic", "lipogram", "count")[i % 3]
+        topic = r.choice(FW_TOPICS[lang])
+        if kind == "acrostic":
+            w = r.choice(FW_WORDS[lang])
+            q = (f"Write a short poem about {topic} with {len(w)} lines whose first letters spell {w}. Each line has at "
+                 "least four words. Reply with the poem only." if lang == "en" else
+                 f"Schreibe ein kurzes Gedicht über {topic} mit {len(w)} Zeilen, deren Anfangsbuchstaben {w} ergeben. Jede "
+                 "Zeile hat mindestens vier Wörter. Antworte nur mit dem Gedicht.")
+            spec = w
+        elif kind == "lipogram":
+            letter = r.choice(["a", "i"] if lang == "de" else ["a", "o"])
+            q = (f"Write three sentences about {topic} without using the letter '{letter}' anywhere (upper or lower case). "
+                 "Reply with the sentences only." if lang == "en" else
+                 f"Schreibe drei Sätze über {topic}, ohne irgendwo den Buchstaben „{letter}“ zu verwenden (weder groß noch "
+                 "klein). Antworte nur mit den Sätzen.")
+            spec = letter
+        else:
+            k = r.choice([17, 23, 31])
+            q = (f"Write exactly one sentence about {topic} with exactly {k} words. Reply with the sentence only."
+                 if lang == "en" else
+                 f"Schreibe genau einen Satz über {topic} mit genau {k} Wörtern. Antworte nur mit dem Satz.")
+            spec = k
+        items.append({"id": str(i), "lang": lang, "kind": kind, "spec": spec, "gold": None,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_form_writing(item, reply):
+    text = (reply["content"] or "").strip()
+    lang_ok = common.lang_ok(text, item["lang"], min_words=8) is not False
+    if item["kind"] == "acrostic":
+        lines = [ln.strip().lstrip("*#-0123456789. ").strip() for ln in text.splitlines() if ln.strip()]
+        form = len(lines) == len(item["spec"]) and all(
+            ln[:1].upper() == c and len(ln.split()) >= 4 for ln, c in zip(lines, item["spec"]))
+    elif item["kind"] == "lipogram":
+        sents = [x for x in re.split(r"(?<=[.!?])\s+", text) if x.strip()]
+        form = item["spec"] not in text.lower() and len(sents) == 3
+    else:
+        form = len([w for w in text.split() if re.search(r"\w", w)]) == item["spec"] and len(
+            re.findall(r"[.!?](\s|$)", text)) <= 1
+    ok = form and lang_ok
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["spec"],
+            "detail": {f"ok_{item['kind']}": float(ok), "form_only": float(form)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2043,6 +2100,7 @@ TASKS = {
     "en_variety": task(("en",), load_en_variety, score_en_variety, 512, 20),
     "de_variety": task(("de",), load_de_variety, score_de_variety, 512, 20),
     "de_relative": task(("de",), load_de_relative, score_de_relative, 16, 32, lang_check=False),
+    "form_writing": task(("de", "en"), load_form_writing, score_form_writing, 512, 30, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

@@ -966,7 +966,21 @@ def test_number_compare():
     assert tn.score_number_compare(d, {"content": "Antwort: " + d["gold"].replace(",", ".")})["correct"]
 
 
+
+def test_unit_chain():
+    from fractions import Fraction
+    import tasks_novel as tn
+    it = tn.load_unit_chain("en", 12, 0)
+    assert {x["steps"] for x in it} == {2, 3, 4} and {x["back"] for x in it} == {True, False}
+    for x in it:
+        g = Fraction(x["gold"])
+        assert tn.score_unit_chain(x, {"content": f"Answer: {g.numerator}/{g.denominator}"})["correct"]
+        assert tn.score_unit_chain(x, {"content": f"Answer: {float(g):.4f}"})["correct"]
+        assert not tn.score_unit_chain(x, {"content": f"Answer: {float(g) * 1.1 + 1:.4f}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_unit_chain()
     test_number_compare()
     test_continuity_error()
     test_regex_synth()

@@ -3000,6 +3000,56 @@ def score_number_compare(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- unit_chain (conversion through invented units)
+# "1 blorp = 3 zings, 4 zings = 7 quops, ...": convert an amount along a chain of 2-4 invented units, sometimes
+# backwards. The rates are shuffled in the text; one irrelevant rate is a distractor. Exact rational answer.
+UC_NAMES = ["blorp", "zing", "quop", "frell", "mudd", "skee", "tarv", "glim"]
+
+
+def load_unit_chain(lang, n, seed):
+    from fractions import Fraction
+    items = []
+    for i in range(n or 150):
+        r = rng_of("unit_chain", i)
+        k = 2 + i % 3  # conversions in the chain
+        names = r.sample(UC_NAMES, k + 2)
+        chain, extra = names[:k + 1], names[k + 1]
+        facts, rate = [], Fraction(1)
+        for a, b in zip(chain, chain[1:]):
+            x, y = r.randint(1, 5), r.randint(2, 9)
+            facts.append((x, a, y, b))
+            rate *= Fraction(y, x)
+        facts.append((r.randint(1, 5), r.choice(chain[:-1]), r.randint(2, 9), extra))  # irrelevant branch
+        r.shuffle(facts)
+        back = i % 2 == 1
+        amt = r.randint(2, 12)
+        if back:
+            src, dst, gold = chain[-1], chain[0], Fraction(amt) / rate
+        else:
+            src, dst, gold = chain[0], chain[-1], amt * rate
+        text = " ".join(f"{x} {a}{'s' if x != 1 else ''} = {y} {b}s." for x, a, y, b in facts)
+        q = (f"{text}\nHow many {dst}s are {amt} {src}s? Give an exact number (a fraction is fine)." if lang == "en" else
+             f"{text}\nWie viele {dst}s sind {amt} {src}s? Gib eine exakte Zahl an (ein Bruch ist in Ordnung).")
+        items.append({"id": str(i), "lang": lang, "steps": k, "back": back, "gold": str(gold),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_unit_chain(item, reply):
+    from fractions import Fraction
+    line = (final_answer(reply["content"]) or "").replace(" ", "").replace("−", "-")
+    line = line.split("=")[-1]
+    m = re.search(r"(\d+)/(\d+)", line)
+    try:
+        val = Fraction(int(m[1]), int(m[2])) if m else Fraction(re.search(r"\d+(?:[.,]\d+)?", line)[0].replace(",", "."))
+    except (TypeError, ValueError, ZeroDivisionError):
+        val = None
+    g = Fraction(item["gold"])
+    ok = val is not None and (val == g or abs(val - g) <= Fraction(1, 200) * abs(g))  # decimals to ~3 places count
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
+            "detail": {f"ok_steps{item['steps']}": float(ok), "ok_back" if item["back"] else "ok_forward": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4547,6 +4597,7 @@ TASKS = {
     "regex_synth": {**task(load_regex_synth, score_regex_synth, 24, 80), "max_tokens": 2048},
     "continuity_error": task(load_continuity_error, score_continuity_error, 24, 120),
     "number_compare": task(load_number_compare, score_number_compare, 24, 160),
+    "unit_chain": task(load_unit_chain, score_unit_chain, 24, 150),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

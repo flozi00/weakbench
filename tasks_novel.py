@@ -1874,6 +1874,57 @@ def score_mixed_units(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- double_negation (trap: stacked negations)
+# Four people, each with a statement about team membership wrapped in 0-3 negations; one person is asked about.
+# Sub-metric ok_neg<k> by the number of negations on the asked statement.
+# (main clause, subordinate clause) forms, so German "dass" clauses put the verb last
+DN_TEXT = {
+    "en": {"base": [("{x} is on the team", "{x} is on the team"), ("{x} is not on the team", "{x} is not on the team")],
+           "wrap": [("It is not true that {c}", "it is not true that {c}"), ("It is false that {c}", "it is false that {c}")],
+           "q": ["Is {x} on the team? Answer yes or no.", "Is {x} not on the team? Answer yes or no."]},
+    "de": {"base": [("{x} ist im Team", "{x} im Team ist"), ("{x} ist nicht im Team", "{x} nicht im Team ist")],
+           "wrap": [("Es stimmt nicht, dass {c}", "es nicht stimmt, dass {c}"), ("Es ist falsch, dass {c}", "es falsch ist, dass {c}")],
+           "q": ["Ist {x} im Team? Antworte mit ja oder nein.", "Ist {x} nicht im Team? Antworte mit ja oder nein."]},
+}
+
+
+def dn_statement(r, x, negs, lang):
+    """A statement about x with `negs` negations (0-3: an inner "not" plus up to two wrappers). Its truth for
+    "x is on the team" is negs even; the question form decides the yes/no, so parity alone is no shortcut."""
+    T = DN_TEXT[lang]
+    inner = 1 if negs == 3 else 0 if negs == 0 else r.randint(0, 1)
+    main, sub = (f.format(x=x) for f in T["base"][inner])
+    for _ in range(negs - inner):
+        w = r.choice(T["wrap"])
+        main, sub = w[0].format(c=sub), w[1].format(c=sub)
+    return main + ".", negs % 2 == 0
+
+
+def load_double_negation(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("double_negation", i)
+        people = r.sample(NAMES, 4)
+        target_negs = i % 4
+        stmts = [dn_statement(r, x, target_negs if j == 0 else r.randrange(4), lang)[0] for j, x in enumerate(people)]
+        on = target_negs % 2 == 0
+        r.shuffle(stmts)
+        q_neg = r.random() < 0.5
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        x = people[0]
+        items.append({"id": str(i), "lang": lang, "negs": target_negs, "gold": yes if on != q_neg else no,
+                      "messages": [{"role": "user", "content": " ".join(stmts) + "\n" + DN_TEXT[lang]["q"][q_neg].format(x=x)
+                                    + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_double_negation(item, reply):
+    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
+    ok = yn[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"],
+            "detail": {f"ok_neg{item['negs']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3404,6 +3455,7 @@ TASKS = {
     "reversal": task(load_reversal, score_reversal, 24, 200),
     "off_by_one": task(load_off_by_one, score_off_by_one, 25, 200),
     "mixed_units": task(load_mixed_units, score_mixed_units, 24, 150),
+    "double_negation": task(load_double_negation, score_double_negation, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

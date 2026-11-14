@@ -708,7 +708,20 @@ def test_mixed_units():
     assert not r["correct"] and r["detail"]["naive_sum"] == 1.0
 
 
+
+def test_double_negation():
+    import random
+    import tasks_novel as tn
+    r = random.Random(0)
+    assert tn.dn_statement(r, "Mia", 0, "de") == ("Mia ist im Team.", True)
+    s, t = tn.dn_statement(random.Random(1), "Mia", 3, "de")
+    assert s.count("nicht") + s.count("falsch") == 3 and not t and s.endswith("nicht im Team ist."), s
+    it = tn.load_double_negation("en", 40, 0)
+    assert {x["gold"] for x in it if x["negs"] == 0} == {"yes", "no"}  # parity is no shortcut
+
+
 if __name__ == "__main__":
+    test_double_negation()
     test_mixed_units()
     test_off_by_one()
     test_reversal()

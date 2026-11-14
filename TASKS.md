@@ -170,3 +170,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `irony` | generated: the same praise ("Na super", "Great") over a good or a bad event | de, en | 30 / 60 | off | ironic/sincere; `ok_ironic` / `ok_sincere` |
 | `grid_transform` | generated 3x3 / 4x4 letter grids, 1-3 rotations / mirrorings, then one row | de, en | 24 / 150 | auto | exact letters; `ok_ops1..3` |
 | `blocks_plan` | generated blocksworld (3-6 blocks), plan as move lines | de, en | 24 / 120 | auto | simulator: every move legal and goal reached; `ok_b3..6`, `illegal`, `optimal` (BFS length) |
+| `audience_explain` ** | eight concepts x three readers (8-year-old, adult newcomer, expert) with word limits | de, en | 12 / 24 | off | judge: correct, fits the reader, explains why, language; exact word limit; `fit_<reader>` |

@@ -830,6 +830,72 @@ def score_memory_dialog(item, reply):
                        "no_reask": float(met[-1])}}
 
 
+# ---------------------------------------------------------------- audience_explain (judge: one concept, three readers)
+# The same concept explained for an 8-year-old, for an adult newcomer and for an expert, within a word limit. The
+# judge checks correctness and the fit to the reader; the word limit is checked exactly. The per-audience split shows
+# whether a model can actually shift register or writes one middle-of-the-road text for everyone.
+AE_CONCEPTS = {"en": ["photosynthesis", "inflation", "vaccination", "public-key encryption", "plate tectonics",
+                      "compound interest", "the greenhouse effect", "how a fridge cools"],
+               "de": ["Photosynthese", "Inflation", "Impfung", "Public-Key-Verschlüsselung", "Plattentektonik",
+                      "Zinseszins", "Treibhauseffekt", "wie ein Kühlschrank kühlt"]}
+AE_AUD = {"child": ("an 8-year-old child", "ein achtjähriges Kind", 80),
+          "adult": ("an adult with no background in the field", "einen Erwachsenen ohne Vorwissen im Fach", 120),
+          "expert": ("an expert in a neighbouring field who wants the precise mechanism",
+                     "eine Fachperson aus einem Nachbarfach, die den genauen Mechanismus will", 150)}
+AE_CHECK = {"child": "Words and sentences suit an 8-year-old: no unexplained technical term, short sentences, a concrete "
+                     "everyday picture.",
+            "adult": "Clear for a newcomer: technical terms are explained, no talking down, no oversimplification that "
+                     "becomes wrong.",
+            "expert": "Precise for an expert: names the actual mechanism with correct terms, no childish analogies, no "
+                      "padding."}
+AE_JUDGE = """Evaluate an EXPLANATION written for a given READER. For each criterion answer YES or NO.
+Reply with ONLY {{"verdicts": [...]}}.
+
+REQUEST: {req}
+
+EXPLANATION:
+{text}
+
+CRITERIA:
+1. Everything it states is factually correct (simplifications are fine if not wrong).
+2. {fit}
+3. It actually explains how or why, not only what.
+4. It is written in {lang} throughout."""
+
+
+def load_audience_explain(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    auds = list(AE_AUD)
+    for i in range(n or len(AE_CONCEPTS[lang]) * 3):
+        c = AE_CONCEPTS[lang][(i // 3) % len(AE_CONCEPTS[lang])]
+        aud = auds[i % 3]
+        en_r, de_r, limit = AE_AUD[aud]
+        req = (f"Explain {c} for {en_r}, in at most {limit} words." if lang == "en" else
+               f"Erkläre {c} für {de_r}, in höchstens {limit} Wörtern.")
+        items.append({"id": str(i), "lang": lang, "audience": aud, "limit": limit,
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_audience_explain(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len(re.findall(r"\w+", text))
+    out = tasks_judge.judge("", AE_JUDGE.format(req=item["messages"][0]["content"], text=text or "(empty)",
+                                                fit=AE_CHECK[item["audience"]],
+                                                lang="German" if item["lang"] == "de" else "English"), max_tokens=128)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 4:
+        raise ValueError(f"unusable explain verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= item["limit"]]
+    a = item["audience"]
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
+            "detail": {"all_met": float(all(met)), f"fit_{a}": float(met[1]), f"correct_{a}": float(met[0]),
+                       "within_limit": float(met[4]), "words": words}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -860,6 +926,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "audience_explain": {"langs": ("de", "en"), "load": load_audience_explain, "score": score_audience_explain,
+                              "think": False, "max_tokens": 512,
+                              "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

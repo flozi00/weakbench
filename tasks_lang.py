@@ -1629,6 +1629,50 @@ def score_de_address(item, reply):
             "detail": {f"ok_{item['register']}": float(ok), "mixed": float(du and sie)}}
 
 
+# ---------------------------------------------------------------- mixed_input (understand Denglisch / code-switched messages)
+# A chat message that switches language mid-sentence, with the facts split across both languages and one correction
+# ("nee, wait, ..."). The question asks for the final day and time; asked in German (de) or English (en).
+MX_DAYS = [("Montag", "Monday"), ("Dienstag", "Tuesday"), ("Mittwoch", "Wednesday"), ("Donnerstag", "Thursday"),
+           ("Freitag", "Friday")]
+MX_TEMPL = [
+    "Hey, ich hab das Meeting mit dem client auf {d1e} verschoben, at {t1} pm. Nee wait, sorry, die können erst am "
+    "{d2d}, same time.",
+    "Kurzes update: the review ist jetzt am {d1d} um {t1} Uhr nachmittags. Actually scratch that, wir machen {d2e} at {t2} pm.",
+    "So, the call with Lena: {d1e}, {t1} pm. Oh warte, sie hat geschrieben, dass es {d2d} um {t2} Uhr nachmittags besser passt.",
+]
+MX_Q = {"de": "An welchem Wochentag und um wie viel Uhr (nachmittags, 12-Stunden-Format) findet der Termin am Ende statt? "
+              "Antworte im Format: <Wochentag>, <Stunde> Uhr.",
+        "en": "On which weekday and at what time (afternoon, 12-hour clock) does the appointment finally take place? Answer "
+              "as: <weekday>, <hour> pm."}
+
+
+def load_mixed_input(lang, n, seed):
+    items = []
+    for i in range(n or 90):
+        r = random.Random(f"mixed_input:{i}")
+        (d1d, d1e), (d2d, d2e) = r.sample(MX_DAYS, 2)
+        t1, t2 = r.sample(range(1, 6), 2)
+        k = i % len(MX_TEMPL)
+        msg = MX_TEMPL[k].format(d1d=d1d, d1e=d1e, d2d=d2d, d2e=d2e, t1=t1, t2=t2)
+        final_t = t1 if k == 0 else t2  # "same time" keeps the first time
+        day = d2d if lang == "de" else d2e
+        items.append({"id": str(i), "lang": lang, "gold": f"{day}, {final_t}", "day": (d2d, d2e), "hour": final_t,
+                      "decoy": (d1d, d1e),
+                      "messages": [{"role": "user", "content": f"Nachricht / message:\n\"{msg}\"\n\n{MX_Q[lang]}"}]})
+    return items
+
+
+def score_mixed_input(item, reply):
+    t = (reply["content"] or "").strip().splitlines()
+    line = (t[-1] if t else "").lower()
+    day_ok = any(d.lower() in line for d in item["day"]) and not any(d.lower() in line for d in item["decoy"])
+    hours = re.findall(r"\b(\d{1,2})(?::00)?\s*(?:uhr|pm|p\.m\.)", line)
+    hour_ok = bool(hours) and int(hours[0]) % 12 == item["hour"] % 12
+    ok = day_ok and hour_ok
+    return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"],
+            "detail": {"day_ok": float(day_ok), "hour_ok": float(hour_ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1667,6 +1711,7 @@ TASKS = {
     "de_separable": task(("de",), load_de_separable, score_de_separable, 128, 32, lang_check=False),
     "de_compound_gender": task(("de",), load_de_compound_gender, score_de_compound_gender, 16, 60, lang_check=False),
     "de_address": task(("de",), load_de_address, score_de_address, 256, 30, lang_check=False),
+    "mixed_input": task(("de", "en"), load_mixed_input, score_mixed_input, 64, 30),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

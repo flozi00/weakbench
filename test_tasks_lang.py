@@ -461,7 +461,20 @@ def test_de_address():
     assert not sc(inf, "Danke für Ihre Nachricht. Ich schicke dir morgen die Unterlagen.")
 
 
+def test_mixed_input():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        it = tl.load_mixed_input(lang, 6, 0)
+        for x in it:
+            assert tl.score_mixed_input(x, {"content": x["gold"] + (" Uhr" if lang == "de" else " pm")})["correct"], x
+            wrong = (x["decoy"][0] if lang == "de" else x["decoy"][1]) + f", {x['hour']} pm"
+            assert not tl.score_mixed_input(x, {"content": wrong})["correct"]
+        x = it[0]
+        assert tl.score_mixed_input(x, {"content": f"{x['day'][0]}, {x['hour'] + 12}:00 Uhr"})["correct"]  # 24 h is fine
+
+
 if __name__ == "__main__":
+    test_mixed_input()
     test_de_address()
     test_de_compound_gender()
     test_de_separable()

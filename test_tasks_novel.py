@@ -552,7 +552,8 @@ def test_puzzle_mutation():
     assert sc(en["6-1"], {"content": "Answer: his father, not his mother"})["correct"]
     assert not sc(en["1-0"], {"content": "Answer: not the same"})["correct"]
     assert sc(en["5-1"], {"content": "Answer: it does not change"})["correct"]
-    assert not sc(en["5-0"], {"content": "Answer: raise (not same)"})["correct"]
+    assert sc(en["5-0"], {"content": "Answer: raise (not same)"})["correct"]  # the alternative is negated
+    assert not sc(en["5-0"], {"content": "Answer: raise or same"})["correct"]
 
 
 

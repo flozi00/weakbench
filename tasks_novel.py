@@ -3969,7 +3969,7 @@ def score_prob_fallacies(item, reply):
 # Asian-disease style: N people at risk; option A is sure, option B a gamble with the same expected value. Each pair
 # shows the same numbers framed as "saved" and as "die". There is no right answer; a rational chooser picks the
 # same in both frames. sure_gain / sure_loss = share choosing the sure option per frame (the gap is the framing
-# effect); correct = a parseable choice. Sure/gamble positions alternate between A and B.
+# effect). correct = chose the sure option, so group_agree = the choice is frame-independent. Positions alternate.
 FR_TOPIC = {"en": ["an outbreak threatens {n} people in a town", "a flood threatens {n} homes in a valley",
                    "a factory closure threatens {n} jobs"],
             "de": ["ein Krankheitsausbruch bedroht {n} Menschen in einer Stadt", "ein Hochwasser bedroht {n} Häuser in einem Tal",
@@ -4025,11 +4025,12 @@ def score_framing(item, reply):
     line = (final_answer(reply["content"]) or "").strip()
     m = re.match(r"\W*(?:plan|option)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line)
     pred = m.group(1).upper() if m else None
-    ok = pred is not None
-    d = {}
-    if pred:
-        d["sure_loss" if item["loss"] else "sure_gain"] = float(pred == item["sure"])
-    return {"correct": ok, "score": float(ok), "pred": pred, "gold": None, "detail": d}
+    # no right answer: "correct" records the choice (True = the sure option), so the grouped group_agree is the share of
+    # pairs whose choice survives the reframing; None when the reply names no option
+    chose_sure = None if pred is None else pred == item["sure"]
+    d = {} if pred is None else {"sure_loss" if item["loss"] else "sure_gain": float(chose_sure)}
+    return {"correct": chose_sure, "score": None if chose_sure is None else float(chose_sure), "pred": pred, "gold": None,
+            "detail": d}
 
 
 # ---------------------------------------------------------------- table_qa

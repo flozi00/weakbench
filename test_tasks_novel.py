@@ -1196,7 +1196,8 @@ def test_framing():
     for a, b in zip(it[::2], it[1::2]):
         assert not a["loss"] and b["loss"] and a["sure"] == b["sure"]
     r = tn.score_framing(it[1], {"content": f"Antwort: {it[1]['sure']}"})
-    assert r["correct"] and r["detail"]["sure_loss"] == 1.0
+    assert r["correct"] is True and r["detail"]["sure_loss"] == 1.0
+    assert tn.score_framing(it[1], {"content": "Antwort: keine"})["correct"] is None
 
 
 if __name__ == "__main__":

@@ -2894,9 +2894,17 @@ CE_FACTS = {
            ("{b} hatte {n1} Brötchen gebacken.", "Alle {n2} Brötchen, die {b} gebacken hatte, wurden gegessen.",
             "Alle {n1} Brötchen, die {b} gebacken hatte, wurden gegessen.", None)]}
 CE_FILL = {"en": ["The sky was clear.", "Birds sang in the trees.", "The street was quiet.", "A bus drove past.",
-                  "Someone laughed in the distance.", "The bakery smelled of bread."],
+                  "Someone laughed in the distance.", "The bakery smelled of bread.", "A cyclist rang a bell.",
+                  "The church clock was slow as usual.", "A cat slept on a wall.", "Two children argued about a ball."],
            "de": ["Der Himmel war klar.", "In den Bäumen sangen Vögel.", "Die Straße war ruhig.", "Ein Bus fuhr vorbei.",
-                  "In der Ferne lachte jemand.", "Die Bäckerei duftete nach Brot."]}
+                  "In der Ferne lachte jemand.", "Die Bäckerei duftete nach Brot.", "Ein Radfahrer klingelte.",
+                  "Die Kirchturmuhr ging wie immer nach.", "Eine Katze schlief auf einer Mauer.",
+                  "Zwei Kinder stritten um einen Ball."]}
+# consistent sentences that touch the same fact in a way that looks suspicious but is not a contradiction
+CE_NEAR = {"en": ["{a} took off the {c1} coat and hung it up.", "{b} fed the dog before breakfast.",
+                  "At ten to {t1} the train was still waiting.", "Only {n3} of the rolls were eaten; the rest were frozen."],
+           "de": ["{a} zog den {c1} Mantel aus und hängte ihn auf.", "{b} fütterte den Hund vor dem Frühstück.",
+                  "Um zehn vor {t1} wartete der Zug noch.", "Nur {n3} der Brötchen wurden gegessen, der Rest wurde eingefroren."]}
 
 
 def load_continuity_error(lang, n, seed):
@@ -2910,17 +2918,16 @@ def load_continuity_error(lang, n, seed):
         t1 = r.randint(6, 9)
         n1 = r.randint(6, 12)
         vals = {"a": a, "b": b, "c1": c1, "c2": c2, "t1": t1, "t2": t1 + 2, "n1": n1, "n2": n1 + r.choice([-3, 3]),
-                "b_gen": b + ("'" if b.endswith("s") else "s")}
+                "b_gen": b + ("'" if b.endswith("s") else "s"), "n3": n1 - 2}
         contra = (i // 4) % 3 != 0  # a third are clean controls
-        sents = [f[0].format(**vals)]
-        fill = r.sample(CE_FILL[lang], 5)
-        sents += fill[:3]
-        sents.append((f[1] if contra else f[2]).format(**vals))
-        sents += fill[3:]
-        r_pos = r.randint(2, 4)  # the late sentence moves around a little
-        late = sents.pop(4)
-        sents.insert(r_pos + 1, late)
-        gold = (r_pos + 2) if contra else 0
+        fact = i % 4
+        late = (f[1] if contra else (f[2] if (i // 12) % 2 else CE_NEAR[lang][fact])).format(**vals)
+        sents = [f[0].format(**vals)] + r.sample(CE_FILL[lang], 7)
+        at = r.randint(3, 7)  # the late sentence lands somewhere after a few fillers
+        sents.insert(at, late)
+        if contra and r.random() < 0.5:  # a consistent near-miss elsewhere as a decoy
+            sents.insert(r.randint(1, at - 1), CE_NEAR[lang][fact].format(**vals))
+        gold = sents.index(late) + 1 if contra else 0
         story = " ".join(f"({k + 1}) {x}" for k, x in enumerate(sents))
         q = ("Does any sentence contradict an earlier one? Answer with its number, or 0 if none does." if lang == "en" else
              "Widerspricht ein Satz einem früheren? Antworte mit seiner Nummer oder mit 0, wenn keiner das tut.")

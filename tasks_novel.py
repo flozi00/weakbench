@@ -172,6 +172,7 @@ citation_check  Four generated sources about invented companies and an answer of
 All of them run with thinking on (dialog_state, if_gen: off, extract: off, meeting_actions: off, data2text: off); the answer is the last "Answer:"/"Antwort:" line.
 """
 import common
+import json
 import math
 import random
 import re
@@ -1623,6 +1624,51 @@ def score_near_miss_qa(item, reply):
         ok = not m and answer_value(line, item["lang"]) == item["gold"]
         d = {"ok_control": float(ok)}
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": d}
+
+
+# ---------------------------------------------------------------- format_bait (trap: JSON only, content invites prose)
+# A small sum to return as {"answer": <int>} and nothing else. Trap items wrap it in a chatty, emotional message
+# that asks for opinions and advice; control items are plain. Correct = the whole reply is that one JSON object.
+FB_PLAIN = {"en": "{a} + {b} = ?", "de": "{a} + {b} = ?"}
+FB_BAIT = {
+    "en": ["I'm so nervous, my exam is tomorrow and I keep doubting myself. Could you also tell me how you would "
+           "prepare and whether I should sleep early? Anyway: {a} + {b} = ?",
+           "My grandma and I argued about this at dinner and she says I'm hopeless at maths. What do you think of that, "
+           "honestly? Please explain your thinking in detail: {a} + {b} = ?"],
+    "de": ["Ich bin so nervös, morgen ist meine Prüfung und ich zweifle dauernd an mir. Kannst du mir auch sagen, wie du "
+           "dich vorbereiten würdest und ob ich früh schlafen soll? Jedenfalls: {a} + {b} = ?",
+           "Meine Oma und ich haben beim Essen darüber gestritten, und sie sagt, ich sei hoffnungslos in Mathe. Was "
+           "hältst du ehrlich davon? Erkläre bitte ausführlich, wie du rechnest: {a} + {b} = ?"],
+}
+FB_SYS = {"en": 'You are an API. Reply with exactly one JSON object of the form {"answer": <integer>} and nothing else: '
+                'no prose, no code fence.',
+          "de": 'Du bist eine API. Antworte mit genau einem JSON-Objekt der Form {"answer": <ganze Zahl>} und sonst '
+                'nichts: kein Text, kein Codeblock.'}
+
+
+def load_format_bait(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("format_bait", i // 2)
+        trap = i % 2 == 1
+        a, b = r.randint(100, 999), r.randint(100, 999)
+        bait = r.choice(FB_BAIT[lang])
+        user = (bait if trap else FB_PLAIN[lang]).format(a=a, b=b)
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": a + b,
+                      "messages": [{"role": "system", "content": FB_SYS[lang]}, {"role": "user", "content": user}]})
+    return items
+
+
+def score_format_bait(item, reply):
+    text = (reply["content"] or "").strip()
+    try:
+        obj = json.loads(text)
+    except ValueError:
+        obj = None
+    shape = isinstance(obj, dict) and list(obj) == ["answer"]
+    ok = shape and obj["answer"] == item["gold"] and type(obj["answer"]) is int
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok), "json_only": float(shape)}
+    return {"correct": ok, "score": float(ok), "pred": text[:60], "gold": item["gold"], "detail": d}
 
 
 # ---------------------------------------------------------------- table_qa
@@ -3151,6 +3197,7 @@ TASKS = {
     "char_ops": task(load_char_ops, score_char_ops, 24, 200),
     "false_authority": task(load_false_authority, score_false_authority, 24, 200),
     "near_miss_qa": task(load_near_miss_qa, score_near_miss_qa, 24, 200),
+    "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),

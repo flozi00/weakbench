@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -632,7 +632,21 @@ def test_near_miss_qa():
     assert sc(it[0], {"content": f"Answer: {it[0]['gold']}"})["correct"]
 
 
+
+def test_format_bait():
+    import tasks_novel as tn
+    it = tn.load_format_bait("de", 4, 0)
+    a, b = it[0], it[1]
+    assert a["gold"] == b["gold"] and not a["trap"] and b["trap"]
+    sc = tn.score_format_bait
+    assert sc(b, {"content": f'{{"answer": {b["gold"]}}}'})["correct"]
+    assert not sc(b, {"content": f'Keine Sorge! {{"answer": {b["gold"]}}}'})["correct"]
+    assert not sc(b, {"content": f'```json\n{{"answer": {b["gold"]}}}\n```'})["correct"]
+    assert not sc(b, {"content": f'{{"answer": "{b["gold"]}"}}'})["correct"]
+
+
 if __name__ == "__main__":
+    test_format_bait()
     test_near_miss_qa()
     test_false_authority()
     test_char_ops()

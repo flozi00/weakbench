@@ -1795,6 +1795,22 @@ IR_EVENTS = {"en": [("the train is on time for once", "the train is late again")
                     ("zum Picknick hat der Regen aufgehört", "zum Picknick fing es an zu schütten")]}
 IR_PRAISE = {"en": ["Great, {e}.", "Wonderful, {e}. Just what I needed.", "Oh perfect, {e}."],
              "de": ["Na super, {e}.", "Wunderbar, {e}. Genau das, was ich gebraucht habe.", "Oh perfekt, {e}."]}
+# harder: the identical remark, only the context before it decides (wanted vs dreaded)
+IR_CONTEXT = {"en": [("My garden is completely dried out.", "We planned the picnic for weeks.", "Great, it's raining."),
+                     ("I really need a quiet weekend at home.", "I was so looking forward to the concert tonight.",
+                      "Wonderful, the concert got cancelled."),
+                     ("I have been trying to sell that old car for months.", "I loved that old car.",
+                      "Oh perfect, someone took the car away."),
+                     ("I wanted an excuse to leave the meeting early.", "I had to finish my talk in that meeting.",
+                      "Great, the fire alarm went off in the middle of the meeting.")],
+              "de": [("Mein Garten ist völlig ausgetrocknet.", "Wir haben das Picknick seit Wochen geplant.",
+                      "Na super, es regnet."),
+                     ("Ich brauche dringend ein ruhiges Wochenende zu Hause.", "Ich habe mich so auf das Konzert heute "
+                      "Abend gefreut.", "Wunderbar, das Konzert wurde abgesagt."),
+                     ("Ich versuche seit Monaten, das alte Auto loszuwerden.", "Ich habe das alte Auto geliebt.",
+                      "Oh perfekt, jemand hat das Auto mitgenommen."),
+                     ("Ich wollte einen Grund, das Meeting früher zu verlassen.", "Ich musste in dem Meeting noch meinen "
+                      "Vortrag halten.", "Na super, mitten im Meeting ging der Feueralarm los.")]}
 IR_ASK = {"en": "Is the speaker being ironic or sincere? Answer with one word: ironic or sincere.",
           "de": "Meint die Person das ironisch oder ernst? Antworte mit einem Wort: ironisch oder ernst."}
 
@@ -1803,11 +1819,16 @@ def load_irony(lang, n, seed):
     items = []
     for i in range(n or 60):
         r = random.Random(f"irony:{i}")
-        good, bad = r.choice(IR_EVENTS[lang])
         ironic = i % 2 == 1
-        remark = r.choice(IR_PRAISE[lang]).format(e=bad if ironic else good)
+        kind = ("event", "context")[(i // 2) % 2]
+        if kind == "event":
+            good, bad = r.choice(IR_EVENTS[lang])
+            remark = r.choice(IR_PRAISE[lang]).format(e=bad if ironic else good)
+        else:  # the same remark; the speaker's situation decides
+            wanted, dreaded, said = r.choice(IR_CONTEXT[lang])
+            remark = (dreaded if ironic else wanted) + " " + said
         gold = ("ironic" if ironic else "sincere") if lang == "en" else ("ironisch" if ironic else "ernst")
-        items.append({"id": str(i), "lang": lang, "ironic": ironic, "gold": gold,
+        items.append({"id": str(i), "lang": lang, "ironic": ironic, "kind": kind, "gold": gold,
                       "messages": [{"role": "user", "content": f"„{remark}“\n\n{IR_ASK[lang]}"}]})
     return items
 
@@ -1818,7 +1839,7 @@ def score_irony(item, reply):
     pred = {"ernstgemeint": "ernst", "aufrichtig": "ernst"}.get(w[0], w[0]) if w else None
     ok = pred == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
-            "detail": {"ok_ironic" if item["ironic"] else "ok_sincere": float(ok)}}
+            "detail": {"ok_ironic" if item["ironic"] else "ok_sincere": float(ok), f"ok_{item.get('kind', 'event')}": float(ok)}}
 
 
 def task(langs, load, score, max_tokens, quick, **kw):

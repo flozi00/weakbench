@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -918,7 +918,21 @@ def test_judge_ability():
         assert sum(y["fluff"] == f for y in full) > 40
 
 
+
+def test_regex_synth():
+    import tasks_novel as tn
+    it = tn.load_regex_synth("en", 10, 0)
+    for x in it:
+        assert len(x["pos"]) >= 7 and len(x["neg"]) >= 7
+        assert tn.score_regex_synth(x, {"content": f"```\n{x['gold']}\n```"})["correct"]
+        literal = "|".join(__import__("re").escape(p) for p in x["pos"][:5])  # memorises the shown list
+        r = tn.score_regex_synth(x, {"content": f"```{literal}```"})
+        assert not r["correct"] and r["detail"]["overfit"] == 1.0
+    assert not tn.score_regex_synth(it[0], {"content": "```(unclosed```"})["correct"]
+
+
 if __name__ == "__main__":
+    test_regex_synth()
     test_judge_ability()
     test_blocks_plan()
     test_grid_transform()

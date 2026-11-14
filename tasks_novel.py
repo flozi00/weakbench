@@ -2782,6 +2782,80 @@ def score_judge_ability(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- regex_synth (write a regex from examples, checked by running it)
+# A hidden pattern built from 2-3 parts (digits, letters, a literal separator, an optional part) generates matching
+# and near-miss strings. The model writes one Python regex; it must fullmatch every positive (shown and held out)
+# and no negative (shown and held out). Held-out strings test generalisation, not memorising the list.
+RS_PARTS = [("[0-9]{%d}", "%d digits", lambda r, n: "".join(r.choice("0123456789") for _ in range(n))),
+            ("[A-Z]{%d}", "%d capital letters", lambda r, n: "".join(r.choice("ABCDEFGHKMNPRSTXZ") for _ in range(n))),
+            ("[a-z]{%d}", "%d small letters", lambda r, n: "".join(r.choice("abcdefghkmnprstxz") for _ in range(n)))]
+RS_SEP = ["-", "_", ".", "/", ":"]
+
+
+def rs_make(r):
+    k = r.choice([2, 3])
+    parts = [(RS_PARTS[r.randrange(3)], r.randint(2, 4)) for _ in range(k)]
+    sep = r.choice(RS_SEP)
+    pat = re.escape(sep).join(p[0] % n for p, n in parts)
+
+    def gen(rr):
+        return sep.join(p[2](rr, n) for p, n in parts)
+    return pat, gen, sep, parts
+
+
+def rs_negative(r, s, sep):
+    """A near miss: one character class wrong, one character too many or too few, or another separator."""
+    kind = r.randrange(4)
+    i = r.randrange(len(s))
+    if kind == 0 and s[i] != sep:
+        swap = "x" if s[i].isdigit() else ("7" if s[i].isalpha() else "x")
+        return s[:i] + swap + s[i + 1:]
+    if kind == 1:
+        return s[:i] + s[i] + s[i:]
+    if kind == 2 and len(s) > 3:
+        return s[:i] + s[i + 1:]
+    other = r.choice([x for x in RS_SEP if x != sep])
+    return s.replace(sep, other)
+
+
+def load_regex_synth(lang, n, seed):
+    items = []
+    for i in range(n or 80):
+        r = rng_of("regex_synth", i)
+        pat, gen, sep, parts = rs_make(r)
+        pos = list(dict.fromkeys(gen(r) for _ in range(12)))
+        negs = list(dict.fromkeys(x for x in (rs_negative(r, gen(r), sep) for _ in range(30))
+                                  if not re.fullmatch(pat, x)))[:12]
+        shown_p, held_p, shown_n, held_n = pos[:5], pos[5:], negs[:5], negs[5:]
+        q = (("Write one Python regular expression that matches (with re.fullmatch) all of these:\n" if lang == "en" else
+              "Schreibe einen regulären Python-Ausdruck, der (mit re.fullmatch) alle diese Zeichenketten trifft:\n")
+             + "\n".join(shown_p) + ("\n\nand none of these:\n" if lang == "en" else "\n\nund keine von diesen:\n")
+             + "\n".join(shown_n) + ("\n\nIt must generalise to new strings of the same kind. Give the regex alone in a "
+                                     "code block." if lang == "en" else "\n\nEr muss auf neue Zeichenketten derselben Art "
+                                     "verallgemeinern. Gib nur den Ausdruck in einem Codeblock an."))
+        items.append({"id": str(i), "lang": lang, "gold": pat, "pos": pos, "neg": negs, "shown": 5,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_regex_synth(item, reply):
+    text = reply["content"] or ""
+    # a language tag only counts when a newline follows it ("```python\n"); "```AB_CD```" is the regex itself
+    blocks = [b for _, b in re.findall(r"```([a-zA-Z]*\n)?(.*?)```", text, re.S)] or re.findall(r"`([^`]+)`", text)
+    cand = (blocks[-1] if blocks else text.strip().splitlines()[-1] if text.strip() else "").strip()
+    cand = re.sub(r"^r?[\"']|[\"']$", "", cand.splitlines()[0] if cand else "")
+    try:
+        rx = re.compile(cand)
+        hit = lambda s: rx.fullmatch(s) is not None  # noqa: E731
+        shown_ok = all(hit(s) for s in item["pos"][:5]) and not any(hit(s) for s in item["neg"][:5])
+        held_ok = all(hit(s) for s in item["pos"][5:]) and not any(hit(s) for s in item["neg"][5:])
+    except re.error:
+        shown_ok = held_ok = False
+    ok = shown_ok and held_ok
+    return {"correct": ok, "score": float(ok), "pred": cand[:60], "gold": item["gold"],
+            "detail": {"fits_shown": float(shown_ok), "generalises": float(ok), "overfit": float(shown_ok and not held_ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4326,6 +4400,7 @@ TASKS = {
     "grid_transform": task(load_grid_transform, score_grid_transform, 24, 150),
     "blocks_plan": {**task(load_blocks_plan, score_blocks_plan, 24, 120), "max_tokens": 4096},
     "judge_ability": {**task(load_judge_ability, score_judge_ability, 24, 160), "grouped": True},
+    "regex_synth": {**task(load_regex_synth, score_regex_synth, 24, 80), "max_tokens": 2048},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

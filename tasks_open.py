@@ -834,14 +834,16 @@ def score_memory_dialog(item, reply):
 # The same concept explained for an 8-year-old, for an adult newcomer and for an expert, within a word limit. The
 # judge checks correctness and the fit to the reader; the word limit is checked exactly. The per-audience split shows
 # whether a model can actually shift register or writes one middle-of-the-road text for everyone.
-AE_CONCEPTS = {"en": ["photosynthesis", "inflation", "vaccination", "public-key encryption", "plate tectonics",
-                      "compound interest", "the greenhouse effect", "how a fridge cools"],
-               "de": ["Photosynthese", "Inflation", "Impfung", "Public-Key-Verschlüsselung", "Plattentektonik",
-                      "Zinseszins", "Treibhauseffekt", "wie ein Kühlschrank kühlt"]}
-AE_AUD = {"child": ("an 8-year-old child", "ein achtjähriges Kind", 80),
-          "adult": ("an adult with no background in the field", "einen Erwachsenen ohne Vorwissen im Fach", 120),
-          "expert": ("an expert in a neighbouring field who wants the precise mechanism",
-                     "eine Fachperson aus einem Nachbarfach, die den genauen Mechanismus will", 150)}
+AE_CONCEPTS = {"en": ["what photosynthesis is", "what inflation is", "how vaccination works", "how public-key encryption works",
+                      "what plate tectonics is", "how compound interest works", "what the greenhouse effect is",
+                      "how a fridge cools"],
+               "de": ["was Photosynthese ist", "was Inflation ist", "wie eine Impfung wirkt",
+                      "wie Public-Key-Verschlüsselung funktioniert", "was Plattentektonik ist", "wie Zinseszins funktioniert",
+                      "was der Treibhauseffekt ist", "wie ein Kühlschrank kühlt"]}
+AE_AUD = {"child": ("an 8-year-old child", "einem achtjährigen Kind", 80),
+          "adult": ("an adult without prior knowledge of the topic", "einem Erwachsenen ohne Vorkenntnisse", 120),
+          "expert": ("an expert from a neighbouring field who wants the precise mechanism",
+                     "einer Fachperson aus einem Nachbarfach, die den genauen Mechanismus wissen will", 150)}
 AE_CHECK = {"child": "Words and sentences suit an 8-year-old: no unexplained technical term, short sentences, a concrete "
                      "everyday picture.",
             "adult": "Clear for a newcomer: technical terms are explained, no talking down, no oversimplification that "
@@ -859,8 +861,8 @@ EXPLANATION:
 CRITERIA:
 1. Everything it states is factually correct (simplifications are fine if not wrong).
 2. {fit}
-3. It actually explains how or why, not only what.
-4. It is written in {lang} throughout."""
+3. It explains how or why at the reader's level, not only what it is.
+Ignore length; it is checked separately."""
 
 
 def load_audience_explain(lang, n, seed):
@@ -871,8 +873,8 @@ def load_audience_explain(lang, n, seed):
         c = AE_CONCEPTS[lang][(i // 3) % len(AE_CONCEPTS[lang])]
         aud = auds[i % 3]
         en_r, de_r, limit = AE_AUD[aud]
-        req = (f"Explain {c} for {en_r}, in at most {limit} words." if lang == "en" else
-               f"Erkläre {c} für {de_r}, in höchstens {limit} Wörtern.")
+        req = (f"Explain to {en_r} {c}. Use at most {limit} words." if lang == "en" else
+               f"Erkläre {de_r}, {c}. Verwende höchstens {limit} Wörter.")
         items.append({"id": str(i), "lang": lang, "audience": aud, "limit": limit,
                       "messages": [{"role": "user", "content": req}]})
     return items
@@ -881,19 +883,18 @@ def load_audience_explain(lang, n, seed):
 def score_audience_explain(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    words = len(re.findall(r"\w+", text))
+    words = len([w for w in re.sub(r"^[#*\-\s]+", "", text, flags=re.M).split() if re.search(r"\w", w)])  # hyphenated = 1
     out = tasks_judge.judge("", AE_JUDGE.format(req=item["messages"][0]["content"], text=text or "(empty)",
-                                                fit=AE_CHECK[item["audience"]],
-                                                lang="German" if item["lang"] == "de" else "English"), max_tokens=128)
+                                                fit=AE_CHECK[item["audience"]]), max_tokens=128)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")
-    if not isinstance(v, list) or len(v) != 4:
+    if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable explain verdict {out[:120]!r}")
     met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= item["limit"]]
     a = item["audience"]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
             "detail": {"all_met": float(all(met)), f"fit_{a}": float(met[1]), f"correct_{a}": float(met[0]),
-                       "within_limit": float(met[4]), "words": words}}
+                       "within_limit": float(met[3]), "words": words}}
 
 
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,

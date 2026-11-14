@@ -264,15 +264,16 @@ def test_memory_dialog():
 
 
 def test_audience_explain():
-    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 4}), "finish_reason": "stop"})
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 3}), "finish_reason": "stop"})
     try:
         tasks_judge.configure(url, "mock", 32768)
         it = to.load_audience_explain("de", None, 0)
+        assert it[0]["messages"][0]["content"].startswith("Erkläre einem achtjährigen Kind, was Photosynthese ist.")
         assert len(it) == 24 and [x["audience"] for x in it[:3]] == ["child", "adult", "expert"]
         r = to.score_audience_explain(it[0], {"content": "Wort " * 50})
         assert r["score"] == 1.0
         r = to.score_audience_explain(it[0], {"content": "Wort " * 200})
-        assert r["detail"]["within_limit"] == 0.0 and r["score"] == 0.8
+        assert r["detail"]["within_limit"] == 0.0 and r["score"] == 0.75
     finally:
         stop()
         tasks_judge.configure(None, None, None)

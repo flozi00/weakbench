@@ -2747,25 +2747,36 @@ def load_judge_ability(lang, n, seed):
         c = (a * b) % d + d * r.randint(1, 3)
         k = 1 + g % 3
         slip = d * r.choice([-2, -1, 1, 2]) if k < 3 else r.choice([-1, 1])
-        fluff_wrong = g % 2 == 0  # half the wrong solutions sound extra confident and run longer
-        right, _ = ja_solution(a, b, c, d, 0, 0, lang, not fluff_wrong and r.random() < 0.3)
+        # the confident sentence sits on the wrong solution, on the right one, or on neither, equally often: no payoff
+        fluff = ("wrong", "right", "none")[g % 3]
+        fluff_wrong = fluff == "wrong"
+        right, _ = ja_solution(a, b, c, d, 0, 0, lang, fluff == "right")
         wrong, _ = ja_solution(a, b, c, d, k, slip, lang, fluff_wrong)
-        first_right = (g % 4 < 2) != bool(swap)
+        first_right = ((g // 3) % 2 == 0) != bool(swap)
         A, B = (right, wrong) if first_right else (wrong, right)
         q, ask = JA_TEXT[lang]
         content = f"{q.format(a=a, b=b, c=c, d=d)}\n\nA:\n{A}\n\nB:\n{B}\n\n{ask}\n" + ASK[lang]
         items.append({"id": f"{g}-{swap}", "lang": lang, "gold": "A" if first_right else "B",
-                      "longer": "A" if len(A) > len(B) else "B", "fluff_wrong": fluff_wrong,
+                      "longer": "A" if len(A) > len(B) else "B", "fluff_wrong": fluff_wrong, "fluff": fluff,
                       "messages": [{"role": "user", "content": content}]})
     return items
 
 
 def score_judge_ability(item, reply):
     line = (final_answer(reply["content"]) or "").strip()
-    m = re.match(r"\W*([AB])\b", line) or re.search(r"\b(?:solution|lösung)\s+([AB])\b", line, re.I)
-    pred = m.group(1).upper() if m else None
+    letters = re.findall(r"\b([AB])\b", line)
+    pred = None
+    if len(set(letters)) == 1:
+        pred = letters[0]
+    elif letters:  # "A is wrong, B is correct": the letter next to the verdict word
+        m = re.search(r"\b([AB])\b[^AB]{0,25}\b(correct|right|richtig|stimmt)", line, re.I) or \
+            re.search(r"\b(correct|right|richtig)\b[^AB]{0,15}\b([AB])\b", line, re.I)
+        if m:
+            pred = m.group(1) if m.group(1) in "AB" else m.group(2)
+        elif re.search(r"\bso\s+([AB])\b\W*$|\balso\s+([AB])\b\W*$", line):
+            pred = letters[-1]
     ok = pred == item["gold"]
-    d = {"ok_fluff_wrong" if item["fluff_wrong"] else "ok_plain": float(ok)}
+    d = {f"ok_fluff_{item.get('fluff', 'wrong' if item['fluff_wrong'] else 'none')}": float(ok)}
     if pred:
         d["chose_longer"] = float(pred == item["longer"])
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}

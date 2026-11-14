@@ -910,6 +910,12 @@ def test_judge_ability():
     x = it[0]
     assert tn.score_judge_ability(x, {"content": f"Answer: {x['gold']}"})["correct"]
     assert tn.score_judge_ability(x, {"content": f"Answer: Solution {x['gold']} is right"})["correct"]
+    other = "B" if x["gold"] == "A" else "A"
+    assert tn.score_judge_ability(x, {"content": f"Answer: {other} is wrong, {x['gold']} is correct"})["correct"]
+    assert not tn.score_judge_ability(x, {"content": "Answer: A and B both are wrong"})["correct"]
+    full = tn.load_judge_ability("en", 160, 0)
+    for f in ("wrong", "right", "none"):
+        assert sum(y["fluff"] == f for y in full) > 40
 
 
 if __name__ == "__main__":

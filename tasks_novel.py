@@ -1735,6 +1735,42 @@ def score_rephrase_consistency(item, reply):
             "detail": {f"ok_{item['form']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- reversal (trap: a learned relation asked backwards)
+# Six invented "A's mentor is B" facts in context; control asks forward (who is A's mentor), trap asks backward
+# (whose mentor is B). Same fact, same context; ok_forward - ok_backward is the reversal gap.
+RV2_TEXT = {"en": ("The mentor of {a} is {b}.", "Who is the mentor of {a}?", "Whose mentor is {b}?"),
+            "de": ("Die Mentorin von {a} ist {b}.", "Wer ist die Mentorin von {a}?", "Wessen Mentorin ist {b}?")}
+
+
+def load_reversal(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("reversal", i // 2)
+        back = i % 2 == 1
+        names = []
+        while len(names) < 12:
+            w = ch_word(r, 2, 3).capitalize()
+            if w not in names:
+                names.append(w)
+        pairs = list(zip(names[:6], names[6:]))  # every person appears once: no chains
+        k = r.randrange(6)
+        fact, fwd, bwd = RV2_TEXT[lang]
+        a, b = pairs[k]
+        q = "\n".join(fact.format(a=x, b=y) for x, y in pairs) + "\n" + (bwd.format(b=b) if back else fwd.format(a=a))
+        items.append({"id": str(i), "lang": lang, "backward": back, "gold": a if back else b,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_reversal(item, reply):
+    line = final_answer(reply["content"]) or ""
+    names = re.findall(r"[A-ZÄÖÜ][a-zäöüß]+", line)
+    cand = [w for w in names if w.lower() not in ("die", "der", "the", "mentor", "mentorin", "antwort", "answer")]
+    ok = cand[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
+            "detail": {"ok_backward" if item["backward"] else "ok_forward": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3262,6 +3298,7 @@ TASKS = {
     "false_authority": task(load_false_authority, score_false_authority, 24, 200),
     "near_miss_qa": task(load_near_miss_qa, score_near_miss_qa, 24, 200),
     "rephrase_consistency": {**task(load_rephrase_consistency, score_rephrase_consistency, 24, 150), "grouped": True},
+    "reversal": task(load_reversal, score_reversal, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -674,7 +674,20 @@ def test_rephrase_consistency():
     assert g == {"group_agree": 0.5, "group_all": 0.5}, g
 
 
+
+def test_reversal():
+    import tasks_novel as tn
+    it = tn.load_reversal("de", 6, 0)
+    a, b = it[0], it[1]
+    assert a["messages"][0]["content"].rsplit("\n", 2)[0] == b["messages"][0]["content"].rsplit("\n", 2)[0]
+    assert f"von {b['gold']} ist {a['gold']}." in a["messages"][0]["content"]
+    assert tn.score_reversal(b, {"content": f"Antwort: Die Mentorin von {b['gold']}"})["correct"]
+    assert tn.score_reversal(b, {"content": f"Antwort: {b['gold']}"})["correct"]
+    assert not tn.score_reversal(b, {"content": f"Antwort: {a['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_reversal()
     test_rephrase_consistency()
     test_format_bait()
     test_near_miss_qa()

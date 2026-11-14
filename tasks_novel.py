@@ -3962,6 +3962,60 @@ def score_framing(item, reply):
     return {"correct": None, "score": None, "pred": pred, "gold": None, "detail": d}  # no right answer: not an accuracy
 
 
+# ---------------------------------------------------------------- conclusion_spot (find the conclusion of an argument)
+# Two premises (a rule and a case), the conclusion they support, and an unrelated true-sounding fact, shuffled into
+# numbered sentences. Half the items mark the conclusion ("therefore"/"also"), half do not: then only the logic tells.
+CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a member of the Zorvel club.", "Lena pays a fee.",
+                   "The club meets on Fridays."),
+                  ("All brimak plants need shade.", "This plant is a brimak plant.", "This plant needs shade.",
+                   "Brimak plants grow slowly."),
+                  ("Trains on line 7 never run after midnight.", "The last train tonight is a line 7 train.",
+                   "The last train tonight leaves before midnight.", "Line 7 was opened in 1998."),
+                  ("Anyone who passes the test gets a certificate.", "Tom passed the test.", "Tom gets a certificate.",
+                   "The test takes two hours.")],
+           "de": [("Jedes Mitglied im Zorvel-Club zahlt einen Beitrag.", "Lena ist Mitglied im Zorvel-Club.",
+                   "Lena zahlt einen Beitrag.", "Der Club trifft sich freitags."),
+                  ("Alle Brimak-Pflanzen brauchen Schatten.", "Diese Pflanze ist eine Brimak-Pflanze.",
+                   "Diese Pflanze braucht Schatten.", "Brimak-Pflanzen wachsen langsam."),
+                  ("Züge der Linie 7 fahren nie nach Mitternacht.", "Der letzte Zug heute ist ein Zug der Linie 7.",
+                   "Der letzte Zug heute fährt vor Mitternacht.", "Die Linie 7 wurde 1998 eröffnet."),
+                  ("Wer die Prüfung besteht, bekommt ein Zertifikat.", "Tom hat die Prüfung bestanden.",
+                   "Tom bekommt ein Zertifikat.", "Die Prüfung dauert zwei Stunden.")]}
+CS_MARK = {"en": "Therefore, ", "de": "Also "}
+
+
+def load_conclusion_spot(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("conclusion_spot", i)
+        p1, p2, c, d = CS_ARGS[lang][i % len(CS_ARGS[lang])]
+        marked = (i // len(CS_ARGS[lang])) % 2 == 0
+        if marked:
+            c = CS_MARK[lang] + (c[0].lower() + c[1:] if lang == "en" else c)
+            if lang == "de":  # "Also zahlt Lena einen Beitrag": verb second after "Also"
+                w = c[len("Also "):].rstrip(".").split()
+                verb_at = next(k for k, x in enumerate(w) if x[0].islower())
+                c = "Also " + " ".join([w[verb_at]] + w[:verb_at] + w[verb_at + 1:]) + "."
+        sents = [p1, p2, c, d]
+        order = list(range(4))
+        r.shuffle(order)
+        shown = [sents[k] for k in order]
+        gold = order.index(2) + 1
+        text = " ".join(f"({k + 1}) {x}" for k, x in enumerate(shown))
+        q = ("Which sentence is the conclusion that the others support? Answer with its number." if lang == "en" else
+             "Welcher Satz ist die Schlussfolgerung, die von den anderen gestützt wird? Antworte mit seiner Nummer.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "marked": marked,
+                      "messages": [{"role": "user", "content": f"{text}\n{q}\n" + ASK[lang]}]})
+    return items
+
+
+def score_conclusion_spot(item, reply):
+    m = re.search(r"\d", final_answer(reply["content"]) or "")
+    ok = bool(m) and int(m.group()) == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": m.group() if m else None, "gold": item["gold"],
+            "detail": {"ok_marked" if item["marked"] else "ok_unmarked": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5526,6 +5580,7 @@ TASKS = {
     "simpson": task(load_simpson, score_simpson, 24, 120),
     "prob_fallacies": task(load_prob_fallacies, score_prob_fallacies, 24, 120),
     "framing": {**task(load_framing, score_framing, 24, 120), "grouped": True},
+    "conclusion_spot": task(load_conclusion_spot, score_conclusion_spot, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -1201,7 +1201,19 @@ def test_framing():
     assert len({x["messages"][0]["content"] for x in full}) == len(full)
 
 
+
+def test_conclusion_spot():
+    import tasks_novel as tn
+    it = tn.load_conclusion_spot("de", 16, 0)
+    assert {x["marked"] for x in it} == {True, False}
+    m = next(x for x in it if x["marked"])
+    assert "Also zahlt Lena" in m["messages"][0]["content"] or "Also braucht" in m["messages"][0]["content"] or "Also " in m["messages"][0]["content"]
+    for x in it:
+        assert tn.score_conclusion_spot(x, {"content": f"Antwort: ({x['gold']})"})["correct"]
+
+
 if __name__ == "__main__":
+    test_conclusion_spot()
     test_framing()
     test_prob_fallacies()
     test_simpson()

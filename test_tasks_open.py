@@ -360,7 +360,24 @@ def test_howto_steps():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_tactful_message():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 4}), "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_tactful_message("de", 4, 0)
+        assert [x["kind"] for x in it] == ["condolence", "rejection", "apology", "decline"]
+        ap = it[2]
+        good = f"Liebe {ap['facts'][0]}, Ihre Bestellung {ap['facts'][1]} kommt leider {ap['facts'][2]} Tage später."
+        assert to.score_tactful_message(ap, {"content": good})["detail"]["facts_ok"] == 1.0
+        assert to.score_tactful_message(ap, {"content": "Entschuldigung."})["detail"]["facts_ok"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_tactful_message()
     test_howto_steps()
     test_triage_advice()
     test_neutral_summary()

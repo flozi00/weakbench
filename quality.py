@@ -1272,7 +1272,7 @@ GROUPS = {
                  "de_variety", "en_variety", "de_no_anglicisms", "form_writing", "irony", "revise_on_feedback",
                  "code_comments_lang"],
     "judge": ["open_checklist", "tutor_feedback", "persona_guard", "human_persona", "self_model", "memory_dialog",
-              "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor", "neutral_summary", "triage_advice", "howto_steps"],
+              "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor", "neutral_summary", "triage_advice", "howto_steps", "tactful_message"],
 }
 
 

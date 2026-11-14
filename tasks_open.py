@@ -1111,6 +1111,79 @@ def score_howto_steps(item, reply):
                        "no_unsafe": float(met[-2]), "safety_ok": float(met[-1]), "all_met": float(all(met))}}
 
 
+# ---------------------------------------------------------------- tactful_message (judge + exact: delicate messages)
+# Four delicate situations with generated names and facts. Exact: every given fact appears (name, date/number) and the
+# word limit holds. Judge: the tone fits the situation and relationship, it is honest (no false promise), not a pile of
+# clichés, and it does not shift blame.
+TM_CASES = {
+    "condolence": {"en": "Write a short message to your colleague {name}, whose father died last week. You will cover {pname}'s "
+                         "shift on {day}. At most {k} words.",
+                   "de": "Schreibe eine kurze Nachricht an deine Kollegin {name}, deren Vater letzte Woche gestorben ist. Du "
+                         "übernimmst {pname}s Schicht am {day}. Höchstens {k} Wörter."},
+    "rejection": {"en": "Write a short rejection to the applicant {name} for the position of {role}. The position went to "
+                        "someone with more {skill} experience. At most {k} words.",
+                  "de": "Schreibe eine kurze Absage an die Bewerberin {name} für die Stelle als {role}. Die Stelle ging an "
+                        "jemanden mit mehr Erfahrung in {skill}. Höchstens {k} Wörter."},
+    "apology": {"en": "Write a short apology to the customer {name}: order {num} will arrive {d} days late because a supplier "
+                      "failed. Offer free shipping on the next order. At most {k} words.",
+                "de": "Schreibe eine kurze Entschuldigung an die Kundin {name}: Bestellung {num} kommt {d} Tage später, weil "
+                      "ein Zulieferer ausgefallen ist. Biete für die nächste Bestellung kostenlosen Versand an. Höchstens {k} Wörter."},
+    "decline": {"en": "Write a short reply to your friend {name}, declining the invitation to the wedding on {day} because you "
+                      "are abroad then. At most {k} words.",
+                "de": "Schreibe eine kurze Antwort an deine Freundin {name} und sage die Einladung zur Hochzeit am {day} ab, "
+                      "weil du dann im Ausland bist. Höchstens {k} Wörter."}}
+TM_NAMES = ["Hanna", "Sofia", "Leonie", "Amira", "Clara", "Ida"]
+TM_DAYS = {"en": ["Saturday", "the 14th", "Friday", "the 22nd"], "de": ["Samstag", "14.", "Freitag", "22."]}
+TM_JUDGE = """Evaluate a short message written for this situation:
+{task}
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+
+MESSAGE:
+{reply}
+
+CRITERIA:
+1. The tone fits the situation and the relationship (warm where personal, polite and clear where professional).
+2. It is honest: no false promise or invented reason.
+3. It is not a pile of stock phrases; it says something specific.
+4. It does not shift blame onto the recipient (or, for the apology, does not hide behind excuses)."""
+
+
+def load_tactful_message(lang, n, seed):
+    tasks_judge.check_judge()
+    items, kinds = [], list(TM_CASES)
+    for i in range(n or 40):
+        r = random.Random(f"tactful_message:{i}")
+        kind = kinds[i % 4]
+        name = r.choice(TM_NAMES)
+        v = {"name": name, "pname": name, "day": r.choice(TM_DAYS[lang]), "k": r.choice([60, 80, 100]),
+             "role": r.choice(["Projektleiterin", "Buchhalterin", "Grafikerin"] if lang == "de" else
+                              ["project manager", "accountant", "designer"]),
+             "skill": r.choice(["Python", "SAP", "Personalführung"] if lang == "de" else ["Python", "SAP", "team leadership"]),
+             "num": r.randint(10000, 99999), "d": r.randint(2, 9)}
+        task_text = TM_CASES[kind][lang].format(**v)
+        facts = {"condolence": [name, v["day"].rstrip(".")], "rejection": [name, v["role"]],
+                 "apology": [name, str(v["num"]), str(v["d"])], "decline": [name, v["day"].rstrip(".")]}[kind]
+        items.append({"id": str(i), "lang": lang, "kind": kind, "facts": facts, "limit": v["k"],
+                      "messages": [{"role": "user", "content": task_text}]})
+    return items
+
+
+def score_tactful_message(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len([w for w in text.split() if re.search(r"\w", w)])
+    facts_ok = all(f.lower() in text.lower() for f in item["facts"]) and words <= item["limit"]
+    out = tasks_judge.judge("", TM_JUDGE.format(task=item["messages"][0]["content"], reply=text or "(empty)"), max_tokens=96)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 4:
+        raise ValueError(f"unusable tactful verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [facts_ok]
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
+            "detail": {"facts_ok": float(facts_ok), "tone_ok": float(met[0]), "all_met": float(all(met)),
+                       f"all_{item['kind']}": float(all(met))}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -1164,6 +1237,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "howto_steps": {"langs": ("de", "en"), "load": load_howto_steps, "score": score_howto_steps, "think": False,
                          "max_tokens": 1024, "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
                          "lang_check": True, "opt_in": True, "needs_judge": True},
+         "tactful_message": {"langs": ("de", "en"), "load": load_tactful_message, "score": score_tactful_message,
+                             "think": False, "max_tokens": 512,
+                             "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 40, "en": 40}},
+                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

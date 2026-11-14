@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -882,7 +882,24 @@ def test_grid_transform():
         assert tn.score_grid_transform(x, {"content": "Answer: " + txt})["correct"], txt
 
 
+
+def test_blocks_plan():
+    import tasks_novel as tn
+    start, goal = [["A", "B"], ["C"]], [["C", "B", "A"]]  # B on A; want A on B on C
+    plan = "move B onto C\nmove A onto B"
+    final, n = tn.bp_run(start, plan)
+    assert tn.bp_canon(final) == tn.bp_canon(goal) and n == 2 and tn.bp_optimal(start, goal) == 2
+    assert tn.bp_run(start, "move A onto C")[0] is None  # A is covered
+    it = tn.load_blocks_plan("de", 8, 0)
+    for x in it:
+        assert x["optimal"] and x["optimal"] >= 1
+    x = it[0]
+    r = tn.score_blocks_plan(x, {"content": "move A onto A"})
+    assert not r["correct"]
+
+
 if __name__ == "__main__":
+    test_blocks_plan()
     test_grid_transform()
     test_nesting_depth()
     test_arith_length()

@@ -2587,6 +2587,114 @@ def score_grid_transform(item, reply):
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {f"ok_ops{item['ops']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- blocks_plan (PlanBench-style blocksworld, checked by simulation)
+# Blocks on a table in stacks; the model writes moves "move X onto Y" / "move X onto table" (only a clear block, onto a
+# clear block or the table). A simulator checks every move and the goal; any valid plan counts, `optimal` is reported.
+BP_NAMES = "ABCDEFG"
+
+
+def bp_random_state(r, blocks):
+    stacks = []
+    for b in r.sample(blocks, len(blocks)):
+        if stacks and r.random() < 0.6:
+            r.choice(stacks).append(b)
+        else:
+            stacks.append([b])
+    return stacks
+
+
+def bp_desc(stacks, lang):
+    parts = []
+    for st in stacks:
+        parts.append(" on ".join(reversed(st)) + " on the table" if lang == "en" else
+                     " auf ".join(reversed(st)) + " auf dem Tisch")
+    return "; ".join(parts)
+
+
+def bp_canon(stacks):
+    return sorted(tuple(s) for s in stacks)
+
+
+def bp_optimal(start, goal):
+    """Breadth-first search over states: the shortest plan length (tiny: at most 6 blocks)."""
+    from collections import deque
+    start, goal = tuple(bp_canon(start)), tuple(bp_canon(goal))
+    seen, q = {start}, deque([(start, 0)])
+    while q:
+        st, d = q.popleft()
+        if st == goal:
+            return d
+        stacks = [list(x) for x in st]
+        for i, src in enumerate(stacks):
+            b = src[-1]
+            targets = [j for j in range(len(stacks)) if j != i] + ([None] if len(src) > 1 else [])
+            for j in targets:
+                new = [list(x) for x in stacks]
+                new[i].pop()
+                if j is None:
+                    new.append([b])
+                else:
+                    new[j].append(b)
+                key = tuple(bp_canon([x for x in new if x]))
+                if key not in seen:
+                    seen.add(key)
+                    q.append((key, d + 1))
+    return None
+
+
+def load_blocks_plan(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("blocks_plan", i)
+        k = 3 + i % 4
+        blocks = list(BP_NAMES[:k])
+        start = bp_random_state(r, blocks)
+        goal = bp_random_state(r, blocks)
+        while bp_canon(goal) == bp_canon(start):
+            goal = bp_random_state(r, blocks)
+        q = (f"Blocks world. Now: {bp_desc(start, 'en')}. Goal: {bp_desc(goal, 'en')}. You may move one clear block "
+             "(nothing on it) at a time onto the table or onto another clear block. Write the plan as lines "
+             "\"move X onto Y\" or \"move X onto table\", nothing else." if lang == "en" else
+             f"Klötzchenwelt. Jetzt: {bp_desc(start, 'de')}. Ziel: {bp_desc(goal, 'de')}. Du darfst immer einen freien "
+             "Klotz (nichts liegt darauf) auf den Tisch oder auf einen anderen freien Klotz legen. Schreibe den Plan als "
+             "Zeilen \"move X onto Y\" oder \"move X onto table\", sonst nichts.")
+        items.append({"id": str(i), "lang": lang, "blocks": k, "start": start, "goal": goal,
+                      "optimal": bp_optimal(start, goal), "gold": None, "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def bp_run(start, text):
+    """Simulate the moves; returns (final stacks or None on an illegal move, number of moves)."""
+    stacks = [list(s) for s in start]
+    moves = re.findall(r"move\s+([A-G])\s+onto\s+(table|[A-G])", text, re.I)
+    for b, t in moves:
+        b, t = b.upper(), t.upper()
+        src = next((s for s in stacks if s and s[-1] == b), None)
+        if src is None:
+            return None, len(moves)
+        if t == "TABLE":
+            if len(src) == 1:
+                return None, len(moves)  # already on the table: a wasted, ill-formed move
+            src.pop()
+            stacks.append([b])
+        else:
+            dst = next((s for s in stacks if s and s[-1] == t), None)
+            if dst is None or dst is src:
+                return None, len(moves)
+            src.pop()
+            dst.append(b)
+        stacks = [s for s in stacks if s]
+    return stacks, len(moves)
+
+
+def score_blocks_plan(item, reply):
+    final, n = bp_run(item["start"], reply["content"] or "")
+    ok = final is not None and n > 0 and bp_canon(final) == bp_canon(item["goal"])
+    return {"correct": ok, "score": float(ok), "pred": n, "gold": item["optimal"],
+            "detail": {f"ok_b{item['blocks']}": float(ok), "illegal": float(final is None),
+                       "optimal": float(ok and n == item["optimal"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4129,6 +4237,7 @@ TASKS = {
     "arith_length": task(load_arith_length, score_arith_length, 28, 140),
     "nesting_depth": task(load_nesting_depth, score_nesting_depth, 24, 144),
     "grid_transform": task(load_grid_transform, score_grid_transform, 24, 150),
+    "blocks_plan": {**task(load_blocks_plan, score_blocks_plan, 24, 120), "max_tokens": 4096},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -547,5 +547,22 @@ def test_noop_math():
         assert not tn.score_noop_math(it[1], {"content": f"Answer: {g + 3}"})["correct"]
 
 
+
+def test_puzzle_mutation():
+    import tasks_novel as tn
+    sc = tn.score_puzzle_mutation
+    for lang in ("en", "de"):
+        it = tn.load_puzzle_mutation(lang, None, 0)
+        assert len(it) == 16 and sum(x["mutated"] for x in it) == 8
+    en = {x["id"]: x for x in tn.load_puzzle_mutation("en", None, 0)}
+    assert sc(en["0-0"], {"content": "Answer: 5 cents"})["correct"]
+    assert not sc(en["0-1"], {"content": "Answer: 5 cents"})["correct"]
+    assert sc(en["0-1"], {"content": "Answer: 10"})["correct"]
+    assert not sc(en["7-0"], {"content": "Answer: 500"})["correct"]
+    assert sc(en["7-1"], {"content": "Answer: 500 minutes"})["correct"]
+    assert sc(en["2-1"], {"content": "Answer: 0"})["correct"]
+
+
 if __name__ == "__main__":
     test_noop_math()
+    test_puzzle_mutation()

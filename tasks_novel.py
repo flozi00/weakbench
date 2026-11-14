@@ -1340,6 +1340,69 @@ def score_noop_math(item, reply):
             "detail": {"ok_noop" if item["noop"] else "ok_clean": float(ok)}}
 
 
+# ---------------------------------------------------------------- puzzle_mutation (trap: famous riddle, one detail changed)
+# Each riddle twice: the original (control) and a mutation whose answer differs. ok_orig - ok_mut is the trap:
+# a model that recites the famous answer passes the control and fails the mutation. gold = regex on the answer line.
+PUZZLES = [
+    {"en": ("A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How many cents does the ball cost?",
+            "A bat and a ball cost $1.10 in total. The bat costs $1.00. How many cents does the ball cost?"),
+     "de": ("Ein Schläger und ein Ball kosten zusammen 1,10 €. Der Schläger kostet 1,00 € mehr als der Ball. Wie viele Cent kostet der Ball?",
+            "Ein Schläger und ein Ball kosten zusammen 1,10 €. Der Schläger kostet 1,00 €. Wie viele Cent kostet der Ball?"),
+     "gold": (r"^\D*5\b", r"^\D*10\b")},
+    {"en": ("Which is heavier: a kilogram of feathers or a kilogram of steel? Answer 'feathers', 'steel' or 'same'.",
+            "Which is heavier: a kilogram of feathers or two kilograms of steel? Answer 'feathers', 'steel' or 'same'."),
+     "de": ("Was ist schwerer: ein Kilogramm Federn oder ein Kilogramm Stahl? Antworte mit 'Federn', 'Stahl' oder 'gleich'.",
+            "Was ist schwerer: ein Kilogramm Federn oder zwei Kilogramm Stahl? Antworte mit 'Federn', 'Stahl' oder 'gleich'."),
+     "gold": (r"same|gleich", r"steel|stahl")},
+    {"en": ("Sally has 3 brothers. Each of her brothers has 2 sisters. How many sisters does Sally have?",
+            "Sally has 3 brothers. Each of her brothers has exactly 1 sister. How many sisters does Sally have?"),
+     "de": ("Sally hat 3 Brüder. Jeder ihrer Brüder hat 2 Schwestern. Wie viele Schwestern hat Sally?",
+            "Sally hat 3 Brüder. Jeder ihrer Brüder hat genau 1 Schwester. Wie viele Schwestern hat Sally?"),
+     "gold": (r"^\D*1\b|\bone\b|\beine\b", r"^\D*0\b|\bnone\b|\bzero\b|\bkeine\b|\bnull\b")},
+    {"en": ("A patch of lily pads doubles in size every day. It covers the whole lake on day 48. On which day did it cover half the lake?",
+            "A patch of lily pads grows by the same area every day, starting from nothing on day 0. It covers the whole lake on day 48. On which day did it cover half the lake?"),
+     "de": ("Ein Seerosenteppich verdoppelt jeden Tag seine Fläche. Am Tag 48 bedeckt er den ganzen See. An welchem Tag bedeckte er den halben See?",
+            "Ein Seerosenteppich wächst jeden Tag um dieselbe Fläche, beginnend bei null an Tag 0. Am Tag 48 bedeckt er den ganzen See. An welchem Tag bedeckte er den halben See?"),
+     "gold": (r"^\D*47\b", r"^\D*24\b")},
+    {"en": ("A farmer must cross a river with a wolf, a goat and a cabbage. The boat holds the farmer and one item. The wolf eats the goat and the goat eats the cabbage when left alone. What is the minimum number of crossings (one way counts as one)?",
+            "A farmer must cross a river with a wolf, a goat and a cabbage. The boat is large enough for the farmer and all three items at once. The wolf eats the goat and the goat eats the cabbage when left alone without the farmer. What is the minimum number of crossings (one way counts as one)?"),
+     "de": ("Ein Bauer muss mit einem Wolf, einer Ziege und einem Kohlkopf über einen Fluss. Ins Boot passen der Bauer und ein Gegenstand. Allein gelassen frisst der Wolf die Ziege und die Ziege den Kohl. Wie viele Überfahrten sind mindestens nötig (eine Richtung zählt als eine)?",
+            "Ein Bauer muss mit einem Wolf, einer Ziege und einem Kohlkopf über einen Fluss. Das Boot ist groß genug für den Bauern und alle drei zugleich. Ohne den Bauern frisst der Wolf die Ziege und die Ziege den Kohl. Wie viele Überfahrten sind mindestens nötig (eine Richtung zählt als eine)?"),
+     "gold": (r"^\D*7\b|\bseven\b|\bsieben\b", r"^\D*1\b|\bone\b|\beine\b")},
+    {"en": ("Game show: three doors, a car behind one, goats behind two. You pick door 1. The host, who knows where the car is, always opens another door with a goat; he opens door 3. Does switching to door 2 raise, lower or not change your chance of winning? Answer 'raise', 'lower' or 'same'.",
+            "Game show: three doors, a car behind one, goats behind two. You pick door 1. The host does not know where the car is and opens one of the other two doors at random; by chance it is door 3 and shows a goat. Does switching to door 2 raise, lower or not change your chance of winning? Answer 'raise', 'lower' or 'same'."),
+     "de": ("Spielshow: drei Türen, hinter einer ein Auto, hinter zweien Ziegen. Du wählst Tür 1. Der Moderator, der weiß, wo das Auto ist, öffnet immer eine andere Tür mit Ziege; er öffnet Tür 3. Erhöht, senkt oder ändert ein Wechsel zu Tür 2 deine Gewinnchance nicht? Antworte mit 'erhöht', 'senkt' oder 'gleich'.",
+            "Spielshow: drei Türen, hinter einer ein Auto, hinter zweien Ziegen. Du wählst Tür 1. Der Moderator weiß nicht, wo das Auto ist, und öffnet zufällig eine der beiden anderen Türen; zufällig ist es Tür 3 mit einer Ziege. Erhöht, senkt oder ändert ein Wechsel zu Tür 2 deine Gewinnchance nicht? Antworte mit 'erhöht', 'senkt' oder 'gleich'."),
+     "gold": (r"raise|erh[öo]ht", r"same|gleich")},
+    {"en": ("A doctor and a boy are fishing. The boy is the doctor's son, but the doctor is not the boy's father. Who is the doctor to the boy? Answer in one word.",
+            "A doctor and a boy are fishing. The doctor, a man, is the boy's father. Who is the doctor to the boy? Answer in one word."),
+     "de": ("Eine Ärztin oder ein Arzt angelt mit einem Jungen. Der Junge ist das Kind dieser Person, aber die Person ist nicht sein Vater. Wer ist die Person für den Jungen? Antworte mit einem Wort.",
+            "Ein Arzt angelt mit einem Jungen. Der Arzt, ein Mann, ist der Vater des Jungen. Wer ist der Arzt für den Jungen? Antworte mit einem Wort."),
+     "gold": (r"mother|mutter|mom|mama", r"father|vater|dad|papa")},
+    {"en": ("It takes 5 machines 5 minutes to make 5 widgets. How many minutes would it take 100 machines to make 100 widgets?",
+            "It takes 5 machines 5 minutes to make 5 widgets. How many minutes would it take 1 machine to make 100 widgets?"),
+     "de": ("5 Maschinen brauchen 5 Minuten für 5 Teile. Wie viele Minuten brauchen 100 Maschinen für 100 Teile?",
+            "5 Maschinen brauchen 5 Minuten für 5 Teile. Wie viele Minuten braucht 1 Maschine für 100 Teile?"),
+     "gold": (r"^\D*5\b", r"^\D*500\b")},
+]
+
+
+def load_puzzle_mutation(lang, n, seed):
+    items = []
+    for k, pz in enumerate(PUZZLES):
+        for mut in (0, 1):
+            items.append({"id": f"{k}-{mut}", "lang": lang, "mutated": bool(mut), "gold": pz["gold"][mut],
+                          "messages": [{"role": "user", "content": pz[lang][mut] + "\n" + ASK[lang]}]})
+    return items[:n] if n else items
+
+
+def score_puzzle_mutation(item, reply):
+    line = (final_answer(reply["content"]) or "").strip().lower()
+    ok = bool(re.search(item["gold"], line))
+    return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"],
+            "detail": {"ok_mutated" if item["mutated"] else "ok_original": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -2863,6 +2926,7 @@ TASKS = {
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
     "noop_math": task(load_noop_math, score_noop_math, 24, 200),
+    "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),
     "meeting_actions": {**task(load_meeting_actions, score_meeting_actions, 24, 150), "think": False,
                         "max_tokens": 512},
     "citation_check": task(load_citation_check, score_citation_check, 24, 150),

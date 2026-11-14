@@ -164,3 +164,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `fallacy_spot` | generated arguments about invented town proposals, five fallacies + a sound control, shuffled options | de, en | 24 / 120 | auto | letter; `ok_<fallacy>` |
 | `arith_length` | generated exact addition / multiplication of 2- to 8-digit numbers | de, en | 28 / 140 | auto | exact integer; `ok_d2..8`, `ok_add*` / `ok_mul*` (the length where exactness breaks) |
 | `nesting_depth` | generated: nested arithmetic (depth 1-6) and bracket balance over ()[]{} (depth 2-7) | de, en | 24 / 144 | auto | value / yes-no; `ok_eval_d*`, `ok_balance_d*` |
+| `constrained_plan` ** | generated requests (meals / day trip / training week) with 3-4 drawn constraints | de, en | 18 / 60 | off | judge per constraint + usefulness; `constraints_met`, `all_met` |

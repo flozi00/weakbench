@@ -662,6 +662,93 @@ def score_self_model(item, reply):
                        **{f"ok_c{i + 1}": float(x) for i, x in enumerate(met)}}}
 
 
+# ---------------------------------------------------------------- constrained_plan (judge: a plan under generated constraints)
+# A user asks for a short plan (meals, a day trip, a training week) with 3-4 generated constraints. The judge checks
+# each constraint separately plus usefulness; the checklist is derived from the drawn constraints, so every item has
+# its own ground truth and no two items share all of them.
+CP_DOMAINS = {
+    "meals": {"en": "Plan dinners for the next {k} days for me.", "de": "Plane mir Abendessen für die nächsten {k} Tage.",
+              "cons": [("vegetarian", "No meat or fish in any dinner.", "vegetarisch", "Kein Fleisch und kein Fisch in "
+                        "irgendeinem Abendessen."),
+                       ("no nuts, I am allergic", "No nuts or nut products anywhere.", "keine Nüsse, ich bin allergisch",
+                        "Nirgends Nüsse oder Nussprodukte."),
+                       ("at most 30 minutes each", "Every dinner is plausibly doable in 30 minutes.",
+                        "höchstens 30 Minuten pro Gericht", "Jedes Gericht ist plausibel in 30 Minuten machbar."),
+                       ("no dish twice", "No dinner repeats.", "kein Gericht doppelt", "Kein Gericht wiederholt sich."),
+                       ("one dinner must use leftovers of another", "At least one dinner explicitly reuses leftovers.",
+                        "ein Abendessen soll Reste eines anderen verwerten", "Mindestens ein Gericht verwertet "
+                        "ausdrücklich Reste.")]},
+    "trip": {"en": "Plan a day trip by train for me ({k} stops).", "de": "Plane mir einen Tagesausflug mit dem Zug ({k} Stationen).",
+             "cons": [("back home by 6 pm", "The plan ends with being home by 18:00.", "um 18 Uhr wieder zu Hause",
+                       "Der Plan endet spätestens um 18 Uhr zu Hause."),
+                      ("with a wheelchair user", "Every stop is plausibly wheelchair accessible or the issue is addressed.",
+                       "mit einer Rollstuhlfahrerin", "Jede Station ist plausibel barrierefrei oder das Thema wird "
+                       "angesprochen."),
+                      ("budget 40 euros per person", "Costs are addressed and stay within 40 euros per person.",
+                       "Budget 40 Euro pro Person", "Kosten werden genannt und bleiben unter 40 Euro pro Person."),
+                      ("a lunch break of an hour", "It contains a lunch break of about an hour.",
+                       "eine Stunde Mittagspause", "Er enthält eine Mittagspause von etwa einer Stunde."),
+                      ("include times for each stop", "Each stop has a time.", "mit Uhrzeiten für jede Station",
+                       "Jede Station hat eine Uhrzeit.")]},
+    "training": {"en": "Make me a {k}-day training plan for this week.", "de": "Mach mir einen Trainingsplan für {k} Tage diese Woche.",
+                 "cons": [("my knee hurts, no running or jumping", "No running or jumping anywhere.",
+                           "mein Knie schmerzt, kein Laufen und Springen", "Nirgends Laufen oder Springen."),
+                          ("no gym, only at home", "Every exercise works at home without gym machines.",
+                           "kein Fitnessstudio, nur zu Hause", "Jede Übung geht zu Hause ohne Geräte aus dem Studio."),
+                          ("at most 20 minutes a day", "Every day stays within 20 minutes.", "höchstens 20 Minuten am Tag",
+                           "Jeder Tag bleibt unter 20 Minuten."),
+                          ("one rest day", "It contains exactly one rest day.", "ein Ruhetag", "Er enthält genau einen "
+                           "Ruhetag.")]},
+}
+CP_JUDGE = """Check a PLAN against the user's request. For each criterion answer YES or NO. Reply with ONLY
+{{"verdicts": [...]}}.
+
+REQUEST:
+{req}
+
+PLAN:
+{plan}
+
+CRITERIA:
+{crit}"""
+
+
+def load_constrained_plan(lang, n, seed):
+    tasks_judge.check_judge()
+    items, doms = [], list(CP_DOMAINS)
+    for i in range(n or 60):
+        r = random.Random(f"constrained_plan:{i}")
+        dom = CP_DOMAINS[doms[i % len(doms)]]
+        k = r.randint(3, 5)
+        cons = r.sample(dom["cons"], r.randint(3, min(4, len(dom["cons"]))))
+        de = lang == "de"
+        req = dom[lang].format(k=k) + (" Bedingungen: " if de else " Conditions: ") + \
+            "; ".join(c[2] if de else c[0] for c in cons) + "."
+        crit = [c[3] if de else c[1] for c in cons] + [
+            (f"Der Plan umfasst genau {k} Einträge (Tage/Stationen) und ist konkret und brauchbar." if de else
+             f"The plan has exactly {k} entries (days/stops) and is concrete and usable.")]
+        items.append({"id": str(i), "lang": lang, "domain": doms[i % len(doms)], "criteria": crit,
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_constrained_plan(item, reply):
+    tasks_judge.check_judge()
+    text = reply["content"].strip()
+    out = tasks_judge.judge("", CP_JUDGE.format(req=item["messages"][0]["content"], plan=text or "(empty)",
+                                                crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(item["criteria"]))),
+                            max_tokens=256)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != len(item["criteria"]):
+        raise ValueError(f"unusable plan verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    cons = met[:-1]
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
+            "detail": {"all_met": float(all(met)), "constraints_met": round(sum(cons) / len(cons), 4),
+                       f"all_{item['domain']}": float(all(met))}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -684,6 +771,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "self_model": {"langs": ("de", "en"), "load": load_self_model, "score": score_self_model, "think": False,
                         "max_tokens": 512, "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
                         "lang_check": True, "opt_in": True, "needs_judge": True},
+         "constrained_plan": {"langs": ("de", "en"), "load": load_constrained_plan, "score": score_constrained_plan,
+                              "think": False, "max_tokens": 1536,
+                              "counts": {"quick": {"de": 18, "en": 18}, "full": {"de": 60, "en": 60}},
+                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

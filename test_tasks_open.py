@@ -225,7 +225,26 @@ def test_human_persona_and_self_model():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_constrained_plan():
+    def handler(path, body):
+        crit = body["messages"][-1]["content"].split("CRITERIA:")[-1].strip().splitlines()
+        return {"content": json.dumps({"verdicts": ["YES"] * (len(crit) - 1) + ["NO"]}), "finish_reason": "stop"}
+    url, stop = mock_server.serve(handler)
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_constrained_plan("de", 6, 0)
+        assert {x["domain"] for x in it} == {"meals", "trip", "training"}
+        assert 4 <= len(it[0]["criteria"]) <= 5 and "Bedingungen" in it[0]["messages"][0]["content"]
+        r = to.score_constrained_plan(it[0], {"content": "Plan ..."})
+        assert r["detail"]["constraints_met"] == 1.0 and r["detail"]["all_met"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_constrained_plan()
     test_human_persona_and_self_model()
     test_persona_guard()
     test_tutor_feedback()

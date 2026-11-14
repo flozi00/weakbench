@@ -3440,11 +3440,19 @@ def load_ascii_chart(lang, n, seed):
 
 def score_ascii_chart(item, reply):
     line = final_answer(reply["content"]) or ""
-    if item["kind"] == "second":
-        labs = [w for w in re.findall(r"[A-Za-z]+", line) if w.lower() in [x.lower() for x in AC_LABELS[item["lang"]]]]
-        ok = bool(labs) and labs[-1].lower() == item["gold"].lower()
-    else:
-        ok = last_int(line) == int(item["gold"])
+    if item["kind"] == "second":  # the first label named; German labels are capitalised ("so", "do" are words)
+        full = {"montag": "Mo", "dienstag": "Di", "mittwoch": "Mi", "donnerstag": "Do", "freitag": "Fr", "samstag": "Sa",
+                "sonntag": "So"}
+        labs = []
+        for w in re.findall(r"[A-Za-zÄÖÜäöüß]+", line):
+            if item["lang"] == "en" and re.match(r"(mon|tue|wed|thu|fri|sat|sun)", w.lower()):
+                labs.append(w[:3].capitalize())
+            elif item["lang"] == "de" and (w in AC_LABELS["de"] or w.lower() in full):
+                labs.append(full.get(w.lower(), w))
+        ok = bool(labs) and labs[0] == item["gold"]
+    else:  # the first number: "11 (20 − 9)"
+        m = re.search(r"\d+", line)
+        ok = bool(m) and int(m.group()) == int(item["gold"])
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 

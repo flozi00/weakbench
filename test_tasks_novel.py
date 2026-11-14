@@ -1062,6 +1062,10 @@ def test_ascii_chart():
         assert {x["kind"] for x in it} == {"value", "diff", "second"}
         for x in it:
             assert tn.score_ascii_chart(x, {"content": f"Answer: {x['gold']}"})["correct"]
+            if x["kind"] == "diff":
+                assert tn.score_ascii_chart(x, {"content": f"Answer: {x['gold']} (20 - 9)"})["correct"]
+            if x["kind"] == "second" and lang == "de":
+                assert tn.score_ascii_chart(x, {"content": f"Antwort: {x['gold']}, so wie gezeigt"})["correct"]
 
 
 if __name__ == "__main__":

@@ -2245,29 +2245,39 @@ def load_bilingual_notice(lang, n, seed):
         r = random.Random(f"bilingual_notice:{i}")
         ev_de, ev_en = r.choice(BN_EVENTS)
         day, mon = r.randint(1, 28), r.randint(1, 12)
-        hh, room, price = r.randint(9, 20), r.randint(101, 420), r.choice([5, 8, 12, 15])
-        prompt = (f"Schreibe einen kurzen Aushang zweisprachig, zuerst ein Abschnitt „DE:“ auf Deutsch, dann ein Abschnitt "
-                  f"„EN:“ auf Englisch, mit demselben Inhalt: {ev_de} ({ev_en}) am {day}.{mon}., Beginn {hh} Uhr, Raum {room}, "
+        hh, room = r.randint(9, 20), r.randint(101, 420)
+        price = r.choice([p for p in (5, 8, 12, 15, 25) if p not in (day, mon, hh)])  # no fact hides behind another
+        prompt = (f"Schreibe einen kurzen zweisprachigen Aushang: zuerst einen Abschnitt „DE:“ auf Deutsch, dann einen "
+                  f"Abschnitt „EN:“ auf Englisch, jeweils mit demselben Inhalt: {ev_de} ({ev_en}) am {day}.{mon}., Beginn {hh} Uhr, Raum {room}, "
                   f"Eintritt {price} Euro. Mindestens zwei Sätze pro Abschnitt.")
         items.append({"id": str(i), "lang": "de", "gold": None, "facts": [str(day), str(hh), str(room), str(price)],
+                      "month_strip": [f"{day}.{mon}.", f"{day}.{mon:02d}.", f"{day}/{mon}", f"{mon}/{day}"],
                       "messages": [{"role": "user", "content": prompt}]})
     return items
 
 
 def score_bilingual_notice(item, reply):
     text = reply["content"] or ""
-    m = re.search(r"\bDE\s*:(.*?)\bEN\s*:(.*)", text, re.S)
-    if not m:
+    head = re.compile(r"(?im)^[^\w\n]*(DE|Deutsch|German|EN|English|Englisch)\b[^\w\n]*:?[^\w\n]*")
+    marks = list(head.finditer(text))
+    secs = {}
+    for k, mk in enumerate(marks):  # each heading owns the text up to the next one, in either order
+        key = "de" if mk.group(1).lower() in ("de", "deutsch", "german") else "en"
+        secs.setdefault(key, text[mk.end(): marks[k + 1].start() if k + 1 < len(marks) else len(text)])
+    if set(secs) != {"de", "en"}:
         return {"correct": False, "score": 0.0, "pred": text[:60], "gold": None,
                 "detail": {"sections": 0.0, "de_ok": 0.0, "en_ok": 0.0, "facts_ok": 0.0}}
-    de, en = m.group(1), m.group(2)
+    de, en = secs["de"], secs["en"]
+    for mon in item.get("month_strip", []):  # the month must not stand in for a missing fact
+        de, en = de.replace(mon, " "), en.replace(mon, " ")
     de_ok = common.lang_ok(de, "de", min_words=8) is True
     en_ok = common.lang_ok(en, "en", min_words=8) is True
     nums = lambda t: re.findall(r"\d+", t)  # noqa: E731
     hh = int(item["facts"][1])
     en_alt = {str(hh), str(hh - 12)} if hh > 12 else {str(hh)}  # "7 pm" for 19 Uhr
+    noon = hh == 12 and re.search(r"\b(noon|midday)\b", en, re.I)
     facts_ok = all(f in nums(de) for f in item["facts"]) and all(
-        (bool(en_alt & set(nums(en))) if k == 1 else f in nums(en)) for k, f in enumerate(item["facts"]))
+        ((bool(en_alt & set(nums(en))) or bool(noon)) if k == 1 else f in nums(en)) for k, f in enumerate(item["facts"]))
     ok = de_ok and en_ok and facts_ok
     return {"correct": ok, "score": float(ok), "pred": text[:60], "gold": None,
             "detail": {"sections": 1.0, "de_ok": float(de_ok), "en_ok": float(en_ok), "facts_ok": float(facts_ok)}}

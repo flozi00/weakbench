@@ -618,6 +618,9 @@ def test_bilingual_notice():
             f"and the entry is {price} euros and we look forward to seeing you.")
     assert tl.score_bilingual_notice(x, {"content": good})["correct"]
     assert not tl.score_bilingual_notice(x, {"content": good.replace(f"room {room}", "room 1")})["correct"]
+    de_part, en_part = good.split("\nEN:")
+    swapped = "🇬🇧 English:" + en_part + "\n🇩🇪 Deutsch:" + de_part[3:]
+    assert tl.score_bilingual_notice(x, {"content": swapped})["correct"]
 
 
 if __name__ == "__main__":

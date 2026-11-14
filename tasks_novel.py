@@ -5414,3 +5414,15 @@ TASKS = {
     "if_gen": {**task(load_if_gen, score_if_gen, 100, 200), "think": False, "max_tokens": 1024},
     "dialog_state": {**task(load_dialog, score_dialog, 24, 200), "think": False, "max_tokens": 1024},
 }
+
+
+# generated tasks whose draws repeat prompts: keep the distinct ones only. _FEW: fewer distinct items than the old
+# full count, so the full tier is all of them; _QUICK_CAP: quick tiers that exceeded the distinct count
+_FEW = {'percent_traps', 'en_produce', 'polyglot_switch', 'sys_adherence', 'form_writing', 'de_no_anglicisms',
+        'agreement_attractor', 'prop_logic', 'counterfactual_world'}
+_QUICK_CAP = {'en_produce': 40}
+for _name in ['math_missing', 'counterfactual_world', 'fake_entity', 'prop_logic', 'percent_traps', 'jugs', 'probability', 'seq_induction', 'sci_calc']:
+    _t = TASKS[_name]
+    _full = {k: v if v and _name not in _FEW else None for k, v in _t["counts"]["full"].items()}  # all distinct if fewer
+    _quick = {k: min(v, _QUICK_CAP.get(_name, v)) if v else v for k, v in _t["counts"]["quick"].items()}
+    TASKS[_name] = {**_t, "load": common.distinct(_t["load"]), "counts": {"quick": _quick, "full": _full}}

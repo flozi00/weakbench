@@ -14,7 +14,8 @@ def test_all():
     for name, t in tn.TASKS.items():
         full = t["load"]("en", t["counts"]["full"]["en"], 0)
         quick = t["load"]("de", t["counts"]["quick"]["de"], 0)
-        assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
+        want = t["counts"]["full"]["en"]
+        assert (want is None or len(full) == want) and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
         for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path", "stale_answer", "pii_redact") else []:  # own tests below

@@ -315,6 +315,22 @@ def hf_list(repo, revision, repo_type="datasets"):
 DATA_REPO, DATA_REV = "flozi00/weakbench-data", "5a0c00d5c0895b899658e3a7891d35a10feeeac0"
 
 
+def distinct(load, pool=600):
+    """Wrap a generated-task loader so it yields only items with a prompt not seen before (in item order, so the quick
+    tier stays a prefix of the full tier). It draws up to `pool` candidates; with n=None it returns every distinct one."""
+    def wrapped(lang, n, seed):
+        out, seen = [], set()
+        for x in load(lang, pool, seed):
+            key = json.dumps(x.get("turns") or x["messages"], sort_keys=True, ensure_ascii=False)
+            if key not in seen:
+                seen.add(key)
+                out.append(x)
+                if n and len(out) == n:
+                    break
+        return out
+    return wrapped
+
+
 class OwnSet:
     """A hand-written set from the private DATA_REPO (`sets/<module>.<NAME>.py`, a Python literal), fetched on
     first use so a run without access fails loudly only in the tasks that need it."""

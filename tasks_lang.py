@@ -1399,6 +1399,59 @@ def score_de_reported(item, reply):
             "detail": {"ok_plural" if item["plural"] else "ok_singular": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_homophones (its/it's, their/there/they're, then/than, affect/effect)
+EH_FILL = {"p": ["Maria", "my brother", "the manager", "Mr Hale"], "n": ["bike", "laptop", "garden", "report"]}
+EH_TEMPL = [
+    ("its", "its", "The company changed ___ logo last year."),
+    ("its", "it's", "___ been a long week for {p}."),
+    ("its", "its", "The {n} lost ___ shine after the rain."),
+    ("its", "it's", "{P} says ___ too late to fix the {n} today."),
+    ("their", "their", "The neighbours parked ___ car in front of our {n}."),
+    ("their", "there", "Put the {n} over ___, next to the door."),
+    ("their", "they're", "Tell the kids ___ allowed to stay up late tonight."),
+    ("their", "there", "___ is a problem with the {n}."),
+    ("then", "than", "{P} is taller ___ everyone else in the team."),
+    ("then", "then", "First check the {n}, and ___ write the summary."),
+    ("then", "than", "The new {n} is cheaper ___ the old one."),
+    ("affect", "affect", "The delay will not ___ the final price of the {n}."),
+    ("affect", "effect", "The new rule had a strong ___ on {p}."),
+    ("affect", "effect", "The medicine takes ___ after an hour."),
+]
+EH_SETS = {"its": {"its", "it's"}, "their": {"their", "there", "they're"}, "then": {"then", "than"},
+           "affect": {"affect", "effect"}}
+EH_ASK = ("Which word belongs in the gap ___? Answer with that word only, spelled exactly as it fits (ignore "
+          "capitalisation at the start of the sentence).\n\n{s}")
+
+
+def load_en_homophones(lang, n, seed):
+    items, seen = [], set()
+    for i in range(400):
+        if len(items) == (n or 400):
+            break
+        r = random.Random(f"en_homophones:{i}")
+        pair, gold, t = EH_TEMPL[i % len(EH_TEMPL)]
+        p = r.choice(EH_FILL["p"])
+        sent = t.format(n=r.choice(EH_FILL["n"]), p=p, P=p[0].upper() + p[1:])
+        if sent in seen:
+            continue
+        seen.add(sent)
+        items.append({"id": str(i), "lang": "en", "pair": pair, "gold": gold, "sent": sent,
+                      "messages": [{"role": "user", "content": EH_ASK.format(s=sent)}]})
+    return items
+
+
+def score_en_homophones(item, reply):
+    raw = (tasks_novel.final_answer(reply["content"]) or reply["content"] or "").lower().replace("’", "'")
+    words = re.findall(r"[a-z]+(?:'[a-z]+)?", raw)
+    cand = [w for w in words if w in EH_SETS[item["pair"]]]
+    tmpl = re.findall(r"[a-z]+(?:'[a-z]+)?|___", item["sent"].lower())
+    if len(words) > 3 and len(words) == len(tmpl):  # the whole sentence filled in: read the word at the gap
+        cand = [words[tmpl.index("___")]]
+    ok = cand[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": cand[:1], "gold": item["gold"],
+            "detail": {f"ok_{item['pair']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1432,6 +1485,7 @@ TASKS = {
     "de_case": task(("de",), load_de_case, score_de_case, 64, 120, lang_check=False),
     "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 40, lang_check=False),
     "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 24, lang_check=False),
+    "en_homophones": task(("en",), load_en_homophones, score_en_homophones, 32, 40, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

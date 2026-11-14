@@ -403,6 +403,19 @@ def test_de_reported():
     assert not tl.score_de_reported(sein, {"content": "Die Gäste sagen, sie würden müde sein."})["correct"]
 
 
+def test_en_homophones():
+    import tasks_lang as tl
+    it = tl.load_en_homophones("en", None, 0)
+    assert len(it) >= 40
+    for x in it:
+        assert "{" not in x["sent"]
+        assert tl.score_en_homophones(x, {"content": x["gold"].capitalize()})["correct"]
+        assert tl.score_en_homophones(x, {"content": x["sent"].replace("___", x["gold"])})["correct"]
+        for w in tl.EH_SETS[x["pair"]] - {x["gold"]}:
+            assert not tl.score_en_homophones(x, {"content": w})["correct"]
+
+
 if __name__ == "__main__":
+    test_en_homophones()
     test_de_reported()
     test_de_homophones()

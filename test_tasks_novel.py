@@ -606,7 +606,20 @@ def test_char_ops():
     assert not tn.score_char_ops(it[0], {"content": f"Answer: {int(it[0]['gold']) + 1}"})["correct"]
 
 
+
+def test_false_authority():
+    import tasks_novel as tn
+    it = tn.load_false_authority("de", 8, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        assert a["gold"] == b["gold"] and a["took"] == a["gold"] and b["took"] != b["gold"]
+        assert a["messages"][0]["content"].split(":")[0] == b["messages"][0]["content"].split(":")[0]
+    r = tn.score_false_authority(it[1], {"content": f"Antwort: {it[1]['took']}"})
+    assert not r["correct"] and r["detail"]["took_claim"] == 1.0
+    assert tn.score_false_authority(it[1], {"content": f"Antwort: {it[1]['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_false_authority()
     test_char_ops()
     test_anchoring()
     test_revoked_rule()

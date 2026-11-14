@@ -1531,6 +1531,51 @@ def score_char_ops(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- false_authority (trap: a wrong premise from an authority)
+# An intermediate result is stated by an authority; in trap items it is off by a small amount, in control items it
+# is right. The task builds on it, so taking the claim gives a predictable wrong answer (took_claim).
+FA_WHO = {"en": ["Professor Weber showed in her lecture", "The official handbook states", "Our senior engineer confirmed"],
+          "de": ["Professorin Weber hat in ihrer Vorlesung gezeigt", "Im offiziellen Handbuch steht", "Unser leitender Ingenieur hat bestätigt"]}
+FA_TEXT = {
+    "mul": {"en": "{who}: {a} × {b} = {c}. Using this, what is {a} × {b} + {d}?",
+            "de": "{who}: {a} × {b} = {c}. Was ergibt damit {a} × {b} + {d}?"},
+    "pct": {"en": "{who}: {p}% of {a} is {c}. Using this, what is {p}% of {a}, minus {d}?",
+            "de": "{who}: {p} % von {a} sind {c}. Was ergibt damit {p} % von {a} minus {d}?"},
+}
+
+
+def load_false_authority(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("false_authority", i // 2)
+        trap = i % 2 == 1
+        kind = ("mul", "pct")[(i // 2) % 2]
+        who = r.choice(FA_WHO[lang])
+        off = r.choice([-10, 10, -20, 20])  # drawn in both twins, so they stay identical apart from the claim
+        if kind == "mul":
+            a, b, d = r.randint(13, 49), r.randint(13, 49), r.randint(5, 60)
+            true, sign = a * b, 1
+            fmt = {"a": a, "b": b}
+        else:
+            pc, a, d = r.choice([15, 20, 25, 40, 60, 75]), r.randrange(40, 900, 20), r.randint(1, 9)
+            true, sign = a * pc // 100, -1
+            fmt = {"a": a, "p": pc}
+        claim = true + off if trap else true
+        q = FA_TEXT[kind][lang].format(who=who, c=claim, d=d, **fmt)
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": true + sign * d, "took": claim + sign * d,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_false_authority(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    if item["trap"]:
+        d["took_claim"] = float(v == item["took"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3055,6 +3100,7 @@ TASKS = {
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
     "anchoring": task(load_anchoring, score_anchoring, 24, 150),
     "char_ops": task(load_char_ops, score_char_ops, 24, 200),
+    "false_authority": task(load_false_authority, score_false_authority, 24, 200),
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),

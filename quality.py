@@ -1165,6 +1165,8 @@ def summarize(run_dir):
                      "secs": round(sum(r["latency_s"] or 0 for r in rs), 1)})  # request-seconds, not wall time
     for row in rows:
         row["extra"].update(cross_lingual(cells, row["task"]))
+        if TASKS.get(row["task"], {}).get("grouped"):
+            row["extra"].update(group_consistency(cells[(row["task"], row["lang"])]))
         base = TASKS.get(row["task"], {}).get("pair_with")
         if base and (base, row["lang"]) in cells:  # the same items in another form: does the verdict survive?
             a = {str(r["id"]): r["correct"] for r in cells[(base, row["lang"])] if not r["error"]}
@@ -1173,6 +1175,19 @@ def summarize(run_dir):
             if both:
                 row["extra"]["xt_correct_agree"] = round(statistics.fmean(a[i] == b[i] for i in both), 4)
     return rows
+
+
+def group_consistency(rs):
+    """Tasks with "grouped": ids "<group>-<k>" ask one fact several ways. `group_agree`: every member of a group got
+    the same verdict; `group_all`: every member right. Only complete groups without errors count."""
+    groups = collections.defaultdict(list)
+    for r in rs:
+        groups[str(r["id"]).rsplit("-", 1)[0]].append(r)
+    full = [g for g in groups.values() if len(g) > 1 and all(not r["error"] and isinstance(r["correct"], bool) for r in g)]
+    if not full:
+        return {}
+    return {"group_agree": round(statistics.fmean(len({r["correct"] for r in g}) == 1 for g in full), 4),
+            "group_all": round(statistics.fmean(all(r["correct"] for r in g) for g in full), 4)}
 
 
 def cross_lingual(cells, task_name):

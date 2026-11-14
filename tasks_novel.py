@@ -1686,6 +1686,55 @@ def score_format_bait(item, reply):
     return {"correct": ok, "score": float(ok), "pred": text[:60], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- rephrase_consistency (trap: same fact, three phrasings)
+# A chain of "older than" facts over five people (shuffled); one pair is asked three ways: "Is X older than Y?",
+# "Is Y younger than X?", "Who is older, X or Y?". Ids "<group>-<form>"; quality.summarize reports group_agree
+# (all three verdicts equal) and group_all (all three right) for tasks with "grouped".
+RC_TEXT = {
+    "en": {"fact": "{a} is older than {b}.", "older": "Is {x} older than {y}? Answer yes or no.",
+           "younger": "Is {y} younger than {x}? Answer yes or no.", "who": "Who is older, {x} or {y}? Answer with the name."},
+    "de": {"fact": "{a} ist älter als {b}.", "older": "Ist {x} älter als {y}? Antworte mit ja oder nein.",
+           "younger": "Ist {y} jünger als {x}? Antworte mit ja oder nein.", "who": "Wer ist älter, {x} oder {y}? Antworte mit dem Namen."},
+}
+RC_FORMS = ("older", "younger", "who")
+
+
+def load_rephrase_consistency(lang, n, seed):
+    items = []
+    for i in range(n or 150):
+        g, form = divmod(i, 3)
+        r = rng_of("rephrase_consistency", g)
+        people = r.sample(NAMES, 5)  # oldest first
+        facts = [RC_TEXT[lang]["fact"].format(a=people[k], b=people[k + 1]) for k in range(4)]
+        r.shuffle(facts)
+        i1, i2 = sorted(r.sample(range(5), 2))
+        while i2 - i1 < 2:  # at least one inference step
+            i1, i2 = sorted(r.sample(range(5), 2))
+        x, y = (people[i1], people[i2]) if r.random() < 0.5 else (people[i2], people[i1])
+        x_older = people.index(x) < people.index(y)
+        f = RC_FORMS[form]
+        gold = (("yes" if lang == "en" else "ja") if x_older else ("no" if lang == "en" else "nein")) if f != "who" \
+            else (x if x_older else y)
+        q = " ".join(facts) + "\n" + RC_TEXT[lang][f].format(x=x, y=y)
+        items.append({"id": f"{g}-{form}", "lang": lang, "form": f, "gold": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_rephrase_consistency(item, reply):
+    line = (final_answer(reply["content"]) or "").strip().lower()
+    words = re.findall(r"[a-zäöüß]+", line)
+    gold = item["gold"].lower()
+    if item["form"] == "who":
+        names = [w for w in words if w.capitalize() in NAMES]
+        ok = names[:1] == [gold]
+    else:
+        yn = [w for w in words if w in ("yes", "no", "ja", "nein")]
+        ok = yn[:1] == [gold]
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
+            "detail": {f"ok_{item['form']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3212,6 +3261,7 @@ TASKS = {
     "char_ops": task(load_char_ops, score_char_ops, 24, 200),
     "false_authority": task(load_false_authority, score_false_authority, 24, 200),
     "near_miss_qa": task(load_near_miss_qa, score_near_miss_qa, 24, 200),
+    "rephrase_consistency": {**task(load_rephrase_consistency, score_rephrase_consistency, 24, 150), "grouped": True},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

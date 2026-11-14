@@ -656,7 +656,26 @@ def test_format_bait():
     assert not sc(b, {"content": f'{{"answer": "{b["gold"]}"}}'})["correct"]
 
 
+
+def test_rephrase_consistency():
+    import tasks_novel as tn
+    import quality
+    it = tn.load_rephrase_consistency("de", 24, 0)
+    assert len(it) == 24 and [x["form"] for x in it[:3]] == list(tn.RC_FORMS)
+    a, b, c = it[:3]
+    assert a["messages"][0]["content"].split("\n")[0] == c["messages"][0]["content"].split("\n")[0]
+    assert (a["gold"] == "ja") == (b["gold"] == "ja")
+    sc = tn.score_rephrase_consistency
+    assert sc(c, {"content": f"Antwort: {c['gold']} ist älter."})["correct"]
+    assert sc(a, {"content": f"Antwort: {a['gold'].capitalize()}, weil ..."})["correct"]
+    rec = lambda i, ok: {"id": i, "error": None, "correct": ok}
+    g = quality.group_consistency([rec("0-0", True), rec("0-1", True), rec("0-2", True),
+                                   rec("1-0", True), rec("1-1", False), rec("1-2", True)])
+    assert g == {"group_agree": 0.5, "group_all": 0.5}, g
+
+
 if __name__ == "__main__":
+    test_rephrase_consistency()
     test_format_bait()
     test_near_miss_qa()
     test_false_authority()

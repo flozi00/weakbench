@@ -1913,6 +1913,44 @@ def score_en_variety(item, reply):
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": [w[idx] for w in item["words"]],
             "detail": {f"ok_{item['variety'].lower()}": float(ok), "other_spelling": float(bool(wrong))}}
 
+# ---------------------------------------------------------------- de_variety (Swiss Standard German: no ß, held throughout)
+# Four sentences about a market, written for Germany or for Switzerland, with four given words that contain ß in
+# Germany. Swiss spelling uses ss everywhere (Strasse, gross); Germany keeps ß after long vowels and diphthongs.
+DV_WORDS = [("Straße", "Strasse"), ("groß", "gross"), ("Fuß", "Fuss"), ("heißen", "heissen"), ("außerdem", "ausserdem"),
+            ("Spaß", "Spass"), ("süß", "süss"), ("Grüße", "Grüsse"), ("weiß", "weiss"), ("draußen", "draussen")]
+
+
+def load_de_variety(lang, n, seed):
+    items = []
+    for i in range(n or 40):
+        r = random.Random(f"de_variety:{i}")
+        swiss = i % 2 == 1
+        words = r.sample(DV_WORDS, 4)
+        shown = [w[0] if swiss else w[1] for w in words]  # the other spelling: copying fails
+        where = "für Leserinnen und Leser in der Schweiz (Schweizer Rechtschreibung)" if swiss else \
+            "für Leserinnen und Leser in Deutschland (deutsche Rechtschreibung)"
+        items.append({"id": str(i), "lang": "de", "swiss": swiss, "words": words,
+                      "messages": [{"role": "user", "content": f"Schreibe vier Sätze über einen Wochenmarkt, {where}. "
+                                    f"Verwende diese Wörter in der passenden Schreibweise (gebeugt ist erlaubt): "
+                                    f"{', '.join(shown)}."}]})
+    return items
+
+
+def score_de_variety(item, reply):
+    text = reply["content"] or ""
+    low = text.lower()
+    idx = 1 if item["swiss"] else 0
+    stem = lambda w: re.escape(w.lower()[:-2] if w.endswith("en") else w.lower()[:-1] if w.endswith("e") else w.lower())  # noqa: E731
+    used = [bool(re.search(r"\b" + stem(w[idx]), low)) for w in item["words"]]
+    if item["swiss"]:
+        wrong = "ß" in text
+    else:
+        wrong = any(re.search(r"\b" + stem(w[1]), low) for w in item["words"])
+    ok = all(used) and not wrong
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": [w[idx] for w in item["words"]],
+            "detail": {"ok_swiss" if item["swiss"] else "ok_germany": float(ok), "other_spelling": float(wrong)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1956,6 +1994,7 @@ TASKS = {
     "wug": task(("de", "en"), load_wug, score_wug, 32, 40, lang_check=False),
     "irony": task(("de", "en"), load_irony, score_irony, 16, 30, lang_check=False),
     "en_variety": task(("en",), load_en_variety, score_en_variety, 512, 20),
+    "de_variety": task(("de",), load_de_variety, score_de_variety, 512, 20),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

@@ -526,7 +526,18 @@ def test_en_variety():
     assert not tl.score_en_variety(br, {"content": good + " The color was nice."})["correct"]
 
 
+def test_de_variety():
+    import tasks_lang as tl
+    it = tl.load_de_variety("de", 2, 0)
+    de, ch = it[0], it[1]
+    assert tl.score_de_variety(de, {"content": " ".join(w[0] for w in de["words"])})["correct"]
+    assert not tl.score_de_variety(de, {"content": " ".join(w[1] for w in de["words"])})["correct"]
+    assert tl.score_de_variety(ch, {"content": " ".join(w[1] for w in ch["words"])})["correct"]
+    assert not tl.score_de_variety(ch, {"content": " ".join(w[1] for w in ch["words"]) + " Fußgänger"})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_variety()
     test_en_variety()
     test_irony()
     test_wug()

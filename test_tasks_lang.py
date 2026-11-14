@@ -593,7 +593,20 @@ def test_tense_order():
             assert "{" not in x["messages"][0]["content"]
 
 
+def test_de_grammar_fix():
+    import tasks_lang as tl
+    it = tl.load_de_grammar_fix("de", 40, 0)
+    assert {x["kind"] for x in it} == {"clean", "agree", "relative", "dass", "separable"}
+    for x in it:
+        assert tl.score_de_grammar_fix(x, {"content": x["gold"]})["correct"]
+        shown = x["messages"][0]["content"].split("\n\n")[1]
+        assert tl.score_de_grammar_fix(x, {"content": shown})["correct"] == (x["kind"] == "clean")
+        for a in x["alts"]:
+            assert tl.score_de_grammar_fix(x, {"content": a})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_grammar_fix()
     test_tense_order()
     test_de_no_anglicisms()
     test_form_writing()

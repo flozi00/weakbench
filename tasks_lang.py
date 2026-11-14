@@ -2163,6 +2163,72 @@ def score_tense_order(item, reply):
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_grammar_fix (correct one grammar error, change nothing else)
+# Clean sentences from the generated grammar tasks (agreement across attractors, relative pronouns, das/dass, separable
+# verbs) with one injected grammar error (wrong verb number, wrong pronoun case, das<->dass, unsplit separable verb),
+# plus clean controls. The model returns the corrected sentence; correct = exactly the clean sentence (words and
+# punctuation; whitespace and quotes ignored). Spelling is spell_fix's job; this is grammar only.
+def gf_sources(r, i):
+    kind = ("agree", "relative", "dass", "separable")[i % 4]
+    if kind == "agree":
+        x = load_agreement_attractor("de", 160, 0)[r.randrange(160)]
+        gold = x["messages"][0]["content"].split("\n\n")[1].replace("___", x["gold"])
+        bad = gold.replace(f" {x['gold']} ", f" {'sind' if x['gold'] == 'ist' else 'ist'} ", 1)
+        # the other valid fix: keep the verb, change the subject's number ("Der Zettel ... ist")
+        sg, pl = next(p for p in AA_SUBJ["de"] if gold.startswith(p[0] + " ") or gold.startswith(p[1] + " "))
+        alt = (sg + bad[len(pl):]) if gold.startswith(pl + " ") else (pl + bad[len(sg):])
+        return kind, gold, bad, [alt]
+    elif kind == "relative":
+        x = load_de_relative("de", None, 0)[r.randrange(32)]
+        gold = x["messages"][0]["content"].split("\n\n")[1].replace("___", x["gold"])
+        wrong = {"der": "den", "den": "dem", "dem": "den", "die": "der", "das": "dem", "denen": "die", "dessen": "deren",
+                 "deren": "dessen"}[x["gold"]]
+        bad = gold.replace(f", {x['gold']} ", f", {wrong} ", 1)
+        return kind, gold, bad, []
+    elif kind == "dass":
+        x = load_de_homophones("de", None, 0)
+        x = [y for y in x if y["pair"] == "das_dass"][r.randrange(len([y for y in x if y["pair"] == "das_dass"]))]
+        gold = x["sent"].replace("___", x["gold"])
+        gold = gold[0].upper() + gold[1:]
+        bad_word = "dass" if x["gold"] == "das" else "das"
+        bad = x["sent"].replace("___", bad_word)
+        bad = bad[0].upper() + bad[1:]
+        return kind, gold, bad, []
+    else:
+        x = [y for y in load_de_separable("de", None, 0) if y["form"] == "main"][r.randrange(8)]
+        gold = x["gold"]
+        w = gold.split()
+        pre = w[-1].rstrip(".")
+        bad = " ".join([w[0] if not w[1][0].islower() else w[0]] + w[1:]).replace(f" {pre}.", ".")
+        fin = next(t for t in gold.split() if t.islower() and t not in ("heute",))
+        bad = bad.replace(f" {fin} ", f" {pre}{fin} ", 1)
+        return kind, gold, bad, []
+
+
+def load_de_grammar_fix(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = random.Random(f"de_grammar_fix:{i}")
+        kind, gold, bad, alts = gf_sources(r, i)
+        clean = (i // 4) % 4 == 0  # a quarter are already correct
+        shown = gold if clean else bad
+        if not clean and bad == gold:
+            raise RuntimeError(f"de_grammar_fix: no error injected into {gold!r}")
+        items.append({"id": str(i), "lang": "de", "kind": "clean" if clean else kind, "gold": gold,
+                      "alts": [] if clean else alts,
+                      "messages": [{"role": "user", "content": "Korrigiere den Grammatikfehler in diesem Satz, falls es "
+                                    "einen gibt, und ändere sonst nichts. Antworte nur mit dem Satz.\n\n" + shown}]})
+    return items
+
+
+def score_de_grammar_fix(item, reply):
+    norm = lambda t: re.sub(r"\s+", " ", t.strip().strip("„“\"*").strip())  # noqa: E731
+    lines = [norm(x) for x in (reply["content"] or "").splitlines() if norm(x)]
+    ok = bool(lines) and norm(re.sub(r"^\w+:\s*", "", lines[-1])) in {norm(g) for g in [item["gold"], *item.get("alts", [])]}
+    return {"correct": ok, "score": float(ok), "pred": (lines[-1] if lines else "")[:80], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2211,6 +2277,7 @@ TASKS = {
     "form_writing": task(("de", "en"), load_form_writing, score_form_writing, 512, 30, lang_check=False),
     "de_no_anglicisms": task(("de",), load_de_no_anglicisms, score_de_no_anglicisms, 512, 12, lang_check=False),
     "tense_order": task(("de", "en"), load_tense_order, score_tense_order, 512, 30),
+    "de_grammar_fix": task(("de",), load_de_grammar_fix, score_de_grammar_fix, 128, 40, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

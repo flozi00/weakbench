@@ -548,6 +548,8 @@ def test_de_relative():
     assert g[("Die Frau", "gen")] == "deren" and g[("Die Nachbarn", "dat")] == "denen" and g[("Der Mann", "acc")] == "den"
     x = it[0]
     assert tl.score_de_relative(x, {"content": x["gold"].capitalize()})["correct"]
+    m = next(y for y in it if y["gold"] == "den")
+    assert tl.score_de_relative(m, {"content": "welchen"})["correct"] and not tl.score_de_relative(m, {"content": "dem"})["correct"]
 
 
 if __name__ == "__main__":

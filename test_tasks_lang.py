@@ -497,6 +497,9 @@ def test_wug():
     for x in de + tl.load_wug("en", 6, 0):
         assert tl.score_wug(x, {"content": x["gold"]})["correct"]
         assert not tl.score_wug(x, {"content": x["gold"] + "x"})["correct"]
+        assert not tl.score_wug(x, {"content": x["gold"] + "x or " + x["gold"]})["correct"]  # a hedge counts the first
+    past = tl.load_wug("en", 3, 0)[1]
+    assert tl.score_wug(past, {"content": past["gold"][:-2] + past["gold"][-3] + "ed"})["correct"]
 
 
 def test_irony():
@@ -506,6 +509,8 @@ def test_irony():
         assert {x["ironic"] for x in it} == {True, False}
         for x in it:
             assert tl.score_irony(x, {"content": x["gold"].capitalize() + "."})["correct"]
+    x = next(x for x in tl.load_irony("de", 10, 0) if x["gold"] == "ernst")
+    assert tl.score_irony(x, {"content": "Nicht ironisch, sondern ernst."})["correct"]
 
 
 if __name__ == "__main__":

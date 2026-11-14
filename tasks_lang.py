@@ -1728,15 +1728,26 @@ WUG_DE_END = ["pf", "ck", "mm", "ll", "nn", "d", "t", "rk", "mp"]
 
 
 def wug_en(r):  # rare onsets keep real words out ("snap", "trok")
-    return r.choice(["spl", "thr", "scr", "gl", "dw", "skw"]) + r.choice(["u", "e", "o"]) + r.choice(WUG_EN_END)
+    while True:
+        w = r.choice(["spl", "thr", "scr", "gl", "dw", "skw"]) + r.choice(["u", "e", "o"]) + r.choice(WUG_EN_END)
+        if not any(w.startswith(x) for x in WUG_REAL):
+            return w
 
 
 def en_suffix(w):
     return w + ("es" if w.endswith(("s", "x", "z", "ch", "sh")) else "s")
 
 
-def de_stem(r):  # rare onsets and umlauts keep real words out ("trocken")
-    return r.choice(["pfl", "schn", "kn", "spr", "gl", "schw"]) + r.choice(["ü", "ö", "au", "ei"]) + r.choice(WUG_DE_END)
+WUG_REAL = {"glück", "knüll", "gleit", "schneit", "spreit", "schnöd", "glen", "glum", "glop", "dwoch", "glos"}
+
+
+def de_stem(r):  # rare onsets keep real words out; doubled consonants only after a short vowel
+    while True:
+        v = r.choice(["ü", "ö", "au", "ei", "a", "u"])
+        end = r.choice(WUG_DE_END if v in ("ü", "ö", "a", "u") else ["pf", "d", "t", "rk", "mp", "f", "g", "l"])
+        st = r.choice(["pfl", "schn", "kn", "spr", "gl", "schw"]) + v + end
+        if not any(st.startswith(w) for w in WUG_REAL):
+            return st
 
 
 def load_wug(lang, n, seed):
@@ -1768,14 +1779,21 @@ def load_wug(lang, n, seed):
                 inf, gold, frame = pre + st + "en", pre + st + ("et" if dt else "t"), "Gestern hat sie den Brief ___."
             q = (f"Das ausgedachte Verb „{inf}“ ist ein regelmäßiges (schwaches) Verb. Setze die richtige Form ein und "
                  f"antworte nur mit diesem Wort.\n\n{frame}")
-        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+        alts = {gold}
+        if lang == "en" and kind == "past":
+            alts.add(gold[:-2] + gold[-3] + "ed")  # thrushetted (British doubling)
+        if lang == "en" and kind != "past" and gold.endswith(("ses", "zes")) and gold[-4] in "aeiou":
+            alts.add(gold[:-2] + gold[-3] + "es")  # quizzes, busses
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold, "alts": sorted(alts),
                       "messages": [{"role": "user", "content": q}]})
     return items
 
 
 def score_wug(item, reply):
     words = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
-    ok = item["gold"] in words[:3] or words[-1:] == [item["gold"]]
+    stem = item["gold"][:4]
+    cand = [w for w in words if stem in w]  # the first form of the nonce word; a hedge "x or y" counts the first
+    ok = bool(cand) and cand[0] in item.get("alts", [item["gold"]])
     return {"correct": ok, "score": float(ok), "pred": " ".join(words[:3]), "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
@@ -1794,30 +1812,40 @@ IR_EVENTS = {"en": [("the train is on time for once", "the train is late again")
                     ("der Drucker hat alles gedruckt", "der Drucker hat sich auf Seite eins verklemmt"),
                     ("zum Picknick hat der Regen aufgehört", "zum Picknick fing es an zu schütten")]}
 IR_PRAISE = {"en": ["Great, {e}.", "Wonderful, {e}. Just what I needed.", "Oh perfect, {e}."],
-             "de": ["Na super, {e}.", "Wunderbar, {e}. Genau das, was ich gebraucht habe.", "Oh perfekt, {e}."]}
+             "de": ["Super, {e}.", "Wunderbar, {e}. Genau das, was ich gebraucht habe.", "Toll, {e}."]}  # not "Na super": sarcastic by default
 # harder: the identical remark, only the context before it decides (wanted vs dreaded)
 IR_CONTEXT = {"en": [("My garden is completely dried out.", "We planned the picnic for weeks.", "Great, it's raining."),
-                     ("I really need a quiet weekend at home.", "I was so looking forward to the concert tonight.",
-                      "Wonderful, the concert got cancelled."),
-                     ("I have been trying to sell that old car for months.", "I loved that old car.",
-                      "Oh perfect, someone took the car away."),
-                     ("I wanted an excuse to leave the meeting early.", "I had to finish my talk in that meeting.",
-                      "Great, the fire alarm went off in the middle of the meeting.")],
+                     ("I really didn't want to go to that concert my colleague booked.",
+                      "I was so looking forward to the concert tonight.", "Wonderful, the concert got cancelled."),
+                     ("I have been trying to sell that old car for months.", "I loved that old car and never wanted to sell it.",
+                      "Oh perfect, my partner sold the car today."),
+                     ("I dreaded presenting in today's meeting.", "I prepared my talk for today's meeting all week.",
+                      "Great, the meeting got cancelled."),
+                     ("My kids begged for a snow day.", "I have to drive two hours to the airport this morning.",
+                      "Wonderful, it snowed half a metre overnight."),
+                     ("I wanted the house to myself tonight.", "I cooked dinner for six people tonight.",
+                      "Great, my guests just cancelled.")],
               "de": [("Mein Garten ist völlig ausgetrocknet.", "Wir haben das Picknick seit Wochen geplant.",
-                      "Na super, es regnet."),
-                     ("Ich brauche dringend ein ruhiges Wochenende zu Hause.", "Ich habe mich so auf das Konzert heute "
-                      "Abend gefreut.", "Wunderbar, das Konzert wurde abgesagt."),
-                     ("Ich versuche seit Monaten, das alte Auto loszuwerden.", "Ich habe das alte Auto geliebt.",
-                      "Oh perfekt, jemand hat das Auto mitgenommen."),
-                     ("Ich wollte einen Grund, das Meeting früher zu verlassen.", "Ich musste in dem Meeting noch meinen "
-                      "Vortrag halten.", "Na super, mitten im Meeting ging der Feueralarm los.")]}
+                      "Super, es regnet."),
+                     ("Ich wollte überhaupt nicht auf das Konzert, das mein Kollege gebucht hat.",
+                      "Ich habe mich so auf das Konzert heute Abend gefreut.", "Wunderbar, das Konzert wurde abgesagt."),
+                     ("Ich versuche seit Monaten, das alte Auto zu verkaufen.", "Ich habe das alte Auto geliebt und wollte "
+                      "es nie verkaufen.", "Toll, mein Partner hat heute das Auto verkauft."),
+                     ("Mir graute vor meinem Vortrag im heutigen Meeting.", "Ich habe die ganze Woche meinen Vortrag für "
+                      "das heutige Meeting vorbereitet.", "Super, das Meeting wurde abgesagt."),
+                     ("Meine Kinder haben sich so einen schneefreien Schultag gewünscht.", "Ich muss heute früh zwei Stunden "
+                      "zum Flughafen fahren.", "Wunderbar, über Nacht kam ein halber Meter Schnee."),
+                     ("Ich wollte heute Abend die Wohnung für mich haben.", "Ich habe heute Abend für sechs Leute gekocht.",
+                      "Toll, meine Gäste haben gerade abgesagt.")]}
 IR_ASK = {"en": "Is the speaker being ironic or sincere? Answer with one word: ironic or sincere.",
           "de": "Meint die Person das ironisch oder ernst? Antworte mit einem Wort: ironisch oder ernst."}
 
 
 def load_irony(lang, n, seed):
-    items = []
-    for i in range(n or 60):
+    items, seen = [], set()
+    for i in range(400):  # distinct prompts only
+        if len(items) == (n or 60):
+            break
         r = random.Random(f"irony:{i}")
         ironic = i % 2 == 1
         kind = ("event", "context")[(i // 2) % 2]
@@ -1828,15 +1856,21 @@ def load_irony(lang, n, seed):
             wanted, dreaded, said = r.choice(IR_CONTEXT[lang])
             remark = (dreaded if ironic else wanted) + " " + said
         gold = ("ironic" if ironic else "sincere") if lang == "en" else ("ironisch" if ironic else "ernst")
+        if remark in seen:
+            continue
+        seen.add(remark)
         items.append({"id": str(i), "lang": lang, "ironic": ironic, "kind": kind, "gold": gold,
                       "messages": [{"role": "user", "content": f"„{remark}“\n\n{IR_ASK[lang]}"}]})
     return items
 
 
 def score_irony(item, reply):
-    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
-         if x in ("ironic", "sincere", "ironisch", "ernst", "ernstgemeint", "aufrichtig")]
-    pred = {"ernstgemeint": "ernst", "aufrichtig": "ernst"}.get(w[0], w[0]) if w else None
+    syn = {"ironic": "ironic", "sarcastic": "ironic", "sincere": "sincere", "genuine": "sincere", "ironisch": "ironisch",
+           "sarkastisch": "ironisch", "ernst": "ernst", "ernstgemeint": "ernst", "ernsthaft": "ernst", "aufrichtig": "ernst"}
+    toks = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    # the first keyword not negated right before it ("nicht ironisch, sondern ernst")
+    w = [syn[x] for j, x in enumerate(toks) if x in syn and (j == 0 or toks[j - 1] not in ("not", "nicht", "kein", "no"))]
+    pred = w[0] if w else None
     ok = pred == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
             "detail": {"ok_ironic" if item["ironic"] else "ok_sincere": float(ok), f"ok_{item.get('kind', 'event')}": float(ok)}}

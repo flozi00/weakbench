@@ -755,16 +755,21 @@ def score_constrained_plan(item, reply):
 # small talk; turn 5 asks for a recommendation that depends on all of them, without repeating them. The judge gets
 # the facts and checks each one is respected, plus that the model does not ask for something already said.
 MD_FACTS = {
-    "age": {"en": ["My daughter turns {v} next week, by the way.", "fits a child of {v}"],
-            "de": ["Meine Tochter wird übrigens nächste Woche {v}.", "passt zu einem Kind von {v} Jahren"], "v": [4, 7, 10, 13]},
-    "allergy": {"en": ["Ugh, she reacted to {v} again yesterday, we have to be so careful.", "contains no {v}"],
-                "de": ["Gestern hat sie wieder auf {v} reagiert, wir müssen so aufpassen.", "enthält keine {v}"],
+    "age": {"en": ["My daughter turns {v} next week, by the way.", "Every idea fits a child of {v}."],
+            "de": ["Meine Tochter wird übrigens nächste Woche {v}.", "Jede Idee passt zu einem {v}-jährigen Kind."],
+            "v": [4, 7, 10, 13]},
+    "allergy": {"en": ["Ugh, my daughter reacted to {v} again yesterday, we have to be so careful.",
+                       "No cake idea (and no edible gift) contains {v}."],
+                "de": ["Gestern hat meine Tochter wieder auf {v} reagiert, wir müssen so aufpassen.",
+                       "Keine Kuchenidee (und kein essbares Geschenk) enthält {v}."],
                 "v": {"en": ["peanuts", "milk", "eggs"], "de": ["Erdnüsse", "Milch", "Eier"]}},
-    "budget": {"en": ["Money is tight this month, I can spend {v} euros at most.", "costs at most {v} euros"],
-               "de": ["Das Geld ist diesen Monat knapp, ich kann höchstens {v} Euro ausgeben.", "kostet höchstens {v} Euro"],
+    "budget": {"en": ["Money is tight this month, I can spend {v} euros at most on the gift.",
+                      "Each gift idea plausibly costs at most {v} euros (prices need not be stated)."],
+               "de": ["Das Geld ist diesen Monat knapp, ich kann höchstens {v} Euro für das Geschenk ausgeben.",
+                      "Jede Geschenkidee kostet plausibel höchstens {v} Euro (Preise müssen nicht genannt sein)."],
                "v": [15, 25, 40]},
-    "dislike": {"en": ["She finds anything with {v} boring.", "is not about {v}"],
-                "de": ["Alles mit {v} findet sie langweilig.", "hat nichts mit {v} zu tun"],
+    "dislike": {"en": ["My daughter finds anything with {v} boring.", "No idea is about {v}."],
+                "de": ["Alles mit {v} findet meine Tochter langweilig.", "Keine Idee hat mit {v} zu tun."],
                 "v": {"en": ["horses", "princesses", "dinosaurs"], "de": ["Pferden", "Prinzessinnen", "Dinosauriern"]}},
 }
 MD_SMALL = {"en": ["The weather has been awful all week.", "Work is crazy at the moment.", "We finally fixed the car."],
@@ -772,7 +777,8 @@ MD_SMALL = {"en": ["The weather has been awful all week.", "Work is crazy at the
                    "Wir haben endlich das Auto repariert."]}
 MD_ASK = {"en": "Okay, so: what should I give her for her birthday, and what cake should I bake? Two concrete ideas each.",
           "de": "Also: Was soll ich ihr zum Geburtstag schenken, und was für einen Kuchen soll ich backen? Je zwei konkrete Ideen."}
-MD_JUDGE = """Evaluate the FINAL reply in this chat. Facts the user gave earlier: {facts}.
+MD_JUDGE = """Evaluate only the FINAL reply in this chat. Facts the user gave earlier: {facts}. A clarifying question
+about something the user has NOT said yet is fine.
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 
 CONVERSATION:
@@ -795,8 +801,7 @@ def load_memory_dialog(lang, n, seed):
         small = list(MD_SMALL[lang])
         r.shuffle(said)
         turns = [said[0] + " " + small[0], small[1] + " " + said[1], said[2] + " " + said[3], small[2], MD_ASK[lang]]
-        crit = [("Every idea " if lang == "en" else "Jede Idee ") + MD_FACTS[k][lang][1].format(v=v) + "."
-                for k, v in facts.items()]
+        crit = [MD_FACTS[k][lang][1].format(v=v) for k, v in facts.items()]
         crit.append("It does not ask again for information the user already gave." if lang == "en" else
                     "Sie fragt nicht erneut nach Informationen, die schon genannt wurden.")
         chat = [[{"role": "user", "content": turns[0]}]] + [[{"role": "user", "content": t}] for t in turns[1:]]

@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, ".")
 REPLIES = ["Answer: yes", "Answer: no", "Antwort: ja", "Antwort: nein", "Answer: A", "Answer: B", "Answer: C", "Answer: D",
            "Answer: 0", "Answer: 1", "Answer: cannot be determined", "Antwort: nicht bestimmbar", "Answer: ambiguous",
-           "Antwort: mehrdeutig", "die", "das", "der", "is", "are", "ist", "sind", "dass", "das", "seit", "seid"]
+           "Antwort: mehrdeutig", "die", "das", "der", "is", "are", "ist", "sind", "dass", "das", "seit", "seid", "ironic", "sincere", "ironisch", "ernst"]
 tasks = sys.argv[1].split(",") if len(sys.argv) > 1 else [n for m in ("tasks_novel", "tasks_lang") for n in importlib.import_module(m).TASKS]
 mods = [importlib.import_module(m) for m in ("tasks_novel", "tasks_lang")]
 for name in tasks:

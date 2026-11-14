@@ -127,3 +127,22 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `chart_read` | opt-in, vision: generated PNGs — a bar chart with unlabeled gridlines every 10 units (read one bar's value, or name the second-tallest bar by colour), or two coloured squares (left/right + above/below) | de, en | 60 / 120 | on | exact number / colour / relation; `ok_value`, `ok_rank`, `ok_rel` |
 | `mmmu_pro` † | MMMU/MMMU_Pro `standard (10 options)`: 1,730 real exam questions, 30 disciplines, 1-7 images each | en | 150 / 1730 | on | letter A–J (4-option items A–D) |
 | `drift` | Wikipedia DE/EN + HumanEval+ code, `prompt_logprobs` top-20 | de, en, code | 8 / 32 docs | – | KL, top-1 agreement, perplexity ratio (compare.py) |
+| `puzzle_mutation` | own: 8 famous riddles, original vs one detail changed (private set) | de, en | 16 / 16 | auto | regex on the answer line; `ok_original` / `ok_mutated` |
+| `lookalike` | generated: four firms, the asked one has a near-twin name in trap items | de, en | 24 / 200 | auto | number; `ok_control` / `ok_lookalike`, `took_twin` |
+| `revoked_rule` | generated dialogue: a sign-off word replaced mid-dialogue (trap) or kept | de, en | 24 / 120 | off | last word; `took_old` |
+| `anchoring` | generated: rough product estimate with / without a colleague's 2-4x-off guess | de, en | 24 / 150 | auto | within 25 %; `pull` toward the anchor |
+| `char_ops` | generated: count / reverse / n-th letter / words-with-letter over invented words | de, en | 24 / 200 | auto | exact; `ok_<kind>` |
+| `false_authority` | generated: an authority states an intermediate result off by 10-20 | de, en | 24 / 200 | auto | number; `took_claim` |
+| `near_miss_qa` | generated key-figure list, the asked cell missing but its neighbours stated | de, en | 24 / 200 | auto | abstain vs value; `guessed` |
+| `format_bait` | generated: JSON-only system prompt, chatty user turn in trap items | de, en | 24 / 150 | off | the whole reply is `{"answer": n}`; `json_only` |
+| `rephrase_consistency` | generated: one "older than" inference asked three ways (grouped) | de, en | 24 / 150 | auto | `group_agree` / `group_all` / `group_all_of_any` |
+| `reversal` | generated: invented mentor facts asked forward vs backward | de, en | 24 / 200 | auto | name; `ok_forward` / `ok_backward` |
+| `off_by_one` | generated: inclusive pages, strictly between, fence posts, hotel nights, `range()` | de, en | 25 / 200 | auto | number; `off_by_one` |
+| `mixed_units` | generated: three quantities, one in the other unit (cm/m, min/h, g/kg) | de, en | 24 / 150 | auto | value; `naive_sum` |
+| `double_negation` | generated: membership statements under 0-3 negations | de, en | 24 / 200 | auto | yes/no; `ok_neg0..3` |
+| `false_premise` | generated: "in which year did X resign?" when X never resigned | de, en | 24 / 200 | auto | reject vs year; `took_premise` |
+| `option_order` | generated: one divisibility question, right option at A-D (grouped) | de, en | 24 / 200 | auto | letter; `ok_pos*`, `chose_*`, `group_agree` |
+| `source_trust` | generated: a wrong majority vs the calibrated lab measurement | de, en | 24 / 200 | auto | number; `took_majority` |
+| `switched_question` | generated: a preamble builds up to the total, the last sentence asks another question | de, en | 24 / 200 | auto | number; `took_total` |
+| `de_commas` | generated German sentences without commas (weil/obwohl/wenn, dass, relative, um ... zu, none) | de | 60 / 240 | off | exact comma positions over unchanged words |
+| `tutor_feedback` ** | generated: a student's 3-step solution with one planted slip; feedback judged against ground truth | de, en | 30 / 120 | off | 5 criteria; `found_step` |

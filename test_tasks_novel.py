@@ -1078,6 +1078,8 @@ def test_maze_path():
     assert sum(x["gold"] == "none" for x in it) == 5
     for x in it:
         assert tn.score_maze_path(x, {"content": f"Antwort: {'keine' if x['gold'] == 'none' else x['gold']}"})["correct"]
+        if x["gold"] == "none":
+            assert tn.score_maze_path(x, {"content": "Antwort: Es gibt keinen Weg (0 Schritte)."})["correct"]
 
 
 if __name__ == "__main__":

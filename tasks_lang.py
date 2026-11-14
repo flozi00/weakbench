@@ -2371,16 +2371,16 @@ def load_time_prep(lang, n, seed):
         r = random.Random(f"time_prep:{i}")
         gold, gen = table[i % len(table)]
         sent = TP_FRAME[lang].format(t=gen(r))
-        ask = ("Fill the gap with one preposition. Answer with that word only.\n\n" if lang == "en" else
-               "Setze eine Präposition (gegebenenfalls mit Artikel verschmolzen) in die Lücke ein. Antworte nur mit dem "
-               "Wort.\n\n")
+        ask = ("Fill the gap with at, on or in. Answer with that word only.\n\n" if lang == "en" else
+               "Setze um, am, im oder in in die Lücke ein. Antworte nur mit dem Wort.\n\n")  # closed choice: one answer
         items.append({"id": str(i), "lang": lang, "gold": gold, "kind": i % len(table),
                       "messages": [{"role": "user", "content": ask + sent}]})
     return items
 
 
 def score_time_prep(item, reply):
-    w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    opts = ("at", "on", "in") if item["lang"] == "en" else ("um", "am", "im", "in")
+    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower()) if x in opts]
     ok = w[:1] == [item["gold"]] or (item["gold"] == "at" and item["kind"] == 7 and w[:1] == ["on"])  # on the weekend (US)
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
 

@@ -3481,7 +3481,7 @@ def load_maze_path(lang, n, seed):
     while len(items) < (n or 120):
         i += 1
         r = rng_of("maze_path", i)
-        size = 6 + i % 4
+        size = 6 + len(items) % 4  # by item, so rejected draws do not skew the size mix
         g = [["#" if r.random() < 0.3 else "." for _ in range(size)] for _ in range(size)]
         cells = [(y, x) for y in range(size) for x in range(size) if g[y][x] == "."]
         if len(cells) < 2:
@@ -3505,10 +3505,11 @@ def load_maze_path(lang, n, seed):
 def score_maze_path(item, reply):
     line = (final_answer(reply["content"]) or "").lower()
     if item["gold"] == "none":
-        ok = bool(re.search(r"\b(none|no path|unreachable|keine|nicht erreichbar|unmöglich|impossible)\b", line)) and not re.search(r"\d", line)
-    else:
-        m = re.search(r"\d+", line)
-        ok = bool(m) and int(m.group()) == item["gold"]
+        ok = bool(re.search(r"\b(none|no (path|route|way)|unreachable|not reachable|keinen?|kein weg|nicht erreichbar|"
+                            r"unerreichbar|nicht möglich|unmöglich|impossible)\b", line)) and not re.search(r"[1-9]", line)
+    else:  # the last number: "5x5 grid, 7 steps"
+        m = re.findall(r"\d+", line)
+        ok = bool(m) and int(m[-1]) == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": item["gold"],
             "detail": {f"ok_size{item['size']}": float(ok), "ok_none" if item["gold"] == "none" else "ok_path": float(ok)}}
 

@@ -651,6 +651,8 @@ def test_time_prep():
         it = tl.load_time_prep(lang, 16, 0)
         for x in it:
             assert tl.score_time_prep(x, {"content": x["gold"]})["correct"]
+    x = tl.load_time_prep("en", 1, 0)[0]
+    assert tl.score_time_prep(x, {"content": "Answer: at"})["correct"]
     we = tl.load_time_prep("en", 8, 0)[7]
     assert tl.score_time_prep(we, {"content": "on"})["correct"]
 

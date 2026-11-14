@@ -2350,6 +2350,41 @@ def score_revise_on_feedback(item, reply):
                        **{f"ok_{c}": float(v) for c, v in applied.items()}}}
 
 
+# ---------------------------------------------------------------- time_prep (prepositions of time)
+# A gap before a generated time expression: EN at/on/in (at 5 pm, on Monday, in May, in 2019, on 3 May, at night,
+# in the morning), DE um/am/im/in (um 5 Uhr, am Montag, im Mai, im Jahr 2019 / 2019, am 3. Mai, in der Nacht).
+TP_EN = [("at", lambda r: f"{r.randint(1, 12)} pm"), ("on", lambda r: r.choice(["Monday", "Friday", "Sunday"])),
+         ("in", lambda r: r.choice(["May", "October", "March"])), ("in", lambda r: str(r.randint(1990, 2023))),
+         ("on", lambda r: f"{r.randint(2, 28)} {r.choice(['May', 'June', 'July'])}"), ("at", lambda r: "night"),
+         ("in", lambda r: r.choice(["the morning", "the evening"])), ("at", lambda r: "the weekend")]
+TP_DE = [("um", lambda r: f"{r.randint(1, 12)} Uhr"), ("am", lambda r: r.choice(["Montag", "Freitag", "Sonntag"])),
+         ("im", lambda r: r.choice(["Mai", "Oktober", "März"])), ("im", lambda r: f"Jahr {r.randint(1990, 2023)}"),
+         ("am", lambda r: f"{r.randint(2, 28)}. {r.choice(['Mai', 'Juni', 'Juli'])}"), ("in", lambda r: "der Nacht"),
+         ("am", lambda r: r.choice(["Morgen", "Abend"])), ("am", lambda r: "Wochenende")]
+TP_FRAME = {"en": "The meeting with Clara takes place ___ {t}.", "de": "Das Treffen mit Clara findet ___ {t} statt."}
+
+
+def load_time_prep(lang, n, seed):
+    items = []
+    table = TP_EN if lang == "en" else TP_DE
+    for i in range(n or 80):
+        r = random.Random(f"time_prep:{i}")
+        gold, gen = table[i % len(table)]
+        sent = TP_FRAME[lang].format(t=gen(r))
+        ask = ("Fill the gap with one preposition. Answer with that word only.\n\n" if lang == "en" else
+               "Setze eine Präposition (gegebenenfalls mit Artikel verschmolzen) in die Lücke ein. Antworte nur mit dem "
+               "Wort.\n\n")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "kind": i % len(table),
+                      "messages": [{"role": "user", "content": ask + sent}]})
+    return items
+
+
+def score_time_prep(item, reply):
+    w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    ok = w[:1] == [item["gold"]] or (item["gold"] == "at" and item["kind"] == 7 and w[:1] == ["on"])  # on the weekend (US)
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2401,6 +2436,7 @@ TASKS = {
     "de_grammar_fix": task(("de",), load_de_grammar_fix, score_de_grammar_fix, 128, 40, lang_check=False),
     "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
+    "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

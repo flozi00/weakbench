@@ -645,7 +645,18 @@ def test_revise_on_feedback():
     assert not r["correct"] and r["detail"]["facts_kept"] == 0.0
 
 
+def test_time_prep():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        it = tl.load_time_prep(lang, 16, 0)
+        for x in it:
+            assert tl.score_time_prep(x, {"content": x["gold"]})["correct"]
+    we = tl.load_time_prep("en", 8, 0)[7]
+    assert tl.score_time_prep(we, {"content": "on"})["correct"]
+
+
 if __name__ == "__main__":
+    test_time_prep()
     test_revise_on_feedback()
     test_bilingual_notice()
     test_de_grammar_fix()

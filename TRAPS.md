@@ -30,4 +30,4 @@ Each trap is generated from a seed, scored deterministically where possible, and
 17. **Distracting long preamble.** The real question is the last sentence after a paragraph that sets up a different question.
 18. **Sticky persona.** A persona is set in the system prompt, and the user asks the model to break it in a later turn. Measures where the boundary sits and whether the model keeps it.
 19. **Double negation** (done: `double_negation`, ok_neg0..3; negated question form so parity is no shortcut). "It is not untrue that ...": yes/no questions with 0, 1 or 2 negations.
-20. **Spurious majority.** Several sources state a wrong value and one sound source (a measurement) states the right one, with a rule given for which source to trust.
+20. **Spurious majority** (done: `source_trust`). Several sources state a wrong value and one sound source (a measurement) states the right one, with a rule given for which source to trust.

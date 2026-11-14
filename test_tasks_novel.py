@@ -753,7 +753,19 @@ def test_option_order():
     assert tn.score_option_order(it[2], {"content": "Antwort: **C**"})["correct"]
 
 
+
+def test_source_trust():
+    import tasks_novel as tn
+    it = tn.load_source_trust("en", 4, 0)
+    a, b = it[0], it[1]
+    assert a["gold"] == b["gold"] and b["messages"][0]["content"].count(f": {b['majority']} g.") == 3
+    r = tn.score_source_trust(b, {"content": f"Answer: {b['majority']} g"})
+    assert not r["correct"] and r["detail"]["took_majority"] == 1.0
+    assert tn.score_source_trust(b, {"content": f"Answer: {b['gold']} g (lab)"})["correct"]
+
+
 if __name__ == "__main__":
+    test_source_trust()
     test_option_order()
     test_false_premise()
     test_double_negation()

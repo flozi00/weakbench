@@ -2015,6 +2015,47 @@ def score_option_order(item, reply):
             "detail": {f"ok_pos{item['gold']}": float(ok), **({f"chose_{pred}": 1.0} if pred else {})}}
 
 
+# ---------------------------------------------------------------- source_trust (trap: a wrong majority vs the trusted source)
+# A rule says which source counts (the calibrated lab measurement). Four sources report a device's weight; in trap
+# items three blogs agree on a wrong value, in control items they agree with the lab. took_majority = the blogs' value.
+ST_TEXT = {
+    "en": {"rule": "Rule: if sources disagree, only the calibrated lab measurement counts.",
+           "lab": "Calibrated lab measurement: {v} g.", "blog": "{who}: {v} g.",
+           "who": ["Tech blog", "Online shop listing", "Forum post", "Review video"],
+           "q": "How much does the device weigh, in grams?"},
+    "de": {"rule": "Regel: Wenn Quellen sich widersprechen, zählt nur die kalibrierte Labormessung.",
+           "lab": "Kalibrierte Labormessung: {v} g.", "blog": "{who}: {v} g.",
+           "who": ["Technikblog", "Angebot im Onlineshop", "Forumsbeitrag", "Testvideo"],
+           "q": "Wie viel wiegt das Gerät in Gramm?"},
+}
+
+
+def load_source_trust(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("source_trust", i // 2)
+        trap = i % 2 == 1
+        T = ST_TEXT[lang]
+        true = r.randint(120, 950)
+        wrong = true + r.choice([-1, 1]) * r.randint(15, 80)
+        who = r.sample(T["who"], 3)
+        srcs = [T["blog"].format(who=w, v=wrong if trap else true) for w in who]
+        srcs.insert(r.randrange(4), T["lab"].format(v=true))
+        q = T["rule"] + "\n" + "\n".join(srcs) + "\n" + T["q"]
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": true, "majority": wrong,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_source_trust(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    if item["trap"]:
+        d["took_majority"] = float(v == item["majority"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3548,6 +3589,7 @@ TASKS = {
     "double_negation": task(load_double_negation, score_double_negation, 24, 200),
     "false_premise": task(load_false_premise, score_false_premise, 24, 200),
     "option_order": {**task(load_option_order, score_option_order, 24, 200), "grouped": True},
+    "source_trust": task(load_source_trust, score_source_trust, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

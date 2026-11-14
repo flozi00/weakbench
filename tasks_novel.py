@@ -2551,10 +2551,11 @@ def score_nesting_depth(item, reply):
 # left-right, mirror top-bottom), then: what is row k? Per number-of-operations sub-metric.
 GT_OPS = {"cw": lambda g: [list(r) for r in zip(*g[::-1])], "ccw": lambda g: [list(r) for r in zip(*g)][::-1],
           "lr": lambda g: [r[::-1] for r in g], "tb": lambda g: g[::-1]}
-GT_NAME = {"en": {"cw": "rotate 90° clockwise", "ccw": "rotate 90° counter-clockwise", "lr": "mirror left-right",
-                  "tb": "mirror top-bottom"},
+GT_NAME = {"en": {"cw": "rotate 90° clockwise", "ccw": "rotate 90° counter-clockwise", "lr": "mirror left-right (swap left and right)",
+                  "tb": "mirror top-bottom (swap top and bottom)"},
            "de": {"cw": "um 90° im Uhrzeigersinn drehen", "ccw": "um 90° gegen den Uhrzeigersinn drehen",
-                  "lr": "links-rechts spiegeln", "tb": "oben-unten spiegeln"}}
+                  "lr": "links-rechts spiegeln (links und rechts vertauschen)",
+                  "tb": "oben-unten spiegeln (oben und unten vertauschen)"}}
 
 
 def load_grid_transform(lang, n, seed):
@@ -2564,10 +2565,15 @@ def load_grid_transform(lang, n, seed):
         size = 3 if i % 2 == 0 else 4
         letters = r.sample("ABCDEFGHJKLMNPQRSTUVWXYZ", size * size)
         g = [letters[k * size:(k + 1) * size] for k in range(size)]
-        ops = [r.choice(list(GT_OPS)) for _ in range(1 + (i // 2) % 3)]
-        out = g
-        for o in ops:
-            out = GT_OPS[o](out)
+        nops = 1 + (i // 2) % 3
+        while True:  # no sequence that collapses: every step yields a grid not seen before
+            ops = [r.choice(list(GT_OPS)) for _ in range(nops)]
+            states, out = [g], g
+            for o in ops:
+                out = GT_OPS[o](out)
+                states.append(out)
+            if len({str(x) for x in states}) == len(states):
+                break
         k = r.randrange(size)
         grid = "\n".join(" ".join(row) for row in g)
         steps = ", ".join(GT_NAME[lang][o] for o in ops)
@@ -2575,14 +2581,17 @@ def load_grid_transform(lang, n, seed):
              "the letters left to right." if lang == "en" else
              f"Raster:\n{grid}\n\nWende nacheinander an: {steps}. Wie lautet danach Zeile {k + 1} (von oben)? Antworte "
              "mit den Buchstaben von links nach rechts.")
-        items.append({"id": str(i), "lang": lang, "ops": len(ops), "gold": "".join(out[k]),
+        items.append({"id": str(i), "lang": lang, "ops": len(ops), "gold": "".join(out[k]), "size": size,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_grid_transform(item, reply):
-    line = final_answer(reply["content"]) or ""
-    got = "".join(re.findall(r"\b[A-Z]\b", line)) or re.sub(r"[^A-Z]", "", line)
+    line = (final_answer(reply["content"]) or "").upper()
+    n = item.get("size", len(item["gold"]))
+    runs = re.findall(r"(?:\b[A-Z]\b[\s,;|>–-]*){%d}" % n, line)  # the last run of n single letters ("I think: C A D")
+    words = re.findall(r"\b[A-Z]{%d}\b" % n, line)
+    got = re.sub(r"[^A-Z]", "", runs[-1]) if runs else (words[-1] if words else "")
     ok = got == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {f"ok_ops{item['ops']}": float(ok)}}
 
@@ -2652,10 +2661,10 @@ def load_blocks_plan(lang, n, seed):
         goal = bp_random_state(r, blocks)
         while bp_canon(goal) == bp_canon(start):
             goal = bp_random_state(r, blocks)
-        q = (f"Blocks world. Now: {bp_desc(start, 'en')}. Goal: {bp_desc(goal, 'en')}. You may move one clear block "
+        q = (f"Blocks world (each stack listed top to bottom). Now: {bp_desc(start, 'en')}. Goal: {bp_desc(goal, 'en')}. You may move one clear block "
              "(nothing on it) at a time onto the table or onto another clear block. Write the plan as lines "
              "\"move X onto Y\" or \"move X onto table\", nothing else." if lang == "en" else
-             f"Klötzchenwelt. Jetzt: {bp_desc(start, 'de')}. Ziel: {bp_desc(goal, 'de')}. Du darfst immer einen freien "
+             f"Klötzchenwelt (jeder Stapel von oben nach unten). Jetzt: {bp_desc(start, 'de')}. Ziel: {bp_desc(goal, 'de')}. Du darfst immer einen freien "
              "Klotz (nichts liegt darauf) auf den Tisch oder auf einen anderen freien Klotz legen. Schreibe den Plan als "
              "Zeilen \"move X onto Y\" oder \"move X onto table\", sonst nichts.")
         items.append({"id": str(i), "lang": lang, "blocks": k, "start": start, "goal": goal,
@@ -2666,17 +2675,28 @@ def load_blocks_plan(lang, n, seed):
 def bp_run(start, text):
     """Simulate the moves; returns (final stacks or None on an illegal move, number of moves)."""
     stacks = [list(s) for s in start]
-    moves = re.findall(r"move\s+([A-G])\s+onto\s+(table|[A-G])", text, re.I)
+    line_re = re.compile(r"^\W*(?:\d+[.)]\s*)?move\s+([A-G])\s+(?:onto|on|to)\s+(?:the\s+)?(table|[A-G])\b\W*$", re.I)
+    runs, cur = [], []
+    for ln in text.splitlines():  # only lines that are a move; the last unbroken run is the plan
+        m = line_re.match(ln.strip())
+        if m:
+            cur.append(m.groups())
+        elif ln.strip():
+            if cur:
+                runs.append(cur)
+            cur = []
+    if cur:
+        runs.append(cur)
+    moves = runs[-1] if runs else []
     for b, t in moves:
         b, t = b.upper(), t.upper()
         src = next((s for s in stacks if s and s[-1] == b), None)
         if src is None:
             return None, len(moves)
         if t == "TABLE":
-            if len(src) == 1:
-                return None, len(moves)  # already on the table: a wasted, ill-formed move
-            src.pop()
-            stacks.append([b])
+            if len(src) > 1:  # already on the table: a no-op that only costs optimality
+                src.pop()
+                stacks.append([b])
         else:
             dst = next((s for s in stacks if s and s[-1] == t), None)
             if dst is None or dst is src:

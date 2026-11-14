@@ -878,7 +878,7 @@ def test_grid_transform():
     it = tn.load_grid_transform("en", 12, 0)
     assert {x["ops"] for x in it} == {1, 2, 3}
     x = it[0]
-    for txt in (x["gold"], " ".join(x["gold"]), ", ".join(x["gold"])):
+    for txt in (x["gold"], " ".join(x["gold"]), ", ".join(x["gold"]), "I think it is " + " ".join(x["gold"]).lower()):
         assert tn.score_grid_transform(x, {"content": "Answer: " + txt})["correct"], txt
 
 
@@ -890,6 +890,8 @@ def test_blocks_plan():
     final, n = tn.bp_run(start, plan)
     assert tn.bp_canon(final) == tn.bp_canon(goal) and n == 2 and tn.bp_optimal(start, goal) == 2
     assert tn.bp_run(start, "move A onto C")[0] is None  # A is covered
+    final, n = tn.bp_run(start, "First I would move A onto B, hm.\nPlan:\n1. Move B onto the table\n2. move B to C\nmove A onto B")
+    assert tn.bp_canon(final) == tn.bp_canon(goal) and n == 3
     it = tn.load_blocks_plan("de", 8, 0)
     for x in it:
         assert x["optimal"] and x["optimal"] >= 1

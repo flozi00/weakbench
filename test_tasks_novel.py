@@ -900,7 +900,20 @@ def test_blocks_plan():
     assert not r["correct"]
 
 
+
+def test_judge_ability():
+    import tasks_novel as tn
+    it = tn.load_judge_ability("en", 16, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        assert a["gold"] != b["gold"]  # the same pair, A/B swapped
+    assert {x["gold"] for x in it} == {"A", "B"} and {x["fluff_wrong"] for x in it} == {True, False}
+    x = it[0]
+    assert tn.score_judge_ability(x, {"content": f"Answer: {x['gold']}"})["correct"]
+    assert tn.score_judge_ability(x, {"content": f"Answer: Solution {x['gold']} is right"})["correct"]
+
+
 if __name__ == "__main__":
+    test_judge_ability()
     test_blocks_plan()
     test_grid_transform()
     test_nesting_depth()

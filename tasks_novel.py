@@ -2715,6 +2715,62 @@ def score_blocks_plan(item, reply):
                        "optimal": float(ok and n == item["optimal"])}}
 
 
+# ---------------------------------------------------------------- judge_ability (the model as a judge: which solution is right?)
+# Two worked solutions to the same generated problem: one correct, one with a single slip carried on to the end, the
+# wrong one sometimes longer and more confident. Each pair is asked twice with A/B swapped ("grouped": a judge that
+# flips with the order is unreliable). `chose_longer` exposes length bias.
+JA_TEXT = {"en": ("A club buys {a} boxes of {b} balls. {c} balls are lost. The rest is split equally among {d} teams. "
+                  "How many balls does each team get?", "Which solution is correct? Answer A or B."),
+           "de": ("Ein Verein kauft {a} Kartons mit je {b} Bällen. {c} Bälle gehen verloren. Der Rest wird gleichmäßig auf "
+                  "{d} Teams verteilt. Wie viele Bälle bekommt jedes Team?", "Welche Lösung ist richtig? Antworte mit A oder B.")}
+JA_FLUFF = {"en": "Let me carefully double-check every step. All steps are verified, so the answer is certainly correct.",
+            "de": "Ich prüfe jeden Schritt sorgfältig nach. Alle Schritte sind geprüft, das Ergebnis ist also sicher richtig."}
+
+
+def ja_solution(a, b, c, d, slip_step, slip, lang, fluff):
+    v1 = a * b + (slip if slip_step == 1 else 0)
+    v2 = v1 - c + (slip if slip_step == 2 else 0)
+    v3 = v2 // d + (slip if slip_step == 3 else 0)
+    div = ":" if lang == "de" else "÷"
+    lines = [f"{a} × {b} = {v1}", f"{v1} − {c} = {v2}", f"{v2} {div} {d} = {v3}",
+             ("Antwort: " if lang == "de" else "Answer: ") + str(v3)]
+    return ("\n".join(lines) + ("\n" + JA_FLUFF[lang] if fluff else "")), v3
+
+
+def load_judge_ability(lang, n, seed):
+    items = []
+    for i in range(n or 160):
+        g, swap = divmod(i, 2)
+        r = rng_of("judge_ability", g)
+        d = r.choice([3, 4, 5, 6])
+        a, b = r.randint(4, 12), r.choice([10, 12, 20, 24])
+        c = (a * b) % d + d * r.randint(1, 3)
+        k = 1 + g % 3
+        slip = d * r.choice([-2, -1, 1, 2]) if k < 3 else r.choice([-1, 1])
+        fluff_wrong = g % 2 == 0  # half the wrong solutions sound extra confident and run longer
+        right, _ = ja_solution(a, b, c, d, 0, 0, lang, not fluff_wrong and r.random() < 0.3)
+        wrong, _ = ja_solution(a, b, c, d, k, slip, lang, fluff_wrong)
+        first_right = (g % 4 < 2) != bool(swap)
+        A, B = (right, wrong) if first_right else (wrong, right)
+        q, ask = JA_TEXT[lang]
+        content = f"{q.format(a=a, b=b, c=c, d=d)}\n\nA:\n{A}\n\nB:\n{B}\n\n{ask}\n" + ASK[lang]
+        items.append({"id": f"{g}-{swap}", "lang": lang, "gold": "A" if first_right else "B",
+                      "longer": "A" if len(A) > len(B) else "B", "fluff_wrong": fluff_wrong,
+                      "messages": [{"role": "user", "content": content}]})
+    return items
+
+
+def score_judge_ability(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*([AB])\b", line) or re.search(r"\b(?:solution|lösung)\s+([AB])\b", line, re.I)
+    pred = m.group(1).upper() if m else None
+    ok = pred == item["gold"]
+    d = {"ok_fluff_wrong" if item["fluff_wrong"] else "ok_plain": float(ok)}
+    if pred:
+        d["chose_longer"] = float(pred == item["longer"])
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4258,6 +4314,7 @@ TASKS = {
     "nesting_depth": task(load_nesting_depth, score_nesting_depth, 24, 144),
     "grid_transform": task(load_grid_transform, score_grid_transform, 24, 150),
     "blocks_plan": {**task(load_blocks_plan, score_blocks_plan, 24, 120), "max_tokens": 4096},
+    "judge_ability": {**task(load_judge_ability, score_judge_ability, 24, 160), "grouped": True},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

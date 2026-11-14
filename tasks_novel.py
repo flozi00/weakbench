@@ -3714,6 +3714,43 @@ def score_percent_traps(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "naive": float(v is not None and abs(v - item["naive"]) <= 0.05)}}
 
 
+# ---------------------------------------------------------------- clock_angle (the hour hand moves too)
+# The smaller angle between the hands at h:mm. Trap: treating the hour hand as fixed on the hour (3:15 -> 0 instead
+# of 7.5 degrees). naive = that frozen-hand answer.
+
+
+def ca_angle(h, m, frozen=False):
+    hour = (h % 12) * 30 + (0 if frozen else m * 0.5)
+    a = abs(hour - m * 6) % 360
+    return min(a, 360 - a)
+
+
+def load_clock_angle(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("clock_angle", i)
+        while True:
+            h, m = r.randint(1, 12), r.choice(range(5, 60, 5)) if i % 2 == 0 else r.randint(1, 59)
+            if ca_angle(h, m) != ca_angle(h, m, frozen=True):
+                break
+        q = (f"What is the smaller angle, in degrees, between the hour hand and the minute hand of an analogue clock at "
+             f"{h}:{m:02d}?" if lang == "en" else
+             f"Wie groß ist der kleinere Winkel in Grad zwischen Stunden- und Minutenzeiger einer analogen Uhr um "
+             f"{h}:{m:02d} Uhr?")
+        items.append({"id": str(i), "lang": lang, "gold": ca_angle(h, m), "naive": ca_angle(h, m, frozen=True),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_clock_angle(item, reply):
+    line = re.sub(r"\([^)]*\)", "", final_answer(reply["content"]) or "")
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:°|grad|degrees?)", line, re.I)
+    v = float(m.group(1).replace(",", ".")) if m else answer_value(line, item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.1
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"naive": float(v is not None and abs(v - item["naive"]) <= 0.1)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5273,6 +5310,7 @@ TASKS = {
     "stale_answer": task(load_stale_answer, score_stale_answer, 24, 120),
     "pii_redact": {**task(load_pii_redact, score_pii_redact, 24, 80), "think": False, "max_tokens": 768},
     "percent_traps": task(load_percent_traps, score_percent_traps, 24, 120),
+    "clock_angle": task(load_clock_angle, score_clock_angle, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

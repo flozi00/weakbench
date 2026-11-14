@@ -1133,7 +1133,18 @@ def test_percent_traps():
     assert tn.score_percent_traps(ud, {"content": f"Antwort: {abs(ud['gold']):g} % niedriger".replace(".", ",")})["correct"]
 
 
+
+def test_clock_angle():
+    import tasks_novel as tn
+    assert tn.ca_angle(3, 15) == 7.5 and tn.ca_angle(3, 15, frozen=True) == 0 and tn.ca_angle(12, 30) == 165
+    for x in tn.load_clock_angle("de", 10, 0):
+        assert tn.score_clock_angle(x, {"content": f"Antwort: {x['gold']:g}°".replace(".", ",")})["correct"]
+        r = tn.score_clock_angle(x, {"content": f"Antwort: {x['naive']:g} Grad"})
+        assert not r["correct"] and r["detail"]["naive"] == 1.0
+
+
 if __name__ == "__main__":
+    test_clock_angle()
     test_percent_traps()
     test_pii_redact()
     test_stale_answer()

@@ -3965,6 +3965,61 @@ def score_prob_fallacies(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": g, "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- framing (the same choice framed as gains or losses)
+# Asian-disease style: N people at risk; option A is sure, option B a gamble with the same expected value. Each pair
+# shows the same numbers framed as "saved" and as "die". There is no right answer; a rational chooser picks the
+# same in both frames. sure_gain / sure_loss = share choosing the sure option per frame (the gap is the framing
+# effect); correct = a parseable choice. Sure/gamble positions alternate between A and B.
+FR_TOPIC = {"en": ["an outbreak threatens {n} people in a town", "a flood threatens {n} homes in a valley",
+                   "a factory closure threatens {n} jobs"],
+            "de": ["ein Krankheitsausbruch bedroht {n} Menschen in einer Stadt", "ein Hochwasser bedroht {n} Häuser in einem Tal",
+                   "eine Werksschließung bedroht {n} Arbeitsplätze"]}
+FR_UNIT = {"en": ["people", "homes", "jobs"], "de": ["Menschen", "Häuser", "Arbeitsplätze"]}
+FR_GAIN = {"en": ("saved", "all {n} are saved", "none is saved"), "de": ("gerettet", "alle {n} gerettet", "keine gerettet")}
+FR_LOSS = {"en": ("lost", "none is lost", "all {n} are lost"), "de": ("verloren", "keine verloren", "alle {n} verloren")}
+
+
+def load_framing(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        g, loss = divmod(i, 2)
+        r = rng_of("framing", g)
+        k = r.randrange(3)
+        tot = r.choice([300, 600, 900, 1200])
+        frac = r.choice([3, 4])  # sure part = tot/frac; gamble = 1/frac chance of all
+        sure = tot // frac
+        unit = FR_UNIT[lang][k]
+        topic = FR_TOPIC[lang][k].format(n=tot)
+        verb, best, worst = (FR_LOSS if loss else FR_GAIN)[lang]
+        sure_n = tot - sure if loss else sure
+        if lang == "en":
+            o_sure = f"{sure_n} {unit} are {verb} for certain."
+            o_gamble = f"With probability 1/{frac}, {best.format(n=tot)}; with probability {frac - 1}/{frac}, {worst.format(n=tot)}."
+            ask = f"Imagine {topic}. You must choose a plan.\n"
+        else:
+            o_sure = f"Sicher werden {sure_n} {unit} {verb}."
+            o_gamble = (f"Mit Wahrscheinlichkeit 1/{frac} werden {best.format(n=tot)}, mit Wahrscheinlichkeit "
+                        f"{frac - 1}/{frac} werden {worst.format(n=tot)}.")
+            ask = f"Stell dir vor, {topic}. Du musst einen Plan wählen.\n"
+        sure_first = (g % 2 == 0)
+        a, b = (o_sure, o_gamble) if sure_first else (o_gamble, o_sure)
+        tail = ("Answer A or B." if lang == "en" else "Antworte mit A oder B.")
+        items.append({"id": f"{g}-{loss}", "lang": lang, "loss": bool(loss), "sure": "A" if sure_first else "B",
+                      "gold": None, "messages": [{"role": "user", "content": f"{ask}A) {a}\nB) {b}\n{tail}\n" + ASK[lang]}]})
+    return items
+
+
+def score_framing(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*(?:plan|option)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line)
+    pred = m.group(1).upper() if m else None
+    ok = pred is not None
+    d = {}
+    if pred:
+        d["sure_loss" if item["loss"] else "sure_gain"] = float(pred == item["sure"])
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": None, "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5528,6 +5583,7 @@ TASKS = {
     "base_rate": task(load_base_rate, score_base_rate, 24, 120),
     "simpson": task(load_simpson, score_simpson, 24, 120),
     "prob_fallacies": task(load_prob_fallacies, score_prob_fallacies, 24, 120),
+    "framing": {**task(load_framing, score_framing, 24, 120), "grouped": True},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

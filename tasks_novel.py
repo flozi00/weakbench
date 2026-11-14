@@ -4220,6 +4220,66 @@ def score_dim_analysis(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- table_join (answer across two tables)
+# Table 1: people -> team. Table 2: team -> city, budget. Questions need the join: how many people work in city X,
+# the total budget of the teams that have someone named Y... or which city has the most people. One team has no
+# members (a distractor for the sum over teams with people).
+TJ_PEOPLE = ["Arin", "Belo", "Cira", "Doro", "Emil", "Fenja", "Goran", "Hella", "Ivo", "Juna", "Kemal", "Lotte"]
+TJ_TEAMS = ["Alpha", "Beta", "Gamma", "Delta", "Omega"]
+TJ_CITIES = ["Kiel", "Graz", "Basel", "Bremen"]
+
+
+def load_table_join(lang, n, seed):
+    items, i = [], -1
+    while len(items) < (n or 120):
+        i += 1
+        r = rng_of("table_join", i)
+        teams = r.sample(TJ_TEAMS, 4)
+        city = {t: r.choice(TJ_CITIES) for t in teams}
+        budget = {t: r.randrange(10, 90, 5) * 1000 for t in teams}
+        people = r.sample(TJ_PEOPLE, r.randint(7, 10))
+        member = {p: r.choice(teams[:3]) for p in people}  # teams[3] stays empty
+        kind = ("count", "sum", "max")[len(items) % 3]
+        de = lang == "de"
+        if kind == "count":
+            c = r.choice(sorted(set(city.values())))
+            gold = sum(city[member[p]] == c for p in people)
+            q = (f"Wie viele Personen arbeiten in einem Team mit Sitz in {c}?" if de else
+                 f"How many people work in a team based in {c}?")
+        elif kind == "sum":
+            gold = sum(budget[t] for t in set(member.values()))
+            q = ("Wie hoch ist das Gesamtbudget aller Teams, die mindestens eine Person haben?" if de else
+                 "What is the total budget of all teams that have at least one person?")
+        else:
+            counts = {}
+            for p in people:
+                counts[city[member[p]]] = counts.get(city[member[p]], 0) + 1
+            top = sorted(counts.items(), key=lambda kv: -kv[1])
+            if len(top) > 1 and top[0][1] == top[1][1]:
+                continue  # a tie has no single answer
+            gold = top[0][0]
+            q = "In welcher Stadt arbeiten die meisten Personen?" if de else "In which city do the most people work?"
+        t1 = "\n".join(f"| {p} | {member[p]} |" for p in people)
+        t2 = "\n".join(f"| {t} | {city[t]} | {budget[t]} |" for t in teams)
+        h1 = "| Person | Team |" if de else "| Person | Team |"
+        h2 = "| Team | Stadt | Budget (Euro) |" if de else "| Team | City | Budget (euros) |"
+        text = f"{h1}\n|---|---|\n{t1}\n\n{h2}\n|---|---|---|\n{t2}\n\n{q}"
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": text + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_table_join(item, reply):
+    line = final_answer(reply["content"]) or ""
+    if item["kind"] == "max":
+        named = [c for c in TJ_CITIES if re.search(r"\b" + c + r"\b", line)]
+        ok = named[:1] == [item["gold"]]
+    else:
+        v = answer_value(re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", line), item["lang"])
+        ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": line[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5788,6 +5848,7 @@ TASKS = {
     "sunk_cost": task(load_sunk_cost, score_sunk_cost, 24, 120),
     "regression_mean": task(load_regression_mean, score_regression_mean, 24, 120),
     "dim_analysis": task(load_dim_analysis, score_dim_analysis, 24, 120),
+    "table_join": task(load_table_join, score_table_join, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

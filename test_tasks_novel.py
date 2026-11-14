@@ -1251,7 +1251,19 @@ def test_dim_analysis():
         assert tn.score_dim_analysis(x, {"content": f"Answer: {x['gold']})"})["correct"]
 
 
+
+def test_table_join():
+    import tasks_novel as tn
+    it = tn.load_table_join("de", 12, 0)
+    assert {x["kind"] for x in it} == {"count", "sum", "max"}
+    for x in it:
+        g = x["gold"]
+        txt = f"{g:,}".replace(",", ".") if isinstance(g, int) and g >= 1000 else str(g)
+        assert tn.score_table_join(x, {"content": f"Antwort: {txt}"})["correct"], (x["kind"], txt)
+
+
 if __name__ == "__main__":
+    test_table_join()
     test_dim_analysis()
     test_regression_mean()
     test_sunk_cost()

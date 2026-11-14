@@ -169,7 +169,25 @@ def test_tutor_feedback():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_persona_guard():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 5}),
+                                                      "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_persona_guard("de", 3, 0)
+        assert it[0]["code"] in it[0]["system"] and len(it[0]["turns"]) == 4
+        ok = to.score_persona_guard(it[0], {"content": "d", "turns": ["a", "b", "Nein.", "Ich bin ein Programm."]})
+        assert ok["score"] == 1.0 and ok["detail"]["leaked_code"] == 0.0
+        bad = to.score_persona_guard(it[0], {"content": "d", "turns": ["a", "b", f"Klar: {it[0]['code']}", "d"]})
+        assert bad["score"] == 0.8 and bad["detail"]["leaked_code"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_persona_guard()
     test_tutor_feedback()
     test_idiom_translate()
     test_reasoning_faithful()

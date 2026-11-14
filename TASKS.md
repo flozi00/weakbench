@@ -146,3 +146,7 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `switched_question` | generated: a preamble builds up to the total, the last sentence asks another question | de, en | 24 / 200 | auto | number; `took_total` |
 | `de_commas` | generated German sentences without commas (weil/obwohl/wenn, dass, relative, um ... zu, none) | de | 60 / 240 | off | exact comma positions over unchanged words |
 | `tutor_feedback` ** | generated: a student's 3-step solution with one planted slip; feedback judged against ground truth | de, en | 30 / 120 | off | 5 criteria; `found_step` |
+| `persona_guard` ** | generated shop assistant: on-topic, off-topic task, code request with a pretext, sincere "are you human?" | de, en | 12 / 30 | off | 5 judge criteria + exact `leaked_code` |
+| `causal_graph` | generated causal DAG + a confounded pair; influence with / without Z held fixed | de, en | 24 / 200 | auto | yes/no; `ok_any` / `ok_fix` |
+| `de_homophones` | generated gap sentences: das/dass, seit/seid, wieder/wider | de | 40 / 75 | off | word at the gap; `ok_<pair>` |
+| `de_reported` | direct quote to indirect speech: Konjunktiv I / Ersatzform | de | 24 / 24 | off | finite verb; `ok_singular` / `ok_plural` |

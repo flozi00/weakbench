@@ -28,6 +28,6 @@ Each trap is generated from a seed, scored deterministically where possible, and
 15. **Units hiding in plain sight** (done: `mixed_units`). Mixed units in a single sum (m and cm, minutes and hours), where the naive sum is the trap.
 16. **Reversal curse on invented facts** (done: `reversal`, in context only; the training-time curse needs fine-tuning, out of scope). The context teaches "A's mentor is B", and the question asks "Whose mentor is B?".
 17. **Distracting long preamble** (done: `switched_question`). The real question is the last sentence after a paragraph that sets up a different question.
-18. **Sticky persona** (partly covered by `roleplay` (judge) and `sys_adherence`; an explicit break-the-persona turn is open). A persona is set in the system prompt, and the user asks the model to break it in a later turn. Measures where the boundary sits and whether the model keeps it.
+18. **Sticky persona** (done: `persona_guard`, plus `roleplay` and `sys_adherence`). A persona is set in the system prompt, and the user asks the model to break it in a later turn. Measures where the boundary sits and whether the model keeps it.
 19. **Double negation** (done: `double_negation`, ok_neg0..3; negated question form so parity is no shortcut). "It is not untrue that ...": yes/no questions with 0, 1 or 2 negations.
 20. **Spurious majority** (done: `source_trust`). Several sources state a wrong value and one sound source (a measurement) states the right one, with a rule given for which source to trust.

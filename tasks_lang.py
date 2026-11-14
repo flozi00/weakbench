@@ -2385,6 +2385,34 @@ def score_time_prep(item, reply):
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_reported (reported speech with backshift)
+# "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
+# present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
+ER_VERBS = [("am tired", "was tired", "is tired"), ("will come tomorrow", "would come", "will come"),
+            ("can swim", "could swim", "can swim"), ("have finished the report", "had finished", "has finished"),
+            ("was ill last week", "had been ill", "was ill"), ("am working late", "was working", "is working"),
+            ("must leave early", "had to leave|must leave", "must leave"), ("don't like coffee", "didn't like|did not like", "doesn't like")]
+ER_SPK = [("Anna", "she"), ("Tom", "he"), ("My boss", "she"), ("The driver", "he")]
+
+
+def load_en_reported(lang, n, seed):
+    items = []
+    for i in range(n or len(ER_VERBS) * len(ER_SPK)):
+        quote, gold, _ = ER_VERBS[i % len(ER_VERBS)]
+        spk, pron = ER_SPK[(i // len(ER_VERBS)) % len(ER_SPK)]
+        items.append({"id": str(i), "lang": "en", "gold": gold, "kind": i % len(ER_VERBS),
+                      "messages": [{"role": "user", "content": "Put this into reported speech, shifting every tense one step back (\""
+                                    f"{spk} said that ...\"). Reply with the sentence only.\n\n{spk} said: \"I {quote}.\""}]})
+    return items
+
+
+def score_en_reported(item, reply):
+    text = re.sub(r"[\"“”][^\"“”]*[\"“”]", " ", reply["content"] or "").lower().replace("’", "'")  # drop a copied quote
+    after = text.split("said", 1)[-1]
+    ok = bool(re.search(r"\b(" + item["gold"] + r")\b", after)) and not re.search(r"\bi (am|will|can|have)\b", after)
+    return {"correct": ok, "score": float(ok), "pred": after[:60], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2437,6 +2465,7 @@ TASKS = {
     "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
+    "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

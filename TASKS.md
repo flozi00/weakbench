@@ -196,3 +196,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `time_prep` | generated time expressions after a gap: at/on/in, um/am/im/in | de, en | 40 / 80 | off | exact preposition; per expression type |
 | `maze_path` | generated 6x6-9x9 ASCII mazes with S and E; a fifth unreachable | de, en | 25 / 120 | auto | BFS shortest steps or "none"; `ok_size*`, `ok_none` |
 | `neutral_summary` ** | generated two-sided disputes (tenant/landlord, neighbours, colleagues) with facts and loaded claims, summarised for a mediator | de, en | 12 / 30 | off | judge: both sides, facts right, accusations attributed, no verdict, nothing invented; word limit |
+| `en_reported` | generated: direct quotes into reported speech with an explicit one-step backshift (am->was, will->would, have->had, was->had been, do->did) | en | 32 / 32 | off | the backshifted verb, copied quotes and first person rejected |

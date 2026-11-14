@@ -657,7 +657,18 @@ def test_time_prep():
     assert tl.score_time_prep(we, {"content": "on"})["correct"]
 
 
+def test_en_reported():
+    import tasks_lang as tl
+    it = tl.load_en_reported("en", None, 0)
+    assert len(it) == 32
+    sc = lambda x, t: tl.score_en_reported(x, {"content": t})["correct"]  # noqa: E731
+    assert sc(it[0], "Anna said that she was tired.") and not sc(it[0], "Anna said that she is tired.")
+    assert sc(it[1], "Anna said she would come the next day.") and not sc(it[1], 'Anna said: "I will come tomorrow."')
+    assert sc(it[4], "Anna said that she had been ill the week before.") and not sc(it[4], "Anna said that she was ill.")
+
+
 if __name__ == "__main__":
+    test_en_reported()
     test_time_prep()
     test_revise_on_feedback()
     test_bilingual_notice()

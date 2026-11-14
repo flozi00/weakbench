@@ -3870,6 +3870,73 @@ def score_simpson(item, reply):
             "detail": {f"ok_{item['ask']}": float(ok), "ok_paradox" if item["paradox"] else "ok_control": float(ok)}}
 
 
+# ---------------------------------------------------------------- prob_fallacies (gambler's fallacy, conjunction fallacy)
+# gambler: a fair coin / die shows a streak; the probability of the next outcome (unchanged). conjunction: a persona
+# that fits Y, then "which is more likely: X, or X and Y?" (X alone, always). control: a plain probability.
+PF_PERSONA = {"en": [("Mira is 31, outspoken, studied environmental science and joins climate protests.", "Mira works in a bank",
+                      "Mira works in a bank and is active in an environmental group"),
+                     ("Tom is quiet, loves numbers and spends weekends building model railways.", "Tom is a teacher",
+                      "Tom is a teacher and teaches maths")],
+              "de": [("Mira ist 31, meinungsstark, hat Umweltwissenschaften studiert und geht zu Klimademos.",
+                      "Mira arbeitet in einer Bank", "Mira arbeitet in einer Bank und ist in einer Umweltgruppe aktiv"),
+                     ("Tom ist ruhig, liebt Zahlen und baut am Wochenende Modelleisenbahnen.", "Tom ist Lehrer",
+                      "Tom ist Lehrer und unterrichtet Mathematik")]}
+
+
+def load_prob_fallacies(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("prob_fallacies", i)
+        kind = ("gambler", "conjunction", "control")[i % 3]
+        if kind == "gambler":
+            k = r.randint(5, 9)
+            if r.random() < 0.5:
+                q = (f"A fair coin has landed heads {k} times in a row. What is the probability, in percent, that the next "
+                     "toss is tails?" if lang == "en" else
+                     f"Eine faire Münze ist {k}-mal hintereinander auf Kopf gefallen. Wie groß ist die Wahrscheinlichkeit "
+                     "in Prozent, dass der nächste Wurf Zahl ist?")
+                gold = "50"
+            else:
+                q = (f"A fair die has not shown a six in the last {k * 3} rolls. What is the probability, as a fraction, "
+                     "that the next roll is a six?" if lang == "en" else
+                     f"Ein fairer Würfel hat in den letzten {k * 3} Würfen keine Sechs gezeigt. Wie groß ist die "
+                     "Wahrscheinlichkeit als Bruch, dass der nächste Wurf eine Sechs ist?")
+                gold = "1/6"
+        elif kind == "conjunction":
+            desc, x, xy = r.choice(PF_PERSONA[lang])
+            opts = [x, xy]
+            r.shuffle(opts)
+            q = (f"{desc}\nWhich is more likely? A) {opts[0]}. B) {opts[1]}. Answer A or B." if lang == "en" else
+                 f"{desc}\nWas ist wahrscheinlicher? A) {opts[0]}. B) {opts[1]}. Antworte mit A oder B.")
+            gold = "AB"[opts.index(x)]
+        else:
+            k = r.choice([4, 5, 8, 10])
+            q = (f"A bag holds {k} balls, exactly one of them red. One ball is drawn at random. What is the probability, "
+                 "as a fraction, that it is red?" if lang == "en" else
+                 f"In einem Beutel sind {k} Kugeln, genau eine davon rot. Eine Kugel wird zufällig gezogen. Wie groß ist die "
+                 "Wahrscheinlichkeit als Bruch, dass sie rot ist?")
+            gold = f"1/{k}"
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_prob_fallacies(item, reply):
+    line = (final_answer(reply["content"]) or "").replace(" ", "")
+    g = item["gold"]
+    if item["kind"] == "conjunction":
+        m = re.match(r"\W*([AB])\b", line) or re.search(r"\b([AB])\)", line)
+        ok = bool(m) and m.group(1) == g
+    elif g == "50":
+        ok = bool(re.search(r"(?<![\d.,])50(?:[.,]0+)?%?(?!\d)|1/2|0[.,]5\b", line))
+    else:
+        a, b = g.split("/")
+        dec = round(int(a) / int(b), 3)
+        ok = bool(re.search(r"(?<!\d)" + re.escape(g) + r"(?!\d)", line)) or any(
+            abs(float(x.replace(",", ".")) - dec) < 0.002 for x in re.findall(r"0[.,]\d+", line))
+    return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": g, "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5432,6 +5499,7 @@ TASKS = {
     "clock_angle": task(load_clock_angle, score_clock_angle, 24, 120),
     "base_rate": task(load_base_rate, score_base_rate, 24, 120),
     "simpson": task(load_simpson, score_simpson, 24, 120),
+    "prob_fallacies": task(load_prob_fallacies, score_prob_fallacies, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -18,7 +18,7 @@ def test_all():
         assert (want is None or len(full) == want) and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path", "stale_answer", "pii_redact") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path", "stale_answer", "pii_redact", "prob_fallacies") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -1169,7 +1169,21 @@ def test_simpson():
         assert tn.score_simpson(x, {"content": f"Antwort: {x['gold']}"})["correct"]
 
 
+
+def test_prob_fallacies():
+    import tasks_novel as tn
+    it = tn.load_prob_fallacies("en", 30, 0)
+    assert {x["kind"] for x in it} == {"gambler", "conjunction", "control"}
+    for x in it:
+        g = x["gold"]
+        assert tn.score_prob_fallacies(x, {"content": f"Answer: {g}" + ("%" if g == "50" else "")})["correct"], x
+    six = next(x for x in it if x["gold"] == "1/6")
+    assert tn.score_prob_fallacies(six, {"content": "Answer: 0.167"})["correct"]
+    assert not tn.score_prob_fallacies(six, {"content": "Answer: 1/5"})["correct"]
+
+
 if __name__ == "__main__":
+    test_prob_fallacies()
     test_simpson()
     test_base_rate()
     test_clock_angle()

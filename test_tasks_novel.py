@@ -990,8 +990,11 @@ def test_fake_entity():
     assert f["fake"] and not r["fake"]
     assert tn.score_fake_entity(f, {"content": "Dazu habe ich keine Informationen, das Institut scheint nicht zu existieren."})["correct"]
     assert not tn.score_fake_entity(f, {"content": "Es wurde 1952 von Hans Müller gegründet."})["correct"]
-    assert tn.score_fake_entity(r, {"content": "Das war Johann Wolfgang von Goethe."})["correct"]
+    faust = next(y for y in tn.load_fake_entity("de", 40, 0) if "Faust" in y["messages"][0]["content"])
+    assert tn.score_fake_entity(faust, {"content": "Das war Johann Wolfgang von Goethe."})["correct"]
     assert not tn.score_fake_entity(f, {"content": "I don't know the exact year, but it was founded by Hans Weber."})["correct"]
+    shaped = [y for y in tn.load_fake_entity("en", 40, 0) if not y["fake"] and "Aconcagua" in y["messages"][0]["content"]]
+    assert shaped and tn.score_fake_entity(shaped[0], {"content": "About 6,961 metres."})["correct"]
     for t in ("I couldn't find any reliable information.", "Mir ist kein solches Institut bekannt.", "There is no such mountain."):
         assert tn.score_fake_entity(f, {"content": t})["correct"], t
 

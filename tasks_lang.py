@@ -1961,6 +1961,42 @@ def score_de_variety(item, reply):
             "detail": {"ok_swiss" if item["swiss"] else "ok_germany": float(ok), "other_spelling": float(wrong)}}
 
 
+# ---------------------------------------------------------------- de_relative (Relativpronomen: Genus, Numerus, Kasus, dessen/deren)
+# A head noun (gender/number) and a relative clause whose gap needs a given case: nominative, accusative, dative or
+# genitive (dessen/deren). Generated from noun x clause frames; the gold follows the paradigm exactly.
+RL_NOUNS = [("Der Mann", "m"), ("Die Frau", "f"), ("Das Kind", "n"), ("Die Nachbarn", "pl"), ("Der Lehrer", "m"),
+            ("Die Ärztin", "f"), ("Das Team", "n"), ("Die Gäste", "pl")]
+RL_PRON = {"nom": {"m": "der", "f": "die", "n": "das", "pl": "die"},
+           "acc": {"m": "den", "f": "die", "n": "das", "pl": "die"},
+           "dat": {"m": "dem", "f": "der", "n": "dem", "pl": "denen"},
+           "gen": {"m": "dessen", "f": "deren", "n": "dessen", "pl": "deren"}}
+RL_FRAME = {"nom": ("{n}, ___ gestern angerufen {hat}, kommt morgen.", "{n}, ___ gestern angerufen {hat}, kommen morgen."),
+            "acc": ("{n}, ___ ich gestern getroffen habe, kommt morgen.", "{n}, ___ ich gestern getroffen habe, kommen morgen."),
+            "dat": ("{n}, ___ ich das Buch gegeben habe, kommt morgen.", "{n}, ___ ich das Buch gegeben habe, kommen morgen."),
+            "gen": ("{n}, ___ Auto gestohlen wurde, kommt morgen.", "{n}, ___ Auto gestohlen wurde, kommen morgen.")}
+
+
+def load_de_relative(lang, n, seed):
+    items, cases = [], list(RL_PRON)
+    for i in range(n or len(RL_NOUNS) * 4):
+        noun, g = RL_NOUNS[(i // 4) % len(RL_NOUNS)]
+        case = cases[i % 4]
+        pl = g == "pl"
+        sent = RL_FRAME[case][pl].format(n=noun, hat="haben" if pl else "hat")
+        items.append({"id": str(i), "lang": "de", "case": case, "gold": RL_PRON[case][g],
+                      "messages": [{"role": "user", "content": "Setze das richtige Relativpronomen in die Lücke ein. "
+                                    "Antworte nur mit dem Wort.\n\n" + sent}]})
+    return items
+
+
+def score_de_relative(item, reply):
+    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+         if x in ("der", "die", "das", "den", "dem", "denen", "dessen", "deren", "welcher", "welche", "welches", "welchen",
+                  "welchem")]
+    ok = w[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_{item['case']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2005,6 +2041,7 @@ TASKS = {
     "irony": task(("de", "en"), load_irony, score_irony, 16, 30, lang_check=False),
     "en_variety": task(("en",), load_en_variety, score_en_variety, 512, 20),
     "de_variety": task(("de",), load_de_variety, score_de_variety, 512, 20),
+    "de_relative": task(("de",), load_de_relative, score_de_relative, 16, 32, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

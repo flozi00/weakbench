@@ -540,7 +540,18 @@ def test_de_variety():
     assert tl.score_de_variety(x, {"content": "Die Größe, die Füße, der Spaß, die Süße."})["correct"]
 
 
+def test_de_relative():
+    import tasks_lang as tl
+    it = tl.load_de_relative("de", None, 0)
+    assert len(it) == 32
+    g = {(x["messages"][0]["content"].split("\n\n")[1].split(",")[0], x["case"]): x["gold"] for x in it}
+    assert g[("Die Frau", "gen")] == "deren" and g[("Die Nachbarn", "dat")] == "denen" and g[("Der Mann", "acc")] == "den"
+    x = it[0]
+    assert tl.score_de_relative(x, {"content": x["gold"].capitalize()})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_relative()
     test_de_variety()
     test_en_variety()
     test_irony()

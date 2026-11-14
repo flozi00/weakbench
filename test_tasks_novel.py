@@ -1126,7 +1126,10 @@ def test_percent_traps():
         assert tn.score_percent_traps(x, {"content": f"Antwort: {g:g}".replace(".", ",")})["correct"], x
         r = tn.score_percent_traps(x, {"content": f"Antwort: {x['naive']:g}".replace(".", ",")})
         assert not r["correct"] and r["detail"]["naive"] == 1.0
+    rel = it[0]
+    assert tn.score_percent_traps(rel, {"content": f"Antwort: {rel['naive']} Prozentpunkte, das sind {rel['gold']:g} %".replace(".", ",")})["correct"]
     ud = it[1]
+    assert tn.score_percent_traps(ud, {"content": f"Answer: decreased by {abs(ud['gold']):g}% (1.2 x 0.8 = 0.96)"})["correct"]
     assert tn.score_percent_traps(ud, {"content": f"Antwort: {abs(ud['gold']):g} % niedriger".replace(".", ",")})["correct"]
 
 

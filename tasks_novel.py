@@ -3672,8 +3672,10 @@ def load_percent_traps(lang, n, seed):
             b = a + r.choice([1, 2, 3, 4, 5])
             if kind == "relative":
                 gold, naive = round((b - a) / a * 100, 2), b - a
-                q = (f"An interest rate rises from {a} % to {b} %. By how many percent did the rate rise?" if lang == "en" else
-                     f"Ein Zinssatz steigt von {a} % auf {b} %. Um wie viel Prozent ist der Zinssatz gestiegen?")
+                q = (f"An interest rate rises from {a} % to {b} %. By what percentage of its old value did the rate rise "
+                     "(relative change, not percentage points)?" if lang == "en" else
+                     f"Ein Zinssatz steigt von {a} % auf {b} %. Um wie viel Prozent seines bisherigen Werts ist der Zinssatz "
+                     "gestiegen (relative Änderung, nicht Prozentpunkte)?")
             else:
                 gold, naive = b - a, round((b - a) / a * 100, 2)
                 q = (f"An interest rate rises from {a} % to {b} %. By how many percentage points did it rise?" if lang == "en"
@@ -3698,9 +3700,13 @@ def load_percent_traps(lang, n, seed):
 
 
 def score_percent_traps(item, reply):
-    line = (final_answer(reply["content"]) or "").replace("−", "-")
-    v = answer_value(line, item["lang"])
-    neg = re.search(r"-\s*\d", line) or re.search(r"\b(minus|weniger|niedriger|lower|less|decrease|gesunken|fell)\b", line, re.I)
+    line = re.sub(r"\([^)]*\)", "", (final_answer(reply["content"]) or "").replace("−", "-"))  # bracketed working
+    pct = re.search(r"(-?\d+(?:[.,]\d+)?)\s*(?:%|prozent(?!punkt)|percent(?!age point))", line, re.I)
+    v = (float(pct.group(1).replace(",", ".")) if pct and item["kind"] in ("relative", "updown")
+         else answer_value(line, item["lang"]))
+    neg = re.search(r"-\s*\d", line) or re.search(
+        r"\b(minus|weniger|niedriger|geringer|unter|lower|less|below|decreas\w*|reduc\w*|drop\w*|loss|fell|fall\w*|"
+        r"gesunken|gefallen|r[üu]ckgang|verlust|abnahme|gesenkt)\b", line, re.I)
     if v is not None and item["gold"] < 0 and v > 0 and neg:
         v = -v
     ok = v is not None and abs(v - item["gold"]) <= 0.05

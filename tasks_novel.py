@@ -3981,7 +3981,10 @@ CS_ARGS = {"en": [("Every member of the Zorvel club pays a fee.", "Lena is a mem
                    "Der letzte Zug heute fährt vor Mitternacht.", "Die Linie 7 wurde 1998 eröffnet."),
                   ("Wer die Prüfung besteht, bekommt ein Zertifikat.", "Tom hat die Prüfung bestanden.",
                    "Tom bekommt ein Zertifikat.", "Die Prüfung dauert zwei Stunden.")]}
-CS_MARK = {"en": "Therefore, ", "de": "Also "}
+CS_MARKED = {"en": ["Therefore, Lena pays a fee.", "Therefore, this plant needs shade.",
+                    "Therefore, the last train tonight leaves before midnight.", "Therefore, Tom gets a certificate."],
+             "de": ["Also zahlt Lena einen Beitrag.", "Also braucht diese Pflanze Schatten.",
+                    "Also fährt der letzte Zug heute vor Mitternacht.", "Also bekommt Tom ein Zertifikat."]}
 
 
 def load_conclusion_spot(lang, n, seed):
@@ -3991,11 +3994,7 @@ def load_conclusion_spot(lang, n, seed):
         p1, p2, c, d = CS_ARGS[lang][i % len(CS_ARGS[lang])]
         marked = (i // len(CS_ARGS[lang])) % 2 == 0
         if marked:
-            c = CS_MARK[lang] + (c[0].lower() + c[1:] if lang == "en" else c)
-            if lang == "de":  # "Also zahlt Lena einen Beitrag": verb second after "Also"
-                w = c[len("Also "):].rstrip(".").split()
-                verb_at = next(k for k, x in enumerate(w) if x[0].islower())
-                c = "Also " + " ".join([w[verb_at]] + w[:verb_at] + w[verb_at + 1:]) + "."
+            c = CS_MARKED[lang][i % len(CS_ARGS[lang])]
         sents = [p1, p2, c, d]
         order = list(range(4))
         r.shuffle(order)

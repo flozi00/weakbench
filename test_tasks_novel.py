@@ -1207,7 +1207,7 @@ def test_conclusion_spot():
     it = tn.load_conclusion_spot("de", 16, 0)
     assert {x["marked"] for x in it} == {True, False}
     m = next(x for x in it if x["marked"])
-    assert "Also zahlt Lena" in m["messages"][0]["content"] or "Also braucht" in m["messages"][0]["content"] or "Also " in m["messages"][0]["content"]
+    assert "Also braucht diese Pflanze" in " ".join(x["messages"][0]["content"] for x in it)
     for x in it:
         assert tn.score_conclusion_spot(x, {"content": f"Antwort: ({x['gold']})"})["correct"]
 

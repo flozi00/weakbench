@@ -1034,8 +1034,10 @@ def test_prop_logic():
     import tasks_novel as tn
     a, b = ("atom", 0), ("atom", 1)
     assert tn.pl_valid([("if", a, b), ("not", b)], ("not", a), 2) and not tn.pl_valid([("if", a, b), b], a, 2)
-    it = tn.load_prop_logic("de", 32, 0)
-    assert sum(x["gold"] == "ja" for x in it) == 16
+    it = tn.load_prop_logic("de", 40, 0)
+    assert sum(x["gold"] == "ja" for x in it) == 20 and {x["form"] for x in it} == set(range(10))
+    x = next(y for y in it if y["gold"] == "nein")
+    assert tn.score_prop_logic(x, {"content": "Antwort: Das folgt nicht."})["correct"]
     assert "Wenn das Trell ist offen" not in " ".join(x["messages"][0]["content"] for x in it)
 
 
@@ -1046,6 +1048,8 @@ def test_table_build():
     table = "| " + " | ".join(x["cols"]) + " |\n|---|---|---|---|\n" + "\n".join("| " + " | ".join(r) + " |" for r in x["gold"])
     assert tn.score_table_build(x, {"content": table})["correct"]
     swapped = table.replace("\n" + "| " + " | ".join(x["gold"][0]) + " |", "", 1) + "\n| " + " | ".join(x["gold"][0]) + " |"
+    nopipes = "\n".join(ln.strip().strip("|") for ln in table.splitlines())
+    assert tn.score_table_build(x, {"content": "Entwurf:\n| a | b |\n\nFinal:\n" + nopipes})["correct"]
     r = tn.score_table_build(x, {"content": swapped})
     assert not r["correct"] and r["detail"]["rows_right_but_order"] == 1.0
 

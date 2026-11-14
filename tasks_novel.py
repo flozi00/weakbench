@@ -3310,12 +3310,11 @@ def load_prop_logic(lang, n, seed):
             ([("if", a, b), a], b), ([("if", a, b), ("not", b)], ("not", a)),          # modus ponens / tollens
             ([("if", a, b), b], a), ([("if", a, b), ("not", a)], ("not", b)),          # the two fallacies
             ([("or", a, b), ("not", a)], b), ([("if", a, b), ("if", b, c)], ("if", a, c)),
-            ([("if", a, b), ("if", b, c), ("not", c)], ("not", a)), ([("or", a, b), a], ("not", b))]
-        prem, concl = forms[i % len(forms)]
-        want = len(items) % 2 == 0
+            ([("if", a, b), ("if", b, c), ("not", c)], ("not", a)), ([("or", a, b), a], ("not", b)),
+            ([("if", a, b), ("if", b, c), c], a), ([("if", a, b)], ("if", b, a))]  # two more invalid: 5 valid, 5 not
+        f = len(items) % len(forms)  # every form in turn (the form index, not the draw, decides)
+        prem, concl = forms[f]
         valid = pl_valid(prem, concl, 4)
-        if valid != want:
-            continue  # keep valid / invalid balanced
         A = r.sample(PL_ATOMS[lang], 4)
         A = {k: A[k] for k in range(4)}
         ps = "\n".join(f"- {pl_render(p, A, lang)[0].upper()}{pl_render(p, A, lang)[1:]}." for p in prem)
@@ -3324,15 +3323,20 @@ def load_prop_logic(lang, n, seed):
         q = (f"Premises:\n{ps}\nDoes this follow: \"{cs}\"? Answer yes or no." if lang == "en" else
              f"Prämissen:\n{ps}\nFolgt daraus: „{cs}“? Antworte mit ja oder nein.")
         yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
-        items.append({"id": str(i), "lang": lang, "form": i % len(forms), "gold": yes if valid else no,
+        items.append({"id": str(i), "lang": lang, "form": f, "gold": yes if valid else no,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_prop_logic(item, reply):
-    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
-    ok = yn[:1] == [item["gold"]]
-    return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
+    line = (final_answer(reply["content"]) or "").lower()
+    if re.search(r"does not follow|doesn.t follow|folgt nicht|nicht zwingend", line):
+        pol = False
+    else:
+        yn = [w for w in re.findall(r"[a-z]+", line) if w in ("yes", "no", "ja", "nein")]
+        pol = (yn[0] in ("yes", "ja")) if yn else (True if re.search(r"\bfollows\b|\bfolgt\b", line) else None)
+    ok = pol is not None and pol == (item["gold"] in ("yes", "ja"))
+    return {"correct": ok, "score": float(ok), "pred": pol, "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
 
 
 # ---------------------------------------------------------------- table_build (turn prose into a sorted Markdown table)
@@ -3376,9 +3380,20 @@ def load_table_build(lang, n, seed):
 
 
 def score_table_build(item, reply):
-    rows = [[c.strip().strip("*") for c in ln.strip().strip("|").split("|")]
-            for ln in (reply["content"] or "").splitlines() if ln.strip().startswith("|")]
-    rows = [r for r in rows if not all(re.fullmatch(r":?-{2,}:?", c) for c in r if c)]
+    blocks, cur = [], []
+    for ln in (reply["content"] or "").splitlines():  # consecutive table lines form a block; the last block counts
+        if "|" in ln:
+            cur.append(ln)
+        elif cur:
+            blocks.append(cur)
+            cur = []
+    if cur:
+        blocks.append(cur)
+    lines = blocks[-1] if blocks else []
+    rows = [[c.strip().strip("*") for c in ln.strip().strip("|").split("|")] for ln in lines]
+    rows = [r for r in rows if not all(re.fullmatch(r":?-+:?", c) for c in r if c)]
+    num = lambda c: (re.search(r"\d+", c) or [c])[0]  # noqa: E731 - "42 Jahre" is 42
+    rows = [r[:1] + [num(c) for c in r[1:3]] + r[3:] if len(r) >= 3 and r is not rows[0] else r for r in rows]
     header_ok = bool(rows) and [c.lower() for c in rows[0]] == [c.lower() for c in item["cols"]]
     body = rows[1:] if header_ok else rows
     cells_ok = body == item["gold"]

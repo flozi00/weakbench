@@ -2546,6 +2546,47 @@ def score_nesting_depth(item, reply):
             "detail": {f"ok_{item['kind']}_d{item['depth']}": float(ok), f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- grid_transform (mental rotation / reflection of a letter grid)
+# A 3x3 or 4x4 grid of distinct letters, 1-3 operations (rotate 90° clockwise, rotate 90° counter-clockwise, mirror
+# left-right, mirror top-bottom), then: what is row k? Per number-of-operations sub-metric.
+GT_OPS = {"cw": lambda g: [list(r) for r in zip(*g[::-1])], "ccw": lambda g: [list(r) for r in zip(*g)][::-1],
+          "lr": lambda g: [r[::-1] for r in g], "tb": lambda g: g[::-1]}
+GT_NAME = {"en": {"cw": "rotate 90° clockwise", "ccw": "rotate 90° counter-clockwise", "lr": "mirror left-right",
+                  "tb": "mirror top-bottom"},
+           "de": {"cw": "um 90° im Uhrzeigersinn drehen", "ccw": "um 90° gegen den Uhrzeigersinn drehen",
+                  "lr": "links-rechts spiegeln", "tb": "oben-unten spiegeln"}}
+
+
+def load_grid_transform(lang, n, seed):
+    items = []
+    for i in range(n or 150):
+        r = rng_of("grid_transform", i)
+        size = 3 if i % 2 == 0 else 4
+        letters = r.sample("ABCDEFGHJKLMNPQRSTUVWXYZ", size * size)
+        g = [letters[k * size:(k + 1) * size] for k in range(size)]
+        ops = [r.choice(list(GT_OPS)) for _ in range(1 + (i // 2) % 3)]
+        out = g
+        for o in ops:
+            out = GT_OPS[o](out)
+        k = r.randrange(size)
+        grid = "\n".join(" ".join(row) for row in g)
+        steps = ", ".join(GT_NAME[lang][o] for o in ops)
+        q = (f"Grid:\n{grid}\n\nApply in order: {steps}. What is row {k + 1} (from the top) afterwards? Answer with "
+             "the letters left to right." if lang == "en" else
+             f"Raster:\n{grid}\n\nWende nacheinander an: {steps}. Wie lautet danach Zeile {k + 1} (von oben)? Antworte "
+             "mit den Buchstaben von links nach rechts.")
+        items.append({"id": str(i), "lang": lang, "ops": len(ops), "gold": "".join(out[k]),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_grid_transform(item, reply):
+    line = final_answer(reply["content"]) or ""
+    got = "".join(re.findall(r"\b[A-Z]\b", line)) or re.sub(r"[^A-Z]", "", line)
+    ok = got == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {f"ok_ops{item['ops']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4087,6 +4128,7 @@ TASKS = {
     "fallacy_spot": task(load_fallacy_spot, score_fallacy_spot, 24, 120),
     "arith_length": task(load_arith_length, score_arith_length, 28, 140),
     "nesting_depth": task(load_nesting_depth, score_nesting_depth, 24, 144),
+    "grid_transform": task(load_grid_transform, score_grid_transform, 24, 150),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

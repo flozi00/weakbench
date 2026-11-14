@@ -869,7 +869,21 @@ def test_nesting_depth():
     assert len(odd) <= len(no) // 3, (len(odd), len(no))
 
 
+
+def test_grid_transform():
+    import tasks_novel as tn
+    g = [list("AB"), list("CD")]
+    assert tn.GT_OPS["cw"](g) == [list("CA"), list("DB")] and tn.GT_OPS["ccw"](g) == [list("BD"), list("AC")]
+    assert tn.GT_OPS["cw"](tn.GT_OPS["ccw"](g)) == g and tn.GT_OPS["lr"](g) == [list("BA"), list("DC")]
+    it = tn.load_grid_transform("en", 12, 0)
+    assert {x["ops"] for x in it} == {1, 2, 3}
+    x = it[0]
+    for txt in (x["gold"], " ".join(x["gold"]), ", ".join(x["gold"])):
+        assert tn.score_grid_transform(x, {"content": "Answer: " + txt})["correct"], txt
+
+
 if __name__ == "__main__":
+    test_grid_transform()
     test_nesting_depth()
     test_arith_length()
     test_fallacy_spot()

@@ -1595,6 +1595,40 @@ def score_de_compound_gender(item, reply):
             "detail": {f"ok_{item['parts']}parts": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_address (du / Sie held through a translation)
+# Three English sentences addressed to "you", translated for a stated reader: a formal client (Sie, capitalised:
+# Sie/Ihnen/Ihr) or a close friend (du: du/dich/dir/dein). Scored exactly: the right forms present, the other absent,
+# and the formal pronoun capitalised (lower-case "sie/ihnen" mid-sentence is a different word).
+AD_SENT = ["Thank you for your message.", "I will send you the documents tomorrow.", "Could you check your calendar?",
+           "We look forward to seeing you next week.", "Please let me know if you have questions.",
+           "I hope you had a good weekend.", "Your order has been shipped.", "Did you get my invoice?"]
+AD_READER = {"formal": "an einen Geschäftskunden, den du siezt", "informal": "an einen engen Freund, den du duzt"}
+AD_DU = re.compile(r"\b(du|dich|dir|dein|deine|deinen|deinem|deiner|deines)\b", re.I)
+AD_SIE = re.compile(r"\b(Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)\b")  # case-sensitive on purpose
+
+
+def load_de_address(lang, n, seed):
+    items = []
+    for i in range(n or 60):
+        r = random.Random(f"de_address:{i}")
+        reg = ("formal", "informal")[i % 2]
+        sents = r.sample(AD_SENT, 3)
+        items.append({"id": str(i), "lang": "de", "register": reg,
+                      "messages": [{"role": "user", "content": f"Übersetze ins Deutsche, als Nachricht {AD_READER[reg]}. "
+                                    "Antworte nur mit der Übersetzung.\n\n" + " ".join(sents)}]})
+    return items
+
+
+def score_de_address(item, reply):
+    text = reply["content"] or ""
+    body = re.sub(r"(^|[.!?:]\s+)\S+", " ", text)  # sentence-initial words: capitalisation proves nothing there
+    du, sie = bool(AD_DU.search(text)), bool(AD_SIE.search(body)) or bool(AD_SIE.search(text) and not du)
+    low_sie = bool(re.search(r"\b(ihnen)\b", body))  # "ihnen" lower-case in a Sie text: capitalisation error
+    ok = (sie and not du and not low_sie) if item["register"] == "formal" else (du and not AD_SIE.search(body))
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["register"],
+            "detail": {f"ok_{item['register']}": float(ok), "mixed": float(du and sie)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1632,6 +1666,7 @@ TASKS = {
     "glossary_mt": task(("de", "en"), load_glossary_mt, score_glossary_mt, 256, 12),
     "de_separable": task(("de",), load_de_separable, score_de_separable, 128, 32, lang_check=False),
     "de_compound_gender": task(("de",), load_de_compound_gender, score_de_compound_gender, 16, 60, lang_check=False),
+    "de_address": task(("de",), load_de_address, score_de_address, 256, 30, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

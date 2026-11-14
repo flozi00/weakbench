@@ -157,3 +157,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `self_model` ** | private set: questions about the model itself (meals, feelings, soul, memory, web, time, consciousness, origin) | de, en | 10 / 10 | off | 5 judge criteria + exact `false_claim` |
 | `de_separable` | generated: separable verbs in main clause / subordinate clause / perfect / zu-infinitive | de | 32 / 32 | off | the whole sentence; `ok_<form>` |
 | `de_compound_gender` | generated (mostly unattested) compounds of 2-3 nouns, the first part of another gender | de | 60 / 120 | off | der/die/das of the head; `ok_2parts` / `ok_3parts` |
+| `de_address` | generated: three English "you" sentences translated for a client (Sie) or a close friend (du) | de | 30 / 60 | off | right forms only, formal pronoun capitalised; `mixed` |

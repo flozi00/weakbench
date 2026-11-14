@@ -449,7 +449,20 @@ def test_de_compound_gender():
     assert not tl.score_de_compound_gender(x, {"content": ({"der", "die", "das"} - {x["gold"]}).pop()})["correct"]
 
 
+def test_de_address():
+    import tasks_lang as tl
+    it = tl.load_de_address("de", 4, 0)
+    f, inf = it[0], it[1]
+    sc = lambda x, t: tl.score_de_address(x, {"content": t})["correct"]  # noqa: E731
+    assert sc(f, "Vielen Dank für Ihre Nachricht. Ich schicke Ihnen morgen die Unterlagen.")
+    assert not sc(f, "Vielen Dank für deine Nachricht. Ich schicke Ihnen morgen die Unterlagen.")
+    assert not sc(f, "Vielen Dank für Ihre Nachricht. Ich schicke ihnen morgen die Unterlagen.")
+    assert sc(inf, "Danke für deine Nachricht. Ich schicke dir morgen die Unterlagen.")
+    assert not sc(inf, "Danke für Ihre Nachricht. Ich schicke dir morgen die Unterlagen.")
+
+
 if __name__ == "__main__":
+    test_de_address()
     test_de_compound_gender()
     test_de_separable()
     test_glossary_mt()

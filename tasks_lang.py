@@ -2232,6 +2232,44 @@ def score_de_grammar_fix(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- bilingual_notice (the same notice in German and English)
+# Generated facts (event, weekday, date, time, room, price) to announce in two sections "DE:" and "EN:". Each section
+# must be in its language (no mixing) and carry every fact; numbers must agree between the sections.
+BN_EVENTS = [("Sommerfest", "summer party"), ("Erste-Hilfe-Kurs", "first aid course"), ("Infoabend", "information evening"),
+             ("Flohmarkt", "flea market"), ("Lesung", "reading")]
+
+
+def load_bilingual_notice(lang, n, seed):
+    items = []
+    for i in range(n or 40):
+        r = random.Random(f"bilingual_notice:{i}")
+        ev_de, ev_en = r.choice(BN_EVENTS)
+        day, mon = r.randint(1, 28), r.randint(1, 12)
+        hh, room, price = r.randint(9, 20), r.randint(101, 420), r.choice([5, 8, 12, 15])
+        prompt = (f"Schreibe einen kurzen Aushang zweisprachig, zuerst ein Abschnitt „DE:“ auf Deutsch, dann ein Abschnitt "
+                  f"„EN:“ auf Englisch, mit demselben Inhalt: {ev_de} ({ev_en}) am {day}.{mon}., Beginn {hh} Uhr, Raum {room}, "
+                  f"Eintritt {price} Euro. Mindestens zwei Sätze pro Abschnitt.")
+        items.append({"id": str(i), "lang": "de", "gold": None, "facts": [str(day), str(hh), str(room), str(price)],
+                      "messages": [{"role": "user", "content": prompt}]})
+    return items
+
+
+def score_bilingual_notice(item, reply):
+    text = reply["content"] or ""
+    m = re.search(r"\bDE\s*:(.*?)\bEN\s*:(.*)", text, re.S)
+    if not m:
+        return {"correct": False, "score": 0.0, "pred": text[:60], "gold": None,
+                "detail": {"sections": 0.0, "de_ok": 0.0, "en_ok": 0.0, "facts_ok": 0.0}}
+    de, en = m.group(1), m.group(2)
+    de_ok = common.lang_ok(de, "de", min_words=8) is True
+    en_ok = common.lang_ok(en, "en", min_words=8) is True
+    nums = lambda t: re.findall(r"\d+", t)  # noqa: E731
+    facts_ok = all(f in nums(de) and f in nums(en) for f in item["facts"])
+    ok = de_ok and en_ok and facts_ok
+    return {"correct": ok, "score": float(ok), "pred": text[:60], "gold": None,
+            "detail": {"sections": 1.0, "de_ok": float(de_ok), "en_ok": float(en_ok), "facts_ok": float(facts_ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2281,6 +2319,7 @@ TASKS = {
     "de_no_anglicisms": task(("de",), load_de_no_anglicisms, score_de_no_anglicisms, 512, 12, lang_check=False),
     "tense_order": task(("de", "en"), load_tense_order, score_tense_order, 512, 30),
     "de_grammar_fix": task(("de",), load_de_grammar_fix, score_de_grammar_fix, 128, 40, lang_check=False),
+    "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

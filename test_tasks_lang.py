@@ -608,7 +608,20 @@ def test_de_grammar_fix():
     assert len(set(shown)) >= 90, len(set(shown))  # the separable pool has 8 sentences
 
 
+def test_bilingual_notice():
+    import tasks_lang as tl
+    x = tl.load_bilingual_notice("de", 1, 0)[0]
+    d, h, room, price = x["facts"]
+    good = (f"DE: Wir laden euch herzlich zu unserem Fest ein. Es findet am {d}. statt und beginnt um {h} Uhr in Raum {room}, "
+            f"der Eintritt kostet {price} Euro und wir freuen uns auf euch.\n"
+            f"EN: We warmly invite you to our event. It takes place on the {d}th and starts at {h} o'clock in room {room}, "
+            f"and the entry is {price} euros and we look forward to seeing you.")
+    assert tl.score_bilingual_notice(x, {"content": good})["correct"]
+    assert not tl.score_bilingual_notice(x, {"content": good.replace(f"room {room}", "room 1")})["correct"]
+
+
 if __name__ == "__main__":
+    test_bilingual_notice()
     test_de_grammar_fix()
     test_tense_order()
     test_de_no_anglicisms()

@@ -39,6 +39,7 @@ idiom_translate The `idioms` sentences translated into the other language (cell 
                 0; sub-metric `literal`. Opt-in, needs --judge-url.
 """
 import json
+import random
 import re
 
 import common
@@ -352,6 +353,81 @@ def score_idiom_translate(item, reply):
             "gold": item["meaning"], "detail": {"literal": float(m[1] == "LITERAL")}}
 
 
+# ---------------------------------------------------------------- tutor_feedback (judge, generated)
+# A student's three-step solution with one planted arithmetic slip; the model writes feedback to the student.
+# The judge gets the ground truth (which step, right value, right answer) and checks five yes/no criteria.
+TF_ASK = {
+    "en": "A student solved this problem. Write short feedback to the student: say what is right, find the mistake, and "
+          "help them fix it.\n\nProblem: A school buys {a} boxes with {b} pencils each. {c} pencils are broken. The "
+          "rest is shared equally among {d} classes. How many pencils does each class get?\n\nStudent:\n{steps}",
+    "de": "Ein Schüler hat diese Aufgabe gelöst. Schreibe ihm eine kurze Rückmeldung: sag, was stimmt, finde den Fehler "
+          "und hilf ihm, ihn zu korrigieren.\n\nAufgabe: Eine Schule kauft {a} Kartons mit je {b} Stiften. {c} Stifte "
+          "sind kaputt. Der Rest wird gleichmäßig auf {d} Klassen verteilt. Wie viele Stifte bekommt jede Klasse?"
+          "\n\nSchüler:\n{steps}",
+}
+DIV = {"en": "÷", "de": ":"}
+TF_CHECK = ["It identifies step {k} as the step with the mistake.",
+            "It states or clearly leads to the correct value of step {k}: {right}.",
+            "It does not call any other step wrong.",
+            "Any final answer it gives is {answer} (or it gives no final answer).",
+            "The tone is encouraging and addressed to the student, in the student's language."]
+TF_JUDGE = """You grade FEEDBACK a tutor wrote on a student's solution. Ground truth: the student's mistake is in step
+{k}; the correct value of that step is {right}; the correct final answer is {answer}. All other steps follow correctly
+from the previous ones. For each criterion answer YES or NO. Reply with ONLY {{"verdicts": ["YES"|"NO", ...]}}.
+
+TASK GIVEN TO THE TUTOR:
+{task}
+
+FEEDBACK:
+{reply}
+
+CRITERIA:
+{crit}"""
+
+
+def load_tutor_feedback(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 120):
+        r = random.Random(f"tutor_feedback:{i}")
+        d = r.choice([3, 4, 5, 6])
+        a, b = r.randint(4, 12), r.choice([10, 12, 20, 24])
+        c = (a * b) % d + d * r.randint(1, 3)  # the rest divides evenly
+        right = [a * b, a * b - c, (a * b - c) // d]
+        k = i % 3 + 1  # the slip moves between the steps
+        slip = d * r.choice([-2, -1, 1, 2]) if k < 3 else r.choice([-1, 1])  # carried-on values stay whole
+        vals = list(right)
+        vals[k - 1] += slip
+        if k == 1:  # later steps carry the wrong value on correctly
+            vals[1] = vals[0] - c
+        if k <= 2:
+            vals[2] = vals[1] // d
+        fmt = lambda v: f"{v:g}" if lang == "en" else f"{v:g}".replace(".", ",")  # noqa: E731
+        steps = "\n".join([f"1) {a} × {b} = {fmt(vals[0])}", f"2) {fmt(vals[0])} − {c} = {fmt(vals[1])}",
+                           f"3) {fmt(vals[1])} {DIV[lang]} {d} = {fmt(vals[2])}"])
+        items.append({"id": str(i), "lang": lang, "k": k, "right": right[k - 1], "answer": right[2],
+                      "messages": [{"role": "user", "content": TF_ASK[lang].format(a=a, b=b, c=c, d=d, steps=steps)}]})
+    return items
+
+
+def score_tutor_feedback(item, reply):
+    tasks_judge.check_judge()
+    text = reply["content"].strip()
+    crit = [c.format(k=item["k"], right=item["right"], answer=item["answer"]) for c in TF_CHECK]
+    out = tasks_judge.judge("", TF_JUDGE.format(k=item["k"], right=item["right"], answer=item["answer"],
+                                                task=item["messages"][0]["content"], reply=text or "(empty)",
+                                                crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))),
+                            max_tokens=256)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != len(crit):
+        raise ValueError(f"unusable tutor verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith("Y") for x in v]
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
+            "detail": {"all_met": float(all(met)), "found_step": float(met[0]),
+                       **{f"ok_c{i + 1}": float(x) for i, x in enumerate(met)}}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -367,6 +443,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                              "think": False, "max_tokens": 256,
                              "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
                              "lang_check": False, "opt_in": True, "needs_judge": True},
+         "tutor_feedback": {"langs": ("de", "en"), "load": load_tutor_feedback, "score": score_tutor_feedback,
+                            "think": False, "max_tokens": 1024,
+                            "counts": {"quick": {"de": 30, "en": 30}, "full": {"de": 120, "en": 120}},
+                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "roleplay": {"langs": ("de", "en"), "load": load_roleplay, "score": score_roleplay, "think": False,
                       "max_tokens": 1024, "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
                       "lang_check": True, "opt_in": True, "needs_judge": True},

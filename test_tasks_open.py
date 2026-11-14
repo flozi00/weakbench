@@ -147,7 +147,30 @@ def test_idiom_translate():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_tutor_feedback():
+    import re as _re
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 5}),
+                                                      "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_tutor_feedback("de", 6, 0)
+        assert [x["k"] for x in it[:3]] == [1, 2, 3]
+        for x in it:  # exactly the planted step is wrong, later steps follow from it
+            st = _re.findall(r"^(\d)\) (.+) = (.+)$", x["messages"][0]["content"], _re.M)
+            wrong = [int(n) for n, lhs, rhs in st
+                     if abs(eval(lhs.replace("×", "*").replace(":", "/").replace("−", "-").replace(",", "."))
+                            - float(rhs.replace(",", "."))) > 1e-9]
+            assert wrong == [x["k"]], (wrong, x)
+        r = to.score_tutor_feedback(it[0], {"content": "Gut gemacht ..."})
+        assert r["score"] == 1.0 and r["detail"]["found_step"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_tutor_feedback()
     test_idiom_translate()
     test_reasoning_faithful()
     test_roleplay()

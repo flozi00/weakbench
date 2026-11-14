@@ -2468,6 +2468,51 @@ def score_de_plural_adj(item, reply):
             "detail": {"ok_strong" if item["strong"] else "ok_weak": float(ok)}}
 
 
+# ---------------------------------------------------------------- code_comments_lang (language switching inside code)
+# A small Python function to write, requested in one language with comments required in the other (an English request
+# for German comments, a German request for English comments). Scored: the code parses and defines the function,
+# and the comments + docstring (at least 12 words) are in the requested language.
+CC_FUNCS = [("count_vowels", "counts the vowels in a string", "die Vokale in einem String zählt"),
+            ("is_leap_year", "checks whether a year is a leap year", "prüft, ob ein Jahr ein Schaltjahr ist"),
+            ("median", "returns the median of a list of numbers", "den Median einer Zahlenliste zurückgibt"),
+            ("chunk", "splits a list into chunks of size n", "eine Liste in Stücke der Größe n teilt"),
+            ("word_freq", "counts how often each word occurs in a text", "zählt, wie oft jedes Wort in einem Text vorkommt")]
+
+
+def load_code_comments_lang(lang, n, seed):
+    """lang = the comment language; the request is written in the other language."""
+    items = []
+    for i in range(n or 40):
+        name, en, de = CC_FUNCS[i % len(CC_FUNCS)]
+        if lang == "de":
+            q = (f"Write a Python function `{name}` that {en}. Write all comments and the docstring in German. Explain each "
+                 "step in a comment. Reply with the code only.")
+        else:
+            q = (f"Schreibe eine Python-Funktion `{name}`, die {de}. Schreibe alle Kommentare und den Docstring auf "
+                 "Englisch. Erkläre jeden Schritt in einem Kommentar. Antworte nur mit dem Code.")
+        items.append({"id": str(i), "lang": lang, "func": name, "gold": None, "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_code_comments_lang(item, reply):
+    import ast as _ast
+    text = reply["content"] or ""
+    m = re.findall(r"```(?:python|py)?\s*\n(.*?)```", text, re.S)
+    code = m[-1] if m else text
+    try:
+        tree = _ast.parse(code)
+        defined = any(isinstance(nd, _ast.FunctionDef) and nd.name == item["func"] for nd in _ast.walk(tree))
+        docs = " ".join(_ast.get_docstring(nd) or "" for nd in _ast.walk(tree) if isinstance(nd, _ast.FunctionDef))
+    except SyntaxError:
+        defined, docs = False, ""
+    comments = " ".join(re.findall(r"#\s*(.*)", code)) + " " + docs
+    words = len(re.findall(r"[^\W\d_]{2,}", comments))
+    comments_ok = words >= 12 and common.lang_ok(comments, item["lang"], min_words=10) is True
+    ok = defined and comments_ok
+    return {"correct": ok, "score": float(ok), "pred": comments[:80], "gold": None,
+            "detail": {"parses": float(defined), "comments_ok": float(comments_ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2522,6 +2567,7 @@ TASKS = {
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),
+    "code_comments_lang": task(("de", "en"), load_code_comments_lang, score_code_comments_lang, 1024, 20, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

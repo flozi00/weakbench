@@ -680,7 +680,20 @@ def test_de_plural_adj():
     assert len({x["messages"][0]["content"] for x in full}) == len(full)
 
 
+def test_code_comments_lang():
+    import tasks_lang as tl
+    x = tl.load_code_comments_lang("de", 1, 0)[0]
+    good = ("```python\ndef count_vowels(s):\n    \"\"\"Zählt die Vokale in dem übergebenen Text und gibt die Anzahl zurück.\"\"\"\n"
+            "    # Wir gehen jeden Buchstaben durch und prüfen, ob er ein Vokal ist\n"
+            "    return sum(1 for c in s.lower() if c in 'aeiou')\n```")
+    assert tl.score_code_comments_lang(x, {"content": good})["correct"]
+    bad = good.replace("Zählt die Vokale in dem übergebenen Text und gibt die Anzahl zurück.", "Counts the vowels in the text and returns the number.").replace(
+        "Wir gehen jeden Buchstaben durch und prüfen, ob er ein Vokal ist", "We go through each letter and check whether it is a vowel")
+    assert not tl.score_code_comments_lang(x, {"content": bad})["correct"]
+
+
 if __name__ == "__main__":
+    test_code_comments_lang()
     test_de_plural_adj()
     test_en_reported()
     test_time_prep()

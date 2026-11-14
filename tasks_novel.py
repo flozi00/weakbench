@@ -2808,6 +2808,8 @@ def rs_negative(r, s, sep):
     kind = r.randrange(4)
     i = r.randrange(len(s))
     if kind == 0 and s[i] != sep:
+        if s[i].isalpha() and r.random() < 0.5:
+            return s[:i] + s[i].swapcase() + s[i + 1:]  # wrong letter case: [A-Za-z] must not pass
         swap = "x" if s[i].isdigit() else ("7" if s[i].isalpha() else "x")
         return s[:i] + swap + s[i + 1:]
     if kind == 1:
@@ -2838,12 +2840,29 @@ def load_regex_synth(lang, n, seed):
     return items
 
 
+def _rx_ok(pat, pos):
+    try:
+        return all(re.fullmatch(pat, s) for s in pos)
+    except re.error:
+        return False
+
+
 def score_regex_synth(item, reply):
     text = reply["content"] or ""
     # a language tag only counts when a newline follows it ("```python\n"); "```AB_CD```" is the regex itself
-    blocks = [b for _, b in re.findall(r"```([a-zA-Z]*\n)?(.*?)```", text, re.S)] or re.findall(r"`([^`]+)`", text)
-    cand = (blocks[-1] if blocks else text.strip().splitlines()[-1] if text.strip() else "").strip()
-    cand = re.sub(r"^r?[\"']|[\"']$", "", cand.splitlines()[0] if cand else "")
+    blocks = [b for _, b in re.findall(r"```([a-zA-Z]*[ \t]*\n)?(.*?)```", text, re.S)]
+    spans = re.findall(r"`([^`\n]+)`", re.sub(r"```.*?```", "", text, flags=re.S))
+    pool = blocks[-1:] or spans[::-1] or ([text.strip().splitlines()[-1]] if text.strip() else [])
+
+    def extract(chunk):  # the quoted pattern of `pattern = r"..."` / re.compile(r"..."), else the first code line
+        q = re.search(r"""r?(["'])(.+?)\1""", chunk)
+        if q:
+            return q.group(2)
+        lines = [ln.strip() for ln in chunk.strip().splitlines() if ln.strip() and not ln.strip().startswith("import ")]
+        return lines[0] if lines else ""
+    cands = [extract(c) for c in pool]
+    fits = [c for c in cands if _rx_ok(c, item["pos"][:5])]
+    cand = (fits or cands or [""])[0]
     try:
         rx = re.compile(cand)
         hit = lambda s: rx.fullmatch(s) is not None  # noqa: E731

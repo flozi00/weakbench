@@ -929,6 +929,9 @@ def test_regex_synth():
         r = tn.score_regex_synth(x, {"content": f"```{literal}```"})
         assert not r["correct"] and r["detail"]["overfit"] == 1.0
     assert not tn.score_regex_synth(it[0], {"content": "```(unclosed```"})["correct"]
+    g = it[0]["gold"]
+    assert tn.score_regex_synth(it[0], {"content": f'```python\nimport re\npattern = r"{g}"\n```'})["correct"]
+    assert tn.score_regex_synth(it[0], {"content": f"Use `{g}` with `re.fullmatch`."})["correct"]
 
 
 if __name__ == "__main__":

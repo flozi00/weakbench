@@ -518,7 +518,9 @@ def test_en_variety():
     import tasks_lang as tl
     for a, b in tl.EV_WORDS:  # no spelling matches the other one
         assert not _re.search(tl.ev_form(a), b) and not _re.search(tl.ev_form(b), a), (a, b)
-    assert _re.search(tl.ev_form("organise"), "they organised it") and _re.search(tl.ev_form("colour"), "colourful") is None
+    assert _re.search(tl.ev_form("colour"), "colourful") and _re.search(tl.ev_form("neighbour"), "neighbourhood")
+    assert _re.search(tl.ev_form("travel"), "they traveled") and not _re.search(tl.ev_form("travel"), "travelled")
+    assert not _re.search(tl.ev_form("travel"), "we love to travel")
     it = tl.load_en_variety("en", 2, 0)
     br = it[0]
     good = " ".join(w[0] for w in br["words"]) + "."
@@ -534,6 +536,8 @@ def test_de_variety():
     assert not tl.score_de_variety(de, {"content": " ".join(w[1] for w in de["words"])})["correct"]
     assert tl.score_de_variety(ch, {"content": " ".join(w[1] for w in ch["words"])})["correct"]
     assert not tl.score_de_variety(ch, {"content": " ".join(w[1] for w in ch["words"]) + " Fußgänger"})["correct"]
+    x = {"swiss": False, "words": [("groß", "gross"), ("Fuß", "Fuss"), ("Spaß", "Spass"), ("süß", "süss")]}
+    assert tl.score_de_variety(x, {"content": "Die Größe, die Füße, der Spaß, die Süße."})["correct"]
 
 
 if __name__ == "__main__":

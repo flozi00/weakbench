@@ -1879,9 +1879,11 @@ def score_irony(item, reply):
 # ---------------------------------------------------------------- en_variety (British vs American spelling, held throughout)
 # Write a short text that must use four given concepts, in British or American spelling. Scored exactly: every concept
 # appears in the requested spelling (any inflection) and no word in the other spelling appears anywhere.
-EV_WORDS = [("colour", "color"), ("favourite", "favorite"), ("organise", "organize"), ("centre", "center"),
-            ("analyse", "analyze"), ("theatre", "theater"), ("travelling", "traveling"), ("neighbour", "neighbor"),
-            ("realise", "realize"), ("catalogue", "catalog"), ("defence", "defense"), ("grey", "gray")]
+# no organise/realise: -ize is also correct British (Oxford) spelling; analyse/analyze is strict
+EV_WORDS = [("colour", "color"), ("favourite", "favorite"), ("centre", "center"), ("analyse", "analyze"),
+            ("theatre", "theater"), ("travell", "travel"), ("neighbour", "neighbor"), ("catalogue", "catalog"),
+            ("defence", "defense"), ("grey", "gray"), ("litre", "liter")]  # not cheque/check: "check" is a British verb too
+EV_SHOW = {"travell": "travelling", "travel": "traveling"}
 
 
 def load_en_variety(lang, n, seed):
@@ -1890,7 +1892,7 @@ def load_en_variety(lang, n, seed):
         r = random.Random(f"en_variety:{i}")
         variety = ("British", "American")[i % 2]
         words = r.sample(EV_WORDS, 4)
-        shown = [w[1] if variety == "British" else w[0] for w in words]  # show the other spelling: no copying
+        shown = [EV_SHOW.get(w, w) for w in (w[1] if variety == "British" else w[0] for w in words)]  # the other spelling
         items.append({"id": str(i), "lang": "en", "variety": variety, "words": words,
                       "messages": [{"role": "user", "content": f"Write four sentences in {variety} English spelling about "
                                     f"a small town festival. Use these words (in the right spelling for {variety} "
@@ -1901,7 +1903,9 @@ def load_en_variety(lang, n, seed):
 def ev_form(w):
     """The word with its inflections (organise -> organised/organising/organisation), never another spelling's prefix."""
     stem = w[:-1] if w.endswith("e") else w
-    return r"\b" + re.escape(stem) + r"(e|es|ed|ing|s|er|ers|ation|ations)?\b"
+    if w == "travel":  # American: traveled/traveling/traveler; the bare "travel" is British too, so it proves nothing
+        return r"\btravel(ed|ing|er|ers)\b"
+    return r"\b" + re.escape(stem) + r"(e|es|ed|ing|s|er|ers|ation|ations|ful|less|hood|hoods|ish|ist|ists|ed|ing|er|ers)?\b"
 
 
 def score_en_variety(item, reply):
@@ -1918,6 +1922,12 @@ def score_en_variety(item, reply):
 # Germany. Swiss spelling uses ss everywhere (Strasse, gross); Germany keeps ß after long vowels and diphthongs.
 DV_WORDS = [("Straße", "Strasse"), ("groß", "gross"), ("Fuß", "Fuss"), ("heißen", "heissen"), ("außerdem", "ausserdem"),
             ("Spaß", "Spass"), ("süß", "süss"), ("Grüße", "Grüsse"), ("weiß", "weiss"), ("draußen", "draussen")]
+# every stem an inflected form may start with (umlaut and ablaut change the stem: groß -> größer, heißen -> hieß)
+DV_STEMS = {"Straße": (["straß"], ["strass"]), "groß": (["groß", "größ"], ["gross", "gröss"]),
+            "Fuß": (["fuß", "füß"], ["fuss", "füss"]), "heißen": (["heiß", "hieß"], ["heiss", "hiess"]),
+            "außerdem": (["außerdem"], ["ausserdem"]), "Spaß": (["spaß", "späß"], ["spass", "späss"]),
+            "süß": (["süß"], ["süss"]), "Grüße": (["grüß"], ["grüss"]), "weiß": (["weiß"], ["weiss"]),
+            "draußen": (["draußen"], ["draussen"])}
 
 
 def load_de_variety(lang, n, seed):
@@ -1931,7 +1941,7 @@ def load_de_variety(lang, n, seed):
             "für Leserinnen und Leser in Deutschland (deutsche Rechtschreibung)"
         items.append({"id": str(i), "lang": "de", "swiss": swiss, "words": words,
                       "messages": [{"role": "user", "content": f"Schreibe vier Sätze über einen Wochenmarkt, {where}. "
-                                    f"Verwende diese Wörter in der passenden Schreibweise (gebeugt ist erlaubt): "
+                                    f"Verwende diese Wörter in der passenden Schreibweise (Beugung ist erlaubt): "
                                     f"{', '.join(shown)}."}]})
     return items
 
@@ -1940,12 +1950,12 @@ def score_de_variety(item, reply):
     text = reply["content"] or ""
     low = text.lower()
     idx = 1 if item["swiss"] else 0
-    stem = lambda w: re.escape(w.lower()[:-2] if w.endswith("en") else w.lower()[:-1] if w.endswith("e") else w.lower())  # noqa: E731
-    used = [bool(re.search(r"\b" + stem(w[idx]), low)) for w in item["words"]]
+    hit = lambda stems: any(re.search(r"\b" + re.escape(st), low) for st in stems)  # noqa: E731
+    used = [hit(DV_STEMS[w[0]][idx]) for w in item["words"]]
     if item["swiss"]:
         wrong = "ß" in text
     else:
-        wrong = any(re.search(r"\b" + stem(w[1]), low) for w in item["words"])
+        wrong = any(hit(DV_STEMS[w[0]][1]) for w in item["words"])
     ok = all(used) and not wrong
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": [w[idx] for w in item["words"]],
             "detail": {"ok_swiss" if item["swiss"] else "ok_germany": float(ok), "other_spelling": float(wrong)}}

@@ -14,7 +14,7 @@ sycophancy (the user pushes back on a correct answer), math_missing (an unsolvab
 6. **Self-consistency.** Ask the same fact in three phrasings and score the answers as consistent or not.
 7. **Mistaken authority** (done: `false_authority`). "As Professor X showed, ...", where the claim is wrong and must be corrected.
 8. **Lookalike distractors** (done: `lookalike`). Two entities with nearly the same name in the context (Müller GmbH and Müller AG).
-9. **Unanswerable-but-tempting.** A question whose answer is not in the document, with a close match present.
+9. **Unanswerable-but-tempting** (done: `near_miss_qa`). A question whose answer is not in the document, with a close match present.
 10. **Format bait.** The instruction says JSON only, and the content invites prose.
 
 Each trap is generated from a seed, scored deterministically where possible, and gets a German version as well.

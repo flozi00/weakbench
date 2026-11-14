@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -618,7 +618,22 @@ def test_false_authority():
     assert tn.score_false_authority(it[1], {"content": f"Antwort: {it[1]['gold']}"})["correct"]
 
 
+
+def test_near_miss_qa():
+    import tasks_novel as tn
+    it = tn.load_near_miss_qa("en", 10, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        fa, fb = a["messages"][0]["content"].split("\nWhat")[0], b["messages"][0]["content"].split("\nWhat")[0]
+        assert fa == fb and a["gold"] is not None and b["gold"] is None
+        assert f": {a['gold']}\n" in fa + "\n"
+    sc = tn.score_near_miss_qa
+    assert sc(it[1], {"content": "Answer: cannot be determined"})["correct"]
+    assert not sc(it[1], {"content": "Answer: 412"})["correct"]
+    assert sc(it[0], {"content": f"Answer: {it[0]['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_near_miss_qa()
     test_false_authority()
     test_char_ops()
     test_anchoring()

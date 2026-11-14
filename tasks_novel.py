@@ -1576,6 +1576,55 @@ def score_false_authority(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- near_miss_qa (trap: the asked fact is absent, a close one is present)
+# A firm profile with metric x year facts. Control asks a stated fact; trap asks a metric/year pair that is not
+# stated while the same metric for another year and the same year for another metric are. Gold = abstain.
+NM_METRICS = {"en": ["revenue (million euros)", "employees", "stores", "patents"],
+              "de": ["Umsatz (Mio. Euro)", "Beschäftigte", "Filialen", "Patente"]}
+NM_TEXT = {"en": ("Key figures of {f}:", "- {y}, {m}: {v}", "What was the {m} of {f} in {y}?"),
+           "de": ("Kennzahlen der {f}:", "- {y}, {m}: {v}", "Wie hoch war {m} der {f} im Jahr {y}?")}
+NM_DE_ART = {"Umsatz (Mio. Euro)": "der Umsatz (Mio. Euro)", "Beschäftigte": "die Zahl der Beschäftigten",
+             "Filialen": "die Zahl der Filialen", "Patente": "die Zahl der Patente"}
+
+
+def load_near_miss_qa(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("near_miss_qa", i // 2)
+        trap = i % 2 == 1
+        firm = r.choice(LA_BASE) + " " + r.choice(LA_FORMS)
+        years = sorted(r.sample(range(2015, 2025), 3))
+        cells = [(m, y) for m in range(4) for y in years]
+        hole = r.choice(cells)  # never stated
+        near = [c for c in cells if c != hole and (c[0] == hole[0] or c[1] == hole[1])]
+        rest = [c for c in cells if c != hole and c not in near]
+        r.shuffle(rest)
+        stated = near + rest[:3]  # every near miss is stated
+        vals = {c: r.randint(12, 980) for c in stated}
+        r.shuffle(stated)
+        ask = hole if trap else rest[0]  # both drawn in both twins: the twins differ only in the question
+        head, fact, q = NM_TEXT[lang]
+        name = NM_METRICS[lang]
+        facts = "\n".join(fact.format(y=y, m=name[m], v=vals[(m, y)]) for m, y in sorted(stated, key=lambda c: (c[1], c[0])))
+        qm = NM_DE_ART[name[ask[0]]] if lang == "de" else name[ask[0]]
+        text = head.format(f=firm) + "\n" + facts + "\n" + q.format(m=qm, f=firm, y=ask[1])
+        items.append({"id": str(i), "lang": lang, "trap": trap, "gold": None if trap else vals[ask],
+                      "messages": [{"role": "user", "content": text + MISSING_ASK[lang] + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_near_miss_qa(item, reply):
+    line = final_answer(reply["content"]) or ""
+    m = ABSTAIN_RE.search(line)
+    if item["trap"]:
+        ok = bool(m) and last_int(line[:m.start()]) is None
+        d = {"ok_trap": float(ok), "guessed": float(not m and last_int(line) is not None)}
+    else:
+        ok = not m and answer_value(line, item["lang"]) == item["gold"]
+        d = {"ok_control": float(ok)}
+    return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3101,6 +3150,7 @@ TASKS = {
     "anchoring": task(load_anchoring, score_anchoring, 24, 150),
     "char_ops": task(load_char_ops, score_char_ops, 24, 200),
     "false_authority": task(load_false_authority, score_false_authority, 24, 200),
+    "near_miss_qa": task(load_near_miss_qa, score_near_miss_qa, 24, 200),
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),
     "puzzle_mutation": task(load_puzzle_mutation, score_puzzle_mutation, 16, 16),

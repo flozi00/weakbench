@@ -1143,7 +1143,19 @@ def test_clock_angle():
         assert not r["correct"] and r["detail"]["naive"] == 1.0
 
 
+
+def test_base_rate():
+    import tasks_novel as tn
+    it = tn.load_base_rate("en", 8, 0)
+    for x in it:
+        assert 0 < x["gold"] < x["naive"]
+        assert tn.score_base_rate(x, {"content": f"Answer: about {x['gold']}%"})["correct"]
+        assert tn.score_base_rate(x, {"content": f"Answer: {x['naive']}%"})["detail"]["naive"] == 1.0
+    assert "10,000" in it[1]["messages"][0]["content"]
+
+
 if __name__ == "__main__":
+    test_base_rate()
     test_clock_angle()
     test_percent_traps()
     test_pii_redact()

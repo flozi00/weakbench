@@ -3751,6 +3751,52 @@ def score_clock_angle(item, reply):
             "detail": {"naive": float(v is not None and abs(v - item["naive"]) <= 0.1)}}
 
 
+# ---------------------------------------------------------------- base_rate (P(condition | positive test))
+# Prevalence, sensitivity and false-positive rate of a screening test; the question is the share of people with a
+# positive test who really have the condition. Half the items give natural frequencies (out of 10,000 people), half
+# give percentages. naive = the sensitivity (the classic base-rate neglect).
+
+
+def load_base_rate(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("base_rate", i)
+        prev = r.choice([0.5, 1, 2, 5])
+        sens = r.choice([80, 90, 95, 99])
+        fpr = r.choice([2, 5, 9, 10])
+        sick = 10000 * prev / 100
+        tp, fp = sick * sens / 100, (10000 - sick) * fpr / 100
+        gold = round(100 * tp / (tp + fp), 1)
+        freq = i % 2 == 1
+        if lang == "en":
+            facts = (f"Of 10,000 people, {sick:g} have the condition. Of those, {tp:g} test positive. Of the {10000 - sick:g} "
+                     f"without it, {fp:g} also test positive." if freq else
+                     f"{prev:g} % of people have the condition. The test detects {sens} % of them, and {fpr} % of healthy "
+                     "people also test positive.")
+            q = f"{facts} A person tests positive. How likely, in percent, is it that they have the condition?"
+        else:
+            facts = (f"Von 10.000 Menschen haben {sick:g} die Krankheit. Davon werden {tp:g} positiv getestet. Von den "
+                     f"{10000 - sick:g} Gesunden werden {fp:g} ebenfalls positiv getestet." if freq else
+                     f"{prev:g} % der Menschen haben die Krankheit. Der Test erkennt {sens} % von ihnen, und {fpr} % der "
+                     "Gesunden werden ebenfalls positiv getestet.")
+            q = f"{facts} Eine Person wird positiv getestet. Wie wahrscheinlich ist es in Prozent, dass sie die Krankheit hat?"
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": sens, "freq": freq,
+                      "messages": [{"role": "user", "content": q.replace(".0 ", " ") + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_base_rate(item, reply):
+    line = re.sub(r"\([^)]*\)", "", final_answer(reply["content"]) or "")
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:%|prozent|percent)", line, re.I)
+    v = float(m.group(1).replace(",", ".")) if m else answer_value(line, item["lang"])
+    if v is not None and v <= 1 and item["gold"] > 1 and not m:
+        v *= 100  # "0.15"
+    ok = v is not None and abs(v - item["gold"]) <= 1.0
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_freq" if item["freq"] else "ok_percent": float(ok),
+                       "naive": float(v is not None and abs(v - item["naive"]) <= 1.0)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5311,6 +5357,7 @@ TASKS = {
     "pii_redact": {**task(load_pii_redact, score_pii_redact, 24, 80), "think": False, "max_tokens": 768},
     "percent_traps": task(load_percent_traps, score_percent_traps, 24, 120),
     "clock_angle": task(load_clock_angle, score_clock_angle, 24, 120),
+    "base_rate": task(load_base_rate, score_base_rate, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -1,0 +1,357 @@
+"""tasks_lang (lang_switch, lang_quality) with a mock judge, plain asserts:
+
+    python3 test_tasks_lang.py
+"""
+import json
+
+import mock_server
+import quality
+import tasks_judge
+import tasks_lang as tl
+
+reply = lambda text, turns=None: {"content": text, "reasoning": "", "tool_calls": [], "finish_reason": "stop",  # noqa
+                                  **({"turns": turns} if turns else {})}
+DE = ("Der Himmel ist blau, weil das Licht der Sonne an den Molekülen der Luft gestreut wird. Das kurzwellige blaue "
+      "Licht wird dabei stärker gestreut als das rote, und deshalb sehen wir es aus allen Richtungen.")
+EN = ("The sky is blue because sunlight is scattered by the molecules of the air. Short blue wavelengths are "
+      "scattered more than the red ones, and that is why we see blue light coming from every direction.")
+
+
+def test_switch():
+    for lang in ("de", "en"):
+        items = tl.load_switch(lang, None, 0)
+        assert len(items) == 4 * len(tl.TOPICS) and len({i["id"] for i in items}) == len(items)
+        assert [i["id"] for i in tl.load_switch(lang, 60, 0)] == [i["id"] for i in items[:60]]
+    assert quality.TASKS["lang_switch"]["counts"]["quick"] == {"de": 60, "en": 60}
+    it = {i["scenario"]: i for i in tl.load_switch("de", 4, 0)}
+    assert it["mirror"]["messages"][0]["content"] == tl.SYSTEM["en"]
+    assert "German" in it["instructed"]["messages"][0]["content"] and len(it["switch"]["turns"]) == 2
+    r = tl.score_switch(it["switch"], reply(DE, turns=[EN, DE]))
+    assert r["correct"] and r["score"] == 1.0 and r["detail"]["first_turn_ok"] == 1.0, r
+    r = tl.score_switch(it["mirror"], reply(EN))
+    assert not r["correct"] and r["score"] == 0.0 and r["lang_ok"] is False, r
+    r = tl.score_switch(it["mirror"], reply(DE + " " + DE + "\n" + EN))  # German reply that slips into English
+    assert not r["correct"] and 0 < r["score"] < 1 and r["detail"]["wrong_sent_share"] > 0, r
+
+
+def test_quality():
+    verdict = {"errors": [{"type": "spelling", "quote": "fuer dich", "fix": "für dich"},
+                          {"type": "grammar", "quote": "not in the text at all", "fix": "x"}],
+               "fluency": 7, "task_fit": 9}
+    url, stop = mock_server.serve(lambda path, body: {"content": "```json\n" + json.dumps(verdict) + "\n```",
+                                                      "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        items = tl.load_quality("de", None, 0)
+        assert len(items) == len(tl.WRITING) and items[0]["id"] == tl.load_quality("en", 1, 0)[0]["id"]
+        r = tl.score_quality(items[0], reply("Ein Brief  fuer dich, ueber alles."))
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+    d = r["detail"]
+    assert r["correct"] is None and d["clean"] == 0.0 and r["score"] == 0.7 and d["err_spelling"] == 1 and d["judge_dropped"] == 1, r
+    assert d["umlaut_sub"] == 2 and d["task_fit"] == 9
+
+
+def test_grammar():
+    for lang, total in (("de", 2280), ("en", 529)):
+        items = tl.load_grammar(lang, None, 0)
+        assert len(items) == total and [i["id"] for i in tl.load_grammar(lang, 300, 0)] == [i["id"] for i in items[:300]]
+        assert 0.4 < sum(i["gold"] == "A" for i in items) / total < 0.6
+    it = items[0]
+    assert tl.score_grammar(it, reply(f"Answer: {it['gold']}"))["correct"]
+    for form in ("**Answer:** Sentence {g}.", "Antwort: Satz {g}", "Answer: ({g})"):
+        assert tl.score_grammar(it, reply(form.format(g=it["gold"])))["correct"], form
+    assert not tl.score_grammar(it, reply("Answer: A or B"))["correct"]
+    other = "A" if it["gold"] == "B" else "B"
+    r = tl.score_grammar(it, reply(f"Answer: {other}"))
+    assert not r["correct"] and r["detail"][f"ok_{it['phen']}"] == 0.0
+
+
+def test_spell():
+    for lang in ("de", "en"):
+        items = tl.load_spell(lang, None, 0)
+        assert len(items) > 150 and [i["id"] for i in tl.load_spell(lang, 100, 0)] == [i["id"] for i in items[:100]]
+        for it in items:
+            bad = it["messages"][0]["content"].split("\n\n", 1)[1]
+            assert bad != it["gold"] and 2 <= len(it["edits"]) <= 3
+            r = tl.score_spell(it, reply(it["gold"]))
+            assert r["correct"] and r["detail"]["exact"] == 1.0, (it["edits"], r)
+            r = tl.score_spell(it, reply(bad))
+            assert r["score"] == 0 and not r["correct"], (it["edits"], r)
+    assert set(tl.load_spell("de", None, 0)[0]) >= {"gold", "edits"}
+    assert {i["id"] for i in tl.load_spell("de", None, 0)} & {i["id"] for i in tl.load_spell("en", None, 0)}
+
+
+def test_simplify():
+    for lang in ("de", "en"):
+        items = tl.load_simplify(lang, None, 0)
+        assert len(items) == len(tl.NOTICES)
+        for it in items:  # the source itself never passes: no gain
+            assert not tl.score_simplify(it, reply(it["source"]))["correct"]
+            assert tl.score_simplify(it, reply(it["source"]))["detail"]["facts_kept"] == 1.0, it["source"]
+    assert tl.reading_ease("Ab dem 1. März zahlen Sie mehr.", "de")[1] == 6.0  # "1." does not end a sentence
+    easy = ("Sie ziehen um. Dann müssen Sie sich anmelden. Das machen Sie beim Amt. Sie haben dafür zwei Wochen "
+            "Zeit. Wenn Sie zu spät sind, kann das teuer sein. Es kann bis zu 1.000 Euro kosten.")
+    r = tl.score_simplify(tl.load_simplify("de", 1, 0)[0], reply(easy))
+    assert r["correct"] and r["score"] == 1.0, r
+    r = tl.score_simplify(tl.load_simplify("de", 1, 0)[0], reply(easy.replace("1.000", "viel")))
+    assert not r["correct"] and r["detail"]["facts_kept"] == 0.5
+
+
+def test_register():
+    items = {i["id"]: i for i in tl.load_register("de", None, 0)}
+    assert len(items) == 20
+    for it in items.values():  # the unchanged source keeps its old address: never correct
+        r = tl.score_register(it, reply(it["messages"][0]["content"].split("\n\n", 1)[1]))
+        assert not r["correct"] and r["detail"]["new_used"] == 0.0, it["id"]
+    r = tl.score_register(items["sie:0"], reply("Hallo Herr Tom, können Sie mir bis Freitag Ihren Bericht schicken? "
+                                                "Ich brauche ihn für das Meeting um 10 Uhr."))
+    assert r["correct"], r
+    r = tl.score_register(items["du:0"], reply("Liebe Frau Weber, kannst du mir bitte bis Freitag deine Unterlagen "
+                                               "schicken? Sie sind wichtig. Danke!"))
+    assert r["correct"], r  # sentence-initial "Sie" (= they) is not formal address
+    r = tl.score_register(items["du:0"], reply("Liebe Frau Weber, kannst du mir bis Freitag Ihre Unterlagen senden?"))
+    assert not r["correct"] and r["detail"]["old_left"] == 1.0
+
+
+def test_de_case():
+    import collections
+    items = tl.load_de_case("de", 240, 0)
+    assert set(collections.Counter((i["case"], i["art"]) for i in items).values()) == {30}
+    table = {("nom", "m", "def"): "der alte", ("nom", "m", "indef"): "ein alter", ("nom", "n", "indef"): "ein altes",
+             ("acc", "m", "def"): "den alten", ("acc", "n", "indef"): "ein altes", ("acc", "f", "indef"): "eine alte",
+             ("dat", "f", "def"): "der alten", ("dat", "m", "indef"): "einem alten", ("gen", "f", "indef"): "einer alten"}
+    for (case, g, art), want in table.items():
+        got = f"{(tl.DEF if art == 'def' else tl.INDEF)[case][g]} {tl.adj_form('alt', tl.adj_ending(case, g, art))}"
+        assert got == want, (case, g, art, got)
+    assert tl.adj_form("teuer", "en") == "teuren"
+    it = items[0]
+    assert tl.score_de_case(it, reply(f"Antwort: {it['gold']}"))["correct"]
+    assert tl.score_de_case(it, reply(f"**Antwort:** {it['gold'].capitalize()}"))["correct"]
+
+
+def test_idioms():
+    for lang in ("de", "en"):
+        items = tl.load_idioms(lang, None, 0)
+        assert len(items) == 20 and len({i["gold"] for i in items}) == 4
+        for it in items:
+            assert tl.score_idioms(it, reply(f"Answer: {it['gold']}"))["correct"]
+            assert tl.score_idioms(it, reply(f"Answer: {it['gold']}) He bought a thing"))["correct"]
+            r = tl.score_idioms(it, reply(f"Antwort: {it['literal']}"))
+            assert not r["correct"] and r["detail"]["literal"] == 1.0
+
+
+def test_de_verbs():
+    pf = tl.past_form
+    assert [pf("ging", p, "prt") for p in range(6)] == ["ging", "gingst", "ging", "gingen", "gingt", "gingen"]
+    assert [pf("dachte", p, "prt") for p in range(6)] == ["dachte", "dachtest", "dachte", "dachten", "dachtet", "dachten"]
+    assert pf("fand", 4, "prt") == "fandet" and pf("hätte", 3, "k2") == "hätten" and pf("wäre", 1, "k2") == "wärest"
+    it = tl.load_de_verbs("de", 3, 0)[1]
+    assert it["kind"] == "perf" and tl.score_de_verbs(it, reply(f"Antwort: {it['gold']}"))["correct"]
+    k2 = {"id": "x", "gold": "wärest", "kind": "k2"}
+    assert tl.score_de_verbs(k2, reply("Antwort: wärst"))["correct"]
+    assert not tl.score_de_verbs({"gold": "gingest", "kind": "k2"}, reply("Antwort: gingst"))["correct"]
+    assert all("Person: sie (Plural)" in i["messages"][0]["content"] for i in tl.load_de_verbs("de", 240, 0)
+               if "Person: sie" in i["messages"][0]["content"])
+
+
+def test_roundtrip():
+    it = tl.load_roundtrip("de", 3, 0)[0]
+    assert len(it["turns"]) == 2 and it["orig"] in it["turns"][0][0]["content"]
+    r = tl.score_roundtrip(it, {"content": it["orig"], "turns": ["An English version.", it["orig"]]})
+    assert r["score"] > 0.99 and r["detail"]["copied"] == 0.0
+    r = tl.score_roundtrip(it, {"content": it["orig"], "turns": [it["orig"], it["orig"]]})
+    assert r["score"] == 0.0 and r["detail"]["copied"] == 1.0  # never translated
+
+
+def test_locale():
+    items = tl.load_locale("de", 6, 0) + tl.load_locale("en", 6, 0)
+    for it in items:
+        assert tl.score_locale(it, reply(it["gold"]))["correct"]
+        assert tl.score_locale(it, reply(f"**{it['gold']}**"))["correct"]
+    num = next(i for i in items if i["kind"] == "num" and i["lang"] == "de")
+    assert "," in num["gold"][-3:] and not tl.score_locale(num, reply(num["gold"].replace(",", ".")))["correct"]
+
+
+def test_wordplay():
+    assert sorted(["Ofen", "Ölkanne", "Apfel", "Äpfel"], key=tl.din_key) == ["Apfel", "Äpfel", "Ofen", "Ölkanne"]
+    for lang in ("de", "en"):
+        for it in tl.load_wordplay(lang, 30, 0):
+            assert tl.score_wordplay(it, reply(f"Answer: {it['gold']}"))["correct"], it
+
+
+def test_sys_adherence():
+    it = tl.load_sys_adherence("de", 1, 0)[0]
+    sig = f"– Ihr {it['co']}-Team"
+    good = [f"Die Garantie beträgt zwei Jahre. Melden Sie sich gern.\n{sig}",
+            f"Dazu kann ich Ihnen leider keine Auskunft geben.\n{sig}",
+            f"Sie sparen Energie durch Stoßlüften. Senken Sie die Temperatur nachts.\n{sig}"]
+    r = tl.score_sys_adherence(it, {"content": good[-1], "turns": good})
+    assert r["correct"], r
+    bad = good[:1] + [f"Klar, das ist {it['brand']}. Du kannst gern fragen.\n{sig}", good[2]]
+    r = tl.score_sys_adherence(it, {"content": bad[-1], "turns": bad})
+    assert not r["correct"] and r["detail"]["ok_brand"] == 0.0 and r["detail"]["ok_sie"] == 0.0
+
+
+def test_pragmatics():
+    for lang in ("de", "en"):
+        items = tl.TASKS["pragmatics"]["load"](lang, None, 0)
+        assert len(items) == 16 and "Redewendung" not in items[0]["messages"][0]["content"]
+        for it in items:
+            assert tl.score_idioms(it, reply(f"Answer: {it['gold']}"))["correct"]
+            assert tl.score_idioms(it, reply(f"Answer: {it['literal']}"))["detail"]["literal"] == 1.0
+
+
+def test_review5():
+    de = [i for i in tl.load_locale("de", 6, 0) if i["kind"] == "money"][0]
+    assert tl.score_locale(de, reply(f"Antwort: **{de['gold'].replace(' €', '€')}**"))["correct"]
+    it = tl.load_roundtrip("de", 1, 0)[0]
+    assert tl.score_roundtrip(it, {"content": it["orig"], "turns": ["Some English.", it["orig"]]})["score"] > 0.9
+    r = tl.score_roundtrip(it, {"content": "Some English.", "turns": ["Some English.", "Some English."]})
+    assert r["detail"]["copied"] == 1.0
+    srt = next(i for i in tl.load_wordplay("de", 9, 0) if i["kind"] == "sort")
+    numbered = "Antwort:\n" + "\n".join(f"{k + 1}. {w}" for k, w in enumerate(srt["gold"].split(", ")))
+    assert tl.score_wordplay(srt, reply(numbered))["correct"]
+
+
+def test_coref():
+    for lang in ("de", "en"):
+        items = tl.load_coref(lang, None, 0)
+        assert len(items) == 24 and {i["gold"] for i in items[:2]} == set(tl.COREF[lang][0][5])
+        for it in items:
+            assert tl.score_coref(it, reply(f"Answer: {it['gold']}"))["correct"]
+            assert not tl.score_coref(it, reply(f"Answer: {it['other']}"))["correct"]
+            assert tl.score_coref(it, reply(f"Answer: {it['gold'].split()[-1]}"))["correct"]
+
+
+def test_numerals():
+    assert tl.de_words(2347) == "zweitausenddreihundertsiebenundvierzig" and tl.de_words(101) == "einhunderteins"
+    assert tl.de_words(21) == "einundzwanzig" and tl.de_words(1001) == "eintausendeins"
+    assert tl.de_words(316) == "dreihundertsechzehn" and tl.de_words(70000) == "siebzigtausend"
+    assert tl.en_words(2347) == "two thousand three hundred forty-seven"
+    it = {"kind": "write", "lang": "en", "gold": "one hundred five"}
+    assert tl.score_numerals(it, reply("One hundred and five."))["correct"]
+    it = {"kind": "write", "lang": "de", "gold": "einhundertzwölftausendeinhundertvier"}
+    assert tl.score_numerals(it, reply("hundertzwölftausendhundertvier"))["correct"]
+    it = {"kind": "write", "lang": "de", "gold": "eintausendeinhundert"}
+    assert tl.score_numerals(it, reply("tausendeinhundert"))["correct"] and tl.score_numerals(it, reply("tausendhundert"))["correct"]
+    it = {"kind": "read", "lang": "de", "gold": "12345"}
+    assert tl.score_numerals(it, reply("Antwort: 12.345"))["correct"]
+
+
+def test_polyglot():
+    de, en = tl.load_polyglot("de", 40, 0), tl.load_polyglot("en", 40, 0)
+    assert not {i["id"] for i in de} & {i["id"] for i in en}
+    assert {i["dst"] for i in de} >= {"de", "fr", "es", "it"} and all(i["src"] != i["dst"] for i in de + en)
+    it = next(i for i in de if i["dst"] == "fr")
+    fr = "Le sommeil est essentiel pour la santé, et il faut garder des horaires réguliers chaque jour de la semaine."
+    assert tl.score_polyglot(it, reply(fr))["correct"]
+    assert not tl.score_polyglot(it, reply("Sleep matters a lot for health and you should keep regular hours "
+                                           "every single day of the week."))["correct"]
+
+
+def test_officialese():
+    for lang in ("de", "en"):
+        items = tl.load_officialese(lang, None, 0)
+        assert len(items) == 12
+        for it in items:
+            assert tl.score_officialese(it, reply(f"Das sind {it['fact'][0]}."))["correct"]
+    rent = tl.load_officialese("de", 2, 0)[1]
+    assert not tl.score_officialese(rent, reply("Um 145 Euro."))["correct"]
+
+
+def test_de_letter():
+    it = tl.load_de_letter("de", 1, 0)[0]
+    good = ("Kündigung meines Vertrags zum 31. März\n\nSehr geehrte Frau Dr. Lange,\n\nhiermit kündige ich meinen "
+            "Vertrag fristgerecht. Bitte bestätigen Sie mir den Eingang.\n\nMit freundlichen Grüßen\nMax Muster")
+    r = tl.score_de_letter(it, reply(good))
+    assert r["correct"], r
+    bad = good.replace("Kündigung meines", "Betreff: Kündigung meines").replace("Lange,\n\nhiermit",
+                                                                              "Lange!\n\nHiermit").replace(
+        "Grüßen\n", "Grüßen,\n").replace("Bitte bestätigen Sie mir", "Bitte bestätige du mir")
+    r = tl.score_de_letter(it, reply(bad))
+    assert r["score"] == 0.0, r
+
+
+def test_paraphrase():
+    items = tl.load_paraphrase("de", 160, 0)
+    assert sum(i["gold"] for i in items) == 80 and "Den Brief wurde" not in " ".join(i["messages"][0]["content"]
+                                                                                    for i in items)
+    for it in items[:8]:
+        assert tl.score_paraphrase(it, reply("Antwort: JA" if it["gold"] else "Antwort: NEIN"))["correct"]
+        assert not tl.score_paraphrase(it, reply("Antwort: JA oder NEIN"))["correct"]
+
+
+def test_de_compounds():
+    items = tl.load_de_compounds("de", None, 0)
+    assert len(items) == 18 and items[0]["gold"] == "Hund" and items[1]["gold"] == "Schlitten"
+    for it in items:
+        assert tl.score_de_compounds(it, reply(f"Antwort: {it['gold']}"))["correct"]
+        other = [o for o in it["options"] if o != it["gold"]][0]
+        assert not tl.score_de_compounds(it, reply(f"Antwort: {other}"))["correct"]
+
+
+def test_de_produce():
+    it = {"verb": "fahren", "noun": "Bahnhof", "prep": "zu", "conj": "weil"}
+    good = "Ich bin gestern zum alten Bahnhof gefahren, weil mein Zug früh abfuhr."
+    r = tl.score_de_produce(it, reply(good))
+    assert r["correct"], r
+    for good2 in ("Weil es regnete, bin ich gestern zum Bahnhof gefahren.",
+                  "Am 3. Mai bin ich zum Bahnhof gefahren, weil ich müde war und mich ablenken wollte."):
+        assert tl.score_de_produce(it, reply(good2))["correct"], (good2, tl.score_de_produce(it, reply(good2)))
+    assert not tl.score_de_produce({"verb": "gehen", "noun": "Kino", "prep": "zu", "conj": "weil"},
+                                   reply("Ich habe zum Kino gegangen, weil ich müde bin."))["correct"]
+    bad = "Ich fuhr zu den Bahnhof, weil ich habe Zeit."
+    r = tl.score_de_produce(it, reply(bad))
+    assert not r["correct"] and r["detail"]["ok_perfekt"] == 0.0 and r["detail"]["ok_dative"] == 0.0
+    assert len(tl.load_de_produce("de", 60, 0)) == 60
+
+
+def test_en_produce():
+    good = {"ppc_since": "She has been working in the garden since dawn.",
+            "past_perfect": "The garden had flooded before we arrived.",
+            "third_cond": "If it had rained, the garden would have survived.",
+            "passive_by": "The garden was designed by a famous architect."}
+    good2 = {"passive_by": "The library was held by the town and was completely rebuilt by volunteers.",
+             "past_perfect": "She'd already left when the train arrived.",
+             "third_cond": "Had the storm hit earlier, we would've stayed home.",
+             "ppc_since": "The bakery has been steadily growing since 2010."}
+    for form, sent in good2.items():
+        topic = {"passive_by": "library", "past_perfect": "train", "third_cond": "storm", "ppc_since": "bakery"}[form]
+        assert tl.score_en_produce({"form": form, "topic": topic}, reply(sent))["correct"], (form, sent)
+    assert not tl.score_en_produce({"form": "passive_by", "topic": "train"}, reply("The train was out by noon."))[
+        "correct"]
+    for form, sent in good.items():
+        r = tl.score_en_produce({"form": form, "topic": "garden"}, reply(sent))
+        assert r["correct"], (form, r)
+    assert not tl.score_en_produce({"form": "third_cond", "topic": "garden"},
+                                   reply("If it rains, the garden will survive."))["correct"]
+
+
+if __name__ == "__main__":
+    test_en_produce()
+    test_de_produce()
+    test_de_compounds()
+    test_paraphrase()
+    test_de_letter()
+    test_officialese()
+    test_polyglot()
+    test_numerals()
+    test_coref()
+    test_review5()
+    test_pragmatics()
+    test_sys_adherence()
+    test_wordplay()
+    test_locale()
+    test_roundtrip()
+    test_de_verbs()
+    test_idioms()
+    test_de_case()
+    test_register()
+    test_simplify()
+    test_spell()
+    test_grammar()
+    test_switch()
+    test_quality()
+    print("ok")

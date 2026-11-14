@@ -1,0 +1,158 @@
+"""tasks_open (open_checklist) with a mock judge, plain asserts:
+
+    uv run --with pyarrow --with pyyaml --with langdetect --with immutabledict --with 'nltk>=3.9.1' python test_tasks_open.py
+"""
+import json
+
+import mock_server
+import tasks_judge
+import tasks_open as to
+
+reply = lambda text: {"content": text, "reasoning": "", "tool_calls": [], "finish_reason": "stop"}  # noqa: E731
+
+
+def test_checklist():
+    assert all(4 <= len(c) <= 6 for *_, c in to.ITEMS)
+    answer = {"v": None}
+    url, stop = mock_server.serve(lambda path, body: {"content": answer["v"], "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        de, en = to.load_checklist("de", None, 0), to.load_checklist("en", None, 0)
+        assert [i["id"] for i in de] == [i["id"] for i in en] and len(de) == len(to.ITEMS)
+        it = de[0]
+        answer["v"] = json.dumps({"verdicts": ["YES"] * len(it["criteria"])})
+        r = to.score_checklist(it, reply("Der Preis war für den photoelektrischen Effekt."))
+        assert r["score"] == 1.0 and r["detail"]["all_met"] == 1.0, r
+        answer["v"] = "Here: " + json.dumps({"verdicts": ["YES", "NO"] + ["no"] * (len(it["criteria"]) - 2)})
+        r = to.score_checklist(it, reply("x"))
+        assert r["score"] == round(1 / len(it["criteria"]), 4) and r["detail"]["all_met"] == 0.0, r
+        answer["v"] = json.dumps({"verdicts": ["YES"]})
+        try:
+            to.score_checklist(it, reply("x"))
+            raise AssertionError("a short verdict list must raise")
+        except ValueError:
+            pass
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+def test_faithful():
+    answer = {"v": None}
+    url, stop = mock_server.serve(lambda path, body: {"content": answer["v"], "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        for lang in ("de", "en"):
+            items = to.load_faithful(lang, 3, 0)
+            assert items[0]["article"] in items[0]["messages"][0]["content"] and "Summary:" not in items[0]["article"]
+            assert "Zusammenfassung:" not in items[0]["article"] and len(items[0]["article"]) > 200
+        xl = to.load_summary_xl("de", 2, 0)
+        assert xl[0]["lang"] == "de" and "englischen" in xl[0]["messages"][0]["content"]
+        assert xl[0]["article"] == to.load_faithful("en", 2, 0)[0]["article"]
+        answer["v"] = json.dumps({"sentences": [{"text": "a", "label": "SUPPORTED"}, {"text": "b", "label":
+                                  "UNSUPPORTED"}], "main_point": True})
+        r = to.score_faithful(items[0], reply("a. b."))
+        assert r["score"] == 0.5 and r["detail"]["faithful"] == 0.0 and r["detail"]["main_point"] == 1.0, r
+        answer["v"] = json.dumps({"sentences": [{"text": "a", "label": "SUPPORTED"}], "main_point": False})
+        assert to.score_faithful(items[0], reply("a."))["score"] == 0.5  # faithful but pointless
+        answer["v"] = "nothing useful"
+        try:
+            to.score_faithful(items[0], reply("a"))
+            raise AssertionError("an unusable verdict must raise")
+        except ValueError:
+            pass
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+def test_mqm():
+    answer = {"v": None}
+    url, stop = mock_server.serve(lambda path, body: {"content": answer["v"], "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        items = to.load_mqm("de", 3, 0)
+        assert items[0]["src"] in items[0]["messages"][0]["content"] and "German" in items[0]["messages"][0]["content"]
+        words = len(items[0]["src"].split())
+        answer["v"] = json.dumps({"errors": [{"quote": "Haus ist", "category": "accuracy", "severity": "major"},
+                                             {"quote": "nicht im Text", "category": "fluency", "severity": "minor"}]})
+        r = to.score_mqm(items[0], reply("Das Haus ist rot."))
+        assert r["detail"]["judge_dropped"] == 1 and r["detail"]["major_or_worse"] == 1.0
+        assert r["detail"]["mqm_per_100w"] == round(500 / words, 3), r
+        answer["v"] = '{"errors": []}'
+        assert to.score_mqm(items[0], reply("Perfekt."))["score"] == 1.0
+        assert to.score_mqm(items[0], reply(""))["detail"]["major_or_worse"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+def test_proofs():
+    answer = {"v": '{"grade": "GAP", "first_problem": "x"}'}
+    url, stop = mock_server.serve(lambda path, body: {"content": answer["v"], "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        items = to.load_proofs("de", None, 0)
+        assert len(items) == 12 and "Beweise" in items[0]["messages"][0]["content"]
+        r = to.score_proofs(items[0], reply("Seien 2a+1 und 2b+1 ..."))
+        assert r["score"] == 0.5 and not r["correct"] and r["detail"]["gap"] == 1.0
+        answer["v"] = "nonsense"
+        try:
+            to.score_proofs(items[0], reply("x"))
+            raise AssertionError("must raise")
+        except ValueError:
+            pass
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+def test_roleplay():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 4 + ["NO"]}),
+                                                      "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_roleplay("de", 1, 0)[0]
+        assert len(it["turns"]) == 3 and it["turns"][0][0]["role"] == "system"
+        r = to.score_roleplay(it, {"content": "c", "turns": ["a", "b", "c"]})
+        assert r["score"] == 0.8 and r["detail"]["ok_c5"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+def test_reasoning_faithful():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"follows": false}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_reasoning_faithful("de", 2, 0)[0]
+        assert "Rechenschritte" in it["messages"][0]["content"]
+        r = to.score_reasoning_faithful(it, reply(f"3 + 4 = 7\nAntwort: {it['gold']}"))
+        assert r["score"] == 0.0 and r["detail"]["unfaithful_but_correct"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+def test_idiom_translate():
+    url, stop = mock_server.serve(lambda path, body: {"content": "LITERAL", "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_idiom_translate("en", 1, 0)[0]
+        assert it["src"].startswith("Seit Wochen") and "natural English" in it["messages"][0]["content"]
+        r = to.score_idiom_translate(it, reply("He has tomatoes on his eyes."))
+        assert not r["correct"] and r["detail"]["literal"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_idiom_translate()
+    test_reasoning_faithful()
+    test_roleplay()
+    test_proofs()
+    test_mqm()
+    test_faithful()
+    test_checklist()
+    print("ok")

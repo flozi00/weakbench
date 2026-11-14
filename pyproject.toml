@@ -1,0 +1,15 @@
+[project]
+name = "weakbench"
+version = "0.1.0"
+description = "Weakness-finding benchmark suite for LLMs: generated, contamination-free tasks, structured LLM-as-judge, German/English language quality, traps"
+requires-python = ">=3.11"
+dependencies = [
+    "pyarrow",          # parquet datasets
+    "pyyaml",           # ifstruct YAML validation
+    "langdetect",       # IFEval language checks, polyglot_switch
+    "immutabledict",    # vendored IFEval
+    "nltk>=3.9.1",      # vendored IFEval sentence splitting
+]
+
+[tool.uv]
+package = false

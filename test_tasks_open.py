@@ -342,7 +342,25 @@ def test_triage_advice():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_howto_steps():
+    def handler(path, body):
+        n = body["messages"][-1]["content"].split("CRITERIA:")[-1].strip().count("\n") + 1
+        return {"content": json.dumps({"verdicts": ["YES"] * (n - 1) + ["NO"]}), "finish_reason": "stop"}
+    url, stop = mock_server.serve(handler)
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_howto_steps("de", None, 0)
+        assert len(it) == 6
+        r = to.score_howto_steps(it[1], {"content": "Schritte ..."})
+        assert r["detail"]["safety_ok"] == 0.0 and r["score"] < 0.5  # a missing safety step halves the score
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_howto_steps()
     test_triage_advice()
     test_neutral_summary()
     test_socratic_tutor()

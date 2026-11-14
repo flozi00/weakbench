@@ -1190,6 +1190,75 @@ def score_triage_advice(item, reply):
             "gold": item["kind"], "detail": d}
 
 
+# ---------------------------------------------------------------- howto_steps (judge: procedural knowledge with a safety step)
+# Everyday procedures with their key steps and one safety step as ground truth. The judge checks each key step
+# (in substance, any wording), the order where it matters, and the safety step; missing safety is the costly miss.
+HS_TASKS = [
+    {"en": "How do I patch the inner tube of a bike tyre?", "de": "Wie flicke ich den Schlauch eines Fahrradreifens?",
+     "steps": ["take the wheel off / remove the tyre from the rim", "take the tube out", "find the hole (pump up, water or "
+               "listening)", "roughen the area and apply glue, let it dry briefly", "press on the patch",
+               "check the tyre for the cause (glass, thorn) before refitting", "refit tube and tyre, inflate"],
+     "safety": "check the inside of the tyre for the sharp object before refitting"},
+    {"en": "How do I replace a ceiling lamp?", "de": "Wie tausche ich eine Deckenlampe aus?",
+     "steps": ["switch off the circuit breaker / fuse", "check that no voltage is present (voltage tester)",
+               "remove the old lamp and note the wires", "connect live, neutral and earth correctly", "mount the new lamp",
+               "switch the breaker back on and test"],
+     "safety": "switch off the breaker and verify no voltage before touching wires"},
+    {"en": "How do I descale an electric kettle?", "de": "Wie entkalke ich einen Wasserkocher?",
+     "steps": ["fill with water and vinegar or citric acid", "heat it / let it act", "let it soak", "pour out",
+               "rinse and boil fresh water once or twice before use"],
+     "safety": "do not boil citric acid (or rinse and boil clean water afterwards); unplug before wiping the base"},
+    {"en": "How do I bleed a radiator?", "de": "Wie entlüfte ich einen Heizkörper?",
+     "steps": ["turn the heating on so the system warms up, then switch the pump off / wait", "hold a cloth and container under the valve",
+               "open the bleed valve with the radiator key until water comes out", "close the valve",
+               "check the system pressure and top up if needed"],
+     "safety": "let the circulation pump stop first and expect hot water"},
+    {"en": "How do I jump-start a car with another car?", "de": "Wie gebe ich einem Auto Starthilfe mit einem anderen Auto?",
+     "steps": ["both engines off", "red cable: plus of the flat battery to plus of the good battery",
+               "black cable: minus of the good battery to bare metal / earth point of the car with the flat battery",
+               "start the helper car, then the other car", "remove the cables in reverse order"],
+     "safety": "connect black to a metal earth point, not to the flat battery's minus terminal, and keep cables away from fans"},
+    {"en": "How do I change a windscreen wiper blade?", "de": "Wie wechsle ich ein Scheibenwischerblatt?",
+     "steps": ["lift the wiper arm away from the windscreen", "press the clip and slide the old blade off",
+               "slide the new blade on until it clicks", "lower the arm gently"],
+     "safety": "hold the arm so it does not snap back onto the glass (put a cloth on the glass)"},
+]
+HS_JUDGE = """Evaluate instructions for this task: {task}
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+
+INSTRUCTIONS:
+{reply}
+
+CRITERIA:
+{crit}"""
+
+
+def load_howto_steps(lang, n, seed):
+    tasks_judge.check_judge()
+    items = [{"id": str(k), "lang": lang, "steps": t["steps"], "safety": t["safety"],
+              "messages": [{"role": "user", "content": t[lang]}]} for k, t in enumerate(HS_TASKS)]
+    return items if n is None else items[:n]
+
+
+def score_howto_steps(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    crit = [f"It contains this step (any wording): {s}." for s in item["steps"]] + [
+        "The steps are in a workable order.", f"It states the safety point: {item['safety']}."]
+    out = tasks_judge.judge("", HS_JUDGE.format(task=item["messages"][0]["content"], reply=text or "(empty)",
+                                                crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))), max_tokens=192)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != len(crit):
+        raise ValueError(f"unusable howto verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    steps = met[:len(item["steps"])]
+    return {"correct": None, "score": round(sum(met) / len(met), 4) if met[-1] else round(sum(met) / len(met) / 2, 4),
+            "pred": text[:200], "gold": None,
+            "detail": {"steps_found": round(sum(steps) / len(steps), 4), "order_ok": float(met[-2]),
+                       "safety_ok": float(met[-1]), "all_met": float(all(met))}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -1240,6 +1309,9 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 512,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 40, "en": 40}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "howto_steps": {"langs": ("de", "en"), "load": load_howto_steps, "score": score_howto_steps, "think": False,
+                         "max_tokens": 1024, "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
+                         "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

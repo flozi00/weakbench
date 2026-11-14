@@ -368,7 +368,7 @@ TF_ASK = {
 DIV = {"en": "÷", "de": ":"}
 TF_CHECK = ["It identifies step {k} as the step with the mistake.",
             "It states or clearly leads to the correct value of step {k}: {right}.",
-            "It does not call any other step wrong.",
+            "It does not claim that any other step contains its own calculation mistake (saying later values change as a consequence is fine).",
             "Any final answer it gives is {answer} (or it gives no final answer).",
             "The tone is encouraging and addressed to the student, in the student's language."]
 TF_JUDGE = """You grade FEEDBACK a tutor wrote on a student's solution. Ground truth: the student's mistake is in step

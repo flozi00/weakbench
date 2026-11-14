@@ -367,7 +367,7 @@ def test_de_commas():
         assert (x["kind"] == "none") == tl.score_de_commas(x, {"content": x["gold"].replace(",", "")})["correct"]
     r = tl.score_de_commas(it[0], {"content": it[0]["gold"].replace("Hause", "Haus")})
     assert not r["correct"] and r["detail"]["words_changed"] == 1.0
-    assert not tl.score_de_commas(it[5], {"content": it[5]["gold"].replace(" bleibt", ", bleibt")})["correct"]
+    assert tl.score_de_commas(it[0], {"content": it[0]["gold"] + "\n\nDas Komma steht vor dem Nebensatz."})["correct"]
 
 
 if __name__ == "__main__":
@@ -382,6 +382,9 @@ def test_de_homophones():
         assert tl.score_de_homophones(x, {"content": x["gold"].capitalize()})["correct"]
         other = {"das": "dass", "dass": "das", "seit": "seid", "seid": "seit", "wieder": "wider", "wider": "wieder"}
         assert not tl.score_de_homophones(x, {"content": other[x["gold"]]})["correct"]
+        full = x["sent"].replace("___", x["gold"])
+        assert tl.score_de_homophones(x, {"content": full})["correct"], full
+        assert not tl.score_de_homophones(x, {"content": x["sent"].replace("___", other[x["gold"]])})["correct"]
 
 
 def test_de_reported():
@@ -394,6 +397,10 @@ def test_de_reported():
     assert not tl.score_de_reported(sg, {"content": "Anna sagt, sie hat keine Zeit."})["correct"]
     assert tl.score_de_reported(pl, {"content": "Die Gäste sagen, sie hätten keine Zeit."})["correct"]
     assert not tl.score_de_reported(pl, {"content": "Die Gäste sagen, sie haben keine Zeit."})["correct"]
+    assert not tl.score_de_reported(sg, {"content": 'Anna sagt: "Ich habe keine Zeit."'})["correct"]
+    assert tl.score_de_reported(sg, {"content": "Anna sagt, dass sie keine Zeit habe."})["correct"]
+    sein = next(x for x in it if x["verb"] == "sein" and x["plural"])
+    assert not tl.score_de_reported(sein, {"content": "Die Gäste sagen, sie würden müde sein."})["correct"]
 
 
 if __name__ == "__main__":

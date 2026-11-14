@@ -1230,33 +1230,39 @@ def score_polyglot(item, reply):
 # A sentence with its commas removed; the model puts them back. Kinds: subordinate clause after / before the main
 # clause (weil, dass, obwohl, wenn), an embedded relative clause (two commas), an infinitive with "um ... zu", and
 # a control with no comma at all (over-insertion). Scored on the comma positions over an unchanged word sequence.
-CM_SUBJ = [("Der Koch", "der"), ("Die Lehrerin", "die"), ("Das Kind", "das"), ("Mein Nachbar", "der"), ("Anna", "die")]
-CM_VP = [("bleibt", "heute zu Hause"), ("kauft", "frisches Brot"), ("liest", "ein langes Buch"), ("ruft", "den Arzt an"),
-         ("geht", "früh schlafen")]
-CM_SUB = ["es draußen stark regnet", "der Zug wieder Verspätung hat", "morgen ein Feiertag ist",
-          "die Heizung seit gestern kaputt ist", "das Wetter am Wochenende schlecht wird"]
-CM_CONJ = ["weil", "obwohl", "wenn"]
-CM_REL = ["im Hotel am Markt arbeitet", "seit Jahren hier wohnt", "gern im Garten sitzt"]
-CM_UM = ["um Geld zu sparen", "um niemanden zu stören", "um pünktlich zu sein"]
-CM_PP = ["nach dem Essen", "trotz des Regens", "wegen der Hitze", "am späten Abend"]
+CM_SUBJ = [("Der Koch", "der", "im Hotel am Markt arbeitet"), ("Die Lehrerin", "die", "an der Grundschule unterrichtet"),
+           ("Das Kind", "das", "nebenan wohnt"), ("Mein Nachbar", "der", "seit Jahren hier wohnt"),
+           ("Anna", "die", "gern im Garten sitzt")]
+# verb, rest, fitting reasons (verb-final), a fitting "um ... zu", a fitting comma-free phrase
+CM_VP = [("bleibt", "heute zu Hause", ["es draußen stark regnet", "die Straßen glatt sind"], "um sich auszuruhen",
+          "wegen des Sturms"),
+         ("kauft", "frisches Brot", ["morgen ein Feiertag ist", "der Bäcker bald schließt"], "um Gäste zu bewirten",
+          "trotz des Regens"),
+         ("liest", "ein langes Buch", ["der Zug wieder Verspätung hat", "der Fernseher kaputt ist"],
+          "um sich zu entspannen", "nach dem Essen"),
+         ("ruft", "den Arzt an", ["das Fieber nicht sinkt", "die Schmerzen stärker werden"],
+          "um einen Termin zu vereinbaren", "am frühen Morgen"),
+         ("geht", "früh schlafen", ["morgen ein langer Tag ist", "der Wecker um fünf klingelt"], "um fit zu sein",
+          "nach dem Training")]
+CM_CONJ = ["weil", "wenn"]
 CM_KINDS = ("after", "before", "relative", "dass", "um_zu", "none")
 
 
 def cm_sentence(r, kind):
-    (subj, rel), (verb, rest) = r.choice(CM_SUBJ), r.choice(CM_VP)
-    sub, conj = r.choice(CM_SUB), r.choice(CM_CONJ)
+    (subj, rel, relc), (verb, rest, subs, um, pp) = r.choice(CM_SUBJ), r.choice(CM_VP)
+    sub, conj = r.choice(subs), r.choice(CM_CONJ)
     s = subj[0].lower() + subj[1:] if subj.split()[0] in ("Der", "Die", "Das", "Mein") else subj
     if kind == "after":
         return f"{subj} {verb} {rest}, {conj} {sub}."
     if kind == "before":
         return f"{conj.capitalize()} {sub}, {verb} {s} {rest}."
     if kind == "relative":
-        return f"{subj}, {rel} {r.choice(CM_REL)}, {verb} {rest}."
+        return f"{subj}, {rel} {relc}, {verb} {rest}."
     if kind == "dass":
         return f"{subj} sagt, dass {sub}."
     if kind == "um_zu":
-        return f"{subj} {verb} {rest}, {r.choice(CM_UM)}."
-    return f"{subj} {verb} {r.choice(CM_PP)} {rest}."
+        return f"{subj} {verb} {rest}, {um}."
+    return f"{subj} {verb} {pp} {rest}."
 
 
 def cm_tokens(text):
@@ -1264,11 +1270,16 @@ def cm_tokens(text):
 
 
 def load_de_commas(lang, n, seed):
-    items = []
-    for i in range(n or 240):
+    items, seen = [], set()
+    for i in range(600):  # distinct sentences only
+        if len(items) == (n or 150):
+            break
         r = random.Random(f"de_commas:{i}")
         kind = CM_KINDS[i % len(CM_KINDS)]
         gold = cm_sentence(r, kind)
+        if gold in seen:
+            continue
+        seen.add(gold)
         items.append({"id": str(i), "lang": "de", "kind": kind, "gold": gold,
                       "messages": [{"role": "user", "content": "Setze in diesen Satz alle Kommas, die nach den amtlichen "
                                     "Regeln nötig sind. Ändere sonst nichts und gib nur den Satz zurück.\n\n"
@@ -1278,10 +1289,13 @@ def load_de_commas(lang, n, seed):
 
 def score_de_commas(item, reply):
     lines = [x for x in (reply["content"] or "").strip().splitlines() if x.strip()]
-    got, want = cm_tokens(lines[-1] if lines else ""), cm_tokens(item["gold"])
-    same_words = [t for t in got if t != ","] == [t for t in want if t != ","]
+    want = cm_tokens(item["gold"])
+    words = [t for t in want if t != ","]
+    hits = [x for x in lines if [t for t in cm_tokens(x) if t != ","] == words]  # the sentence, not an explanation
+    got = cm_tokens(hits[-1] if hits else (lines[-1] if lines else ""))
+    same_words = bool(hits)
     ok = same_words and got == want
-    return {"correct": ok, "score": float(ok), "pred": (lines[-1] if lines else "")[:80], "gold": item["gold"],
+    return {"correct": ok, "score": float(ok), "pred": (hits[-1] if hits else "")[:80], "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok), "words_changed": float(not same_words)}}
 
 
@@ -1301,7 +1315,7 @@ HO_TEMPL = [
     ("seit_seid", "seid", "Ihr ___ heute aber früh dran!"),
     ("seit_seid", "seid", "___ bitte leise, das Baby schläft."),
     ("seit_seid", "seit", "{P} arbeitet ___ {t} im Homeoffice."),
-    ("wieder_wider", "wieder", "Morgen regnet es schon ___."),
+    ("wieder_wider", "wieder", "Morgen soll es schon ___ regnen."),
     ("wieder_wider", "wider", "Die Mannschaft gewann ___ Erwarten das Finale."),
     ("wieder_wider", "wieder", "{P} hat das {n} ___ zurückgebracht."),
     ("wieder_wider", "wider", "Er handelte ___ besseres Wissen."),
@@ -1311,13 +1325,18 @@ HO_ASK = ("Welches Wort gehört in die Lücke ___? Antworte nur mit dem Wort, ge
 
 
 def load_de_homophones(lang, n, seed):
-    items = []
-    for i in range(n or 140):
+    items, seen = [], set()
+    for i in range(400):  # the distinct sentences only (templates without fillers repeat)
+        if len(items) == (n or 400):
+            break
         r = random.Random(f"de_homophones:{i}")
         pair, gold, t = HO_TEMPL[i % len(HO_TEMPL)]
         p = r.choice(HO_FILL["p"])
         sent = t.format(n=r.choice(HO_FILL["n"]), p=p, P=p[0].upper() + p[1:], t=r.choice(HO_FILL["t"]))
-        items.append({"id": str(i), "lang": "de", "pair": pair, "gold": gold,
+        if sent in seen:
+            continue
+        seen.add(sent)
+        items.append({"id": str(i), "lang": "de", "pair": pair, "gold": gold, "sent": sent,
                       "messages": [{"role": "user", "content": HO_ASK.format(s=sent)}]})
     return items
 
@@ -1325,6 +1344,9 @@ def load_de_homophones(lang, n, seed):
 def score_de_homophones(item, reply):
     words = re.findall(r"[a-zäöüß]+", (tasks_novel.final_answer(reply["content"]) or reply["content"] or "").lower())
     cand = [w for w in words if w in {"das", "dass", "seit", "seid", "wieder", "wider"}]
+    tmpl = re.findall(r"[a-zäöüß]+|___", item.get("sent", "").lower())
+    if len(words) > 3 and len(words) == len(tmpl):  # the whole sentence filled in: read the word at the gap
+        cand = [words[tmpl.index("___")]]
     ok = cand[:1] == [item["gold"]]
     return {"correct": ok, "score": float(ok), "pred": cand[:1], "gold": item["gold"],
             "detail": {f"ok_{item['pair']}": float(ok)}}
@@ -1342,14 +1364,13 @@ RP_VERBS = {  # quote (1st person sg / pl), 3rd sg form, 3rd pl form
     "wissen": ("weiß es nicht", "wissen es nicht", "wisse", "wüssten"),
     "müssen": ("muss früh gehen", "müssen früh gehen", "müsse", "müssten"),
 }
-RP_SPK = [("Anna", "sie", False), ("Der Trainer", "er", False), ("Die Gäste", "sie", True), ("Meine Eltern", "sie", True)]
+RP_SPK = [("Anna", "sie", False), ("Der Trainer", "er", False), ("Die Gäste", "sie", True), ("Die Nachbarn", "sie", True)]
 
 
 def load_de_reported(lang, n, seed):
     items = []
     verbs = list(RP_VERBS)
-    for i in range(n or 144):
-        r = random.Random(f"de_reported:{i}")
+    for i in range(n or len(RP_VERBS) * len(RP_SPK)):  # every verb x speaker once
         verb = verbs[i % len(verbs)]
         spk, pron, plural = RP_SPK[(i // len(verbs)) % len(RP_SPK)]
         sg_q, pl_q, sg, pl = RP_VERBS[verb]
@@ -1364,14 +1385,16 @@ def load_de_reported(lang, n, seed):
 
 
 def score_de_reported(item, reply):
-    text = (reply["content"] or "").lower()
+    text = re.sub(r'[„"“»«][^„"“»«]*[“"«»]', " ", (reply["content"] or "")).lower()  # drop a copied quote
     forms = {f for v in RP_VERBS.values() for f in (v[2], v[3])} | {"haben", "hat", "ist", "sind", "kann", "können",
                                                                       "kommt", "kommen", "weiß", "wissen", "muss", "müssen",
                                                                       "würden", "würde"}
     after = re.split(r"\bsag(?:t|en)\b", text, maxsplit=1)[-1]
     found = [w for w in re.findall(r"[a-zäöüß]+", after) if w in forms]
     # plural: "sie würden kommen" is an accepted Ersatzform too; singular "würde" is not Konjunktiv I
-    ok = item["gold"] in found or item["plural"] and found[:1] == ["würden"]
+    first_person = re.search(r"\b(ich|wir)\b", after) is not None
+    ok = not first_person and (found[:1] == [item["gold"]]
+                               or item["plural"] and item["verb"] in ("kommen", "wissen") and found[:1] == ["würden"])
     return {"correct": ok, "score": float(ok), "pred": found[:2], "gold": item["gold"],
             "detail": {"ok_plural" if item["plural"] else "ok_singular": float(ok)}}
 
@@ -1407,8 +1430,8 @@ TASKS = {
     "roundtrip": task(("de", "en"), load_roundtrip, score_roundtrip, 1024, 60, lang_check=False),
     "de_verbs": task(("de",), load_de_verbs, score_de_verbs, 64, 120, lang_check=False),
     "de_case": task(("de",), load_de_case, score_de_case, 64, 120, lang_check=False),
-    "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 56, lang_check=False),
-    "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 48, lang_check=False),
+    "de_homophones": task(("de",), load_de_homophones, score_de_homophones, 32, 40, lang_check=False),
+    "de_reported": task(("de",), load_de_reported, score_de_reported, 128, 24, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

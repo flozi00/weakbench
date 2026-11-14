@@ -785,7 +785,20 @@ def test_switched_question():
         assert not r["correct"] and r["detail"]["took_total"] == 1.0
 
 
+
+def test_causal_graph():
+    import tasks_novel as tn
+    e = [(0, 1), (1, 2), (0, 3), (3, 2)]
+    assert tn.cg_reach(e, 0, 2) and tn.cg_reach(e, 0, 2, avoid=1) and not tn.cg_reach(e, 2, 0)
+    assert not tn.cg_reach([(0, 1), (1, 2)], 0, 2, avoid=1)
+    for lang in ("en", "de"):
+        it = tn.load_causal_graph(lang, 24, 0)
+        assert len(it) == 24 and {x["kind"] for x in it} == {"any", "fix"}
+        assert sorted({x["gold"] for x in it}) == (["no", "yes"] if lang == "en" else ["ja", "nein"])
+
+
 if __name__ == "__main__":
+    test_causal_graph()
     test_switched_question()
     test_source_trust()
     test_option_order()

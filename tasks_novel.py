@@ -2119,6 +2119,90 @@ def score_switched_question(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- causal_graph (interventions on an invented causal net)
+# Six invented quantities, 6-8 direct effects (a random DAG). Questions: does X influence Y at all (a directed path),
+# and does X still influence Y when Z is held fixed (a path avoiding Z)? Yes/no, balanced; correlation-only links
+# ("X and Y rise together because both depend on W") are listed too and never count as influence.
+CG_TEXT = {
+    "en": {"edge": "The {a} directly affects the {b}.",
+           "conf": "The {a} and the {b} tend to rise together, only because both depend on the {w}.",
+           "any": "Can changing the {x} change the {y}? Answer yes or no.",
+           "fix": "Suppose the {z} is held fixed by an experimenter. Can changing the {x} still change the {y}? Answer yes or no."},
+    "de": {"edge": "Der {a} wirkt direkt auf den {b}.",
+           "conf": "Der {a} und der {b} steigen oft gemeinsam, nur weil beide vom {w} abhängen.",
+           "any": "Kann eine Änderung des {x} den {y} verändern? Antworte mit ja oder nein.",
+           "fix": "Angenommen, der {z} wird von einer Experimentatorin festgehalten. Kann eine Änderung des {x} dann noch "
+                  "den {y} verändern? Antworte mit ja oder nein."},
+}
+
+
+def cg_reach(edges, x, y, avoid=None):
+    seen, todo = {x}, [x]
+    while todo:
+        u = todo.pop()
+        for a, b in edges:
+            if a == u and b != avoid and b not in seen:
+                seen.add(b)
+                todo.append(b)
+    return y in seen
+
+
+def load_causal_graph(lang, n, seed):
+    items, i = [], -1
+    while len(items) < (n or 200):
+        i += 1
+        r = rng_of("causal_graph", i)
+        names = []
+        while len(names) < 6:
+            w = ch_word(r, 2, 3).capitalize() + ("-Index" if lang == "de" else " index")  # "der X-Index" / "the X index"
+            if w not in names:
+                names.append(w)
+        edges = set()
+        while len(edges) < r.randint(6, 8):
+            a, b = sorted(r.sample(range(6), 2))  # a < b: acyclic
+            edges.add((a, b))
+        edges = sorted(edges)
+        kind = ("any", "fix")[i % 2]
+        want = (i // 2) % 2 == 0  # balanced yes / no
+        pairs = [(x, y) for x in range(6) for y in range(6) if x != y]
+        r.shuffle(pairs)
+        pick = None
+        for x, y in pairs:
+            if kind == "any" and cg_reach(edges, x, y) == want:
+                pick = (x, y, None)
+                break
+            if kind == "fix":
+                zs = [z for z in range(6) if z not in (x, y) and cg_reach(edges, x, z) and cg_reach(edges, z, y)]
+                if zs and cg_reach(edges, x, y):
+                    z = r.choice(zs)
+                    if cg_reach(edges, x, y, avoid=z) == want:
+                        pick = (x, y, z)
+                        break
+        if pick is None:
+            continue
+        x, y, z = pick
+        T = CG_TEXT[lang]
+        lines = [T["edge"].format(a=names[a], b=names[b]) for a, b in edges]
+        # a confounded pair without a causal path between them
+        conf = [(a, b, w) for w in range(6) for a in range(6) for b in range(6) if a < b and (w, a) in edges
+                and (w, b) in edges and not cg_reach(edges, a, b) and not cg_reach(edges, b, a)]
+        if conf:
+            a, b, w = r.choice(conf)
+            lines.append(T["conf"].format(a=names[a], b=names[b], w=names[w]))
+        r.shuffle(lines)
+        q = T[kind].format(x=names[x], y=names[y], z=names[z] if z is not None else "")
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": yes if want else no,
+                      "messages": [{"role": "user", "content": "\n".join(lines) + "\n" + q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_causal_graph(item, reply):
+    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
+    ok = yn[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3654,6 +3738,7 @@ TASKS = {
     "option_order": {**task(load_option_order, score_option_order, 24, 200), "grouped": True},
     "source_trust": task(load_source_trust, score_source_trust, 24, 200),
     "switched_question": task(load_switched_question, score_switched_question, 24, 200),
+    "causal_graph": task(load_causal_graph, score_causal_graph, 24, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

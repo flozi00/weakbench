@@ -1180,6 +1180,10 @@ def test_prob_fallacies():
     six = next(x for x in it if x["gold"] == "1/6")
     assert tn.score_prob_fallacies(six, {"content": "Answer: 0.167"})["correct"]
     assert not tn.score_prob_fallacies(six, {"content": "Answer: 1/5"})["correct"]
+    for txt in ("16,7 %", "1 in 6", "16.67%"):
+        assert tn.score_prob_fallacies(six, {"content": "Answer: " + txt})["correct"], txt
+    coin = next(x for x in it if x["gold"] == "50")
+    assert tn.score_prob_fallacies(coin, {"content": "Answer: unchanged, 50%"})["correct"]
 
 
 if __name__ == "__main__":

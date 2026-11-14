@@ -3831,7 +3831,8 @@ def sp_draw(r, paradox):
         a2, b2 = round(a2n * r.uniform(.3, .6)), round(b2n * r.uniform(.1, .45))
         within = a1 / a1n > b1 / b1n and a2 / a2n > b2 / b2n
         overall_a = (a1 + a2) / (a1n + a2n) > (b1 + b2) / (b1n + b2n)
-        if within and (not overall_a) == paradox and abs((a1 + a2) / (a1n + a2n) - (b1 + b2) / (b1n + b2n)) > .02:
+        gaps = (abs(a1 / a1n - b1 / b1n), abs(a2 / a2n - b2 / b2n), abs((a1 + a2) / (a1n + a2n) - (b1 + b2) / (b1n + b2n)))
+        if within and (not overall_a) == paradox and min(gaps) > .02:  # every comparison clear by 2 points
             return (a1, a1n, b1, b1n, a2, a2n, b2, b2n), "A", ("A" if overall_a else "B")
 
 
@@ -3864,7 +3865,8 @@ def load_simpson(lang, n, seed):
 def score_simpson(item, reply):
     line = (final_answer(reply["content"]) or "").strip()
     m = re.match(r"\W*([AB])\b", line) or re.search(r"\b(?:treatment|behandlung)\s+([AB])\b", line, re.I)
-    pred = m.group(1).upper() if m else None
+    last = re.findall(r"\b([AB])\b", line)
+    pred = m.group(1).upper() if m else (last[-1] if last else None)  # "In both hospitals, A"
     ok = pred == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
             "detail": {f"ok_{item['ask']}": float(ok), "ok_paradox" if item["paradox"] else "ok_control": float(ok)}}
@@ -3894,7 +3896,7 @@ PF_PERSONA = {"en": [("Mira is 31, outspoken, studied environmental science and 
                      ("Jonas spielt seit seinem sechsten Lebensjahr Gitarre und hat lange Haare.", "Jonas ist Buchhalter",
                       "Jonas ist Buchhalter und spielt in einer Rockband"),
                      ("Selin spricht vier Sprachen und hat auf drei Kontinenten gelebt.", "Selin arbeitet in einem Krankenhaus",
-                      "Selin arbeitet in einem Krankenhaus als Dolmetscherin"),
+                      "Selin arbeitet als Dolmetscherin in einem Krankenhaus"),
                      ("Paul repariert in seiner Garage alte Fahrräder und verpasst kein Radrennen im Fernsehen.",
                       "Paul ist Anwalt", "Paul ist Anwalt und fährt mit dem Rad zur Arbeit")]}
 
@@ -3938,18 +3940,22 @@ def load_prob_fallacies(lang, n, seed):
 
 
 def score_prob_fallacies(item, reply):
-    line = (final_answer(reply["content"]) or "").replace(" ", "")
+    raw = final_answer(reply["content"]) or ""
+    line = raw.replace(" ", "")
     g = item["gold"]
     if item["kind"] == "conjunction":
-        m = re.match(r"\W*([AB])\b", line) or re.search(r"\b([AB])\)", line)
-        ok = bool(m) and m.group(1) == g
+        m = (re.match(r"\W*(?:option|möglichkeit|antwort)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line))
+        ok = bool(m) and m.group(1).upper() == g
     elif g == "50":
-        ok = bool(re.search(r"(?<![\d.,])50(?:[.,]0+)?%?(?!\d)|1/2|0[.,]5\b", line))
+        ok = bool(re.search(r"(?<!\d)(?<!\d[.,])50(?:[.,]0+)?%?(?!\d)|1/2|0[.,]5\b|half|hälfte|fifty|fünfzig", line, re.I))
     else:
         a, b = g.split("/")
-        dec = round(int(a) / int(b), 3)
-        ok = bool(re.search(r"(?<!\d)" + re.escape(g) + r"(?!\d)", line)) or any(
-            abs(float(x.replace(",", ".")) - dec) < 0.002 for x in re.findall(r"0[.,]\d+", line))
+        dec = int(a) / int(b)
+        pcts = [float(x.replace(",", ".")) for x in re.findall(r"(\d+(?:[.,]\d+)?)%", line)]
+        ok = (bool(re.search(r"(?<!\d)" + re.escape(g) + r"(?!\d)", line))
+              or bool(re.search(r"(?<!\d)1(?:in|von|zu|outof)" + b + r"(?!\d)", line, re.I))
+              or any(abs(float(x.replace(",", ".")) - dec) < 0.002 for x in re.findall(r"0[.,]\d+", line))
+              or any(abs(p - 100 * dec) <= 0.1 for p in pcts))
     return {"correct": ok, "score": float(ok), "pred": line[:30], "gold": g, "detail": {f"ok_{item['kind']}": float(ok)}}
 
 

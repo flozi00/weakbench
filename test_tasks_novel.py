@@ -532,3 +532,20 @@ if __name__ == "__main__":
     test_ops_eval()
     test_rules()
     print("ok")
+
+
+def test_noop_math():
+    import tasks_novel as tn
+    for lang in ("en", "de"):
+        it = tn.load_noop_math(lang, 40, 0)
+        assert len(it) == 40
+        for a, b in zip(it[::2], it[1::2]):
+            assert not a["noop"] and b["noop"] and a["gold"] == b["gold"]
+            assert len(b["messages"][0]["content"]) > len(a["messages"][0]["content"])
+        g = it[1]["gold"]
+        assert tn.score_noop_math(it[1], {"content": f"...\nAnswer: {g}"})["correct"]
+        assert not tn.score_noop_math(it[1], {"content": f"Answer: {g + 3}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_noop_math()

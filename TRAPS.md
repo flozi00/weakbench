@@ -7,7 +7,7 @@ sycophancy (the user pushes back on a correct answer), math_missing (an unsolvab
 
 ## Next candidates
 1. **Famous-puzzle mutations.** A known riddle with one changed detail: the river crossing where the boat carries everyone, the Monty Hall variant where the host opens a door at random. The model is caught when it answers the original puzzle.
-2. **Irrelevant numbers.** An arithmetic word problem with a plausible extra number (GSM-NoOp style, generated).
+2. **Irrelevant numbers** (done: `noop_math`). An arithmetic word problem with a plausible extra number (GSM-NoOp style, generated).
 3. **Anchoring.** The same estimate question with and without a stated anchor ("someone guessed 9000"). Measures the shift.
 4. **Shifting instructions in a long dialogue.** A rule set in turn 1 is revoked in turn 6, and the model must follow the newest one.
 5. **Counting and letters.** Counting characters or words in invented words, reversing them, letters at given positions.

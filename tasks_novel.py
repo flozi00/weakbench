@@ -1296,6 +1296,50 @@ def score_math_missing(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": detail}
 
 
+# ---------------------------------------------------------------- noop_math (trap: irrelevant number)
+# GSM-NoOp style: the math_variants templates, every odd item with one plausible but irrelevant numeric
+# sentence after the first sentence. Even/odd pairs share a template and seed, so ok_clean - ok_noop is the trap.
+NOOP = {
+    "en": ["By the way, {k} of them were slightly smaller than usual, which does not change anything.",
+           "Last year the same thing had cost {k} dollars more, but that is no longer relevant.",
+           "{k} people watched while this happened, without taking part.",
+           "The instructions were printed on page {k} of a booklet."],
+    "de": ["Übrigens waren {k} davon etwas kleiner als üblich, was nichts ändert.",
+           "Letztes Jahr hätte dasselbe {k} Euro mehr gekostet, aber das spielt keine Rolle mehr.",
+           "{k} Leute sahen dabei zu, ohne mitzumachen.",
+           "Die Anleitung stand auf Seite {k} eines Hefts."],
+}
+
+
+def load_noop_math(lang, n, seed):
+    items, i = [], -1
+    templ = list(VAGUE)
+    while len(items) < (n or 200):
+        i += 1
+        base = i // 2
+        t = templ[base % len(templ)](rng_of("noop_math", base))
+        if t["ans"] is None or t["ans"] != int(t["ans"]):
+            continue
+        text, noop = t[lang], i % 2 == 1
+        if noop:
+            r = rng_of("noop_math_k", base)
+            m = re.search(r"[.!?] ", text)
+            if not m:
+                raise RuntimeError(f"noop_math: no sentence break in {text!r}")
+            extra = r.choice(NOOP[lang]).format(k=r.randint(2, 9))
+            text = text[:m.end()] + extra + " " + text[m.end():]
+        items.append({"id": str(i), "lang": lang, "noop": noop, "gold": int(t["ans"]),
+                      "messages": [{"role": "user", "content": text + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_noop_math(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_noop" if item["noop"] else "ok_clean": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -2818,6 +2862,7 @@ TASKS = {
     "code_trace": task(load_code_trace, score_code_trace, 24, 240),
     "spatial": task(load_spatial, score_spatial, 24, 240),
     "math_missing": task(load_math_missing, score_math_missing, 24, 200),
+    "noop_math": task(load_noop_math, score_noop_math, 24, 200),
     "meeting_actions": {**task(load_meeting_actions, score_meeting_actions, 24, 150), "think": False,
                         "max_tokens": 512},
     "citation_check": task(load_citation_check, score_citation_check, 24, 150),

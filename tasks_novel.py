@@ -4035,6 +4035,56 @@ def score_conclusion_spot(item, reply):
             "detail": {"ok_marked" if item["marked"] else "ok_unmarked": float(ok)}}
 
 
+# ---------------------------------------------------------------- sunk_cost (decide by the future, not by what is spent)
+# Continue a project (remaining cost, expected value) or switch to an alternative (cost, value). Gold = the higher
+# future net value. Trap twins add "X has already been spent on the project" where continuing is NOT the better choice;
+# control twins carry no spent amount. took_sunk = chose to continue in a trap item. Labels A/B alternate.
+
+
+def load_sunk_cost(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        g, trap = divmod(i, 2)
+        r = rng_of("sunk_cost", g)
+        while True:
+            rc, rv = r.randint(20, 80) * 1000, r.randint(40, 120) * 1000   # continue: remaining cost, value
+            sc, sv = r.randint(10, 60) * 1000, r.randint(40, 140) * 1000   # switch: cost, value
+            if (sv - sc) - (rv - rc) >= 15000:  # switching is clearly better (by at least 15,000)
+                break
+        spent = r.randint(150, 400) * 1000
+        de = lang == "de"
+        fmt = (lambda x: f"{x:,}".replace(",", ".")) if de else (lambda x: f"{x:,}")  # noqa: E731
+        cont = (f"das laufende Projekt fortsetzen: noch {fmt(rc)} Euro Kosten, erwarteter Ertrag {fmt(rv)} Euro" if de
+                else f"continue the current project: {fmt(rc)} euros still to spend, expected return {fmt(rv)} euros")
+        swit = (f"auf ein neues Projekt umsteigen: {fmt(sc)} Euro Kosten, erwarteter Ertrag {fmt(sv)} Euro" if de
+                else f"switch to a new project: {fmt(sc)} euros cost, expected return {fmt(sv)} euros")
+        sunk = ((f" In das laufende Projekt sind bereits {fmt(spent)} Euro geflossen, die verloren wären, wenn man aufhört."
+                 if de else f" {fmt(spent)} euros have already gone into the current project and would be lost if it stops.")
+                if trap else "")
+        cont_first = g % 2 == 0
+        a, b = (cont, swit) if cont_first else (swit, cont)
+        q = (f"Eine Firma muss sich entscheiden.{sunk}\nA) {a[0].upper() + a[1:]}.\nB) {b[0].upper() + b[1:]}.\nWelche Wahl ist "
+             "wirtschaftlich besser? Antworte mit A oder B." if de else
+             f"A company must decide.{sunk}\nA) {a[0].upper() + a[1:]}.\nB) {b[0].upper() + b[1:]}.\nWhich choice is "
+             "economically better? Answer A or B.")
+        gold = "B" if cont_first else "A"
+        items.append({"id": f"{g}-{trap}", "lang": lang, "trap": bool(trap), "gold": gold,
+                      "cont": "A" if cont_first else "B", "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_sunk_cost(item, reply):
+    line = (final_answer(reply["content"]) or "").strip()
+    m = re.match(r"\W*(?:option|wahl)?\W*([AB])\b", line, re.I) or re.search(r"\b([AB])\)", line)
+    lone = set(re.findall(r"\b([AB])\b", line))
+    pred = m.group(1).upper() if m else (lone.pop() if len(lone) == 1 else None)
+    ok = pred == item["gold"]
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    if item["trap"]:
+        d["took_sunk"] = float(pred == item["cont"])
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5600,6 +5650,7 @@ TASKS = {
     "prob_fallacies": task(load_prob_fallacies, score_prob_fallacies, 24, 120),
     "framing": {**task(load_framing, score_framing, 24, 120), "grouped": True},
     "conclusion_spot": task(load_conclusion_spot, score_conclusion_spot, 24, 120),
+    "sunk_cost": task(load_sunk_cost, score_sunk_cost, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

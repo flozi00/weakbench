@@ -1212,7 +1212,19 @@ def test_conclusion_spot():
         assert tn.score_conclusion_spot(x, {"content": f"Antwort: ({x['gold']})"})["correct"]
 
 
+
+def test_sunk_cost():
+    import tasks_novel as tn
+    it = tn.load_sunk_cost("de", 8, 0)
+    for a, b in zip(it[::2], it[1::2]):
+        assert not a["trap"] and b["trap"] and a["gold"] == b["gold"] and "bereits" in b["messages"][0]["content"]
+    r = tn.score_sunk_cost(it[1], {"content": f"Antwort: {it[1]['cont']}"})
+    assert not r["correct"] and r["detail"]["took_sunk"] == 1.0
+    assert {x["gold"] for x in it} == {"A", "B"}
+
+
 if __name__ == "__main__":
+    test_sunk_cost()
     test_conclusion_spot()
     test_framing()
     test_prob_fallacies()

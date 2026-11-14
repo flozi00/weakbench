@@ -1771,6 +1771,58 @@ def score_reversal(item, reply):
             "detail": {"ok_backward" if item["backward"] else "ok_forward": float(ok)}}
 
 
+# ---------------------------------------------------------------- off_by_one (trap: fence posts and inclusive ranges)
+OB_KINDS = ("pages", "between", "fence", "nights", "loop")
+OB_TEXT = {
+    "en": {"pages": "Read pages {a} to {b} of the book, both included. How many pages is that?",
+           "between": "How many whole numbers lie strictly between {a} and {b}?",
+           "fence": "A straight fence is {L} m long with a post every {d} m, including one at each end. How many posts?",
+           "nights": "A hotel guest checks in on May {a} and checks out on May {b}. How many nights?",
+           "loop": "In Python, how many times does the body of `for i in range({a}, {b}, {d}):` run?"},
+    "de": {"pages": "Lies die Seiten {a} bis {b} des Buches, beide eingeschlossen. Wie viele Seiten sind das?",
+           "between": "Wie viele ganze Zahlen liegen echt zwischen {a} und {b}?",
+           "fence": "Ein gerader Zaun ist {L} m lang, alle {d} m steht ein Pfosten, auch an beiden Enden. Wie viele Pfosten?",
+           "nights": "Ein Hotelgast checkt am {a}. Mai ein und am {b}. Mai aus. Wie viele Nächte sind das?",
+           "loop": "Wie oft läuft in Python der Rumpf von `for i in range({a}, {b}, {d}):`?"},
+}
+
+
+def load_off_by_one(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        r = rng_of("off_by_one", i)
+        kind = OB_KINDS[i % len(OB_KINDS)]
+        a = r.randint(4, 120)
+        if kind == "pages":
+            b = a + r.randint(5, 60)
+            gold, f = b - a + 1, {"a": a, "b": b}
+        elif kind == "between":
+            b = a + r.randint(5, 60)
+            gold, f = b - a - 1, {"a": a, "b": b}
+        elif kind == "fence":
+            d = r.choice([2, 3, 4, 5])
+            L = d * r.randint(6, 30)
+            gold, f = L // d + 1, {"L": L, "d": d}
+        elif kind == "nights":
+            a = r.randint(4, 15)
+            b = a + r.randint(3, 12)
+            gold, f = b - a, {"a": a, "b": b}
+        else:
+            d = r.choice([2, 3, 5])
+            b = a + r.randint(10, 60)
+            gold, f = len(range(a, b, d)), {"a": a, "b": b, "d": d}
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": OB_TEXT[lang][kind].format(**f) + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_off_by_one(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    d = {f"ok_{item['kind']}": float(ok), "off_by_one": float(v is not None and abs(v - item["gold"]) == 1)}
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3299,6 +3351,7 @@ TASKS = {
     "near_miss_qa": task(load_near_miss_qa, score_near_miss_qa, 24, 200),
     "rephrase_consistency": {**task(load_rephrase_consistency, score_rephrase_consistency, 24, 150), "grouped": True},
     "reversal": task(load_reversal, score_reversal, 24, 200),
+    "off_by_one": task(load_off_by_one, score_off_by_one, 25, 200),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -686,7 +686,18 @@ def test_reversal():
     assert not tn.score_reversal(b, {"content": f"Antwort: {a['gold']}"})["correct"]
 
 
+
+def test_off_by_one():
+    import tasks_novel as tn
+    it = tn.load_off_by_one("en", 5, 0)
+    assert [x["kind"] for x in it] == list(tn.OB_KINDS)
+    for x in it:
+        r = tn.score_off_by_one(x, {"content": f"Answer: {x['gold'] + 1}"})
+        assert not r["correct"] and r["detail"]["off_by_one"] == 1.0
+
+
 if __name__ == "__main__":
+    test_off_by_one()
     test_reversal()
     test_rephrase_consistency()
     test_format_bait()

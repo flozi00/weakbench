@@ -2875,6 +2875,67 @@ def score_regex_synth(item, reply):
             "detail": {"fits_shown": float(shown_ok), "generalises": float(ok), "overfit": float(shown_ok and not held_ok)}}
 
 
+# ---------------------------------------------------------------- continuity_error (find the sentence that contradicts the story)
+# A generated 8-10 sentence story establishes facts (a coat's colour, who owns the dog, a time, a count); one later
+# sentence contradicts one of them, or none does (control). Answer: the number of the contradicting sentence, or 0.
+CE_FACTS = {
+    "en": [("{a} wore a {c1} coat.", "{a} buttoned up the {c2} coat.", "{a} buttoned up the {c1} coat.",
+            ["red", "green", "grey", "yellow"]),
+           ("The dog belonged to {b}.", "{b} had never owned a dog.", "{a} took {b}'s dog for a walk.", None),
+           ("The train left at {t1} o'clock.", "At {t2} o'clock the train was still waiting, as it always left at {t2}.",
+            "Shortly after {t1} o'clock the train was gone.", None),
+           ("{b} had baked {n1} rolls.", "All {n2} rolls {b} had baked were eaten.", "All {n1} rolls {b} had baked were eaten.",
+            None)],
+    "de": [("{a} trug einen {c1} Mantel.", "{a} knöpfte den {c2} Mantel zu.", "{a} knöpfte den {c1} Mantel zu.",
+            ["roten", "grünen", "grauen", "gelben"]),
+           ("Der Hund gehörte {b}.", "{b} hatte noch nie einen Hund gehabt.", "{a} ging mit {b_gen} Hund spazieren.", None),
+           ("Der Zug fuhr um {t1} Uhr ab.", "Um {t2} Uhr wartete der Zug noch, denn er fuhr immer um {t2} Uhr ab.",
+            "Kurz nach {t1} Uhr war der Zug weg.", None),
+           ("{b} hatte {n1} Brötchen gebacken.", "Alle {n2} Brötchen, die {b} gebacken hatte, wurden gegessen.",
+            "Alle {n1} Brötchen, die {b} gebacken hatte, wurden gegessen.", None)]}
+CE_FILL = {"en": ["The sky was clear.", "Birds sang in the trees.", "The street was quiet.", "A bus drove past.",
+                  "Someone laughed in the distance.", "The bakery smelled of bread."],
+           "de": ["Der Himmel war klar.", "In den Bäumen sangen Vögel.", "Die Straße war ruhig.", "Ein Bus fuhr vorbei.",
+                  "In der Ferne lachte jemand.", "Die Bäckerei duftete nach Brot."]}
+
+
+def load_continuity_error(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("continuity_error", i)
+        a, b = r.sample(["Lena", "Tom", "Mira", "Jonas"], 2)
+        f = CE_FACTS[lang][i % 4]
+        cols = f[3]
+        c1, c2 = r.sample(cols, 2) if cols else ("", "")
+        t1 = r.randint(6, 9)
+        n1 = r.randint(6, 12)
+        vals = {"a": a, "b": b, "c1": c1, "c2": c2, "t1": t1, "t2": t1 + 2, "n1": n1, "n2": n1 + r.choice([-3, 3]),
+                "b_gen": b + ("'" if b.endswith("s") else "s")}
+        contra = (i // 4) % 3 != 0  # a third are clean controls
+        sents = [f[0].format(**vals)]
+        fill = r.sample(CE_FILL[lang], 5)
+        sents += fill[:3]
+        sents.append((f[1] if contra else f[2]).format(**vals))
+        sents += fill[3:]
+        r_pos = r.randint(2, 4)  # the late sentence moves around a little
+        late = sents.pop(4)
+        sents.insert(r_pos + 1, late)
+        gold = (r_pos + 2) if contra else 0
+        story = " ".join(f"({k + 1}) {x}" for k, x in enumerate(sents))
+        q = ("Does any sentence contradict an earlier one? Answer with its number, or 0 if none does." if lang == "en" else
+             "Widerspricht ein Satz einem früheren? Antworte mit seiner Nummer oder mit 0, wenn keiner das tut.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "fact": i % 4,
+                      "messages": [{"role": "user", "content": story + "\n\n" + q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_continuity_error(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_clean" if item["gold"] == 0 else f"ok_fact{item['fact']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4420,6 +4481,7 @@ TASKS = {
     "blocks_plan": {**task(load_blocks_plan, score_blocks_plan, 24, 120), "max_tokens": 4096},
     "judge_ability": {**task(load_judge_ability, score_judge_ability, 24, 160), "grouped": True},
     "regex_synth": {**task(load_regex_synth, score_regex_synth, 24, 80), "max_tokens": 2048},
+    "continuity_error": task(load_continuity_error, score_continuity_error, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

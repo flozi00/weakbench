@@ -934,7 +934,20 @@ def test_regex_synth():
     assert tn.score_regex_synth(it[0], {"content": f"Use `{g}` with `re.fullmatch`."})["correct"]
 
 
+
+def test_continuity_error():
+    import tasks_novel as tn
+    it = tn.load_continuity_error("de", 24, 0)
+    assert {x["gold"] == 0 for x in it} == {True, False}
+    for x in it:
+        n = len(__import__("re").findall(r"\(\d+\)", x["messages"][0]["content"]))
+        assert 0 <= x["gold"] <= n
+        assert tn.score_continuity_error(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+        assert "{" not in x["messages"][0]["content"]
+
+
 if __name__ == "__main__":
+    test_continuity_error()
     test_regex_synth()
     test_judge_ability()
     test_blocks_plan()

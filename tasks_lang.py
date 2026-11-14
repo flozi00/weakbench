@@ -2071,11 +2071,11 @@ def score_form_writing(item, reply):
 # A workplace text where English terms are the habit (Meeting, Deadline, Feedback, Release, Bug ...). The instruction
 # asks for German words only; scored on a list of common anglicisms (inflected and in compounds) and the language.
 NA_WORDS = ["meeting", "deadline", "feedback", "team", "update", "call", "workshop", "download", "tool", "feature",
-            "release", "bug", "deployment", "manager", "briefing", "homeoffice", "office", "kickoff",
-            "kick-off", "slot", "slides", "onboarding", "teamlead", "workflow", "know-how", "event", "job", "ticket"]
+            "release", "bugfix", "bugs", "deployment", "manager", "briefing", "homeoffice", "office", "kickoff",
+            "kick-off", "slot", "slides", "onboarding", "teamlead", "workflow", "know-how", "event", "ticket"]  # not "job": in the Duden, and Jobcenter is an office name
 NA_TOPICS = ["die Planung der nächsten Softwareversion", "ein Projekttreffen mit Rückmeldungen zum Zwischenstand",
              "die Einarbeitung einer neuen Kollegin", "einen Fehler in der Kundensoftware und den Zeitplan zur Behebung",
-             "die Vorbereitung einer Präsentation für die Geschäftsführung", "die Umstellung auf Arbeit von zu Hause"]
+             "die Vorbereitung einer Präsentation für die Geschäftsführung", "die Umstellung auf das Arbeiten von zu Hause"]
 
 
 def load_de_no_anglicisms(lang, n, seed):
@@ -2095,7 +2095,7 @@ def score_de_no_anglicisms(item, reply):
     text = reply["content"] or ""
     low = text.lower()
     # at a word edge (Team, Teamsitzung, Projektteam), never inside unrelated German words (eventuell, Strategie)
-    low = re.sub(r"\beventuell\w*", " ", low)
+    low = re.sub(r"\b(eventuell\w*|eventual\w*|calla\w*|slotte\w*|bugsier\w*|bugwell\w*)", " ", low)  # German words that start alike
     hits = sorted({w for w in NA_WORDS if re.search(r"\b" + re.escape(w) + r"|" + re.escape(w) + r"\b", low)})
     lang_ok = common.lang_ok(text, "de", min_words=20) is True
     ok = not hits and lang_ok

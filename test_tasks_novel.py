@@ -1012,6 +1012,9 @@ def test_knapsack():
         assert tn.score_knapsack(x, {"content": f"Answer: {ans}"})["correct"]
         allx = ", ".join(y[0] for y in x["items"])
         assert not tn.score_knapsack(x, {"content": f"Answer: {allx}"})["correct"]
+        rest = [y[0] for y in x["items"] if y not in best]
+        if rest:
+            assert tn.score_knapsack(x, {"content": f"Answer: {ans} (not the {rest[0]})"})["correct"]
 
 
 if __name__ == "__main__":

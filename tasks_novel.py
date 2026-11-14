@@ -3188,7 +3188,8 @@ def load_knapsack(lang, n, seed):
 
 def score_knapsack(item, reply):
     line = (final_answer(reply["content"]) or "").lower()
-    picked = [x for x in item["items"] if re.search(r"\b" + re.escape(x[0].lower()) + r"\b", line)]
+    line = re.split(r"\(|;|\||\b(?:not|nicht|ohne|except|außer|but not)\b", line)[0]  # drop what it rejects
+    picked = [x for x in item["items"] if re.search(r"\b" + re.escape(x[0].lower()) + r"(?:s|n|en|e)?\b", line)]
     cost, val = sum(x[1] for x in picked), sum(x[2] for x in picked)
     ok = cost <= item["budget"] and val == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": f"{cost}/{val}", "gold": item["gold"],

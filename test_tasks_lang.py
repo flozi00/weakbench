@@ -577,7 +577,7 @@ def test_de_no_anglicisms():
     assert tl.score_de_no_anglicisms(x, {"content": clean})["correct"]
     r = tl.score_de_no_anglicisms(x, {"content": clean.replace("Besprechung", "Teammeeting")})
     assert not r["correct"] and r["detail"]["anglicisms"] >= 1
-    assert tl.score_de_no_anglicisms(x, {"content": clean + " Unsere Strategie bleibt eventuell gleich."})["correct"]
+    assert tl.score_de_no_anglicisms(x, {"content": clean + " Unsere Strategie bleibt eventuell gleich, wir bugsieren das Projekt durch jeden Eventualfall."})["correct"]
 
 
 if __name__ == "__main__":

@@ -740,7 +740,21 @@ def test_false_premise():
     assert not r["correct"] and r["detail"]["took_premise"] == 1.0
 
 
+
+def test_option_order():
+    import re
+    import tasks_novel as tn
+    it = tn.load_option_order("de", 8, 0)
+    assert [x["gold"] for x in it[:4]] == list("ABCD")
+    for x in it:
+        k = int(re.search(r"durch (\d+)", x["messages"][0]["content"]).group(1))
+        opts = [int(v) for v in re.findall(r"^[ABCD]\) (\d+)", x["messages"][0]["content"], re.M)]
+        assert [v % k == 0 for v in opts].count(True) == 1 and opts["ABCD".index(x["gold"])] % k == 0
+    assert tn.score_option_order(it[2], {"content": "Antwort: **C**"})["correct"]
+
+
 if __name__ == "__main__":
+    test_option_order()
     test_false_premise()
     test_double_negation()
     test_mixed_units()

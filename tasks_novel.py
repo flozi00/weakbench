@@ -1980,6 +1980,41 @@ def score_false_premise(item, reply):
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- option_order (trap: position bias in multiple choice)
+# One question, four options, asked four times with the right option at A, B, C and D (ids "<group>-<pos>",
+# "grouped": group_agree = the verdict survives reordering). Sub-metric ok_pos<A-D> exposes a favourite letter.
+OO_TEXT = {"en": {"div": "Which of these numbers is divisible by {k}?", "ans": "Answer with the letter only."},
+           "de": {"div": "Welche dieser Zahlen ist durch {k} teilbar?", "ans": "Antworte nur mit dem Buchstaben."}}
+
+
+def load_option_order(lang, n, seed):
+    items = []
+    for i in range(n or 200):
+        g, pos = divmod(i, 4)
+        r = rng_of("option_order", g)
+        k = r.choice([7, 11, 13, 17])
+        right = k * r.randint(8, 70)
+        wrong = []
+        while len(wrong) < 3:  # near misses: right +- a little, never divisible
+            w = right + r.choice([-1, 1]) * r.randint(1, k - 1) + k * r.randint(-3, 3)
+            if w % k and w > 0 and w not in wrong:
+                wrong.append(w)
+        opts = wrong[:pos] + [right] + wrong[pos:]
+        body = "\n".join(f"{'ABCD'[j]}) {v}" for j, v in enumerate(opts))
+        q = OO_TEXT[lang]["div"].format(k=k) + "\n" + body + "\n" + OO_TEXT[lang]["ans"]
+        items.append({"id": f"{g}-{pos}", "lang": lang, "gold": "ABCD"[pos],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_option_order(item, reply):
+    m = re.search(r"\b([ABCD])\b", final_answer(reply["content"]) or "")
+    pred = m.group(1) if m else None
+    ok = pred == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"],
+            "detail": {f"ok_pos{item['gold']}": float(ok), **({f"chose_{pred}": 1.0} if pred else {})}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -3512,6 +3547,7 @@ TASKS = {
     "mixed_units": task(load_mixed_units, score_mixed_units, 24, 150),
     "double_negation": task(load_double_negation, score_double_negation, 24, 200),
     "false_premise": task(load_false_premise, score_false_premise, 24, 200),
+    "option_order": {**task(load_option_order, score_option_order, 24, 200), "grouped": True},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

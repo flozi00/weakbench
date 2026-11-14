@@ -3335,6 +3335,59 @@ def score_prop_logic(item, reply):
     return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- table_build (turn prose into a sorted Markdown table)
+# A paragraph lists 4-6 records (name, city, year, score) in free order. The model builds a Markdown table with the
+# requested column order, sorted by a requested column and direction, with one derived column (age in 2026).
+# Parsed and compared cell by cell.
+TB_NAMES = ["Arin", "Belo", "Cira", "Doro", "Emil", "Fenja", "Goran", "Hella"]
+TB_CITIES = ["Kiel", "Graz", "Basel", "Bremen", "Linz", "Ulm"]
+
+
+def load_table_build(lang, n, seed):
+    items = []
+    for i in range(n or 100):
+        r = rng_of("table_build", i)
+        k = 4 + i % 3
+        recs = [{"name": nm, "city": r.choice(TB_CITIES), "year": r.randint(1950, 2005), "score": r.randint(10, 99)}
+                for nm in r.sample(TB_NAMES, k)]
+        while len({x["score"] for x in recs}) < k or len({x["year"] for x in recs}) < k:
+            for x in recs:
+                x["score"], x["year"] = r.randint(10, 99), r.randint(1950, 2005)
+        key = r.choice(["score", "year"])
+        desc = r.random() < 0.5
+        parts = [(f"{x['name']} from {x['city']}, born {x['year']}, scored {x['score']} points" if lang == "en" else
+                  f"{x['name']} aus {x['city']}, geboren {x['year']}, erzielte {x['score']} Punkte") for x in recs]
+        text = "; ".join(parts) + "."
+        cols = ["Name", "Score", "Age", "City"] if lang == "en" else ["Name", "Punkte", "Alter", "Stadt"]
+        order_en = "descending" if desc else "ascending"
+        order_de = "absteigend" if desc else "aufsteigend"
+        keyname = {"score": cols[1], "year": "year of birth" if lang == "en" else "Geburtsjahr"}[key]
+        q = (f"{text}\nMake a Markdown table with exactly the columns {', '.join(cols)} in this order, where Age is the "
+             f"age in 2026 (2026 minus year of birth). Sort the rows by {keyname}, {order_en}. Reply with the table only."
+             if lang == "en" else
+             f"{text}\nErstelle eine Markdown-Tabelle mit genau den Spalten {', '.join(cols)} in dieser Reihenfolge; Alter "
+             f"ist das Alter im Jahr 2026 (2026 minus Geburtsjahr). Sortiere die Zeilen nach {keyname}, {order_de}. Antworte "
+             "nur mit der Tabelle.")
+        rows = sorted(recs, key=lambda x: x[key], reverse=desc)
+        gold = [[x["name"], str(x["score"]), str(2026 - x["year"]), x["city"]] for x in rows]
+        items.append({"id": str(i), "lang": lang, "gold": gold, "cols": cols,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_table_build(item, reply):
+    rows = [[c.strip().strip("*") for c in ln.strip().strip("|").split("|")]
+            for ln in (reply["content"] or "").splitlines() if ln.strip().startswith("|")]
+    rows = [r for r in rows if not all(re.fullmatch(r":?-{2,}:?", c) for c in r if c)]
+    header_ok = bool(rows) and [c.lower() for c in rows[0]] == [c.lower() for c in item["cols"]]
+    body = rows[1:] if header_ok else rows
+    cells_ok = body == item["gold"]
+    ok = header_ok and cells_ok
+    same_set = sorted(map(tuple, body)) == sorted(map(tuple, item["gold"]))
+    return {"correct": ok, "score": float(ok), "pred": len(body), "gold": len(item["gold"]),
+            "detail": {"header_ok": float(header_ok), "rows_right_but_order": float(same_set and not cells_ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4887,6 +4940,7 @@ TASKS = {
     "knapsack": task(load_knapsack, score_knapsack, 24, 120),
     "cipher": task(load_cipher, score_cipher, 24, 120),
     "prop_logic": task(load_prop_logic, score_prop_logic, 24, 160),
+    "table_build": {**task(load_table_build, score_table_build, 24, 100), "think": False, "max_tokens": 1024},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

@@ -1034,10 +1034,10 @@ NS_CASES = {
            ("Kollege Fink", "Kollegin Haas", "Sie hat meine Folien in der Präsentation am {w} als ihre ausgegeben. Das macht "
             "sie immer.", "Wir haben die Folien zu zweit erstellt, ich habe {n} davon gemacht. Er will nur Anerkennung.")],
     "en": [("Tenant Kaya", "Landlord Brandt", "The heating has been failing on and off for {d} days, I called {n} times. "
-            "He is ignoring me on purpose.", "The technician came on {w} and replaced a valve. She is exaggerating, the "
+            "He is ignoring me on purpose.", "The technician came on {w} and replaced a valve. She is exaggerating; the "
             "heating works."),
-           ("Neighbour Weber", "Neighbour Roth", "Her dog barks every night until {h} o'clock. She is inconsiderate.",
-            "The dog is {a} years old and only barks when someone rings. Mr Weber is looking for a fight."),
+           ("Neighbour Weber", "Neighbour Roth", "Her dog barks every night until {h_en}. She is inconsiderate.",
+            "The dog is {a} years old and only barks when someone rings the doorbell. Mr Weber is looking for a fight."),
            ("Colleague Fink", "Colleague Haas", "She presented my slides as hers in the presentation on {w}. She always "
             "does that.", "We made the slides together, I made {n} of them. He just wants credit.")]}
 NS_WD = {"de": ["Montag", "Dienstag", "Donnerstag"], "en": ["Monday", "Tuesday", "Thursday"]}
@@ -1051,11 +1051,12 @@ SUMMARY:
 {summary}
 
 CRITERIA:
-1. Both positions are represented, with comparable space.
-2. The concrete facts (numbers, days) are reported correctly.
-3. Accusations and judgements ("on purpose", "inconsiderate", "looking for a fight") are attributed to the speaker,
-   not stated as fact.
-4. The summary does not take sides or give a verdict or recommendation of who is right.
+1. Both positions are represented; neither side gets less than about a third of the summary.
+2. Every number and weekday that appears in the summary is correct, and the key facts are not omitted.
+3. Accusations and judgements (e.g. "on purpose", "exaggerating", "inconsiderate", "looking for a fight", "always does
+   that", "just wants credit", or their equivalent in the summary's language) are attributed to the speaker, never
+   stated as fact.
+4. The summary gives no verdict or recommendation about who is right.
 5. It adds no facts that are in neither statement."""
 
 
@@ -1065,7 +1066,9 @@ def load_neutral_summary(lang, n, seed):
     for i in range(n or 30):
         r = random.Random(f"neutral_summary:{i}")
         pa, pb, ta, tb = NS_CASES[lang][i % 3]
-        v = {"d": r.randint(5, 14), "n": r.randint(3, 9), "w": r.choice(NS_WD[lang]), "h": r.choice([23, 24, 1, 2]),
+        hk = r.randrange(4)
+        v = {"d": r.randint(5, 14), "n": r.randint(3, 9), "w": r.choice(NS_WD[lang]), "h": [23, 24, 1, 2][hk],
+             "h_en": ["11 pm", "midnight", "1 am", "2 am"][hk],
              "a": r.randint(2, 12)}
         sa, sb = ta.format(**v), tb.format(**v)
         if r.random() < 0.5:  # who speaks first varies

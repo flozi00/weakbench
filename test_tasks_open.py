@@ -243,7 +243,27 @@ def test_constrained_plan():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_memory_dialog():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES", "NO", "YES", "YES", "YES"]}),
+                                                      "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_memory_dialog("de", 4, 0)
+        x = it[0]
+        assert len(x["user_turns"]) == 5 and len(x["criteria"]) == 5
+        said = " ".join(x["user_turns"][:4])
+        assert all(str(v) in said for v in x["facts"].values())
+        assert not any(str(v) in x["user_turns"][4] for v in x["facts"].values())
+        r = to.score_memory_dialog(x, {"content": "e", "turns": ["a", "b", "c", "d", "e"]})
+        assert r["score"] == 0.8 and r["detail"]["no_reask"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()
     test_persona_guard()

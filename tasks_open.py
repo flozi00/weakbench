@@ -750,6 +750,81 @@ def score_constrained_plan(item, reply):
                        f"all_{item['domain']}": float(all(met))}}
 
 
+# ---------------------------------------------------------------- memory_dialog (judge: use facts given turns earlier)
+# Five user turns. Facts (a child's age, an allergy, a budget, a dislike) are dropped casually in turns 1-3 among
+# small talk; turn 5 asks for a recommendation that depends on all of them, without repeating them. The judge gets
+# the facts and checks each one is respected, plus that the model does not ask for something already said.
+MD_FACTS = {
+    "age": {"en": ["My daughter turns {v} next week, by the way.", "fits a child of {v}"],
+            "de": ["Meine Tochter wird übrigens nächste Woche {v}.", "passt zu einem Kind von {v} Jahren"], "v": [4, 7, 10, 13]},
+    "allergy": {"en": ["Ugh, she reacted to {v} again yesterday, we have to be so careful.", "contains no {v}"],
+                "de": ["Gestern hat sie wieder auf {v} reagiert, wir müssen so aufpassen.", "enthält keine {v}"],
+                "v": {"en": ["peanuts", "milk", "eggs"], "de": ["Erdnüsse", "Milch", "Eier"]}},
+    "budget": {"en": ["Money is tight this month, I can spend {v} euros at most.", "costs at most {v} euros"],
+               "de": ["Das Geld ist diesen Monat knapp, ich kann höchstens {v} Euro ausgeben.", "kostet höchstens {v} Euro"],
+               "v": [15, 25, 40]},
+    "dislike": {"en": ["She finds anything with {v} boring.", "is not about {v}"],
+                "de": ["Alles mit {v} findet sie langweilig.", "hat nichts mit {v} zu tun"],
+                "v": {"en": ["horses", "princesses", "dinosaurs"], "de": ["Pferden", "Prinzessinnen", "Dinosauriern"]}},
+}
+MD_SMALL = {"en": ["The weather has been awful all week.", "Work is crazy at the moment.", "We finally fixed the car."],
+            "de": ["Das Wetter war die ganze Woche furchtbar.", "Bei der Arbeit ist gerade viel los.",
+                   "Wir haben endlich das Auto repariert."]}
+MD_ASK = {"en": "Okay, so: what should I give her for her birthday, and what cake should I bake? Two concrete ideas each.",
+          "de": "Also: Was soll ich ihr zum Geburtstag schenken, und was für einen Kuchen soll ich backen? Je zwei konkrete Ideen."}
+MD_JUDGE = """Evaluate the FINAL reply in this chat. Facts the user gave earlier: {facts}.
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+
+CONVERSATION:
+{conv}
+
+CRITERIA (about the final reply):
+{crit}"""
+
+
+def load_memory_dialog(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 48):
+        r = random.Random(f"memory_dialog:{i}")
+        facts = {}
+        for k, f in MD_FACTS.items():
+            vals = f["v"][lang] if isinstance(f["v"], dict) else f["v"]
+            facts[k] = r.choice(vals)
+        said = [MD_FACTS[k][lang][0].format(v=v) for k, v in facts.items()]
+        small = list(MD_SMALL[lang])
+        r.shuffle(said)
+        turns = [said[0] + " " + small[0], small[1] + " " + said[1], said[2] + " " + said[3], small[2], MD_ASK[lang]]
+        crit = [("Every idea " if lang == "en" else "Jede Idee ") + MD_FACTS[k][lang][1].format(v=v) + "."
+                for k, v in facts.items()]
+        crit.append("It does not ask again for information the user already gave." if lang == "en" else
+                    "Sie fragt nicht erneut nach Informationen, die schon genannt wurden.")
+        chat = [[{"role": "user", "content": turns[0]}]] + [[{"role": "user", "content": t}] for t in turns[1:]]
+        items.append({"id": str(i), "lang": lang, "facts": facts, "criteria": crit, "user_turns": turns, "turns": chat,
+                      "messages": chat[0]})
+    return items
+
+
+def score_memory_dialog(item, reply):
+    tasks_judge.check_judge()
+    answers = reply.get("turns") or [reply["content"]]
+    if len(answers) != len(item["user_turns"]):
+        raise ValueError(f"memory_dialog needs one reply per turn, got {len(answers)}")
+    conv = "\n\n".join(f"USER: {u}\nASSISTANT: {a}" for u, a in zip(item["user_turns"], answers))
+    out = tasks_judge.judge("", MD_JUDGE.format(facts=json.dumps(item["facts"], ensure_ascii=False), conv=conv,
+                                                crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(item["criteria"]))),
+                            max_tokens=256)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != len(item["criteria"]):
+        raise ValueError(f"unusable memory verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    keys = list(item["facts"])
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": answers[-1][:200], "gold": None,
+            "detail": {"all_met": float(all(met)), **{f"kept_{k}": float(met[j]) for j, k in enumerate(keys)},
+                       "no_reask": float(met[-1])}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -776,6 +851,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                               "think": False, "max_tokens": 1536,
                               "counts": {"quick": {"de": 18, "en": 18}, "full": {"de": 60, "en": 60}},
                               "lang_check": True, "opt_in": True, "needs_judge": True},
+         "memory_dialog": {"langs": ("de", "en"), "load": load_memory_dialog, "score": score_memory_dialog,
+                           "think": False, "max_tokens": 1024,
+                           "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
+                           "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

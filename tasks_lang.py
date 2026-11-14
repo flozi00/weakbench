@@ -1226,6 +1226,65 @@ def score_polyglot(item, reply):
             "detail": {f"ok_{item['src']}_{item['dst']}": float(ok), "detected": got}}
 
 
+# ---------------------------------------------------------------- de_commas (German comma rules, generated)
+# A sentence with its commas removed; the model puts them back. Kinds: subordinate clause after / before the main
+# clause (weil, dass, obwohl, wenn), an embedded relative clause (two commas), an infinitive with "um ... zu", and
+# a control with no comma at all (over-insertion). Scored on the comma positions over an unchanged word sequence.
+CM_SUBJ = [("Der Koch", "der"), ("Die Lehrerin", "die"), ("Das Kind", "das"), ("Mein Nachbar", "der"), ("Anna", "die")]
+CM_VP = [("bleibt", "heute zu Hause"), ("kauft", "frisches Brot"), ("liest", "ein langes Buch"), ("ruft", "den Arzt an"),
+         ("geht", "früh schlafen")]
+CM_SUB = ["es draußen stark regnet", "der Zug wieder Verspätung hat", "morgen ein Feiertag ist",
+          "die Heizung seit gestern kaputt ist", "das Wetter am Wochenende schlecht wird"]
+CM_CONJ = ["weil", "obwohl", "wenn"]
+CM_REL = ["im Hotel am Markt arbeitet", "seit Jahren hier wohnt", "gern im Garten sitzt"]
+CM_UM = ["um Geld zu sparen", "um niemanden zu stören", "um pünktlich zu sein"]
+CM_PP = ["nach dem Essen", "trotz des Regens", "wegen der Hitze", "am späten Abend"]
+CM_KINDS = ("after", "before", "relative", "dass", "um_zu", "none")
+
+
+def cm_sentence(r, kind):
+    (subj, rel), (verb, rest) = r.choice(CM_SUBJ), r.choice(CM_VP)
+    sub, conj = r.choice(CM_SUB), r.choice(CM_CONJ)
+    s = subj[0].lower() + subj[1:] if subj.split()[0] in ("Der", "Die", "Das", "Mein") else subj
+    if kind == "after":
+        return f"{subj} {verb} {rest}, {conj} {sub}."
+    if kind == "before":
+        return f"{conj.capitalize()} {sub}, {verb} {s} {rest}."
+    if kind == "relative":
+        return f"{subj}, {rel} {r.choice(CM_REL)}, {verb} {rest}."
+    if kind == "dass":
+        return f"{subj} sagt, dass {sub}."
+    if kind == "um_zu":
+        return f"{subj} {verb} {rest}, {r.choice(CM_UM)}."
+    return f"{subj} {verb} {r.choice(CM_PP)} {rest}."
+
+
+def cm_tokens(text):
+    return re.findall(r"[\wäöüÄÖÜß]+|,", text.lower())
+
+
+def load_de_commas(lang, n, seed):
+    items = []
+    for i in range(n or 240):
+        r = random.Random(f"de_commas:{i}")
+        kind = CM_KINDS[i % len(CM_KINDS)]
+        gold = cm_sentence(r, kind)
+        items.append({"id": str(i), "lang": "de", "kind": kind, "gold": gold,
+                      "messages": [{"role": "user", "content": "Setze in diesen Satz alle Kommas, die nach den amtlichen "
+                                    "Regeln nötig sind. Ändere sonst nichts und gib nur den Satz zurück.\n\n"
+                                    + gold.replace(",", "")}]})
+    return items
+
+
+def score_de_commas(item, reply):
+    lines = [x for x in (reply["content"] or "").strip().splitlines() if x.strip()]
+    got, want = cm_tokens(lines[-1] if lines else ""), cm_tokens(item["gold"])
+    same_words = [t for t in got if t != ","] == [t for t in want if t != ","]
+    ok = same_words and got == want
+    return {"correct": ok, "score": float(ok), "pred": (lines[-1] if lines else "")[:80], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "words_changed": float(not same_words)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1257,6 +1316,7 @@ TASKS = {
     "roundtrip": task(("de", "en"), load_roundtrip, score_roundtrip, 1024, 60, lang_check=False),
     "de_verbs": task(("de",), load_de_verbs, score_de_verbs, 64, 120, lang_check=False),
     "de_case": task(("de",), load_de_case, score_de_case, 64, 120, lang_check=False),
+    "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,
                          needs_judge=True),

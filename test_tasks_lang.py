@@ -355,3 +355,20 @@ if __name__ == "__main__":
     test_switch()
     test_quality()
     print("ok")
+
+
+def test_de_commas():
+    import tasks_lang as tl
+    it = tl.load_de_commas("de", 12, 0)
+    for x in it:
+        assert "," not in x["messages"][0]["content"].split("\n\n", 1)[1]
+        assert tl.score_de_commas(x, {"content": x["gold"]})["correct"]
+        assert tl.score_de_commas(x, {"content": "Hier der Satz:\n" + x["gold"]})["correct"]
+        assert (x["kind"] == "none") == tl.score_de_commas(x, {"content": x["gold"].replace(",", "")})["correct"]
+    r = tl.score_de_commas(it[0], {"content": it[0]["gold"].replace("Hause", "Haus")})
+    assert not r["correct"] and r["detail"]["words_changed"] == 1.0
+    assert not tl.score_de_commas(it[5], {"content": it[5]["gold"].replace(" bleibt", ", bleibt")})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_commas()

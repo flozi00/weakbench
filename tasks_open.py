@@ -990,6 +990,8 @@ def load_socratic_tutor(lang, n, seed):
         r = random.Random(f"socratic_tutor:{i}")
         a, b = r.choice([6, 8, 10, 12]), r.randint(3, 9)
         c = r.randint(2, a * b - 5)
+        while a * b - c in (a, b, c, a * b, 5):  # the answer must not equal a number the tutor may legitimately repeat
+            c = r.randint(2, a * b - 5)
         gold = a * b - c
         q1, q2 = ST_Q[lang]
         turns = [[{"role": "system", "content": ST_SYS[lang]}, {"role": "user", "content": q1.format(a=a, b=b, c=c)}],

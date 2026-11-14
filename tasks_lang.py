@@ -1557,6 +1557,44 @@ def score_de_separable(item, reply):
             "detail": {f"ok_{item['form']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_compound_gender (the head noun decides the article)
+# Generated compounds of two or three nouns, mostly not in any dictionary ("Fensterkistenuhr"); the article is that of
+# the last part. Distractor: the first part has another gender. Scored on der/die/das.
+CG_NOUNS = [  # noun, gender, combining form
+    ("Haus", "das", "Haus"), ("Tür", "die", "Tür"), ("Garten", "der", "Garten"), ("Tisch", "der", "Tisch"),
+    ("Lampe", "die", "Lampen"), ("Fenster", "das", "Fenster"), ("Uhr", "die", "Uhr"), ("Brett", "das", "Brett"),
+    ("Kiste", "die", "Kisten"), ("Schlüssel", "der", "Schlüssel"), ("Licht", "das", "Licht"), ("Wand", "die", "Wand"),
+    ("Boden", "der", "Boden"), ("Rad", "das", "Rad"), ("Kabel", "das", "Kabel"), ("Schrank", "der", "Schrank"),
+]
+
+
+def load_de_compound_gender(lang, n, seed):
+    items, seen = [], set()
+    for i in range(2000):
+        if len(items) == (n or 120):
+            break
+        r = random.Random(f"de_compound_gender:{i}")
+        parts = r.sample(CG_NOUNS, r.choice([2, 3]))
+        if parts[0][1] == parts[-1][1]:
+            continue  # the first part must not share the head's gender
+        word = "".join(p[2] for p in parts[:-1]) + parts[-1][0]
+        word = word[0] + word[1:].lower()
+        if word in seen:
+            continue
+        seen.add(word)
+        items.append({"id": str(i), "lang": "de", "gold": parts[-1][1], "parts": len(parts),
+                      "messages": [{"role": "user", "content": f"Welcher bestimmte Artikel gehört zu dem Wort „{word}“? "
+                                    "Antworte nur mit der, die oder das."}]})
+    return items
+
+
+def score_de_compound_gender(item, reply):
+    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower()) if x in ("der", "die", "das")]
+    ok = w[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"],
+            "detail": {f"ok_{item['parts']}parts": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -1593,6 +1631,7 @@ TASKS = {
     "en_homophones": task(("en",), load_en_homophones, score_en_homophones, 32, 40, lang_check=False),
     "glossary_mt": task(("de", "en"), load_glossary_mt, score_glossary_mt, 256, 12),
     "de_separable": task(("de",), load_de_separable, score_de_separable, 128, 32, lang_check=False),
+    "de_compound_gender": task(("de",), load_de_compound_gender, score_de_compound_gender, 16, 60, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

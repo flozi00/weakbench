@@ -440,7 +440,17 @@ def test_de_separable():
     assert not tl.score_de_separable(m, {"content": m["gold"].replace(" an.", ".").replace(" ruft ", " anruft ")})["correct"]
 
 
+def test_de_compound_gender():
+    import tasks_lang as tl
+    it = tl.load_de_compound_gender("de", None, 0)
+    assert len(it) == 120 and {x["parts"] for x in it} == {2, 3}
+    x = it[0]
+    assert tl.score_de_compound_gender(x, {"content": x["gold"].capitalize()})["correct"]
+    assert not tl.score_de_compound_gender(x, {"content": ({"der", "die", "das"} - {x["gold"]}).pop()})["correct"]
+
+
 if __name__ == "__main__":
+    test_de_compound_gender()
     test_de_separable()
     test_glossary_mt()
     test_en_homophones()

@@ -2133,19 +2133,21 @@ def load_tense_order(lang, n, seed):
         L = "ABC"
         labels = dict(zip(range(3), r.sample(L, 3)))
         e, lb = evs, labels
-        form = i % 3  # surface orders: reversed, mixed, forward (so neither reading direction is a shortcut)
+        form = i % 3  # surface orders C-B-A, B-A-C, B-A-C with other connectives: never the time order
         if lang == "de":
-            sent = [f"Bevor {x} {e[2][1]} ({lb[2]}), hatte {x} {e[1][2].replace(' hatte', '')} ({lb[1]}). Das war erst, "
-                    f"nachdem {x} {e[0][2]} ({lb[0]}).",
+            sent = [f"Bevor {x} {e[2][1]} ({lb[2]}), hatte {x} {e[1][2].replace(' hatte', '')} ({lb[1]}). "
+                    f"{e[1][2].replace(' hatte', '').split(' ', 2)[0].capitalize()} "
+                    f"{e[1][2].replace(' hatte', '').split(' ', 2)[1]} hatte {x} erst "
+                    f"{e[1][2].replace(' hatte', '').split(' ', 2)[2]}, nachdem {x} {e[0][2]} ({lb[0]}).",
                     f"{x} {TO_DE_V2[e[1][0]]} ({lb[1]}), nachdem {x} {e[0][2]} ({lb[0]}). Danach "
                     f"{TO_DE_V2[e[2][0]].split(' ', 1)[0]} {x} {TO_DE_V2[e[2][0]].split(' ', 1)[1]} ({lb[2]}).",
-                    f"Nachdem {x} {e[0][2]} ({lb[0]}), {TO_DE_V2[e[1][0]].split(' ', 1)[0]} {x} "
-                    f"{TO_DE_V2[e[1][0]].split(' ', 1)[1]} ({lb[1]}). Zuletzt {TO_DE_V2[e[2][0]].split(' ', 1)[0]} {x} "
-                    f"{TO_DE_V2[e[2][0]].split(' ', 1)[1]} ({lb[2]})."][form]
+                    f"{x} {TO_DE_V2[e[1][0]]} ({lb[1]}). Davor hatte {x} {e[0][2].replace(' hatte', '')} ({lb[0]}). "
+                    f"Zuletzt {TO_DE_V2[e[2][0]].split(' ', 1)[0]} {x} {TO_DE_V2[e[2][0]].split(' ', 1)[1]} ({lb[2]})."][form]
         else:
-            sent = [f"Before {x} {e[2][1]} ({lb[2]}), {x} {e[1][2]} ({lb[1]}). That was only after {x} {e[0][2]} ({lb[0]}).",
+            sent = [f"Before {x} {e[2][1]} ({lb[2]}), {x} {e[1][2]} ({lb[1]}). {x} {e[1][2].replace('had ', 'had only ', 1)} "
+                    f"after {x} {e[0][2]} ({lb[0]}).",
                     f"{x} {e[1][1]} ({lb[1]}) after {x} {e[0][2]} ({lb[0]}). Then {x} {e[2][1]} ({lb[2]}).",
-                    f"After {x} {e[0][2]} ({lb[0]}), {x} {e[1][1]} ({lb[1]}). Finally {x} {e[2][1]} ({lb[2]})."][form]
+                    f"{x} {e[1][1]} ({lb[1]}). Before that, {x} {e[0][2]} ({lb[0]}). Finally {x} {e[2][1]} ({lb[2]})."][form]
         q = ("In welcher Reihenfolge geschahen A, B und C? Antworte mit den drei Buchstaben in zeitlicher Reihenfolge." if
              lang == "de" else "In what order did A, B and C happen? Answer with the three letters in time order.")
         items.append({"id": str(i), "lang": lang, "gold": "".join(labels[k] for k in range(3)),
@@ -2154,7 +2156,9 @@ def load_tense_order(lang, n, seed):
 
 
 def score_tense_order(item, reply):
-    got = "".join(re.findall(r"\b[ABC]\b", tasks_novel.final_answer(reply["content"]) or ""))
+    line = tasks_novel.final_answer(reply["content"]) or ""
+    run = re.findall(r"\b([ABC]{3})\b", line)  # "BAC"
+    got = run[-1] if run else "".join(re.findall(r"\b[ABC]\b", line))
     ok = got[-3:] == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {f"ok_form{item['form']}": float(ok)}}
 

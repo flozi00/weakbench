@@ -3242,8 +3242,12 @@ def load_cipher(lang, n, seed):
 
 
 def score_cipher(item, reply):
-    words = re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower())
-    ok = item["gold"] in words[-2:] if words else False
+    line = (final_answer(reply["content"]) or "").lower()
+    for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):  # "Brücke" is "bruecke"
+        line = line.replace(a, b)
+    line = re.split(r"\(|\bfrom\b|\baus\b|\bor\b|\boder\b", line)[0]  # drop "(from fenster)" and alternatives
+    words = re.findall(r"[a-z]+", line)
+    ok = words[-1:] == [item["gold"]]
     return {"correct": ok, "score": float(ok), "pred": " ".join(words[-2:]), "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok), "ok_decode" if item["decode"] else "ok_encode": float(ok)}}
 

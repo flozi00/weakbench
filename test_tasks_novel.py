@@ -1024,6 +1024,9 @@ def test_cipher():
     assert {x["kind"] for x in it} == {"shift", "revshift", "pairs", "vowels"} and {x["decode"] for x in it} == {True, False}
     for x in it:
         assert tn.score_cipher(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+    b = next((x for x in it if x["gold"] == "bruecke"), None)
+    if b:
+        assert tn.score_cipher(b, {"content": "Antwort: Brücke"})["correct"]
 
 
 if __name__ == "__main__":

@@ -587,6 +587,9 @@ def test_tense_order():
         assert {x["form"] for x in it} == {0, 1, 2} and len({x["gold"] for x in it}) > 3
         for x in it:
             assert tl.score_tense_order(x, {"content": "Antwort: " + " ".join(x["gold"])})["correct"]
+            assert tl.score_tense_order(x, {"content": "Answer: " + x["gold"]})["correct"]
+            letters = [w for w in __import__("re").findall(r"\(([ABC])\)", x["messages"][0]["content"])]
+            assert "".join(letters) != x["gold"]  # left to right is never the answer
             assert "{" not in x["messages"][0]["content"]
 
 

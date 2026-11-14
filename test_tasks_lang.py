@@ -623,7 +623,26 @@ def test_bilingual_notice():
     assert tl.score_bilingual_notice(x, {"content": swapped})["correct"]
 
 
+def test_revise_on_feedback():
+    import tasks_lang as tl
+    it = tl.load_revise_on_feedback("de", 20, 0)
+    assert all(len(x["turns"]) == 2 and len(set(x["changes"])) == 3 for x in it)
+    x = next(y for y in it if set(y["changes"]) == {"short", "noexcl", "question"}) if any(
+        set(y["changes"]) == {"short", "noexcl", "question"} for y in it) else None
+    if x:
+        d, h = x["facts"]
+        good = f"Picknick am {d}. Juni um {h} Uhr. Kommt ihr?"
+        assert tl.score_revise_on_feedback(x, {"content": good, "turns": ["a", good]})["correct"]
+    formal = tl.RV_CHANGES["formal"][2]
+    assert formal("Wir laden Sie herzlich ein und freuen uns auf Ihre Antwort.", {"lang": "de"})
+    assert not formal("Wir laden dich ein, Sie wissen ja.", {"lang": "de"})
+    y = it[0]
+    r = tl.score_revise_on_feedback(y, {"content": "x", "turns": ["a", "Hallo!"]})
+    assert not r["correct"] and r["detail"]["facts_kept"] == 0.0
+
+
 if __name__ == "__main__":
+    test_revise_on_feedback()
     test_bilingual_notice()
     test_de_grammar_fix()
     test_tense_order()

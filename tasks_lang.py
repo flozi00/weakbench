@@ -2283,6 +2283,58 @@ def score_bilingual_notice(item, reply):
             "detail": {"sections": 1.0, "de_ok": float(de_ok), "en_ok": float(en_ok), "facts_ok": float(facts_ok)}}
 
 
+# ---------------------------------------------------------------- revise_on_feedback (apply three edits to your own text)
+# Turn 1: write a short invitation with given facts. Turn 2: three concrete change requests drawn from a list, each
+# checkable exactly (word limit, add a fact, no exclamation marks, end with a question, Sie-form / formal you,
+# drop a word). The second reply is scored: every change applied and the original facts still there.
+RV_CHANGES = {
+    "short": ("Kürze den Text auf höchstens 50 Wörter.", "Shorten the text to at most 50 words.",
+              lambda t, it: len([w for w in t.split() if re.search(r"\w", w)]) <= 50),
+    "fact": ("Ergänze, dass es Getränke gibt und man {x} mitbringen soll.",
+             "Add that there will be drinks and people should bring {x}.",
+             lambda t, it: it["extra"][0 if it["lang"] == "de" else 1].lower() in t.lower()),
+    "noexcl": ("Entferne alle Ausrufezeichen.", "Remove all exclamation marks.", lambda t, it: "!" not in t),
+    "question": ("Beende den Text mit einer Frage an die Leser.", "End the text with a question to the readers.",
+                 lambda t, it: t.rstrip().rstrip("*_\"“”").endswith("?")),
+    "formal": ("Schreibe ihn in der Sie-Form.", "Make it formal (no 'hey', no contractions like 'we're').",
+               lambda t, it: (not re.search(r"\b([Dd]u|[Dd]ich|[Dd]ir|[Dd]ein\w*|[Ee]uch|[Ee]uer\w*|ihr)\b", t)  # "Ihr" is formal
+                              and re.search(r"\b(Sie|Ihnen|Ihr\w*)\b", t)) if it["lang"] == "de" else
+               not re.search(r"\bhey\b|\b\w+'(re|ll|ve|s|d)\b|n't\b", t, re.I)),
+}
+RV_EXTRA = [("eine Decke", "a blanket"), ("einen Teller", "a plate"), ("gute Laune", "a good mood")]
+
+
+def load_revise_on_feedback(lang, n, seed):
+    items = []
+    keys = list(RV_CHANGES)
+    for i in range(n or 40):
+        r = random.Random(f"revise_on_feedback:{i}")
+        day, hh = r.randint(1, 28), r.randint(14, 19)
+        place = r.choice(["im Stadtpark", "am See", "im Hof"]) if lang == "de" else r.choice(["in the city park", "by the lake", "in the yard"])
+        changes = r.sample(keys, 3)
+        extra = r.choice(RV_EXTRA)
+        first = (f"Schreibe eine kurze, lockere Einladung an deine Nachbarn zu einem Picknick am {day}. Juni um {hh} Uhr "
+                 f"{place}." if lang == "de" else
+                 f"Write a short, casual invitation to your neighbours for a picnic on June {day} at {hh}:00 {place}.")
+        second = " ".join((RV_CHANGES[c][0] if lang == "de" else RV_CHANGES[c][1]).format(x=extra[0] if lang == "de" else extra[1])
+                          for c in changes)
+        second = ("Danke. Bitte überarbeite den Text: " if lang == "de" else "Thanks. Please revise the text: ") + second
+        turns = [[{"role": "user", "content": first}], [{"role": "user", "content": second}]]
+        items.append({"id": str(i), "lang": lang, "changes": changes, "extra": extra, "facts": [str(day), str(hh)],
+                      "turns": turns, "messages": turns[0], "gold": None})
+    return items
+
+
+def score_revise_on_feedback(item, reply):
+    text = ((reply.get("turns") or [reply["content"]])[-1] or "").strip()
+    applied = {c: bool(RV_CHANGES[c][2](text, item)) for c in item["changes"]}
+    kept = all(f in re.findall(r"\d+", text) for f in item["facts"])
+    ok = all(applied.values()) and kept
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": None,
+            "detail": {"facts_kept": float(kept), "changes_applied": sum(applied.values()) / 3,
+                       **{f"ok_{c}": float(v) for c, v in applied.items()}}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2333,6 +2385,7 @@ TASKS = {
     "tense_order": task(("de", "en"), load_tense_order, score_tense_order, 512, 30),
     "de_grammar_fix": task(("de",), load_de_grammar_fix, score_de_grammar_fix, 128, 40, lang_check=False),
     "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
+    "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

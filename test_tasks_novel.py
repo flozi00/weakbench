@@ -1218,7 +1218,8 @@ def test_sunk_cost():
     it = tn.load_sunk_cost("de", 8, 0)
     for a, b in zip(it[::2], it[1::2]):
         assert not a["trap"] and b["trap"] and a["gold"] == b["gold"] and "bereits" in b["messages"][0]["content"]
-    r = tn.score_sunk_cost(it[1], {"content": f"Antwort: {it[1]['cont']}"})
+    trap = next(x for x in it if x["trap"] and x["gold"] != x["cont"])
+    r = tn.score_sunk_cost(trap, {"content": f"Antwort: {trap['cont']}"})
     assert not r["correct"] and r["detail"]["took_sunk"] == 1.0
     assert {x["gold"] for x in it} == {"A", "B"}
 

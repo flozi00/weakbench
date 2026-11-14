@@ -4037,8 +4037,8 @@ def score_conclusion_spot(item, reply):
 
 # ---------------------------------------------------------------- sunk_cost (decide by the future, not by what is spent)
 # Continue a project (remaining cost, expected value) or switch to an alternative (cost, value). Gold = the higher
-# future net value. Trap twins add "X has already been spent on the project" where continuing is NOT the better choice;
-# control twins carry no spent amount. took_sunk = chose to continue in a trap item. Labels A/B alternate.
+# future net value; in half the groups that is switching, in half continuing. Trap twins add "X has already been spent
+# on the project"; control twins carry no spent amount. took_sunk = chose to continue when switching was better.
 
 
 def load_sunk_cost(lang, n, seed):
@@ -4046,10 +4046,12 @@ def load_sunk_cost(lang, n, seed):
     for i in range(n or 120):
         g, trap = divmod(i, 2)
         r = rng_of("sunk_cost", g)
+        switch_better = g % 2 == 0  # half the groups: continuing is right, and the spent amount is only a decoy
         while True:
             rc, rv = r.randint(20, 80) * 1000, r.randint(40, 120) * 1000   # continue: remaining cost, value
             sc, sv = r.randint(10, 60) * 1000, r.randint(40, 140) * 1000   # switch: cost, value
-            if (sv - sc) - (rv - rc) >= 15000:  # switching is clearly better (by at least 15,000)
+            gap = (sv - sc) - (rv - rc)
+            if (gap >= 15000) if switch_better else (gap <= -15000):  # one option clearly better (by 15,000+)
                 break
         spent = r.randint(150, 400) * 1000
         de = lang == "de"
@@ -4061,13 +4063,14 @@ def load_sunk_cost(lang, n, seed):
         sunk = ((f" In das laufende Projekt sind bereits {fmt(spent)} Euro geflossen, die verloren wären, wenn man aufhört."
                  if de else f" {fmt(spent)} euros have already gone into the current project and would be lost if it stops.")
                 if trap else "")
-        cont_first = g % 2 == 0
+        cont_first = (g // 2) % 2 == 0
         a, b = (cont, swit) if cont_first else (swit, cont)
         q = (f"Eine Firma muss sich entscheiden.{sunk}\nA) {a[0].upper() + a[1:]}.\nB) {b[0].upper() + b[1:]}.\nWelche Wahl ist "
              "wirtschaftlich besser? Antworte mit A oder B." if de else
              f"A company must decide.{sunk}\nA) {a[0].upper() + a[1:]}.\nB) {b[0].upper() + b[1:]}.\nWhich choice is "
              "economically better? Answer A or B.")
-        gold = "B" if cont_first else "A"
+        cont_label = "A" if cont_first else "B"
+        gold = {"A": "B", "B": "A"}[cont_label] if switch_better else cont_label
         items.append({"id": f"{g}-{trap}", "lang": lang, "trap": bool(trap), "gold": gold,
                       "cont": "A" if cont_first else "B", "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
@@ -4080,7 +4083,7 @@ def score_sunk_cost(item, reply):
     pred = m.group(1).upper() if m else (lone.pop() if len(lone) == 1 else None)
     ok = pred == item["gold"]
     d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
-    if item["trap"]:
+    if item["trap"] and item["gold"] != item["cont"]:  # the spent amount pulled toward the worse option
         d["took_sunk"] = float(pred == item["cont"])
     return {"correct": ok, "score": float(ok), "pred": pred, "gold": item["gold"], "detail": d}
 

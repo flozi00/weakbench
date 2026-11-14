@@ -1161,8 +1161,9 @@ def load_tactful_message(lang, n, seed):
              "skill": r.choice(["Python", "SAP", "Personalführung"] if lang == "de" else ["Python", "SAP", "team leadership"]),
              "num": r.randint(10000, 99999), "d": r.randint(2, 9)}
         task_text = TM_CASES[kind][lang].format(**v)
-        facts = {"condolence": [name, v["day"].rstrip(".")], "rejection": [name, v["role"]],
-                 "apology": [name, str(v["num"]), str(v["d"])], "decline": [name, v["day"].rstrip(".")]}[kind]
+        day = v["day"].rstrip(".").replace("the ", "")  # "14th" / "14" / "Samstag"
+        facts = {"condolence": [name, day], "rejection": [name, v["role"]],
+                 "apology": [name, str(v["num"]), str(v["d"])], "decline": [name, day]}[kind]
         items.append({"id": str(i), "lang": lang, "kind": kind, "facts": facts, "limit": v["k"],
                       "messages": [{"role": "user", "content": task_text}]})
     return items

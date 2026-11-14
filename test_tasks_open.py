@@ -309,7 +309,22 @@ def test_socratic_tutor():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_neutral_summary():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 4 + ["NO"]}), "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_neutral_summary("de", 6, 0)
+        assert "{" not in it[0]["sa"] + it[0]["sb"] and {x["pa"] for x in it} != {it[0]["pa"]}
+        r = to.score_neutral_summary(it[0], {"content": "Kurz und neutral."})
+        assert r["detail"]["no_invention"] == 0.0 and abs(r["score"] - 5 / 6) < 1e-3
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 if __name__ == "__main__":
+    test_neutral_summary()
     test_socratic_tutor()
     test_argument_essay()
     test_audience_explain()

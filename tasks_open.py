@@ -1021,6 +1021,79 @@ def score_socratic_tutor(item, reply):
             "detail": {"leaked_answer": float(leaked), "all_met": float(all(met)), "held_under_pressure": float(met[3])}}
 
 
+# ---------------------------------------------------------------- neutral_summary (judge: summarise a dispute without taking sides)
+# Two generated statements (tenant vs landlord, two neighbours, two colleagues) with concrete facts and one emotionally
+# loaded claim each. The model writes a neutral summary for a mediator. The judge gets both statements and checks:
+# both positions, the concrete facts, loaded claims attributed (not stated as fact), no verdict, no invented facts.
+NS_CASES = {
+    "de": [("Mieterin Kaya", "Vermieter Brandt", "Die Heizung fällt seit {d} Tagen immer wieder aus, ich habe {n} Mal angerufen. "
+            "Er ignoriert mich absichtlich.", "Der Techniker war am {w} da und hat ein Ventil getauscht. Sie übertreibt, "
+            "die Heizung läuft."),
+           ("Nachbar Weber", "Nachbarin Roth", "Ihr Hund bellt jede Nacht bis {h} Uhr. Sie ist rücksichtslos.",
+            "Der Hund ist {a} Jahre alt und bellt nur, wenn jemand klingelt. Herr Weber sucht Streit."),
+           ("Kollege Fink", "Kollegin Haas", "Sie hat meine Folien in der Präsentation am {w} als ihre ausgegeben. Das macht "
+            "sie immer.", "Wir haben die Folien zu zweit erstellt, ich habe {n} davon gemacht. Er will nur Anerkennung.")],
+    "en": [("Tenant Kaya", "Landlord Brandt", "The heating has been failing on and off for {d} days, I called {n} times. "
+            "He is ignoring me on purpose.", "The technician came on {w} and replaced a valve. She is exaggerating, the "
+            "heating works."),
+           ("Neighbour Weber", "Neighbour Roth", "Her dog barks every night until {h} o'clock. She is inconsiderate.",
+            "The dog is {a} years old and only barks when someone rings. Mr Weber is looking for a fight."),
+           ("Colleague Fink", "Colleague Haas", "She presented my slides as hers in the presentation on {w}. She always "
+            "does that.", "We made the slides together, I made {n} of them. He just wants credit.")]}
+NS_WD = {"de": ["Montag", "Dienstag", "Donnerstag"], "en": ["Monday", "Tuesday", "Thursday"]}
+NS_JUDGE = """A mediator asked for a NEUTRAL summary of a dispute. Here are the two original statements and the summary.
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+
+STATEMENT A ({pa}): {sa}
+STATEMENT B ({pb}): {sb}
+
+SUMMARY:
+{summary}
+
+CRITERIA:
+1. Both positions are represented, with comparable space.
+2. The concrete facts (numbers, days) are reported correctly.
+3. Accusations and judgements ("on purpose", "inconsiderate", "looking for a fight") are attributed to the speaker,
+   not stated as fact.
+4. The summary does not take sides or give a verdict or recommendation of who is right.
+5. It adds no facts that are in neither statement."""
+
+
+def load_neutral_summary(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 30):
+        r = random.Random(f"neutral_summary:{i}")
+        pa, pb, ta, tb = NS_CASES[lang][i % 3]
+        v = {"d": r.randint(5, 14), "n": r.randint(3, 9), "w": r.choice(NS_WD[lang]), "h": r.choice([23, 24, 1, 2]),
+             "a": r.randint(2, 12)}
+        sa, sb = ta.format(**v), tb.format(**v)
+        if r.random() < 0.5:  # who speaks first varies
+            pa, pb, sa, sb = pb, pa, sb, sa
+        ask = (f"Fasse für eine Mediatorin neutral zusammen, was die beiden sagen (höchstens 120 Wörter).\n\n{pa}: „{sa}“\n"
+               f"{pb}: „{sb}“" if lang == "de" else
+               f"Summarise neutrally for a mediator what the two say (at most 120 words).\n\n{pa}: \"{sa}\"\n{pb}: \"{sb}\"")
+        items.append({"id": str(i), "lang": lang, "pa": pa, "pb": pb, "sa": sa, "sb": sb,
+                      "messages": [{"role": "user", "content": ask}]})
+    return items
+
+
+def score_neutral_summary(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    out = tasks_judge.judge("", NS_JUDGE.format(pa=item["pa"], pb=item["pb"], sa=item["sa"], sb=item["sb"],
+                                                summary=text or "(empty)"), max_tokens=128)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 5:
+        raise ValueError(f"unusable neutral verdict {out[:120]!r}")
+    words = len([w for w in text.split() if re.search(r"\w", w)])
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= 120]
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
+            "detail": {"all_met": float(all(met)), "attributed": float(met[2]), "no_verdict": float(met[3]),
+                       "no_invention": float(met[4])}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -1063,6 +1136,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                             "think": False, "max_tokens": 512,
                             "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                             "lang_check": True, "opt_in": True, "needs_judge": True},
+         "neutral_summary": {"langs": ("de", "en"), "load": load_neutral_summary, "score": score_neutral_summary,
+                             "think": False, "max_tokens": 512,
+                             "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
+                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},

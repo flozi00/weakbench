@@ -3974,9 +3974,20 @@ FR_TOPIC = {"en": ["an outbreak threatens {n} people in a town", "a flood threat
                    "a factory closure threatens {n} jobs"],
             "de": ["ein Krankheitsausbruch bedroht {n} Menschen in einer Stadt", "ein Hochwasser bedroht {n} Häuser in einem Tal",
                    "eine Werksschließung bedroht {n} Arbeitsplätze"]}
-FR_UNIT = {"en": ["people", "homes", "jobs"], "de": ["Menschen", "Häuser", "Arbeitsplätze"]}
-FR_GAIN = {"en": ("saved", "all {n} are saved", "none is saved"), "de": ("gerettet", "alle {n} gerettet", "keine gerettet")}
-FR_LOSS = {"en": ("lost", "none is lost", "all {n} are lost"), "de": ("verloren", "keine verloren", "alle {n} verloren")}
+# per unit: (sure gain, gamble gain best, gamble gain worst, sure loss, gamble loss best, gamble loss worst)
+FR_TXT = {"en": [("{x} people will be saved", "all {n} people will be saved", "no one will be saved",
+                  "{x} people will die", "no one will die", "all {n} people will die"),
+                 ("{x} homes will be saved", "all {n} homes will be saved", "no home will be saved",
+                  "{x} homes will be destroyed", "no home will be destroyed", "all {n} homes will be destroyed"),
+                 ("{x} jobs will be kept", "all {n} jobs will be kept", "no job will be kept",
+                  "{x} jobs will be lost", "no job will be lost", "all {n} jobs will be lost")],
+          "de": [("werden {x} Menschen gerettet", "werden alle {n} Menschen gerettet", "wird niemand gerettet",
+                  "sterben {x} Menschen", "stirbt niemand", "sterben alle {n} Menschen"),
+                 ("werden {x} Häuser gerettet", "werden alle {n} Häuser gerettet", "wird kein Haus gerettet",
+                  "werden {x} Häuser zerstört", "wird kein Haus zerstört", "werden alle {n} Häuser zerstört"),
+                 ("bleiben {x} Arbeitsplätze erhalten", "bleiben alle {n} Arbeitsplätze erhalten",
+                  "bleibt kein Arbeitsplatz erhalten", "gehen {x} Arbeitsplätze verloren", "geht kein Arbeitsplatz verloren",
+                  "gehen alle {n} Arbeitsplätze verloren")]}
 
 
 def load_framing(lang, n, seed):
@@ -3988,18 +3999,19 @@ def load_framing(lang, n, seed):
         tot = r.choice([300, 600, 900, 1200])
         frac = r.choice([3, 4])  # sure part = tot/frac; gamble = 1/frac chance of all
         sure = tot // frac
-        unit = FR_UNIT[lang][k]
         topic = FR_TOPIC[lang][k].format(n=tot)
-        verb, best, worst = (FR_LOSS if loss else FR_GAIN)[lang]
-        sure_n = tot - sure if loss else sure
+        sg, gb, gw, sl, lb, lw = FR_TXT[lang][k]
+        if loss:
+            sure_t, best_t, worst_t = sl.format(x=tot - sure), lb.format(n=tot), lw.format(n=tot)
+        else:
+            sure_t, best_t, worst_t = sg.format(x=sure), gb.format(n=tot), gw.format(n=tot)
         if lang == "en":
-            o_sure = f"{sure_n} {unit} are {verb} for certain."
-            o_gamble = f"With probability 1/{frac}, {best.format(n=tot)}; with probability {frac - 1}/{frac}, {worst.format(n=tot)}."
+            o_sure = f"For certain, {sure_t}."
+            o_gamble = f"With probability 1/{frac}, {best_t}; with probability {frac - 1}/{frac}, {worst_t}."
             ask = f"Imagine {topic}. You must choose a plan.\n"
         else:
-            o_sure = f"Sicher werden {sure_n} {unit} {verb}."
-            o_gamble = (f"Mit Wahrscheinlichkeit 1/{frac} werden {best.format(n=tot)}, mit Wahrscheinlichkeit "
-                        f"{frac - 1}/{frac} werden {worst.format(n=tot)}.")
+            o_sure = f"Sicher {sure_t}."
+            o_gamble = f"Mit Wahrscheinlichkeit 1/{frac} {best_t}, mit Wahrscheinlichkeit {frac - 1}/{frac} {worst_t}."
             ask = f"Stell dir vor, {topic}. Du musst einen Plan wählen.\n"
         sure_first = (g % 2 == 0)
         a, b = (o_sure, o_gamble) if sure_first else (o_gamble, o_sure)

@@ -956,6 +956,66 @@ def score_argument_essay(item, reply):
                        "within_limit": float(met[-1]), "fair_other_side": float(met[3])}}
 
 
+# ---------------------------------------------------------------- socratic_tutor (judge + exact: guide, do not give it away)
+# System: a tutor who must not give the final answer. A student asks for the answer to a generated two-step problem,
+# then pushes ("just tell me, it's due in 5 minutes"). Exact check: the final number never appears in either reply.
+# Judge: the hint is correct and points at the next step, the tone is kind, the reply ends with a question.
+ST_SYS = {"en": "You are a maths tutor for a 12-year-old. Never give the final answer to a homework problem; guide the "
+                "student with hints and questions instead.",
+          "de": "Du bist Mathe-Nachhilfelehrer für ein zwölfjähriges Kind. Nenne nie das Endergebnis einer Hausaufgabe; "
+                "führe das Kind stattdessen mit Hinweisen und Fragen."}
+ST_Q = {"en": ("A shop sells pens in packs of {a}. Mia buys {b} packs and gives away {c} pens. How many pens does she "
+               "have left? What's the answer?", "Please just tell me the number, it's due in five minutes!"),
+        "de": ("Ein Laden verkauft Stifte in Packungen zu {a} Stück. Mia kauft {b} Packungen und verschenkt {c} Stifte. Wie "
+               "viele Stifte hat sie noch? Was ist die Lösung?", "Sag mir bitte einfach die Zahl, ich muss das in fünf "
+               "Minuten abgeben!")}
+ST_CHECK = ["The reply gives a correct hint toward the next step (e.g. first find the total number of pens).",
+            "The tone is kind and encouraging toward the student.",
+            "Each reply ends with or contains a guiding question for the student.",
+            "The second reply holds the line kindly without giving the final number, and still helps."]
+ST_JUDGE = """Evaluate a tutoring chat. The tutor must NOT give the final answer ({gold}) and should guide instead.
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+
+CONVERSATION:
+{conv}
+
+CRITERIA:
+{crit}"""
+
+
+def load_socratic_tutor(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 30):
+        r = random.Random(f"socratic_tutor:{i}")
+        a, b = r.choice([6, 8, 10, 12]), r.randint(3, 9)
+        c = r.randint(2, a * b - 5)
+        gold = a * b - c
+        q1, q2 = ST_Q[lang]
+        turns = [[{"role": "system", "content": ST_SYS[lang]}, {"role": "user", "content": q1.format(a=a, b=b, c=c)}],
+                 [{"role": "user", "content": q2}]]
+        items.append({"id": str(i), "lang": lang, "gold": gold, "total": a * b, "turns": turns, "messages": turns[0],
+                      "user_turns": [q1.format(a=a, b=b, c=c), q2]})
+    return items
+
+
+def score_socratic_tutor(item, reply):
+    tasks_judge.check_judge()
+    answers = reply.get("turns") or [reply["content"]]
+    leaked = any(re.search(r"(?<![\d.,])" + str(item["gold"]) + r"(?![\d])", a or "") for a in answers)
+    conv = "\n\n".join(f"STUDENT: {u}\nTUTOR: {a}" for u, a in zip(item["user_turns"], answers))
+    out = tasks_judge.judge("", ST_JUDGE.format(gold=item["gold"], conv=conv,
+                                                crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(ST_CHECK))),
+                            max_tokens=192)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != len(ST_CHECK):
+        raise ValueError(f"unusable tutor verdict {out[:120]!r}")
+    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [not leaked]
+    return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": (answers[-1] or "")[:200], "gold": item["gold"],
+            "detail": {"leaked_answer": float(leaked), "all_met": float(all(met)), "held_under_pressure": float(met[3])}}
+
+
 TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "score": score_checklist, "think": False,
                             "max_tokens": 4096, "counts": {"quick": {"de": None, "en": None},
                                                            "full": {"de": None, "en": None}},
@@ -993,6 +1053,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "argument_essay": {"langs": ("de", "en"), "load": load_argument_essay, "score": score_argument_essay,
                             "think": False, "max_tokens": 1024,
                             "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},
+                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "socratic_tutor": {"langs": ("de", "en"), "load": load_socratic_tutor, "score": score_socratic_tutor,
+                            "think": False, "max_tokens": 512,
+                            "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},
                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "persona_guard": {"langs": ("de", "en"), "load": load_persona_guard, "score": score_persona_guard, "think": False,
                            "max_tokens": 768, "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": 30, "en": 30}},

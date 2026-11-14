@@ -3136,6 +3136,65 @@ def score_fake_entity(item, reply):
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- knapsack (pick the best set under a budget, checked exactly)
+# 5-8 items with cost and value, a budget; the model lists the items it picks. Correct = within budget and the
+# optimal total value (any optimal set counts). `greedy_trap` items are built so that picking by value/cost ratio fails.
+KN_NAMES = {"en": ["tent", "stove", "lamp", "rope", "map", "radio", "kettle", "chair", "camera", "blanket"],
+            "de": ["Zelt", "Kocher", "Lampe", "Seil", "Karte", "Radio", "Kessel", "Stuhl", "Kamera", "Decke"]}
+
+
+def kn_best(items, budget):
+    from itertools import combinations
+    best = 0
+    for k in range(len(items) + 1):
+        for c in combinations(items, k):
+            if sum(x[1] for x in c) <= budget:
+                best = max(best, sum(x[2] for x in c))
+    return best
+
+
+def kn_greedy(items, budget):
+    tot = val = 0
+    for x in sorted(items, key=lambda x: -x[2] / x[1]):
+        if tot + x[1] <= budget:
+            tot, val = tot + x[1], val + x[2]
+    return val
+
+
+def load_knapsack(lang, n, seed):
+    items_out = []
+    i = -1
+    while len(items_out) < (n or 120):
+        i += 1
+        r = rng_of("knapsack", i)
+        k = 5 + i % 4
+        names = r.sample(KN_NAMES[lang], k)
+        items = [(nm, r.randint(2, 12), r.randint(3, 30)) for nm in names]
+        budget = sum(x[1] for x in items) // 2
+        best, greedy = kn_best(items, budget), kn_greedy(items, budget)
+        trap = len(items_out) % 2 == 1
+        if trap != (greedy < best):
+            continue  # half the items punish greedy picking, half do not
+        lines = "\n".join(f"- {nm}: cost {c}, value {v}" if lang == "en" else f"- {nm}: Kosten {c}, Wert {v}"
+                           for nm, c, v in items)
+        q = (f"Budget: {budget}. Items:\n{lines}\nChoose items with total cost at most {budget} and the highest possible "
+             "total value. List the chosen items, comma-separated." if lang == "en" else
+             f"Budget: {budget}. Gegenstände:\n{lines}\nWähle Gegenstände mit Gesamtkosten höchstens {budget} und dem höchsten "
+             "möglichen Gesamtwert. Nenne die gewählten Gegenstände, durch Kommas getrennt.")
+        items_out.append({"id": str(i), "lang": lang, "items": items, "budget": budget, "gold": best, "greedy_trap": trap,
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items_out
+
+
+def score_knapsack(item, reply):
+    line = (final_answer(reply["content"]) or "").lower()
+    picked = [x for x in item["items"] if re.search(r"\b" + re.escape(x[0].lower()) + r"\b", line)]
+    cost, val = sum(x[1] for x in picked), sum(x[2] for x in picked)
+    ok = cost <= item["budget"] and val == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": f"{cost}/{val}", "gold": item["gold"],
+            "detail": {"ok_trap" if item["greedy_trap"] else "ok_plain": float(ok), "over_budget": float(cost > item["budget"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4685,6 +4744,7 @@ TASKS = {
     "number_compare": task(load_number_compare, score_number_compare, 24, 160),
     "unit_chain": task(load_unit_chain, score_unit_chain, 24, 150),
     "fake_entity": {**task(load_fake_entity, score_fake_entity, 24, 120), "think": False, "max_tokens": 512},
+    "knapsack": task(load_knapsack, score_knapsack, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

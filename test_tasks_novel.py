@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -999,7 +999,23 @@ def test_fake_entity():
         assert tn.score_fake_entity(f, {"content": t})["correct"], t
 
 
+
+def test_knapsack():
+    from itertools import combinations
+    import tasks_novel as tn
+    it = tn.load_knapsack("en", 12, 0)
+    assert {x["greedy_trap"] for x in it} == {True, False}
+    for x in it:
+        best = max((c for k in range(len(x["items"]) + 1) for c in combinations(x["items"], k)
+                    if sum(y[1] for y in c) <= x["budget"]), key=lambda c: sum(y[2] for y in c))
+        ans = ", ".join(y[0] for y in best)
+        assert tn.score_knapsack(x, {"content": f"Answer: {ans}"})["correct"]
+        allx = ", ".join(y[0] for y in x["items"])
+        assert not tn.score_knapsack(x, {"content": f"Answer: {allx}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_knapsack()
     test_fake_entity()
     test_unit_chain()
     test_number_compare()

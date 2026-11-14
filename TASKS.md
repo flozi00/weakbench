@@ -199,3 +199,4 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `en_reported` | generated: direct quotes into reported speech with an explicit one-step backshift (am->was, will->would, have->had, was->had been, do->did) | en | 32 / 32 | off | the backshifted verb, copied quotes and first person rejected |
 | `alien_sort` | generated: an invented order of 6 letters, sort 4-6 words written in them | de, en | 24 / 120 | auto | the exact order; `ok_n4..6` |
 | `stale_answer` | generated two-turn word problem: the second turn repeats it with one number changed | de, en | 24 / 120 | auto | turn 2 exact; `repeated_old` (turn 1 answer given again), `ok_turn1` |
+| `pii_redact` | generated support tickets with name, e-mail, phone, IBAN and customer number, to be rewritten as a public FAQ entry | de, en | 24 / 80 | off | exact: no personal datum survives (digits normalised), the product and problem are kept; `leaked_<kind>` |

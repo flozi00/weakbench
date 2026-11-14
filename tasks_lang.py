@@ -2264,7 +2264,10 @@ def score_bilingual_notice(item, reply):
     de_ok = common.lang_ok(de, "de", min_words=8) is True
     en_ok = common.lang_ok(en, "en", min_words=8) is True
     nums = lambda t: re.findall(r"\d+", t)  # noqa: E731
-    facts_ok = all(f in nums(de) and f in nums(en) for f in item["facts"])
+    hh = int(item["facts"][1])
+    en_alt = {str(hh), str(hh - 12)} if hh > 12 else {str(hh)}  # "7 pm" for 19 Uhr
+    facts_ok = all(f in nums(de) for f in item["facts"]) and all(
+        (bool(en_alt & set(nums(en))) if k == 1 else f in nums(en)) for k, f in enumerate(item["facts"]))
     ok = de_ok and en_ok and facts_ok
     return {"correct": ok, "score": float(ok), "pred": text[:60], "gold": None,
             "detail": {"sections": 1.0, "de_ok": float(de_ok), "en_ok": float(en_ok), "facts_ok": float(facts_ok)}}

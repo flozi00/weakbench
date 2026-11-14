@@ -17,7 +17,7 @@ def test_all():
         assert len(full) == t["counts"]["full"]["en"] and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -979,7 +979,19 @@ def test_unit_chain():
         assert not tn.score_unit_chain(x, {"content": f"Answer: {float(g) * 1.1 + 1:.4f}"})["correct"]
 
 
+
+def test_fake_entity():
+    import tasks_novel as tn
+    it = tn.load_fake_entity("de", 8, 0)
+    f, r = it[0], it[1]
+    assert f["fake"] and not r["fake"]
+    assert tn.score_fake_entity(f, {"content": "Dazu habe ich keine Informationen, das Institut scheint nicht zu existieren."})["correct"]
+    assert not tn.score_fake_entity(f, {"content": "Es wurde 1952 von Hans Müller gegründet."})["correct"]
+    assert tn.score_fake_entity(r, {"content": "Das war Johann Wolfgang von Goethe."})["correct"]
+
+
 if __name__ == "__main__":
+    test_fake_entity()
     test_unit_chain()
     test_number_compare()
     test_continuity_error()

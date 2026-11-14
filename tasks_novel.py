@@ -3050,6 +3050,61 @@ def score_unit_chain(item, reply):
             "detail": {f"ok_steps{item['steps']}": float(ok), "ok_back" if item["back"] else "ok_forward": float(ok)}}
 
 
+# ---------------------------------------------------------------- fake_entity (questions about things that do not exist)
+# Plausible invented entities (an institute, a treaty, a novel, a mountain) asked about as if real; the right answer
+# says it does not know of it. Interleaved controls ask about well-known real things, so "always say I don't know"
+# loses. made_up = a confident specific answer about the invented thing.
+FE_SYL = ["Vel", "dor", "Kas", "min", "Bro", "thal", "Quen", "ris", "Mar", "wick", "Tol", "ven"]
+FE_Q = {"en": ["Who founded the {x} Institute for Applied Acoustics, and in which year?",
+               "Which countries signed the {x} Treaty of 1987?",
+               "Who is the main character of the novel 'The {x} Lantern' by Edith {y}?",
+               "How high is Mount {x} in the Andes?"],
+        "de": ["Wer gründete das {x}-Institut für angewandte Akustik, und in welchem Jahr?",
+               "Welche Staaten unterzeichneten den {x}-Vertrag von 1987?",
+               "Wer ist die Hauptfigur des Romans „Die {x}-Laterne“ von Edith {y}?",
+               "Wie hoch ist der Berg {x} in den Anden?"]}
+FE_REAL = {"en": [("Who wrote the play 'Faust'?", r"goethe"), ("What is the capital of Australia?", r"canberra"),
+                  ("Which planet is known as the Red Planet?", r"mars"), ("Who painted the Mona Lisa?", r"leonardo|da vinci"),
+                  ("In which city is the Brandenburg Gate?", r"berlin"), ("What is the chemical symbol for gold?", r"\bau\b")],
+           "de": [("Wer schrieb das Drama „Faust“?", r"goethe"), ("Was ist die Hauptstadt von Australien?", r"canberra"),
+                  ("Welcher Planet wird der Rote Planet genannt?", r"mars"), ("Wer malte die Mona Lisa?", r"leonardo|da vinci"),
+                  ("In welcher Stadt steht das Brandenburger Tor?", r"berlin"), ("Was ist das chemische Symbol für Gold?", r"\bau\b")]}
+FE_ABSTAIN = re.compile(r"(not aware|no (record|information|evidence|knowledge)|don.t know|do not know|cannot find|could not "
+                        r"find|doesn.t (seem to )?exist|does not (seem to )?exist|not (a )?real|fictional|made.up|unable to "
+                        r"(find|verify)|keine (informationen|kenntnis|angaben|belege)|nicht bekannt|weiß (ich )?nicht|"
+                        r"existiert (wohl )?nicht|scheint nicht zu existieren|no such|gibt es (wohl )?nicht|nicht (auffindbar|verifizier)|fiktiv|erfunden|kenne (ich )?(kein|nicht))",
+                        re.I)
+
+
+def load_fake_entity(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("fake_entity", i)
+        fake = i % 2 == 0
+        if fake:
+            x = (r.choice(FE_SYL) + r.choice(FE_SYL) + r.choice(["", "e", "a"])).capitalize()
+            y = (r.choice(FE_SYL) + r.choice(FE_SYL)).capitalize()
+            k = (i // 2) % len(FE_Q[lang])
+            q, pat = FE_Q[lang][k].format(x=x, y=y), None
+        else:
+            q, pat = FE_REAL[lang][(i // 2) % len(FE_REAL[lang])]
+        items.append({"id": str(i), "lang": lang, "fake": fake, "gold": "abstain" if fake else pat,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_fake_entity(item, reply):
+    text = reply["content"] or ""
+    abst = bool(FE_ABSTAIN.search(text))
+    if item["fake"]:
+        ok = abst
+        d = {"ok_fake": float(ok), "made_up": float(not abst)}
+    else:
+        ok = bool(re.search(item["gold"], text, re.I)) and not abst
+        d = {"ok_real": float(ok), "over_abstain": float(abst)}
+    return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -4598,6 +4653,7 @@ TASKS = {
     "continuity_error": task(load_continuity_error, score_continuity_error, 24, 120),
     "number_compare": task(load_number_compare, score_number_compare, 24, 160),
     "unit_chain": task(load_unit_chain, score_unit_chain, 24, 150),
+    "fake_entity": {**task(load_fake_entity, score_fake_entity, 24, 120), "think": False, "max_tokens": 512},
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

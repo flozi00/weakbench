@@ -823,8 +823,10 @@ def test_counterfactual_world():
     assert {x["conflict"] for x in it} == {True, False}
     for k in range(5):
         assert {x["gold"] for x in it if x["rule"] == k} == {"yes", "no"} or k == 3
-    x = next(x for x in it if x["rule"] == 0 and x["conflict"])
-    assert x["gold"] == "yes"  # e.g. 30 °C: frozen in Veloria
+    for k in range(5):
+        g = [x["gold"] for x in it if x["rule"] == k]
+        assert 0.25 <= g.count("yes") / len(g) <= 0.75, (k, g.count("yes"), len(g))
+    assert 0.4 <= sum(x["conflict"] for x in it) / len(it) <= 0.8
 
 
 if __name__ == "__main__":

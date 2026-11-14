@@ -446,6 +446,7 @@ def test_de_compound_gender():
     assert len(it) == 120 and {x["parts"] for x in it} == {2, 3}
     x = it[0]
     assert tl.score_de_compound_gender(x, {"content": x["gold"].capitalize()})["correct"]
+    assert tl.score_de_compound_gender(x, {"content": "Der Artikel ist " + x["gold"] + "."})["correct"]
     assert not tl.score_de_compound_gender(x, {"content": ({"der", "die", "das"} - {x["gold"]}).pop()})["correct"]
 
 
@@ -459,6 +460,7 @@ def test_de_address():
     assert not sc(f, "Vielen Dank für Ihre Nachricht. Ich schicke ihnen morgen die Unterlagen.")
     assert sc(inf, "Danke für deine Nachricht. Ich schicke dir morgen die Unterlagen.")
     assert not sc(inf, "Danke für Ihre Nachricht. Ich schicke dir morgen die Unterlagen.")
+    assert sc(f, "Ihre Bestellung wurde versandt.") and not sc(f, "Danke für ihre Nachricht. Ich schicke Ihnen alles.")
 
 
 def test_mixed_input():
@@ -471,6 +473,7 @@ def test_mixed_input():
             assert not tl.score_mixed_input(x, {"content": wrong})["correct"]
         x = it[0]
         assert tl.score_mixed_input(x, {"content": f"{x['day'][0]}, {x['hour'] + 12}:00 Uhr"})["correct"]  # 24 h is fine
+        assert tl.score_mixed_input(x, {"content": f"Von {x['decoy'][0]} auf {x['day'][0]} verschoben, {x['hour']} Uhr."})["correct"]
 
 
 if __name__ == "__main__":

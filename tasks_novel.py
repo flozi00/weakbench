@@ -2292,14 +2292,21 @@ CW_RULES = [  # (en rule, de rule, en q, de q, in-world truth fn(v), real truth 
      "In Veloria, is a stay of {v} days longer than two weeks?", "Ist in Veloria ein Aufenthalt von {v} Tagen länger als zwei Wochen?",
      lambda v: v > 18, lambda v: v > 14, (10, 24)),
     ("In Veloria, heavier objects fall more slowly than light ones.", "In Veloria fallen schwere Gegenstände langsamer als leichte.",
-     "In Veloria, a {v} kg stone and a 1 kg ball are dropped together from a tower. Does the ball land first?",
-     "In Veloria werden ein {v}-kg-Stein und ein 1-kg-Ball gleichzeitig von einem Turm fallen gelassen. Landet der Ball zuerst?",
-     lambda v: True, lambda v: False, (5, 50)),
+     "In Veloria, a {v} kg stone and a 1 kg ball are dropped together from a tower. {fq}",
+     "In Veloria lässt man einen {v}-kg-Stein und einen 1-kg-Ball gleichzeitig von einem Turm fallen. {fq}",
+     None, None, (5, 50)),
     ("In Veloria, the sun rises in the west.", "In Veloria geht die Sonne im Westen auf.",
-     "In Veloria, a house faces the {v} side. Does it get the morning sun?",
-     "In Veloria zeigt ein Haus zur {v}seite. Bekommt es die Morgensonne?",
+     "In Veloria, a house faces {v}. Does it get the morning sun?",
+     "In Veloria ist ein Haus nach {v} ausgerichtet. Bekommt es die Morgensonne?",
      None, None, None),
 ]
+
+
+CW_FALL = [("Does the ball land first?", "Landet der Ball zuerst?", True, False),
+           ("Does the stone land first?", "Landet der Stein zuerst?", False, False),
+           ("Do both land at the same moment?", "Landen beide im selben Moment?", False, True),
+           ("Does the stone land last?", "Landet der Stein zuletzt?", True, False)]
+CW_COMBOS = [(True, True), (True, False), (False, True), (False, False)]  # (conflict, in-world answer)
 
 
 def load_counterfactual_world(lang, n, seed):
@@ -2308,15 +2315,21 @@ def load_counterfactual_world(lang, n, seed):
         r = rng_of("counterfactual_world", i)
         k = i % len(CW_RULES)
         en_r, de_r, en_q, de_q, world, real, rng = CW_RULES[k]
-        if rng is None:  # the sun rule: east vs west
-            side_en, side_de = r.choice([("east", "Ost"), ("west", "West")])
-            ans = side_en == "west"
+        want = CW_COMBOS[(i // len(CW_RULES)) % 4]  # balanced conflict / agree and yes / no where the rule allows it
+        if k == 3:  # falling: the question form carries the answer
+            fe, fd, ans, real_ans = r.choice([f for f in CW_FALL if (f[2] != f[3], f[2]) == want] or CW_FALL)
+            conflict = ans != real_ans
+            q = (en_q if lang == "en" else de_q).format(v=r.randint(*rng), fq=fe if lang == "en" else fd)
+        elif rng is None:  # the sun rule: either side is a conflict with reality
+            side_en, side_de = r.choice([("east", "Osten"), ("west", "Westen")])
+            ans, conflict = side_en == "west", True
             q = (en_q if lang == "en" else de_q).format(v=side_en if lang == "en" else side_de)
-            conflict = True
         else:
-            v = r.randint(*rng)
-            ans = world(v)
-            conflict = world(v) != real(v)
+            vals = [v for v in range(rng[0], rng[1] + 1) if v != 40 and (world(v) != real(v), world(v)) == want]
+            if not vals:  # this combination cannot occur for the rule: any value
+                vals = [v for v in range(rng[0], rng[1] + 1) if v != 40]
+            v = r.choice(vals)
+            ans, conflict = world(v), world(v) != real(v)
             q = (en_q if lang == "en" else de_q).format(v=v)
         yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
         items.append({"id": str(i), "lang": lang, "rule": k, "conflict": conflict, "gold": yes if ans else no,
@@ -2329,8 +2342,9 @@ def load_counterfactual_world(lang, n, seed):
 def score_counterfactual_world(item, reply):
     yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
     ok = yn[:1] == [item["gold"]]
+    c = "conflict" if item["conflict"] else "agree"
     return {"correct": ok, "score": float(ok), "pred": yn[:1], "gold": item["gold"],
-            "detail": {f"ok_rule{item['rule']}": float(ok), "ok_conflict" if item["conflict"] else "ok_agree": float(ok)}}
+            "detail": {f"ok_rule{item['rule']}": float(ok), f"ok_{c}": float(ok), f"ok_{c}_rule{item['rule']}": float(ok)}}
 
 
 # ---------------------------------------------------------------- table_qa

@@ -1590,7 +1590,7 @@ def load_de_compound_gender(lang, n, seed):
 
 def score_de_compound_gender(item, reply):
     w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower()) if x in ("der", "die", "das")]
-    ok = w[:1] == [item["gold"]]
+    ok = w[-1:] == [item["gold"]]  # "Der Artikel ist das.": the last article named is the answer
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"],
             "detail": {f"ok_{item['parts']}parts": float(ok)}}
 
@@ -1622,8 +1622,10 @@ def load_de_address(lang, n, seed):
 def score_de_address(item, reply):
     text = reply["content"] or ""
     body = re.sub(r"(^|[.!?:]\s+)\S+", " ", text)  # sentence-initial words: capitalisation proves nothing there
-    du, sie = bool(AD_DU.search(text)), bool(AD_SIE.search(body)) or bool(AD_SIE.search(text) and not du)
-    low_sie = bool(re.search(r"\b(ihnen)\b", body))  # "ihnen" lower-case in a Sie text: capitalisation error
+    du = bool(AD_DU.search(text))
+    sie = bool(AD_SIE.search(body)) or bool(AD_SIE.search(text) and not du)
+    # no source sentence has a she/they referent, so a lower-case ihr/ihnen mid-sentence is a capitalisation error
+    low_sie = bool(re.search(r"\bihr(e[nmrs]?)?\b|\bihnen\b", body))  # "ihnen" lower-case in a Sie text: capitalisation error
     ok = (sie and not du and not low_sie) if item["register"] == "formal" else (du and not AD_SIE.search(body))
     return {"correct": ok, "score": float(ok), "pred": text[:80], "gold": item["register"],
             "detail": {f"ok_{item['register']}": float(ok), "mixed": float(du and sie)}}
@@ -1637,8 +1639,8 @@ MX_DAYS = [("Montag", "Monday"), ("Dienstag", "Tuesday"), ("Mittwoch", "Wednesda
 MX_TEMPL = [
     "Hey, ich hab das Meeting mit dem client auf {d1e} verschoben, at {t1} pm. Nee wait, sorry, die können erst am "
     "{d2d}, same time.",
-    "Kurzes update: the review ist jetzt am {d1d} um {t1} Uhr nachmittags. Actually scratch that, wir machen {d2e} at {t2} pm.",
-    "So, the call with Lena: {d1e}, {t1} pm. Oh warte, sie hat geschrieben, dass es {d2d} um {t2} Uhr nachmittags besser passt.",
+    "Kurzes Update: the review ist jetzt am {d1d} um {t1} Uhr nachmittags. Actually scratch that, wir machen {d2e} at {t2} pm.",
+    "So, the call with Lena: {d1e}, {t1} pm. Oh warte, sie hat geschrieben, dass es am {d2d} um {t2} Uhr nachmittags besser passt.",
 ]
 MX_Q = {"de": "An welchem Wochentag und um wie viel Uhr (nachmittags, 12-Stunden-Format) findet der Termin am Ende statt? "
               "Antworte im Format: <Wochentag>, <Stunde> Uhr.",
@@ -1665,9 +1667,14 @@ def load_mixed_input(lang, n, seed):
 def score_mixed_input(item, reply):
     t = (reply["content"] or "").strip().splitlines()
     line = (t[-1] if t else "").lower()
-    day_ok = any(d.lower() in line for d in item["day"]) and not any(d.lower() in line for d in item["decoy"])
-    hours = re.findall(r"\b(\d{1,2})(?::00)?\s*(?:uhr|pm|p\.m\.)", line)
-    hour_ok = bool(hours) and int(hours[0]) % 12 == item["hour"] % 12
+    days = [(m.start(), d) for d in item["day"] + item["decoy"] for m in re.finditer(d.lower(), line)]
+    day_ok = bool(days) and max(days)[1] in item["day"]  # the last weekday named ("von Dienstag auf Freitag")
+    words = {"eins": 1, "ein": 1, "one": 1, "zwei": 2, "two": 2, "drei": 3, "three": 3, "vier": 4, "four": 4,
+             "fünf": 5, "five": 5}
+    after = line[max(days)[0]:] if days else line
+    m = re.search(r"\b(\d{1,2})(?::00)?\b|\b(" + "|".join(words) + r")\b", after)
+    hour = (int(m[1]) if m[1] else words[m[2]]) if m else None
+    hour_ok = hour is not None and hour % 12 == item["hour"] % 12
     ok = day_ok and hour_ok
     return {"correct": ok, "score": float(ok), "pred": line[:60], "gold": item["gold"],
             "detail": {"day_ok": float(day_ok), "hour_ok": float(hour_ok)}}
@@ -1711,7 +1718,7 @@ TASKS = {
     "de_separable": task(("de",), load_de_separable, score_de_separable, 128, 32, lang_check=False),
     "de_compound_gender": task(("de",), load_de_compound_gender, score_de_compound_gender, 16, 60, lang_check=False),
     "de_address": task(("de",), load_de_address, score_de_address, 256, 30, lang_check=False),
-    "mixed_input": task(("de", "en"), load_mixed_input, score_mixed_input, 64, 30),
+    "mixed_input": task(("de", "en"), load_mixed_input, score_mixed_input, 64, 30, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

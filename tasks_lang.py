@@ -2967,7 +2967,7 @@ def score_de_ersatzinfinitiv(item, reply):
 # ---------------------------------------------------------------- en_irregular (less common irregular verbs)
 EI_VERBS = [("swim", "swam", "swum", "across the lake"), ("forbid", "forbade", "forbidden", "the trip"),
             ("wring", "wrung", "wrung", "the wet towel"), ("seek", "sought", "sought", "advice"),
-            ("forsake", "forsook", "forsaken", "her old plans"), ("tread", "trod", "trodden", "on the fresh paint"),
+            ("forsake", "forsook", "forsaken", "her old plans"), ("freeze", "froze", "frozen", "the vegetables"),
             ("undergo", "underwent", "undergone", "the operation"), ("foresee", "foresaw", "foreseen", "the problem"),
             ("weave", "wove", "woven", "a basket"), ("bite", "bit", "bitten", "into the apple"), ("cling", "clung", "clung", "to the rope"),
             ("withdraw", "withdrew", "withdrawn", "her application"), ("overtake", "overtook", "overtaken", "the truck"),

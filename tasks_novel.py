@@ -10112,6 +10112,61 @@ def score_dice_roll(item, reply):
             "detail": {f"ok_r{item['rolls']}": float(ok), "start_top": float(v == item["start"])}}
 
 
+# ---------------------------------------------------------------- lru_cache
+# A shelf with room for k books; a reader requests books in order, and when the shelf is full the book unused for the
+# longest time goes back to the archive (LRU). How many requests needed a fetch from the archive? Bait: FIFO eviction
+# (the book that came in first leaves), which differs on every item. `ok_k<capacity>`, `fifo_bait`.
+LRU_BOOKS = "ABCDEFG"
+
+
+def lru_misses(seq, k, lru=True):
+    shelf, miss = [], 0
+    for b in seq:
+        if b in shelf:
+            if lru:
+                shelf.remove(b)
+                shelf.append(b)
+            continue
+        miss += 1
+        if len(shelf) == k:
+            shelf.pop(0)
+        shelf.append(b)
+    return miss
+
+
+def load_lru_cache(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("lru_cache", i, att)
+        while True:
+            k = r.choice([2, 3, 4])
+            books = LRU_BOOKS[:k + r.randint(1, 2)]
+            seq = [r.choice(books) for _ in range(r.randint(10, 16))]
+            gold, fifo = lru_misses(seq, k), lru_misses(seq, k, lru=False)
+            if gold != fifo:
+                break
+        q = (f"A library desk has room for {k} books. Readers request these books, in this order: {' '.join(seq)}. A requested "
+             f"book that is on the desk is handed out and put back on the desk. A book that is not on the desk must be fetched "
+             f"from the archive and is then placed on the desk; if the desk is full, the book on the desk that was requested the "
+             f"longest time ago goes back to the archive first. The desk starts empty. How many requests needed a fetch from "
+             f"the archive?" if lang == "en" else
+             f"Auf einem Ausleihtisch einer Bibliothek ist Platz für {k} Bücher. Leser fragen diese Bücher in dieser Reihenfolge "
+             f"an: {' '.join(seq)}. Liegt ein angefragtes Buch auf dem Tisch, wird es ausgegeben und wieder auf den Tisch gelegt. "
+             f"Liegt es nicht dort, muss es aus dem Archiv geholt werden und kommt dann auf den Tisch; ist der Tisch voll, geht "
+             f"vorher das Buch zurück ins Archiv, das am längsten nicht mehr angefragt wurde. Der Tisch ist am Anfang leer. Wie "
+             f"viele Anfragen brauchten einen Gang ins Archiv?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": fifo, "k": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_lru_cache(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_k{item['k']}": float(ok), "fifo_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11220,6 +11275,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "lru_cache": task(load_lru_cache, score_lru_cache, 24, 96),
     "dice_roll": task(load_dice_roll, score_dice_roll, 24, 96),
     "merge_conflict": task(load_merge_conflict, score_merge_conflict, 24, 96),
     "genetics_cross": task(load_genetics_cross, score_genetics_cross, 24, 72),

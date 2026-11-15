@@ -1493,7 +1493,9 @@ def score_en_learner_feedback(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     norm = lambda t: re.sub(r"\s+", " ", re.sub(r"[“”\"*]", "", t.replace("’", "'"))).strip().lower()  # noqa: E731
-    corrected = norm(item["good"]) in norm(text)
+    alts = {"I have been living in Berlin since 2020.": ["I have lived in Berlin since 2020."],
+            "He has been working here for three years.": ["He has worked here for three years."]}.get(item["good"], [])
+    corrected = any(norm(g) in norm(text) for g in [item["good"], *alts])
     out = tasks_judge.judge("", LFE_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
                             max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)

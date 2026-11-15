@@ -1559,11 +1559,24 @@ REWRITE (should be gender-fair German without gender symbols):
 
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 1. The rewrite keeps every fact and instruction of the original (same people, deadlines, rules); nothing added or lost.
-2. No generic masculine remains for groups of people; neutral forms ("Lehrkräfte", "Studierende", "Teilnehmende",
-   "das Team") or pair forms ("Ärztinnen und Ärzte") are used. A masculine noun for a group counts as remaining.
+2. No generic masculine remains for people, whether groups or generic individuals ("jeder Teilnehmer", "ein Experte",
+   "der Bewerber"); neutral forms ("Lehrkräfte", "Studierende", "das Team") or pair forms are used. The masculine half
+   of a pair form ("Ärztinnen und Ärzte") is fine.
 3. The German is grammatically correct after the change: articles, adjective endings, pronouns ("jeder ... seinen" must
    be adapted, e.g. "alle ... ihren"), and verb agreement all fit the new nouns.
 4. It reads naturally, like a text a careful public office would publish (no clumsy chains of pair forms in every clause)."""
+
+
+GF_FORMS = {"Kollegen": ("Kolleg(?:e|en)", "Kollegin(?:nen)?"), "Studenten": ("Student(?:en)?", "Studentin(?:nen)?"),
+            "Student": ("Student(?:en)?", "Studentin(?:nen)?"), "Tutor": ("Tutor(?:en)?", "Tutorin(?:nen)?"),
+            "Dozenten": ("Dozent(?:en)?", "Dozentin(?:nen)?"), "Kunden": ("Kunden?", "Kundin(?:nen)?"),
+            "Ärzte": ("(?:Arzt|Ärzten?)", "Ärztin(?:nen)?"), "Autoren": ("Autor(?:en)?", "Autorin(?:nen)?"),
+            "Referenten": ("Referent(?:en)?", "Referentin(?:nen)?"), "Experte": ("Experten?", "Expertin(?:nen)?")}
+
+
+def _gf_forms(w):
+    """(masculine forms, feminine forms) of a listed noun: every case and number, so "Teilnehmern" or "der Referent" count."""
+    return GF_FORMS.get(w) or (rf"{w}n?s?", rf"{w}in(?:nen)?")
 
 
 def load_de_gender_fair(lang, n, seed):
@@ -1580,8 +1593,12 @@ def score_de_gender_fair(item, reply):
     text = (reply["content"] or "").strip()
     symbols = bool(re.search(r"\w[*:_]in(?:nen)?\b|\w[a-zäöüß]In(?:nen)?\b|\w/-?in(?:nen)?\b", text))
     # a masculine form standing alone; inside a pair ("Lehrerinnen und Lehrer") it is fine
-    pair = lambda w: re.search(rf"\w+in(?:nen)?\s+(?:und|oder|bzw\.)\s+(?:\w+\s+)?{w}\b|\b{w}\s+(?:und|oder|bzw\.)\s+(?:\w+\s+)?\w+in(?:nen)?\b", text)  # noqa: E731
-    left = [w for w in item["masc"] if re.search(rf"\b{w}\b", text) and not pair(w)]
+    rest = text
+    for w in item["masc"]:  # drop correct pair forms ("die Ärztinnen und die Ärzte"), then look for lone masculine forms
+        m_, f_ = _gf_forms(w)
+        rest = re.sub(rf"\b{f_}\s+(?:und|oder|bzw\.)\s+(?:\w+\s+){{0,3}}?{m_}\b|\b{m_}\s+(?:und|oder|bzw\.)\s+(?:\w+\s+){{0,3}}?{f_}\b",
+                      " ", rest)
+    left = [w for w in item["masc"] if re.search(rf"\b{_gf_forms(w)[0]}\b", rest)]
     out = tasks_judge.judge("", GF_JUDGE.format(src=item["src"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")

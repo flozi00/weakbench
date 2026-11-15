@@ -654,6 +654,11 @@ def test_de_gender_fair():
         x = to.load_de_gender_fair("de", None, 0)[0]
         good = "Liebe Lehrkräfte, bitte erinnern Sie die Schülerinnen und Schüler daran, dass alle ihren Ausweis mitbringen müssen. Die Lehrkräfte der Oberstufe treffen sich am Montag."
         assert to.score_de_gender_fair(x, {"content": good})["correct"]
+        assert not to.score_de_gender_fair(x, {"content": "Liebe Lehrerinnen und Lehrer, alle Schülerinnen und Schüler bringen den Ausweis mit; jeder Lehrer prüft ihn."})["correct"]
+        z = to.load_de_gender_fair("de", None, 0)[3]
+        assert to.score_de_gender_fair(z, {"content": "Wir suchen eine erfahrene Entwicklerin oder einen erfahrenen Entwickler. Wer sich bewirbt, sollte drei Jahre Erfahrung haben. Unsere Kundschaft schätzt Fachleute, die gut erklären können."})["correct"]
+        w = to.load_de_gender_fair("de", None, 0)[7]
+        assert not to.score_de_gender_fair(w, {"content": "Alle in der Stadt können Vorschläge einreichen. Experten prüfen jeden Vorschlag, bevor der Rat abstimmt."})["correct"]
         y = to.load_de_gender_fair("de", None, 0)[2]
         assert to.score_de_gender_fair(y, {"content": "Die Studierenden melden sich bis Freitag an. Wer als Tutorin oder Tutor arbeiten will, meldet sich bei der Lehrperson. Jede Studentin und jeder Student erhält danach den Zugang."})["correct"]
         for bad in (good.replace("Lehrkräfte,", "Lehrer*innen,"), good.replace("Liebe Lehrkräfte", "Liebe Lehrer"),

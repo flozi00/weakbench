@@ -3638,6 +3638,37 @@ def score_de_austrian(item, reply):
     return {"correct": ok, "score": float(ok), "pred": t.strip()[:40], "gold": item["gold"][0], "detail": {}}
 
 
+# ---------------------------------------------------------------- en_comparison (comparative and superlative forms)
+ENC_ITEMS = [("This box is ___ than that one. (heavy)", "heavier", ("heavier", "more heavy")),
+            ("The exam was ___ than I expected. (difficult)", "more difficult", ("difficulter", "more difficult")),
+            ("She is the ___ runner in the club. (fast)", "fastest", ("fastest", "most fast")),
+            ("Today is even ___ than yesterday. (bad)", "worse", ("worse", "badder")),
+            ("He has ___ patience than his brother. (little)", "less", ("less", "littler")),
+            ("This is the ___ film I have ever seen. (good)", "best", ("best", "goodest")),
+            ("The new flat is ___ from the station than the old one. (far)", "farther", ("farther", "farer")),
+            ("Could you speak a bit ___? (slowly)", "more slowly", ("slowlier", "more slowly")),
+            ("It is the ___ day of the year. (hot)", "hottest", ("hottest", "hotest")),
+            ("My bag is ___ than yours. (big)", "bigger", ("bigger", "biger")),
+            ("This route is ___ than the motorway. (beautiful)", "more beautiful", ("beautifuller", "more beautiful")),
+            ("This chair is ___ than the old one. (comfortable)", "more comfortable", ("comfortabler", "more comfortable")),
+            ("That was the ___ decision we could make. (bad)", "worst", ("worst", "baddest")),
+            ("The test was ___ than the last one. (easy)", "easier", ("easier", "easyer")),
+            ("Your answer is ___ than mine. (correct)", "more correct", ("correcter", "more correct")),
+            ("She is ___ than her sister. (old)", "older", ("older", "more old"))]
+
+
+def load_en_comparison(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with that form only.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(ENC_ITEMS[:min(n or 16, 16)])]
+
+
+def score_en_comparison(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4174,6 +4205,7 @@ TASKS = {
     "de_nominal_adj": task(("de",), load_de_nominal_adj, score_de_nominal_adj, 16, 16, lang_check=False),
     "en_zero_article": task(("en",), load_en_zero_article, score_en_zero_article, 20, 20, lang_check=False),
     "de_austrian": task(("de",), load_de_austrian, score_de_austrian, 20, 20, lang_check=False),
+    "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

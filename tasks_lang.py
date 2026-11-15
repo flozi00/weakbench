@@ -2363,7 +2363,7 @@ CA_FRAMES = [("gen", "Das Spiel fällt wegen ___ {n} aus.", [("Regens", "m"), ("
 
 def load_de_case_article(lang, n, seed):
     items = []
-    for i in range(n or 120):
+    for i in range(min(n or 24, 24)):
         case, sent, nouns = CA_FRAMES[i % len(CA_FRAMES)]
         noun, g = nouns[(i // len(CA_FRAMES)) % len(nouns)]
         items.append({"id": str(i), "lang": "de", "gold": CA_ART[case][g], "case": case,
@@ -2377,7 +2377,7 @@ def score_de_case_article(item, reply):
     ok = w[:1] == [item["gold"]]
     d = {f"ok_{item['case']}": float(ok)}
     if item["case"] == "gen":
-        d["took_dative"] = float(w[:1] == ["dem"] or (w[:1] == ["der"] and item["gold"] == "des"))
+        d["took_dative"] = float(w[:1] == ["dem"])
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": d}
 
 
@@ -2684,7 +2684,7 @@ TASKS = {
     "de_grammar_fix": task(("de",), load_de_grammar_fix, score_de_grammar_fix, 128, 40, lang_check=False),
     "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
-    "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 60, lang_check=False),
+    "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

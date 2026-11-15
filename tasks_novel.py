@@ -9125,6 +9125,70 @@ def score_country_facts(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- element_facts (periodic table knowledge)
+EF_ELEMENTS = [(1, "H", "Hydrogen", "Wasserstoff"), (2, "He", "Helium", "Helium"), (3, "Li", "Lithium", "Lithium"),
+               (4, "Be", "Beryllium", "Beryllium"), (5, "B", "Boron", "Bor"), (6, "C", "Carbon", "Kohlenstoff"),
+               (7, "N", "Nitrogen", "Stickstoff"), (8, "O", "Oxygen", "Sauerstoff"), (9, "F", "Fluorine", "Fluor"),
+               (10, "Ne", "Neon", "Neon"), (11, "Na", "Sodium", "Natrium"), (12, "Mg", "Magnesium", "Magnesium"),
+               (13, "Al", "Aluminium", "Aluminium"), (14, "Si", "Silicon", "Silicium"), (15, "P", "Phosphorus", "Phosphor"),
+               (16, "S", "Sulfur", "Schwefel"), (17, "Cl", "Chlorine", "Chlor"), (18, "Ar", "Argon", "Argon"),
+               (19, "K", "Potassium", "Kalium"), (20, "Ca", "Calcium", "Calcium"), (24, "Cr", "Chromium", "Chrom"),
+               (25, "Mn", "Manganese", "Mangan"), (26, "Fe", "Iron", "Eisen"), (27, "Co", "Cobalt", "Cobalt"),
+               (28, "Ni", "Nickel", "Nickel"), (29, "Cu", "Copper", "Kupfer"), (30, "Zn", "Zinc", "Zink"),
+               (35, "Br", "Bromine", "Brom"), (47, "Ag", "Silver", "Silber"), (50, "Sn", "Tin", "Zinn"), (53, "I", "Iodine", "Iod"),
+               (74, "W", "Tungsten", "Wolfram"), (78, "Pt", "Platinum", "Platin"), (79, "Au", "Gold", "Gold"),
+               (80, "Hg", "Mercury", "Quecksilber"), (82, "Pb", "Lead", "Blei"), (92, "U", "Uranium", "Uran")]
+EF_ALT = {"Aluminium": ["Aluminum"], "Sulfur": ["Sulphur"], "Silicium": ["Silizium"], "Cobalt": ["Kobalt"], "Iod": ["Jod"],
+          "Tungsten": ["Wolfram"], "Calcium": ["Kalzium"]}
+
+
+def load_element_facts(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):  # 37 elements: at most 32 name and 32 symbol questions without repeats
+        r = rng_of("element_facts", i, att)
+        kind = ("name", "symbol", "heavier")[i % 3]
+        z, sym, en, de = r.choice(EF_ELEMENTS)
+        name = de if lang == "de" else en
+        if kind == "name":
+            q = (f"Which chemical element has the symbol {sym}? Give its name." if lang == "en" else
+                 f"Welches chemische Element hat das Symbol {sym}? Nenne seinen Namen.")
+            items.append({"id": str(i), "lang": lang, "kind": kind, "gold": name, "names": [en, de] + EF_ALT.get(en, []) + EF_ALT.get(de, []),
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+        elif kind == "symbol":
+            q = (f"What is the chemical symbol of {name}?" if lang == "en" else f"Wie lautet das chemische Symbol von {name}?")
+            items.append({"id": str(i), "lang": lang, "kind": kind, "gold": sym,
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+        else:
+            while True:
+                b = r.choice(EF_ELEMENTS)
+                if abs(b[0] - z) >= 3:
+                    break
+            nb = b[3] if lang == "de" else b[2]
+            hi = (z, name) if z > b[0] else (b[0], nb)
+            q = (f"Which element has the higher atomic number (more protons): {name} or {nb}?" if lang == "en" else
+                 f"Welches Element hat die höhere Ordnungszahl (mehr Protonen): {name} oder {nb}?")
+            items.append({"id": str(i), "lang": lang, "kind": kind, "gold": hi[1], "pair": [name, nb],
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_element_facts(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    if item["kind"] == "name":
+        ok = any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in item["names"])
+    elif item["kind"] == "symbol":
+        toks = re.findall(r"(?<![A-Za-z])[A-Z][a-z]?(?![A-Za-z])", fa)  # case-sensitive: "Co" is not "CO"
+        ok = toks[:1] == [item["gold"]]
+    else:
+        pos = {x: m.start() for x in item["pair"] if (m := re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I))}
+        order = sorted(pos, key=pos.get)
+        v = order[0] if order else None
+        if len(order) == 2 and re.search(r"(?i)\b(?:lower|smaller|fewer|niedrigere?|kleinere?|weniger)\b", fa):
+            v = order[1]
+        ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10736,6 +10800,7 @@ TASKS = {
     "geo_locate": task(load_geo_locate, score_geo_locate, 24, 120),
     "town_country": task(load_town_country, score_town_country, 24, 120),
     "country_facts": task(load_country_facts, score_country_facts, 24, 120),
+    "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

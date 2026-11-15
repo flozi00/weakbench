@@ -2018,3 +2018,20 @@ def test_country_facts():
 
 if __name__ == "__main__":
     test_country_facts()
+
+
+def test_element_facts():
+    import tasks_novel as tn
+    xs = tn.load_element_facts("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 96
+    for x in xs[:9]:
+        assert tn.score_element_facts(x, {"content": f"Antwort: {x['gold']}"})["correct"], x
+    s = next(x for x in xs if x["kind"] == "symbol" and len(x["gold"]) == 2)
+    assert not tn.score_element_facts(s, {"content": f"Antwort: {s['gold'].upper()}"})["correct"]
+    h = next(x for x in xs if x["kind"] == "heavier")
+    lo = [p for p in h["pair"] if p != h["gold"]][0]
+    assert tn.score_element_facts(h, {"content": f"Antwort: {lo} hat die niedrigere Ordnungszahl als {h['gold']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_element_facts()

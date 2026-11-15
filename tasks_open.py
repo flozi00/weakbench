@@ -922,7 +922,7 @@ def load_ask_or_answer(lang, n, seed):
     for i in range(min(n or 16, 16)):
         vague, clear = AO_PAIRS[lang][i // 2]
         need = i % 2 == 0
-        items.append({"id": f"{i // 2}-{i % 2}", "lang": lang, "need_ask": need, "group_key": "verdict",
+        items.append({"id": f"{i // 2}-{i % 2}", "lang": lang, "need_ask": need,
                       "messages": [{"role": "user", "content": vague if need else clear}]})
     return items
 

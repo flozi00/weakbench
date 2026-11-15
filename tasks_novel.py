@@ -9990,7 +9990,7 @@ def score_genetics_cross(item, reply):
 # ---------------------------------------------------------------- merge_conflict
 # A 3-way merge of a config file: base, Anna's and Ben's version, line by line (no lines added or removed). A line
 # conflicts only when both changed it AND to different values; a line both changed the same way, or only one changed,
-# merges cleanly (the traps). 0-3 conflicts, balanced by item. `ok_c<conflicts>`, `same_change_flagged`.
+# merges cleanly (the traps). 0-3 conflicts, balanced by item. `ok_c<conflicts>`, `same_change_flagged`, `one_side_flagged`.
 MC_KEYS = ["port", "timeout", "retries", "log_level", "cache_size", "workers", "region", "max_upload", "theme", "language"]
 MC_VALS = {"port": ["8080", "8081", "9000", "443"], "timeout": ["30", "45", "60", "90"], "retries": ["3", "5", "2", "4"],
            "log_level": ["info", "debug", "warn", "error"], "cache_size": ["256", "512", "1024", "128"],
@@ -10024,6 +10024,7 @@ def load_merge_conflict(lang, n, seed):
                 ben[k] = b
         gold = [j + 1 for j, kd in enumerate(kinds) if kd == "conflict"]
         same = [j + 1 for j, kd in enumerate(kinds) if kd == "same"]
+        one = [j + 1 for j, kd in enumerate(kinds) if kd in ("anna", "ben")]
         show = lambda d: "\n".join(f"{j + 1}: {k} = {d[k]}" for j, k in enumerate(keys))  # noqa: E731
         q = (f"Anna and Ben both edited the same config file, starting from the same base version. A merge tool does a 3-way merge "
              f"of each line on its own (neighbouring lines do not affect each other). Which line numbers are merge conflicts? Answer with the line numbers, comma-separated, or \"none\".\n\n"
@@ -10031,7 +10032,7 @@ def load_merge_conflict(lang, n, seed):
              f"Anna und Ben haben dieselbe Konfigurationsdatei bearbeitet, beide ausgehend von derselben Basisversion. Ein Merge-Werkzeug führt "
              f"für jede Zeile einzeln einen 3-Wege-Merge durch (Nachbarzeilen beeinflussen sich nicht). Welche Zeilennummern sind Merge-Konflikte? Antworte mit den "
              f"Zeilennummern, durch Kommas getrennt, oder mit \"keine\".\n\nBASIS:\n{show(base)}\n\nANNA:\n{show(anna)}\n\nBEN:\n{show(ben)}")
-        items.append({"id": str(i), "lang": lang, "gold": gold, "same": same,
+        items.append({"id": str(i), "lang": lang, "gold": gold, "same": same, "one": one,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
@@ -10044,7 +10045,8 @@ def score_merge_conflict(item, reply):
         v = sorted({int(x) for x in re.findall(r"\b\d+\b", fa)}) if re.search(r"\d", fa) else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
-            "detail": {f"ok_c{len(item['gold'])}": float(ok), "same_change_flagged": float(bool(v) and bool(set(v) & set(item["same"])))}}
+            "detail": {f"ok_c{len(item['gold'])}": float(ok), "same_change_flagged": float(bool(v) and bool(set(v) & set(item["same"]))),
+                       "one_side_flagged": float(bool(v) and bool(set(v) & set(item.get("one", []))))}}
 
 
 # ---------------------------------------------------------------- event_order

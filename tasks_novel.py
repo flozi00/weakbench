@@ -8593,6 +8593,45 @@ def score_series_runs(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- elevator_route (follow a stated scheduling rule)
+def load_elevator_route(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("elevator_route", i, att)
+        while True:
+            start = r.randint(2, 12)  # no floor 0: "im 0. Stock" is not German (Erdgeschoss)
+            up = r.random() < 0.5
+            reqs = r.sample([f for f in range(1, 17) if f != start], r.randint(4, 6))
+            above = sorted(f for f in reqs if f > start)
+            below = sorted((f for f in reqs if f < start), reverse=True)
+            order = above + below if up else below + above  # SCAN: finish the current direction, then the rest
+            pos, dist = start, 0
+            for f in order:
+                dist += abs(f - pos)
+                pos = f
+            naive = sum(abs(b - a) for a, b in zip([start] + reqs, reqs))  # served in the order pressed
+            if above and below and naive != dist:
+                break
+        floors = ", ".join(map(str, reqs))
+        q = (f"An elevator is at floor {start} and is moving {'up' if up else 'down'}. Buttons were pressed for floors {floors} "
+             f"(in that order). Rule: it keeps going in its current direction and stops at every requested floor on the way; only "
+             f"when no request is left in that direction does it turn around and serve the rest. How many floors does it travel in "
+             f"total until all requests are served?" if lang == "en" else
+             f"Ein Aufzug steht im {start}. Stock und fährt gerade nach {'oben' if up else 'unten'}. Gedrückt wurden die Stockwerke "
+             f"{floors} (in dieser Reihenfolge). Regel: Er fährt in seiner Richtung weiter und hält an jedem gewünschten Stockwerk auf "
+             f"dem Weg; erst wenn in dieser Richtung kein Wunsch mehr übrig ist, kehrt er um und bedient den Rest. Wie viele Stockwerke "
+             f"fährt er insgesamt, bis alle Wünsche erfüllt sind?")
+        items.append({"id": str(i), "lang": lang, "gold": dist, "bait": naive, "order": order,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_elevator_route(item, reply):
+    v = stated_int(reply, r"(?:floors?|stockwerke?|etagen?)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"press_order": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10194,6 +10233,7 @@ TASKS = {
     "chord_transpose": task(load_chord_transpose, score_chord_transpose, 24, 120),
     "nutrition_portion": task(load_nutrition_portion, score_nutrition_portion, 24, 120),
     "series_runs": task(load_series_runs, score_series_runs, 24, 120),
+    "elevator_route": task(load_elevator_route, score_elevator_route, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

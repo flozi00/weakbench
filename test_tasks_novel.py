@@ -1795,3 +1795,31 @@ def test_series_runs():
 
 if __name__ == "__main__":
     test_series_runs()
+
+
+def test_elevator_route():
+    import tasks_novel as tn
+    xs = tn.load_elevator_route("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs:  # replay the rule from the prompt
+        c = x["messages"][0]["content"]
+        pos = int(re.search(r"at floor (\d+)", c)[1])
+        up = "moving up" in c
+        reqs = [int(v) for v in re.search(r"floors ([\d, ]+) \(", c)[1].split(", ")]
+        dist, todo = 0, set(reqs)
+        while todo:
+            ahead = [f for f in todo if (f > pos if up else f < pos)]
+            if not ahead:
+                up = not up
+                continue
+            nxt = min(ahead, key=lambda f: abs(f - pos))
+            dist += abs(nxt - pos)
+            pos = nxt
+            todo.discard(nxt)
+        assert dist == x["gold"] != x["bait"]
+    x = xs[0]
+    assert tn.score_elevator_route(x, {"content": f"Answer: {x['gold']} floors"})["correct"]
+
+
+if __name__ == "__main__":
+    test_elevator_route()

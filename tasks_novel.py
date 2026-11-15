@@ -6316,6 +6316,44 @@ def score_sql_result(item, reply):
                        "took_null_naive": float(v is not None and abs(v - item["naive"]) < 0.01 and item["naive"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- meet_time (relative motion with a head start)
+def load_meet_time(lang, n, seed):
+    from fractions import Fraction as F
+    fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"  # noqa: E731
+    items = []
+    for i in range(n or 120):
+        r = rng_of("meet_time", i)
+        while True:
+            v1, v2 = r.choice([4, 5, 12, 15, 20, 60, 80]), r.choice([4, 6, 10, 15, 18, 40, 90])
+            d = r.randrange(20, 300, 5)
+            t1 = r.randrange(7 * 60, 10 * 60, 5)
+            lag = r.randrange(10, 90, 5)
+            head = F(v1 * lag, 60)  # km done by the first before the second starts
+            if head >= d:
+                continue
+            meet = t1 + lag + (d - head) / F(v1 + v2, 60)
+            naive = t1 + F(d * 60, v1 + v2)
+            if meet.denominator == 1 and naive.denominator == 1 and meet != naive and meet < 22 * 60:
+                break
+        a, b = ("Anna", "Ben")
+        q = (f"{a} leaves town A at {fmt(t1)} and walks/drives towards town B at {v1} km/h. {b} leaves town B at {fmt(t1 + lag)} and "
+             f"travels towards town A on the same road at {v2} km/h. The road between A and B is {d} km long. At what time do they meet?"
+             if lang == "en" else
+             f"{a} fährt um {fmt(t1)} in Ort A los, mit {v1} km/h in Richtung Ort B. {b} fährt um {fmt(t1 + lag)} in Ort B los, auf "
+             f"derselben Straße mit {v2} km/h in Richtung Ort A. Die Straße zwischen A und B ist {d} km lang. Um wie viel Uhr treffen sie sich?")
+        items.append({"id": str(i), "lang": lang, "gold": fmt(meet), "naive": fmt(naive),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_meet_time(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    t = [f"{int(h):02d}:{m}" for h, m in re.findall(r"\b(\d{1,2})[:.](\d{2})\b", fa)]
+    v = t[0] if len(set(t)) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_same_start": float(v == item["naive"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7895,6 +7933,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "meet_time": task(load_meet_time, score_meet_time, 24, 120),
     "sql_result": task(load_sql_result, score_sql_result, 24, 120),
     "pack_buy": task(load_pack_buy, score_pack_buy, 24, 120),
     "growth_rel": task(load_growth_rel, score_growth_rel, 24, 120),

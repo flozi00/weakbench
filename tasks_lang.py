@@ -4224,7 +4224,7 @@ def score_de_case_identify(item, reply):
 
 # ---------------------------------------------------------------- en_tense_identify (name the tense of a verb phrase)
 ETI_VERBS = [("work", "works", "worked", "working", "worked"), ("play", "plays", "played", "playing", "played"),
-             ("write", "writes", "wrote", "writing", "written"), ("read", "reads", "read", "reading", "read"),
+             ("write", "writes", "wrote", "writing", "written"), ("swim", "swims", "swam", "swimming", "swum"),  # not "read": They [read] is present or past
              ("cook", "cooks", "cooked", "cooking", "cooked"), ("drive", "drives", "drove", "driving", "driven"),
              ("study", "studies", "studied", "studying", "studied"), ("sing", "sings", "sang", "singing", "sung")]
 ETI_SUBJ = [("She", 3), ("They", 0), ("My brother", 3), ("We", 0)]

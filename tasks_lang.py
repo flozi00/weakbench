@@ -3078,7 +3078,7 @@ def score_en_dependent_preps(item, reply):
 
 # ---------------------------------------------------------------- de_weak_nouns (n-Deklination)
 # (noun nominative, form in acc/dat/gen, the genitive form if irregular)
-WN_NOUNS = [("Kunde", "Kunden", "Kunden"), ("Student", "Studenten", "Studenten"), ("Nachbar", "Nachbarn", "Nachbarn"),
+WN_NOUNS = [("Kunde", "Kunden", "Kunden"), ("Student", "Studenten", "Studenten"), ("Polizist", "Polizisten", "Polizisten"),
             ("Herr", "Herrn", "Herrn"), ("Kollege", "Kollegen", "Kollegen"), ("Name", "Namen", "Namens"),
             ("Mensch", "Menschen", "Menschen"), ("Junge", "Jungen", "Jungen")]
 WN_FRAMES = [("akk", "Ich habe gestern den ___ ({n}) getroffen."), ("dat", "Wir sprechen morgen mit dem ___ ({n})."),

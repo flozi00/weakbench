@@ -315,7 +315,11 @@ def load_xl_faithful(lang, n, seed):
     key = lambda r: r["link"]  # noqa: E731
     src = {key(r): r["flores_passage"] for r in rows_of(BELEBELE, f"data/{src_code}.jsonl")}
     tgt = {key(r): r["flores_passage"] for r in rows_of(BELEBELE, f"data/{tgt_code}.jsonl")}
-    split = lambda t: re.split(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ\"„])", t)  # noqa: E731
+    def split(t):  # the Belebele ".x" artifact and CSV-doubled quotes out; no split after "am 21." (German ordinal dates)
+        t = re.sub(r"\.x(?=\s|$)", ".", t).replace('""', '"')
+        return [p.strip('" ') for p in re.split(r"(?<!\d\.)(?<=[.!?])\s+(?=[A-ZÄÖÜ\"„])", t)]
+    months = r"(?i)\b(?:january|february|march|april|may|june|july|august|september|october|november|december|januar|februar|" \
+             r"märz|mai|juni|juli|oktober|dezember)\b"
     pairs = []
     for k in sorted(set(src) & set(tgt)):
         a, b = split(src[k]), split(tgt[k])
@@ -324,7 +328,8 @@ def load_xl_faithful(lang, n, seed):
         for x, y in zip(a, b):
             num = r"(?<![\w.,:/-])\d+(?![\w.,:/-]\d|[\w-])"  # free-standing numbers, not COVID-19, 3.5, 12:30
             nx, ny = re.findall(num, x), re.findall(num, y)
-            if nx and sorted(nx) == sorted(ny) and 60 <= len(y) <= 300:
+            same_months = sorted(m.lower()[:3] for m in re.findall(months, x)) == sorted(m.lower()[:3] for m in re.findall(months, y))
+            if nx and sorted(nx) == sorted(ny) and 60 <= len(y) <= 300 and 0.55 <= len(x) / len(y) <= 1.8 and same_months:
                 pairs.append((x, y, ny))
     items = []
     order = random.Random(f"xl_faithful:{lang}").sample(range(len(pairs)), min(len(pairs), n or 80))

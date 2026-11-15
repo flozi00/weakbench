@@ -6657,9 +6657,10 @@ def load_org_chart(lang, n, seed):
             a, b = r.sample(people[1:], 2)
             ca, cb = chain(a), chain(b)
             lca = next(x for x in ca if x in cb)
-            if lca not in (a, b) and lca != boss[a] or (lca not in (a, b) and lca != boss[b]):
-                if lca not in (a, b) and (boss[a] != lca or boss[b] != lca) and len(ca) + len(cb) >= 6:
-                    break
+            at_root = lca == people[0]
+            if (lca not in (a, b) and (boss[a] != lca or boss[b] != lca) and len(ca) + len(cb) >= 6
+                    and at_root == (i % 4 == 0)):  # the top boss is the answer in a quarter of the items only
+                break
         bait = boss[a] if boss[a] != lca else boss[b]
         lines = [f"{p} reports to {q}." if lang == "en" else f"{p} berichtet an {q}." for p, q in boss.items()]
         r.shuffle(lines)

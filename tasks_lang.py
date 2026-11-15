@@ -3492,6 +3492,37 @@ def score_en_adj_adv(item, reply):
             "detail": {"ok_adverb" if item["adverb"] else "ok_adjective": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_paronyms (look-alike words with different meanings)
+PA_ITEMS = [("Er ist ___ krank: Er hustet und hat Fieber, der Arzt hat ihn krankgeschrieben.", "anscheinend", ("scheinbar", "anscheinend")),
+            ("Der Stab im Wasser ist nur ___ geknickt; in Wirklichkeit ist er gerade.", "scheinbar", ("scheinbar", "anscheinend")),
+            ("Frau Kaya ___ seit zwanzig Jahren Mathematik an unserer Schule.", "lehrt", ("lehrt", "lernt")),
+            ("Mein Sohn ___ gerade für die Führerscheinprüfung.", "lernt", ("lehrt", "lernt")),
+            ("Die Gewerkschaft ___ mehr Lohn für die Pflegekräfte.", "fordert", ("fordert", "fördert")),
+            ("Die Stiftung ___ junge Talente mit einem Stipendium.", "fördert", ("fordert", "fördert")),
+            ("Als der Hund plötzlich bellte, bin ich furchtbar ___.", "erschrocken", ("erschreckt", "erschrocken")),
+            ("Der laute Knall hat die Kinder ___.", "erschreckt", ("erschreckt", "erschrocken")),
+            ("Wir müssen morgen ___ aufstehen, der Flug geht um sechs.", "zeitig", ("zeitig", "zeitlich")),
+            ("Die neue Maschine arbeitet ___: Sie braucht für die gleiche Menge nur halb so viel Strom.", "effizient", ("effektiv", "effizient")),
+            ("Der Kühlschrank ist ___: Er hält die Milch auf genau vier Grad, wie er soll.", "effektiv", ("effektiv", "effizient")),
+            ("Ich habe mir das Buch von meiner Schwester ___; ich gebe es ihr nächste Woche zurück.", "geliehen", ("geliehen", "verliehen")),
+            ("Die Bibliothek hat alle Exemplare schon ___; keins ist mehr im Regal.", "verliehen", ("geliehen", "verliehen")),
+            ("Der Zug hatte zehn Minuten Verspätung, ___ haben wir den Anschluss verpasst.", "deshalb", ("deshalb", "weil")),
+            ("Wir haben den Anschluss verpasst, ___ der Zug zehn Minuten Verspätung hatte.", "weil", ("deshalb", "weil")),
+            ("Das Ergebnis der Wahl ist jetzt ___: Alle Stimmen sind ausgezählt.", "endgültig", ("endgültig", "entgültig"))]
+
+
+def load_de_paronyms(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Setze „{o[i % 2]}“ oder „{o[1 - i % 2]}“ ein. Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(PA_ITEMS[:min(n or 16, 16)])]
+
+
+def score_de_paronyms(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4024,6 +4055,7 @@ TASKS = {
     "de_reflexive_case": task(("de",), load_de_reflexive_case, score_de_reflexive_case, 20, 20, lang_check=False),
     "en_countable": task(("en",), load_en_countable, score_en_countable, 20, 20, lang_check=False),
     "en_adj_adv": task(("en",), load_en_adj_adv, score_en_adj_adv, 20, 20, lang_check=False),
+    "de_paronyms": task(("de",), load_de_paronyms, score_de_paronyms, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

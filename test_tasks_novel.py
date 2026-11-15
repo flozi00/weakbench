@@ -2075,3 +2075,27 @@ def test_leap_days():
 
 if __name__ == "__main__":
     test_leap_days()
+
+
+def test_grid_paths():
+    import itertools
+    import tasks_novel as tn
+    xs = tn.load_grid_paths("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs[:30]:  # brute force over move sequences
+        g = [ln for ln in x["messages"][0]["content"].splitlines() if set(ln) <= set("SZ#.") and ln][:]
+        R, C = len(g), len(g[0])
+        cnt = 0
+        for moves in set(itertools.permutations("R" * (C - 1) + "D" * (R - 1))):
+            y = xx = 0
+            ok = True
+            for m in moves:
+                y, xx = (y + 1, xx) if m == "D" else (y, xx + 1)
+                ok = ok and g[y][xx] != "#"
+            cnt += ok
+        assert cnt == x["gold"], (cnt, x["gold"])
+    assert tn.score_grid_paths(xs[0], {"content": f"Answer: {xs[0]['gold']} paths"})["correct"]
+
+
+if __name__ == "__main__":
+    test_grid_paths()

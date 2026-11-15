@@ -9276,6 +9276,40 @@ def score_leap_days(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"forgot_century_rule": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- grid_paths (count monotone paths around blocked cells)
+def load_grid_paths(lang, n, seed):
+    from math import comb
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("grid_paths", i, att)
+        while True:
+            rows, cols = r.randint(3, 5), r.randint(3, 6)
+            blocked = {(r.randrange(rows), r.randrange(cols)) for _ in range(r.randint(1, 4))} - {(0, 0), (rows - 1, cols - 1)}
+            ways = [[0] * cols for _ in range(rows)]
+            for y in range(rows):
+                for x in range(cols):
+                    if (y, x) in blocked:
+                        continue
+                    ways[y][x] = 1 if (y, x) == (0, 0) else (ways[y - 1][x] if y else 0) + (ways[y][x - 1] if x else 0)
+            gold, naive = ways[-1][-1], comb(rows + cols - 2, rows - 1)
+            if gold > 0 and gold != naive and blocked:
+                break
+        grid = "\n".join("".join("#" if (y, x) in blocked else "S" if (y, x) == (0, 0) else "Z" if (y, x) == (rows - 1, cols - 1)
+                                  else "." for x in range(cols)) for y in range(rows))
+        q = (f"A robot moves on this grid from S (top left) to Z (bottom right). It may only step one cell right or one cell down, "
+             f"and never onto #. How many different paths are there?\n{grid}" if lang == "en" else
+             f"Ein Roboter fährt auf diesem Raster von S (oben links) nach Z (unten rechts). Er darf nur ein Feld nach rechts oder ein "
+             f"Feld nach unten gehen und nie auf #. Wie viele verschiedene Wege gibt es?\n{grid}")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": naive, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_grid_paths(item, reply):
+    v = stated_int(reply, r"(?:paths?|wege?|ways?|möglichkeit)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ignored_blocks": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10890,6 +10924,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

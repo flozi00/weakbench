@@ -1239,9 +1239,9 @@ def score_interpreter(item, reply):
 # ---------------------------------------------------------------- conflict_summary (judge + exact: two sources disagree)
 # Two short reports about the same event disagree on one figure (and agree on the rest). The summary must report both
 # figures with their sources instead of silently picking one or averaging them. Both figures are checked exactly.
-CS_EVENTS = {"en": [("the city marathon", "runners"), ("the book fair", "visitors"), ("the charity concert", "tickets sold"),
+CS_EVENTS = {"en": [("the city marathon", "runners"), ("the book fair", "visitors"), ("the charity concert", "concert-goers"),
                     ("the harbour festival", "visitors"), ("the climate demonstration", "participants"), ("the open day", "guests")],
-             "de": [("dem Stadtmarathon", "Läufer"), ("der Buchmesse", "Besucher"), ("dem Benefizkonzert", "verkaufte Karten"),
+             "de": [("dem Stadtmarathon", "Läufer"), ("der Buchmesse", "Besucher"), ("dem Benefizkonzert", "Konzertbesucher"),
                     ("dem Hafenfest", "Besucher"), ("der Klimademo", "Teilnehmende"), ("dem Tag der offenen Tür", "Gäste")]}
 CS_SRC = {"en": ("The city press office", "The organisers"), "de": ("Die Pressestelle der Stadt", "Die Veranstalter")}
 CS_JUDGE = """Two reports about one event disagree on a number: source 1 says {a}, source 2 says {b}. The rest agrees.

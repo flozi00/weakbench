@@ -1,6 +1,6 @@
 """Builds the private set tasks_novel.GEO_PLACES from GeoNames (CC BY 4.0, https://www.geonames.org/):
-download cities15000.zip into geo_dl/, unzip, run `python build_geo_places.py`, upload wbdata/sets/tasks_novel.GEO_PLACES.py
-to the dataset repo and bump common.DATA_REV."""
+download cities15000.zip and admin1CodesASCII.txt into geo_dl/, unzip, run `python build_geo_places.py`, upload
+wbdata/sets/tasks_novel.GEO_PLACES.py to the dataset repo and bump common.DATA_REV."""
 import random, re, json, sys
 # ISO code -> (English names, German names); only countries with stable, well-known names
 C = {"DE": (["Germany"], ["Deutschland"]), "FR": (["France"], ["Frankreich"]), "IT": (["Italy"], ["Italien"]), "ES": (["Spain"], ["Spanien"]),
@@ -68,17 +68,34 @@ for la, lo, c, p, nm in big:
     names = [nm[0]] + [n for n in nm[1:] if n.lower() not in primaries]  # no other city as an alias (Giza is not Cairo)
     near = [y[4][0] for y in large if y[4][0] != nm[0] and km((la, lo), y[:2]) <= 30]  # accepted for geo_coords only
     pool_city.append((la, lo, c, p, names, near, GEO_DE.get(nm[0], nm[0])))
-# towns whose name exists only once in the whole GeoNames file (no Paris, Texas): for "which country is X in?"
-allnames = {}
+# towns whose name is unambiguous: not used by any other place (any name or alternate name in cities15000), no region,
+# state or country name (admin1 codes, country names, Gold Coast), no city district (PPLX), and well known enough to have
+# 8+ alternate names (drops database-only records); a short deny list for the rest
+DENY = {"paraná", "surrey", "delta", "north shore", "kimberley", "sunshine coast", "gold coast", "springs", "nigel", "mestre",
+        "archway", "cajamarca", "posadas", "ocaña", "crato", "queluz", "coimbra", "münster", "batu", "sutton", "logan city",
+        "montreuil", "lampa", "simmering", "ajax", "the bronx", "buda", "pest"}
+namecount = {}
+recs = []
 for ln in open("geo_dl/cities15000.txt", encoding="utf-8"):
-    f = ln.split("\t")
-    for nm in {f[1], f[2]}:
-        allnames[nm.lower()] = allnames.get(nm.lower(), 0) + 1
+    f = ln.rstrip("\n").split("\t")
+    alts = [a for a in f[3].split(",") if a]
+    for nm in {f[1].lower(), f[2].lower(), *(a.lower() for a in alts)}:
+        namecount[nm] = namecount.get(nm, 0) + 1
+    recs.append((f[1], f[8], int(f[14] or 0), f[7], len(alts), f[2].lower()))  # the native Latin name is shown
+admin = {ln.split("\t")[1].lower() for ln in open("geo_dl/admin1CodesASCII.txt", encoding="utf-8")} | \
+        {ln.split("\t")[2].lower() for ln in open("geo_dl/admin1CodesASCII.txt", encoding="utf-8")}
+countryish = {x.lower() for en, de in C.values() for x in en + de} | {"gold coast", "ceylon", "persia", "siam", "burma"}
 unique_towns = []
-for cc, lst in sorted(towns.items()):
-    ok = [x for x in lst if allnames.get(x[4][0].lower()) == 1 and re.fullmatch(r"[A-Za-zÀ-ÿ' -]{4,}", x[4][0]) and 100_000 <= x[3] and not x[4][0].startswith("City of")]
-    ok = sorted(ok, key=lambda x: (x[0], x[1]))
-    unique_towns += [(x[4][0], cc, x[3]) for x in r.sample(ok, min(10, len(ok)))]
+by = {}
+for ascii_name, cc, pop, fcode, nalt, name in recs:
+    a = ascii_name.lower()
+    if (cc in C and pop >= 100_000 and fcode != "PPLX" and nalt >= 8 and namecount.get(a) == 1 and namecount.get(name, 1) == 1
+            and a not in admin and a not in countryish and a not in DENY and name not in DENY
+            and re.fullmatch(r"[A-Za-zÀ-ÖØ-öø-ÿĀ-ž' -]{4,}", ascii_name)):
+        by.setdefault(cc, []).append((ascii_name, cc, pop))
+for cc in sorted(by):
+    lst = sorted(by[cc])
+    unique_towns += r.sample(lst, min(10, len(lst)))
 out = {"countries": C, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city, "towns": unique_towns}
 s = repr(out)
 open("wbdata/sets/tasks_novel.GEO_PLACES.py", "w", encoding="utf-8").write(s)

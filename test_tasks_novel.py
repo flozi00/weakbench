@@ -1985,6 +1985,10 @@ def test_town_country():
     x = xs[0]
     assert tn.score_town_country(x, {"content": f"Antwort: {x['gold']}"})["correct"]
     assert not tn.score_town_country(x, {"content": "Antwort: keine Ahnung"})["correct"]
+    other = "China" if x["cc"] != "CN" else "Japan"
+    assert tn.score_town_country(x, {"content": f"Antwort: {x['gold']}, nicht {other}"})["correct"]
+    assert tn.score_town_country(x, {"content": f"Antwort: {x['gold']}, nahe {other}"})["correct"]
+    assert not tn.score_town_country(x, {"content": f"Antwort: {x['gold']} oder {other}"})["correct"]
 
 
 if __name__ == "__main__":

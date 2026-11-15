@@ -8929,6 +8929,9 @@ def score_geo_coords(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
     fa = re.sub(r"(?i)\bnew south wales|neusüdwales|\bnew mexico|neumexiko|\bnew england\b", " ", fa)  # regions, not countries
     fa = re.sub(r"(?i)\bnorthern ireland\b", " Nordirland ", fa)  # not "Ireland"
+    # a country after a negation or a proximity word is not the answer ("Japan, nicht China", "Polen, nahe Deutschland")
+    fa = re.sub(r"(?i)\b(?:not|nicht|kein\w*|near|nahe|close to|bordering|neighbou?ring|grenzt an|neben|statt|instead of)"
+                r"\s+(?:(?:the|der|die|das|dem|den)\s+)?[\w-]+(?:\s+[A-ZÄÖÜ][\w-]+)?", " ", fa)
     has = lambda nm: re.search(rf"(?<![\w]){re.escape(nm.rstrip('.'))}\.?(?![\w])", fa, re.I)  # noqa: E731  "U.S" after final_answer
     named = {cc for cc, (en, de) in {**g["countries"], **g.get("decoys", {})}.items() if any(has(x) for x in en + de)}
     if item["kind"] == "country":

@@ -7182,18 +7182,19 @@ def _ce_claims(r, lang):
     a, b = r.sample([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15], 2)
     d = r.choice([1, 4, 5, 6, 9])
     k = r.choice([2, 3, 4, 5, 6, 9])
-    en = {"div": f"Every number from 1 to 200 that is divisible by {a} and by {b} is also divisible by {a * b}.",
+    c = r.choice([a * b, a * b // math.gcd(a, b)])  # a·b or the lcm: equal only for coprime pairs
+    en = {"div": f"Every number from 1 to 200 that is divisible by {a} and by {b} is also divisible by {c}.",
           "sq": f"Every number from 1 to 200 whose square ends in the digit {d} itself ends in the digit {d}.",
           "sum": f"For every number from 1 to 200, if its digit sum is divisible by {k}, the number is divisible by {k}.",
 }
-    de = {"div": f"Jede Zahl von 1 bis 200, die durch {a} und durch {b} teilbar ist, ist auch durch {a * b} teilbar.",
+    de = {"div": f"Jede Zahl von 1 bis 200, die durch {a} und durch {b} teilbar ist, ist auch durch {c} teilbar.",
           "sq": f"Jede Zahl von 1 bis 200, deren Quadrat auf die Ziffer {d} endet, endet selbst auf die Ziffer {d}.",
           "sum": f"Für jede Zahl von 1 bis 200 gilt: Ist ihre Quersumme durch {k} teilbar, dann ist die Zahl durch {k} teilbar."}
-    preds = {"div": lambda n: not (n % a == 0 and n % b == 0) or n % (a * b) == 0,
+    preds = {"div": lambda n: not (n % a == 0 and n % b == 0) or n % c == 0,
              "sq": lambda n: (n * n) % 10 != d or n % 10 == d,
              "sum": lambda n: sum(map(int, str(n))) % k != 0 or n % k == 0}
     kind = r.choice(list(preds))
-    return (en if lang == "en" else de)[kind], preds[kind], kind, {"a": a, "b": b, "d": d, "k": k}
+    return (en if lang == "en" else de)[kind], preds[kind], kind, {"a": a, "b": b, "c": c, "d": d, "k": k}
 
 
 def load_counterexample(lang, n, seed):
@@ -7224,7 +7225,7 @@ def score_counterexample(item, reply):
     nums = [int(x) for x in re.findall(r"\b\d{1,3}\b", fa)][:1]  # the first number is the counterexample
     p_ = item["par"]
     if item["kind"] == "div":
-        pred = lambda m: not (m % p_["a"] == 0 and m % p_["b"] == 0) or m % (p_["a"] * p_["b"]) == 0  # noqa: E731
+        pred = lambda m: not (m % p_["a"] == 0 and m % p_["b"] == 0) or m % p_["c"] == 0  # noqa: E731
     elif item["kind"] == "sq":
         pred = lambda m: (m * m) % 10 != p_["d"] or m % 10 == p_["d"]  # noqa: E731
     else:

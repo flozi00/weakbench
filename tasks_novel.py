@@ -7516,6 +7516,45 @@ def score_dilution(item, reply):
             "detail": {"ok_water" if item["water"] else "ok_concentrate": float(near(item["gold"])), "took_total": float(near(item["bait"]))}}
 
 
+# ---------------------------------------------------------------- count_range (counting with conditions, endpoints included)
+def load_count_range(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("count_range", i, att)
+        kind = ("div_not", "digit", "sum")[i % 3]
+        while True:
+            a = r.randint(1, 400)
+            b = a + r.randint(30, 400)
+            if kind == "div_not":
+                k, m = r.sample([3, 4, 5, 6, 7, 9], 2)
+                pred = lambda x, k=k, m=m: x % k == 0 and x % m != 0  # noqa: E731
+                en, de = f"divisible by {k} but not by {m}", f"durch {k}, aber nicht durch {m} teilbar"
+            elif kind == "digit":
+                d = r.randint(1, 9)
+                pred = lambda x, d=d: str(d) in str(x)  # noqa: E731
+                en, de = f"contain the digit {d} at least once", f"enthalten mindestens einmal die Ziffer {d}"
+            else:
+                t = r.randint(5, 15)
+                pred = lambda x, t=t: sum(map(int, str(x))) == t  # noqa: E731
+                en, de = f"have a digit sum of exactly {t}", f"haben eine Quersumme von genau {t}"
+            gold = sum(pred(x) for x in range(a, b + 1))
+            inner = sum(pred(x) for x in range(a + 1, b))  # both endpoints left out
+            if gold != inner and gold > 0:  # an endpoint counts: the endpoint error shows
+                break
+        q = (f"How many whole numbers from {a} to {b} (both included) {en}?" if lang == "en" else
+             f"Wie viele ganze Zahlen von {a} bis {b} (beide eingeschlossen) {de}?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": inner, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_count_range(item, reply):
+    v = answer_value(result_side(final_answer(reply["content"]) or ""), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "took_endpoint_error": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9096,6 +9135,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),
     "vat_calc": task(load_vat_calc, score_vat_calc, 24, 120),
     "dark_patterns": task(load_dark_patterns, score_dark_patterns, 24, 120),

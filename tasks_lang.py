@@ -3878,6 +3878,32 @@ def score_de_eszett(item, reply):
             "detail": {"ok_eszett" if "ß" in item["gold"] else "ok_ss": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_genitive (genitive -s/-es on masculine and neuter nouns)
+# Dropping the genitive ending ("des Auto") is the common error; weak nouns take -n, not -s ("des Nachbarns" is wrong), so the
+# longer form is gold in half the items.
+GEN_ITEMS = [("Die Farbe des ___ gefällt mir.", "Autos", "Auto"), ("Das Dach des ___ ist undicht.", "Hauses", "Haus"),
+             ("Das Auto des ___ steht vor der Tür.", "Nachbarn", "Nachbarns"), ("Der Preis des ___ ist gestiegen.", "Brotes", "Brot"),
+             ("Die Rede des ___ dauerte eine Stunde.", "Präsidenten", "Präsidentens"), ("Trotz des schlechten ___ gingen wir spazieren.", "Wetters", "Wetter"),
+             ("Während des ___ schliefen alle.", "Flugs", "Flug"), ("Das Zimmer des ___ ist aufgeräumt.", "Studenten", "Studentens"),
+             ("Der Hut des ___ lag auf dem Stuhl.", "Herrn", "Herrns"), ("Wegen des ___ blieb die Schule zu.", "Sturms", "Sturm"),
+             ("Die Idee des ___ fanden alle gut.", "Kollegen", "Kollegens"), ("Das Brüllen des ___ war weit zu hören.", "Löwen", "Löwens"),
+             ("Der Besitzer des ___ ist unbekannt.", "Fahrrads", "Fahrrad"), ("Die Würde des ___ ist unantastbar.", "Menschen", "Menschens"),
+             ("Das Fell des ___ glänzte in der Sonne.", "Bären", "Bärens"), ("Der Duft des ___ zog durch die Wohnung.", "Kaffees", "Kaffee")]
+
+
+def load_de_genitive(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Form ist in geschriebenem Standarddeutsch richtig: "
+                           f"„{two_opts(i, g, (g, w))[0]}“ oder „{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(GEN_ITEMS[:n or len(GEN_ITEMS)])]
+
+
+def score_de_genitive(item, reply):
+    r = score_de_eszett(item, reply)  # same two-word pick; "Autos" contains no "Auto" match thanks to the word bounds
+    r["detail"] = {"ok_genitive": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5173,6 +5199,7 @@ TASKS = {
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),
     "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
+    "de_genitive": task(("de",), load_de_genitive, score_de_genitive, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

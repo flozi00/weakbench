@@ -6603,13 +6603,13 @@ def load_temp_delta(lang, n, seed):
         diff = i % 2 == 0
         pair = (("C", "F"), ("F", "C"), ("C", "K"))[(i // 2) % 3]
         if pair == ("C", "F"):
-            x = r.choice([5, 10, 15, 20, 25, 30])
+            x = r.randint(2, 45)
             slope, off = 9 / 5, 32
         elif pair == ("F", "C"):
-            x = r.choice([9, 18, 27, 36, 45, 54])
+            x = 9 * r.randint(1, 12) if diff else r.randint(-4, 104)
             slope, off = 5 / 9, -32 * 5 / 9
         else:
-            x = r.choice([5, 10, 20, 30])
+            x = r.randint(2, 45)
             slope, off = 1, 273.15
         gold = round(x * slope + (0 if diff else off), 2)
         bait = round(x * slope + off, 2) if diff else round(x * slope, 2)
@@ -8296,7 +8296,8 @@ TASKS = {
 _FEW = {'percent_traps', 'en_produce', 'polyglot_switch', 'sys_adherence', 'form_writing', 'de_no_anglicisms',
         'agreement_attractor', 'prop_logic', 'counterfactual_world'}
 _QUICK_CAP = {'en_produce': 40}
-for _name in ['math_missing', 'counterfactual_world', 'fake_entity', 'prop_logic', 'percent_traps', 'jugs', 'probability', 'seq_induction', 'sci_calc']:
+for _name in ['math_missing', 'counterfactual_world', 'fake_entity', 'prop_logic', 'percent_traps', 'jugs', 'probability', 'seq_induction', 'sci_calc',
+              'temp_delta', 'board_moves', 'weighted_mean', 'parallel_work', 'work_rates', 'weekday_calc']:
     _t = TASKS[_name]
     _full = {k: v if v and _name not in _FEW else None for k, v in _t["counts"]["full"].items()}  # all distinct if fewer
     _quick = {k: min(v, _QUICK_CAP.get(_name, v)) if v else v for k, v in _t["counts"]["quick"].items()}

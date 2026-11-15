@@ -3915,7 +3915,7 @@ ECF_ITEMS = [("Could you ___ me a favour?", "do", ("make", "do")), ("I need to _
              ("It was ___ a long film that I fell asleep.", "such", ("so", "such")), ("The film was ___ long that I fell asleep.", "so", ("so", "such")),
              ("This coffee is too hot ___ drink.", "to", ("to", "for")), ("The box is not big ___ for all the books.", "enough", ("enough", "too")),
              ("Please ___ the table for dinner.", "set", ("set", "sit")), ("Please ___ down, the meeting is starting.", "sit", ("set", "sit")),
-             ("Can you ___ me how to use this app?", "show", ("show", "explain")), ("Can you ___ this word to me?", "explain", ("show", "explain")),
+             ("Can you ___ me how to use this app?", "show", ("show", "explain")), ("Can you ___ what this word means?", "explain", ("show", "explain")),
              ("We ___ a great time at the party.", "had", ("had", "made")), ("I can't ___ the noise any longer.", "stand", ("stand", "stay")),
              ("He forgot to ___ his medicine this morning.", "take", ("take", "make")), ("I ___ a cake for her birthday.", "made", ("made", "did"))]
 

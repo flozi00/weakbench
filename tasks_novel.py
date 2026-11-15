@@ -8437,6 +8437,8 @@ def load_tank_level(lang, n, seed):
 
 def score_tank_level(item, reply):
     v = stated_int(reply, r"(?:litres?|liters?|liter|l\b)")
+    if v is None and re.search(r"\b(?:empty|leer)\b", final_answer(reply["content"]) or "", re.I):
+        v = 0  # "Answer: empty" / "the tank is empty (0 litres)"
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ignored_limits": float(v == item["bait"])}}
 

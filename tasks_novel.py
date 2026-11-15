@@ -5001,8 +5001,10 @@ CS_COL = {"en": ["red", "blue", "green", "yellow"], "de": ["rot", "blau", "grün
 CS_RULES = {  # (en, de); applied in this order
     "neg": ("Every {c0} card counts negative (its value is subtracted).", "Jede {c0}e Karte zählt negativ (ihr Wert wird abgezogen)."),
     "pair": ("If two cards have the same value, both count double.", "Haben zwei Karten denselben Wert, zählen beide doppelt."),
-    "cancel": ("A {c1} card cancels the highest-value card of another colour: that card counts 0.",
-               "Eine {c1}e Karte hebt die höchste Karte einer anderen Farbe auf: diese Karte zählt 0."),
+    "cancel": ("If the hand holds at least one {c1} card, the card with the highest face value among the other colours counts 0 "
+               "(once per hand; on a tie, the first such card in the hand).",
+               "Enthält die Hand mindestens eine {c1}e Karte, zählt die Karte mit dem höchsten Kartenwert unter den anderen Farben 0 "
+               "(einmal pro Hand; bei Gleichstand die erste solche Karte der Hand)."),
     "seven": ("A 7 always counts exactly 7, whatever the other rules say.", "Eine 7 zählt immer genau 7, egal was die anderen Regeln sagen."),
     "cap": ("The total is at most 30; anything above counts as 30.", "Die Summe ist höchstens 30; mehr zählt als 30."),
 }

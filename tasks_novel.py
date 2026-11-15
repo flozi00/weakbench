@@ -6175,7 +6175,7 @@ def load_growth_rel(lang, n, seed):
         while True:
             towns = r.sample(GR_TOWNS, 5)
             a = [r.randrange(2000, 90000, 100) for _ in towns]
-            b = [x + (-1 if shrink else 1) * r.randrange(100, x // 4, 100) for x in a]
+            b = [round(x * (1 + (-1 if shrink else 1) * r.uniform(0.02, 0.25)) / 100) * 100 for x in a]  # relative draw: size says nothing
             rel = [(y - x) / x for x, y in zip(a, b)]
             ab = [y - x for x, y in zip(a, b)]
             pick = (min if shrink else max)
@@ -6193,9 +6193,11 @@ def load_growth_rel(lang, n, seed):
 
 
 def score_growth_rel(item, reply):
-    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    named = [t for t in item["towns"] if re.search(r"\b" + t + r"\b", fa)]
-    v = named[0] if len(named) == 1 else None
+    raw = final_answer(reply["content"]) or ""
+    find = lambda t: sorted((m.start(), x) for x in item["towns"] for m in re.finditer(r"\b" + x + r"\b", t))  # noqa: E731
+    outside = find(re.sub(r"\([^()]*\)", lambda m: " " * len(m[0]), raw))
+    named = outside or find(raw)  # "+13.4 % (Altdorf)": the name only in brackets
+    v = named[0][1] if named else None  # the first town named: "Altdorf, more than Dornfeld"
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_absolute": float(v == item["abs"])}}
 

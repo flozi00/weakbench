@@ -1181,6 +1181,8 @@ def score_analogy_transfer(item, reply):
 # the judge checks that the memo shows the comparison correctly and names the break-even point / when the answer flips.
 DM_JUDGE = """FACTS: plan A costs {fa} € per month and includes {ia} GB; each extra GB costs {ea} €. Plan B costs {fb} € per month and
 includes {ib} GB; each extra GB costs {eb} €. The user needs {u} GB per month. Monthly cost: A = {ca} €, B = {cb} €.
+Break-even: the plans cost the same at {be} GB per month; below that A is cheaper, above it B (whole-GB statements like
+"from {be_up} GB on, B" are correct too).
 
 MEMO:
 {text}
@@ -1214,7 +1216,9 @@ def load_decision_memo(lang, n, seed):
                f"Tarif B: {fb} € pro Monat, {ib} GB inklusive, jedes weitere GB {eb} €. Ich verbrauche etwa {u} GB pro Monat. "
                "Schreib ein kurzes Memo (höchstens 120 Wörter) mit deiner Empfehlung und den Zahlen dahinter und schließe mit einer "
                "Zeile „Empfehlung: A“ oder „Empfehlung: B“.")
-        items.append({"id": str(i), "lang": lang, "gold": gold, "facts": dict(fa=fa, ia=ia, ea=ea, fb=fb, ib=ib, eb=eb, u=u, ca=ca, cb=cb),
+        be = ia + (fb - fa) / ea  # A rises with ea above ia; B is flat up to ib >= be
+        facts = dict(fa=fa, ia=ia, ea=ea, fb=fb, ib=ib, eb=eb, u=u, ca=ca, cb=cb, be=f"{be:g}", be_up=int(be) + 1)
+        items.append({"id": str(i), "lang": lang, "gold": gold, "facts": facts,
                       "messages": [{"role": "user", "content": req}]})
     return items
 
@@ -1222,7 +1226,7 @@ def load_decision_memo(lang, n, seed):
 def score_decision_memo(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    rec = re.findall(r"(?:Recommendation|Empfehlung)\W*:\W*(?:Plan |Tarif )?([AB])\b", text, re.I)
+    rec = re.findall(r"^\W*(?:Recommendation|Empfehlung)\W*[:\-–—]\W*(?:Plan|Tarif|Option)?\W*([AB])\b", text, re.I | re.M)
     choice_ok = bool(rec) and rec[-1].upper() == item["gold"]
     words = len([w for w in text.split() if re.search(r"\w", w)])
     out = tasks_judge.judge("", DM_JUDGE.format(text=text or "(empty)", **item["facts"]), max_tokens=64)

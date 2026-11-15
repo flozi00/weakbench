@@ -3351,10 +3351,10 @@ PP_ITEMS = [("I ___ in Leeds since 2015, and I still love it.", "have lived", "l
             ("I ___ my homework yet, so I can't come out.", "haven't finished", "didn't finish"),
             ("The shop ___ at 9 a.m. today, an hour late.", "opened", "has opened"),
             ("Look! Someone ___ the window - there's glass everywhere.", "has broken", "broke"),
-            ("She ___ at the bank for five years before she became a teacher.", "worked", "has worked"),
+            ("Last summer she ___ at a bank for three months.", "worked", "has worked"),
             ("___ you ever ___ sushi?", "have ... eaten", "did ... eat"),
             ("Two days ago it ___ so hard that the streets flooded.", "rained", "has rained"),
-            ("This is the best book I ___ this year.", "have read", "read"),
+            ("This is the best book I ___ so far this year.", "have read", "read"),
             ("In 1969 people ___ on the moon for the first time.", "landed", "have landed")]
 
 

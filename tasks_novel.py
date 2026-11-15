@@ -6232,7 +6232,8 @@ def load_pack_buy(lang, n, seed):
             packs = [(q, round(q * r.uniform(0.8, 1.3) * 2) / 2) for q in sizes]
             need = r.randint(7, 30)
             g, gr = _pb_best(packs, need), _pb_greedy(packs, need)
-            if (gr > g) == fails:
+            fit_fails = _pb_exact_fit(packs, need) > g  # "fewest rolls that reach the need" is no shortcut here
+            if (gr > g) == fails and (fit_fails or i % 4 not in (0, 1)):
                 break
         fmt = (lambda p: f"{p:.2f} €") if lang == "en" else (lambda p: f"{p:.2f} €".replace(".", ","))
         offer = "; ".join((f"a pack of {q} rolls for {fmt(p)}" if lang == "en" else f"eine Packung mit {q} Rollen für {fmt(p)}")
@@ -6246,8 +6247,20 @@ def load_pack_buy(lang, n, seed):
     return items
 
 
+def _pb_exact_fit(packs, need):
+    """Heuristic: the fewest rolls that reach the need, the cheapest among those."""
+    import itertools
+    lim = [need // q + 1 for q, _ in packs]
+    opts = [(sum(k * q for k, (q, _) in zip(ks, packs)), sum(k * p for k, (_, p) in zip(ks, packs)))
+            for ks in itertools.product(*(range(m + 1) for m in lim))]
+    amt = min(a for a, _ in opts if a >= need)
+    return min(c for a, c in opts if a == amt)
+
+
 def score_pack_buy(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    eur = re.findall(r"(\d+(?:[.,]\d+)?)\s*(?:€|euro|eur)\b|€\s*(\d+(?:[.,]\d+)?)", fa, re.I)  # "2×10 + 1×5 (21 €)"
+    v = parse_number((eur[-1][0] or eur[-1][1]), item["lang"]) if eur else answer_value(fa, item["lang"])
     ok = v is not None and abs(v - item["gold"]) < 0.006
     d = {"ok_greedy_fails" if item["fails"] else "ok_greedy_works": float(ok)}
     if item["fails"]:
@@ -6287,8 +6300,8 @@ def load_sql_result(lang, n, seed):
         gold = round(gold, 2)
         table = "\n".join(f"| {a} | {b} | {'NULL' if c is None else c} | {'NULL' if d is None else d} |" for a, b, c, d in rows)
         q = (("Table orders:\n" if lang == "en" else "Tabelle orders:\n") + "| id | region | amount | status |\n|---|---|---|---|\n"
-             + table + f"\nQuery: `{sql}`\n" + ("What single number does the query return? (Standard SQL semantics.)" if lang == "en" else
-                                                  "Welche einzelne Zahl liefert die Abfrage? (Standard-SQL-Semantik.)"))
+             + table + f"\nQuery: `{sql}`\n" + ("What single number does the query return? (Standard SQL semantics as in PostgreSQL.)" if lang == "en" else
+                                                  "Welche einzelne Zahl liefert die Abfrage? (Standard-SQL-Semantik wie in PostgreSQL.)"))
         items.append({"id": str(i), "lang": lang, "gold": gold, "naive": round(naive, 2), "kind": kind,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
@@ -6322,6 +6335,9 @@ def answer_value(line, lang):
     """The number a final answer line states: after the last "=" when the line restates arithmetic
     ("3 x 49 + 2 x 15 = 177"), else its first number ("6000 m (6 km)")."""
     line = line or ""
+    eq = re.findall(r"\(\s*=\s*([^()]*)\)", line)  # "(80+20)/2 (= 50)": a bracketed result
+    if eq:
+        return parse_number(eq[-1], lang, first=True)
     bare = re.sub(r"\([^()]*\)", " ", line)  # a working note in brackets: "64 m² (= 8 x 6 - 4)"
     if re.search(r"\d", bare):
         line = bare

@@ -6832,6 +6832,46 @@ def score_map_scale(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- iso_week (calendar week by the ISO rule)
+def load_iso_week(lang, n, seed):
+    import datetime as _dt
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("iso_week", i, att)
+        edge = i % 2 == 0
+        y = r.randint(2015, 2032)
+        if edge:
+            d = r.choice([_dt.date(y, 1, r.randint(1, 4)), _dt.date(y, 12, r.randint(28, 31))])
+        else:
+            d = _dt.date(y, r.randint(2, 11), r.randint(1, 28))
+        iy, iw, _ = d.isocalendar()
+        naive = (d.timetuple().tm_yday - 1) // 7 + 1
+        jan1 = _dt.date(d.year, 1, 1)
+        wdn = WD[lang]
+        q = (f"Calendar weeks follow ISO 8601: weeks start on Monday, and week 1 is the week that contains the year's first Thursday. "
+             f"January 1, {d.year} is a {wdn[jan1.weekday()]}. Which calendar week (and of which year) is {d.isoformat()} "
+             f"({wdn[d.weekday()]})? Answer as: week <number> of <year>." if lang == "en" else
+             f"Kalenderwochen folgen ISO 8601: Wochen beginnen am Montag, und KW 1 ist die Woche mit dem ersten Donnerstag des Jahres. "
+             f"Der 1. Januar {d.year} ist ein {wdn[jan1.weekday()]}. In welcher Kalenderwoche (und welchen Jahres) liegt der "
+             f"{d.isoformat()} ({wdn[d.weekday()]})? Antworte so: KW <Zahl> des Jahres <Jahr>.")
+        gold = f"week {iw} of {iy}" if lang == "en" else f"KW {iw} des Jahres {iy}"
+        items.append({"id": str(i), "lang": lang, "gold": gold, "week": iw, "year": iy, "naive": naive, "edge": edge,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_iso_week(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    w = re.search(r"(?:week|KW|Woche)\s*(\d{1,2})", fa, re.I)
+    yr = re.search(r"\b(20\d\d)\b", fa)
+    wk = int(w[1]) if w else None
+    ok = wk == item["week"] and (yr is not None and int(yr[1]) == item["year"])
+    d = {"ok_edge" if item["edge"] else "ok_inside": float(ok)}
+    if item["naive"] != item["week"]:
+        d["took_naive"] = float(wk == item["naive"])
+    return {"correct": ok, "score": float(ok), "pred": f"{wk} {yr[1] if yr else None}", "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8412,6 +8452,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "iso_week": task(load_iso_week, score_iso_week, 24, 120),
     "map_scale": task(load_map_scale, score_map_scale, 24, 120),
     "cond_table": task(load_cond_table, score_cond_table, 24, 120),
     "refund_policy": task(load_refund_policy, score_refund_policy, 24, 120),

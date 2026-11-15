@@ -10289,6 +10289,53 @@ def score_toy_machine(item, reply):
             "detail": {f"ok_loops{item['loops']}": float(ok), "no_loop_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- sliding_puzzle
+# A 3x3 sliding puzzle (tiles 1-8 and a gap) and 6-14 moves, each naming the tile that slides into the gap; which tile
+# is at a named position at the end? Self-built 2-D state. The asked tile is balanced; it never sits there at the start.
+# `ok_m<moves bucket>`, `start_bait` (named the starting tile).
+SP_POS = {"en": ["top left", "top middle", "top right", "middle left", "centre", "middle right", "bottom left",
+                 "bottom middle", "bottom right"],
+          "de": ["oben links", "oben Mitte", "oben rechts", "Mitte links", "Mitte", "Mitte rechts", "unten links",
+                 "unten Mitte", "unten rechts"]}
+
+
+def load_sliding_puzzle(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("sliding_puzzle", i, att)
+        while True:
+            board = list(range(1, 9)) + [0]
+            r.shuffle(board)
+            start, moves = list(board), []
+            k = r.randint(6, 14)
+            while len(moves) < k:
+                g = board.index(0)
+                nb = [p for p in range(9) if abs(p // 3 - g // 3) + abs(p % 3 - g % 3) == 1]
+                p = r.choice([q for q in nb if not moves or board[q] != moves[-1]] or nb)  # no instant undo
+                moves.append(board[p])
+                board[g], board[p] = board[p], 0
+            pos = r.randrange(9)
+            if board[pos] and board[pos] != start[pos] and board[pos] == i % 8 + 1:
+                break
+        rows = "\n".join(" ".join(str(x) if x else "_" for x in start[j:j + 3]) for j in (0, 3, 6))
+        q = (f"A 3x3 sliding puzzle (\"_\" is the gap):\n{rows}\n\nThese tiles are slid into the gap, one after another (each "
+             f"is next to the gap when it moves): {', '.join(map(str, moves))}. Which tile is at the {SP_POS['en'][pos]} at the end?"
+             if lang == "en" else
+             f"Ein 3x3-Schiebepuzzle („_“ ist die Lücke):\n{rows}\n\nDiese Plättchen werden nacheinander in die Lücke geschoben "
+             f"(jedes liegt beim Schieben neben der Lücke): {', '.join(map(str, moves))}. Welches Plättchen liegt am Ende "
+             f"{SP_POS['de'][pos]}?")
+        items.append({"id": str(i), "lang": lang, "gold": board[pos], "start_tile": start[pos], "moves": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_sliding_puzzle(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_m{'6-9' if item['moves'] <= 9 else '10-14'}": float(ok), "start_bait": float(v == item["start_tile"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11397,6 +11444,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "sliding_puzzle": task(load_sliding_puzzle, score_sliding_puzzle, 24, 96),
     "toy_machine": task(load_toy_machine, score_toy_machine, 24, 96),
     "hanoi_state": task(load_hanoi_state, score_hanoi_state, 24, 96),
     "lru_cache": task(load_lru_cache, score_lru_cache, 24, 96),

@@ -5966,7 +5966,7 @@ def load_sheet_eval(lang, n, seed):
             for nm in order:
                 top[nm] = ev(nm, top)
             target = order[0]
-            if true[target] != top[target] and abs(true[target]) < 10000:
+            if true[target] != top[target] and top[target] != 0 and abs(true[target]) < 10000:
                 break
 
         def txt(nm):
@@ -5985,7 +5985,7 @@ def load_sheet_eval(lang, n, seed):
 
 
 def score_sheet_eval(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    v = answer_value(re.sub(r"\b[A-H]1\b", " ", final_answer(reply["content"]) or ""), item["lang"])  # "A1 shows 29"
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_topdown": float(v == item["topdown"])}}
 

@@ -1270,11 +1270,7 @@ def load_interpreter(lang, n, seed):
     tasks_judge.check_judge()
     items = []
     for i in range(min(n or 12, 12)):
-        msgs = [{"role": "system", "content": IP_SYS}]
-        for j in range(i):  # the earlier turns, already interpreted (shown as the source text only, a clean history)
-            src_l, msg = IP_TURNS[j]
-            msgs += [{"role": "user", "content": f"[{'Dr. Krämer' if src_l == 'de' else 'Mr. Hill'}]: {msg}"},
-                     {"role": "assistant", "content": "(interpreted)"}]
+        msgs = [{"role": "system", "content": IP_SYS}]  # each turn alone: a placeholder history would invite copying
         src_l, msg = IP_TURNS[i]
         msgs.append({"role": "user", "content": f"[{'Dr. Krämer' if src_l == 'de' else 'Mr. Hill'}]: {msg}"})
         tgt = "en" if src_l == "de" else "de"

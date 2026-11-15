@@ -4555,6 +4555,56 @@ def score_unit_price(item, reply):
             "detail": {"ok_bulk_worse" if item["bulk_worse"] else "ok_bulk_better": float(ok)}}
 
 
+# ---------------------------------------------------------------- recipe_scale (what scales and what does not)
+# A recipe for p servings, asked for q servings. Ingredient amounts scale proportionally; oven temperature and
+# baking time (per tray, same pan) do not. A quarter of the items ask for a fixed quantity: scaling it is the bait.
+RS_ING = {"en": [("flour", "g"), ("milk", "ml"), ("sugar", "g"), ("butter", "g")],
+          "de": [("Mehl", "g"), ("Milch", "ml"), ("Zucker", "g"), ("Butter", "g")]}
+
+
+def load_recipe_scale(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("recipe_scale", i)
+        p = r.choice([2, 4, 6])
+        q = r.choice([x for x in (3, 8, 10, 12, 1) if x != p])
+        amounts = [r.choice([2, 3, 4, 5, 6]) * 50 * p // 2 for _ in RS_ING[lang]]
+        temp, mins = r.choice([160, 175, 180, 200]), r.choice([20, 25, 35, 40])
+        ings = "\n".join(f"- {a} {u} {name}" for (name, u), a in zip(RS_ING[lang], amounts))
+        trap = i % 4 == 3
+        if trap:
+            fixed = (i // 4) % 2
+            gold = (temp, mins)[fixed]
+            ask = (("At what temperature in °C", "For how many minutes per tray")[fixed] if lang == "en" else
+                   ("Bei wie viel °C", "Wie viele Minuten pro Blech")[fixed])
+            qq = (f"{ask} do you bake for {q} servings (same tray, baked one tray after another)?" if lang == "en" else
+                  f"{ask} backst du für {q} Portionen (gleiches Blech, ein Blech nach dem anderen)?")
+        else:
+            k = (i // 4) % 4
+            name, u = RS_ING[lang][k]
+            gold = amounts[k] * q / p
+            if gold != int(gold):
+                gold = round(gold, 1)
+            gold = int(gold) if gold == int(gold) else gold
+            qq = (f"How many {u} of {name} do you need for {q} servings?" if lang == "en" else
+                  f"Wie viel {u} {name} brauchst du für {q} Portionen?")
+        intro = (f"Recipe for {p} servings:\n{ings}\nBake at {temp} °C for {mins} minutes per tray.\n\n" if lang == "en" else
+                 f"Rezept für {p} Portionen:\n{ings}\nBei {temp} °C {mins} Minuten pro Blech backen.\n\n")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "trap": trap,
+                      "naive": (temp if (i // 4) % 2 == 0 else mins) * q / p if trap else None,
+                      "messages": [{"role": "user", "content": intro + qq + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_recipe_scale(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.051
+    d = {"ok_trap" if item["trap"] else "ok_scaled": float(ok)}
+    if item["trap"]:
+        d["scaled_fixed"] = float(v is not None and abs(v - item["naive"]) < 0.51)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6127,6 +6177,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "recipe_scale": task(load_recipe_scale, score_recipe_scale, 24, 120),
     "unit_price": task(load_unit_price, score_unit_price, 24, 120),
     "count_mentions": task(load_count_mentions, score_count_mentions, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},

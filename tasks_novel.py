@@ -10049,6 +10049,69 @@ def score_merge_conflict(item, reply):
                        "one_side_flagged": float(bool(v) and bool(set(v) & set(item.get("one", []))))}}
 
 
+# ---------------------------------------------------------------- dice_roll
+# A standard die (opposite faces sum to 7) lies on a table with known top, north and east faces and is tipped over
+# its edges 4-8 times (north / south / east / west); which number is on top at the end? Mental 3-D state tracking.
+# Gold top faces balanced over 1-6 by item. `ok_r<rolls>`, `start_top` (answered the starting top face).
+DR_DIR = {"en": {"N": "north", "S": "south", "E": "east", "W": "west"}, "de": {"N": "Norden", "S": "Süden", "E": "Osten", "W": "Westen"}}
+
+
+def dr_roll(st, d):
+    top, north, east = st
+    bottom, south, west = 7 - top, 7 - north, 7 - east
+    return {"N": (south, top, east), "S": (north, bottom, east), "E": (west, north, top), "W": (east, north, bottom)}[d]
+
+
+def load_dice_roll(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("dice_roll", i, att)
+        while True:
+            top = r.randint(1, 6)
+            north = r.choice([f for f in range(1, 7) if f not in (top, 7 - top)])
+            # top and north fix east on a real die (one handedness); dr_hand picks it
+            east = next(e for e in range(1, 7) if e not in (top, 7 - top, north, 7 - north) and dr_hand(top, north, e))
+            k = r.randint(4, 8)
+            moves = [r.choice("NSEW") for _ in range(k)]
+            st = (top, north, east)
+            for d in moves:
+                st = dr_roll(st, d)
+            if st[0] == i % 6 + 1 and st[0] != top:
+                break
+        D = DR_DIR[lang]
+        seq = ", ".join(D[d] for d in moves)
+        q = (f"A standard die (opposite faces add up to 7) lies on a table. The top face shows {top}, the face pointing north "
+             f"shows {north}, and the face pointing east shows {east}. The die is tipped over one of its bottom edges, one step at "
+             f"a time, in these directions: {seq}. (Tipping it north means the top face turns to face north.) Which number is on "
+             f"top at the end?" if lang == "en" else
+             f"Ein normaler Spielwürfel (gegenüberliegende Seiten ergeben zusammen 7) liegt auf einem Tisch. Oben liegt die {top}, "
+             f"nach Norden zeigt die {north} und nach Osten die {east}. Der Würfel wird Schritt für Schritt über eine untere Kante "
+             f"gekippt, in diese Richtungen: {seq}. (Nach Norden kippen heißt: die obere Seite zeigt danach nach Norden.) Welche "
+             f"Zahl liegt am Ende oben?")
+        items.append({"id": str(i), "lang": lang, "gold": st[0], "start": top, "rolls": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def dr_hand(top, north, east):
+    """True when (top, north, east) is a right-handed standard die, i.e. some rotation maps (1, 2, 3) onto it."""
+    seen, todo = set(), [(1, 2, 3)]
+    while todo:
+        st = todo.pop()
+        if st in seen:
+            continue
+        seen.add(st)
+        todo += [dr_roll(st, d) for d in "NE"] + [(st[0], st[2], 7 - st[1])]  # tips + a turn about the vertical axis
+    return (top, north, east) in seen
+
+
+def score_dice_roll(item, reply):
+    v = stated_int(reply, r"(?:top|oben)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_r{item['rolls']}": float(ok), "start_top": float(v == item["start"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11157,6 +11220,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "dice_roll": task(load_dice_roll, score_dice_roll, 24, 96),
     "merge_conflict": task(load_merge_conflict, score_merge_conflict, 24, 96),
     "genetics_cross": task(load_genetics_cross, score_genetics_cross, 24, 72),
     "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),

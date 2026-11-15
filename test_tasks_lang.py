@@ -793,3 +793,24 @@ def test_gap_pick():
 
 if __name__ == "__main__":
     test_gap_pick()
+
+
+def test_gap_tasks_full_sentence():
+    """A reply that repeats the sentence with the gold filled in scores correct in every gap_pick task."""
+    import tasks_lang as tl
+    bad = []
+    for name in ("de_als_wie", "en_usage", "time_prep", "en_dependent_preps", "en_article_sound", "collocations", "de_seit_vor"):
+        t = tl.TASKS[name]
+        for lang in t["langs"]:
+            for it in t["load"](lang, None, 0):
+                line = next(ln for ln in reversed(it["messages"][-1]["content"].splitlines()) if "___" in ln)
+                g = it["gold"]
+                full = line.replace("___", g.capitalize() if line.startswith("___") else g)
+                full = __import__("re").sub(r"\s*\([^)]*\)", "", full) if name == "en_usage" else full
+                if not t["score"](it, {"content": full})["correct"]:
+                    bad.append((name, lang, full))
+    assert not bad, bad[:5]
+
+
+if __name__ == "__main__":
+    test_gap_tasks_full_sentence()

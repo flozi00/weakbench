@@ -393,8 +393,8 @@ CRITERIA:
 def load_tutor_feedback(lang, n, seed):
     tasks_judge.check_judge()
     items = []
-    for i in range(n or 120):
-        r = random.Random(f"tutor_feedback:{i}")
+    for i, att in common.redraws(n or 120, items):
+        r = random.Random(f"tutor_feedback:{i}" + (f"~{att}" if att else ""))
         d = r.choice([3, 4, 5, 6])
         a, b = r.randint(4, 12), r.choice([10, 12, 20, 24])
         c = (a * b) % d + d * r.randint(1, 3)  # the rest divides evenly
@@ -555,8 +555,8 @@ CRITERIA:
 def load_human_persona(lang, n, seed):
     tasks_judge.check_judge()
     items = []
-    for i in range(n or 40):
-        r = random.Random(f"human_persona:{i}")
+    for i, att in common.redraws(n or 40, items):
+        r = random.Random(f"human_persona:{i}" + (f"~{att}" if att else ""))
         name, company, t_de, t_en, q_de, q_en, a_de, a_en = HP_PERSONAS[i % len(HP_PERSONAS)]
         probes = r.sample(list(HP_PROBES), 3)
         de = lang == "de"
@@ -1317,8 +1317,8 @@ CRITERIA:
 def load_socratic_tutor(lang, n, seed):
     tasks_judge.check_judge()
     items = []
-    for i in range(n or 30):
-        r = random.Random(f"socratic_tutor:{i}")
+    for i, att in common.redraws(n or 30, items):
+        r = random.Random(f"socratic_tutor:{i}" + (f"~{att}" if att else ""))
         a, b = r.choice([6, 8, 10, 12]), r.randint(3, 9)
         c = r.randint(2, a * b - 5)
         while a * b - c in (a, b, c, a * b, 5, 12):  # never a number the tutor may legitimately say (incl. the age 12)
@@ -1379,8 +1379,8 @@ CRITERIA:
 def load_neutral_summary(lang, n, seed):
     tasks_judge.check_judge()
     items = []
-    for i in range(n or 30):
-        r = random.Random(f"neutral_summary:{i}")
+    for i, att in common.redraws(n or 30, items):
+        r = random.Random(f"neutral_summary:{i}" + (f"~{att}" if att else ""))
         pa, pb, ta, tb = NS_CASES[lang][i % 3]
         hk = r.randrange(4)
         v = {"d": r.randint(5, 14), "n": r.randint(3, 9), "w": r.choice(NS_WD[lang]), "h": [23, 24, 1, 2][hk],
@@ -1442,7 +1442,7 @@ CRITERIA:
 def load_triage_advice(lang, n, seed):
     tasks_judge.check_judge()
     items = []
-    for i in range(n or 40):
+    for i in range(n or 16):  # 8 cases per kind: more would repeat them
         kind = ("urgent", "harmless")[i % 2]
         pool = TA_CASES[lang][kind]
         msg = pool[(i // 2) % len(pool)] + (" Was soll ich tun?" if lang == "de" else " What should I do?")
@@ -1564,8 +1564,8 @@ CRITERIA:
 def load_tactful_message(lang, n, seed):
     tasks_judge.check_judge()
     items, kinds = [], list(TM_CASES)
-    for i in range(n or 40):
-        r = random.Random(f"tactful_message:{i}")
+    for i, att in common.redraws(n or 40, items):
+        r = random.Random(f"tactful_message:{i}" + (f"~{att}" if att else ""))
         kind = kinds[i % 4]
         name = r.choice(TM_NAMES)
         v = {"name": name, "pname": name, "day": r.choice(TM_DAYS[lang]), "k": r.choice([60, 80, 100]),
@@ -1683,7 +1683,7 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "triage_advice": {"langs": ("de", "en"), "load": load_triage_advice, "score": score_triage_advice,
                            "think": False, "max_tokens": 512,
-                           "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 40, "en": 40}},
+                           "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 16, "en": 16}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "howto_steps": {"langs": ("de", "en"), "load": load_howto_steps, "score": score_howto_steps, "think": False,
                          "max_tokens": 1024, "counts": {"quick": {"de": None, "en": None}, "full": {"de": None, "en": None}},

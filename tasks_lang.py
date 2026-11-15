@@ -255,8 +255,14 @@ def load_grammar(lang, n, seed):
     with open(path, newline="") as f:
         rows = [r for r in csv.DictReader(f, delimiter="\t") if r["sen"] != r["wrong_sen"]
                 and "'" not in r["head"] + r["swap_head"]]  # a contraction swap ("is" -> "'m") is a style cue
-    items = []
-    for i in tasks_judge.pick(range(len(rows)), n, seed):
+    items, seen = [], set()
+    for i in tasks_judge.pick(range(len(rows)), None, seed):  # the data repeats some pairs: the first one counts
+        if n is not None and len(items) == n:
+            break
+        pair = frozenset((rows[i]["sen"], rows[i]["wrong_sen"]))
+        if pair in seen:
+            continue
+        seen.add(pair)
         r, flip = rows[i], random.Random(f"grammar_pairs:{lang}:{i}").random() < 0.5
         a, b = (r["wrong_sen"], r["sen"]) if flip else (r["sen"], r["wrong_sen"])
         items.append({"id": str(i), "lang": lang, "gold": "B" if flip else "A",
@@ -491,8 +497,8 @@ PP_ASK = {"en": "Do these two sentences mean the same thing?\n1. {a}\n2. {b}\nFi
 def load_paraphrase(lang, n, seed):
     kinds = ["passive", "swap", "front", "neg", "passive", "number", "front", "swap"]  # half same, half changed
     items = []
-    for i in range(n or 160):
-        r = random.Random(f"paraphrase:{i}")
+    for i, att in common.redraws(n or 160, items):
+        r = random.Random(f"paraphrase:{i}" + (f"~{att}" if att else ""))
         kind = kinds[i % len(kinds)]
         a, b = r.sample(PP_PEOPLE, 2)
         s1, s2 = pp_sentence(lang, kind, a, b, r.randrange(3), r.randint(2, 5), r)
@@ -760,8 +766,8 @@ DC_ASK = ("Ergänze die Lücke mit dem Artikel und dem Adjektiv in der richtigen
 
 def load_de_case(lang, n, seed):
     items = []
-    for i in range(n or 240):
-        r = random.Random(f"de_case:{i}")
+    for i, att in common.redraws(n or 240, items):
+        r = random.Random(f"de_case:{i}" + (f"~{att}" if att else ""))
         case = ("nom", "acc", "dat", "gen")[i // 2 % 4]  # balanced cases, each with both article kinds
         frame = r.choice([f for c, f in DC_FRAMES if c == case])
         g = "f" if case == "gen" else r.choice("mfn")
@@ -961,8 +967,8 @@ LF_ASK = {"de": {"num": "Schreibe die Zahl {x} im deutschen Format mit Tausender
 def load_locale(lang, n, seed):
     import datetime
     items = []
-    for i in range(n or 120):
-        r = random.Random(f"locale_fmt:{i}")
+    for i, att in common.redraws(n or 120, items):
+        r = random.Random(f"locale_fmt:{i}" + (f"~{att}" if att else ""))
         kind = ("num", "money", "date")[i % 3]
         if kind == "date":
             d = datetime.date(2024, 1, 1) + datetime.timedelta(days=r.randrange(1500))
@@ -1609,8 +1615,8 @@ AD_SIE = re.compile(r"\b(Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)\b")  # case
 
 def load_de_address(lang, n, seed):
     items = []
-    for i in range(n or 60):
-        r = random.Random(f"de_address:{i}")
+    for i, att in common.redraws(n or 60, items):
+        r = random.Random(f"de_address:{i}" + (f"~{att}" if att else ""))
         reg = ("formal", "informal")[i % 2]
         sents = r.sample(AD_SENT, 3)
         items.append({"id": str(i), "lang": "de", "register": reg,
@@ -1650,8 +1656,8 @@ MX_Q = {"de": "An welchem Wochentag und um wie viel Uhr (nachmittags, 12-Stunden
 
 def load_mixed_input(lang, n, seed):
     items = []
-    for i in range(n or 90):
-        r = random.Random(f"mixed_input:{i}")
+    for i, att in common.redraws(n or 90, items):
+        r = random.Random(f"mixed_input:{i}" + (f"~{att}" if att else ""))
         (d1d, d1e), (d2d, d2e) = r.sample(MX_DAYS, 2)
         t1, t2 = r.sample(range(1, 6), 2)
         k = i % len(MX_TEMPL)
@@ -1752,8 +1758,8 @@ def de_stem(r):  # rare onsets keep real words out; doubled consonants only afte
 
 def load_wug(lang, n, seed):
     items = []
-    for i in range(n or 120):
-        r = random.Random(f"wug:{i}")
+    for i, att in common.redraws(n or 120, items):
+        r = random.Random(f"wug:{i}" + (f"~{att}" if att else ""))
         if lang == "en":
             kind = ("plural", "past", "third")[i % 3]
             w = wug_en(r) + ("et" if kind == "past" else "")  # two-syllable verbs: no consonant doubling question
@@ -2660,9 +2666,9 @@ SO_LET = "ABCDE"
 
 def load_sentence_order(lang, n, seed):
     items = []
-    for i in range(min(n or 12, 12)):
+    for i, att in common.redraws(min(n or 12, 12), items):
         sents = SO_TEXTS[lang][i % 4]
-        r = random.Random(f"sentence_order:{i}")
+        r = random.Random(f"sentence_order:{i}" + (f"~{att}" if att else ""))
         while True:
             perm = r.sample(range(5), 5)
             if all(perm[j] + 1 != perm[j + 1] for j in range(4)) and perm[0] != 0:  # no original pair stays adjacent
@@ -2996,7 +3002,7 @@ CC_FUNCS = common.OwnSet("tasks_lang.CC_FUNCS")  # private: flozi00/weakbench-da
 def load_code_comments_lang(lang, n, seed):
     """lang = the comment language; the request is written in the other language."""
     items = []
-    for i in range(n or 40):
+    for i in range(n or len(CC_FUNCS)):  # one item per function: more would repeat them
         name, en, de = CC_FUNCS[i % len(CC_FUNCS)]
         if lang == "de":
             q = (f"Write a Python function `{name}` that {en}. Write all comments and the docstring in German. Explain each "
@@ -3126,8 +3132,8 @@ I18N_TOKEN = re.compile(r"\{\w+\}|%[ds]|</?\w+(?:\s+[^>]*)?>")
 def load_i18n_strings(lang, n, seed):
     """lang = the target language."""
     items = []
-    for i in range(n or 60):
-        r = random.Random(f"i18n_strings:{i}")
+    for i, att in common.redraws(n or 60, items):
+        r = random.Random(f"i18n_strings:{i}" + (f"~{att}" if att else ""))
         picks = r.sample(I18N, 3)
         src = [p[1] if lang == "en" else p[0] for p in picks]
         ask = ("Translate these user-interface strings into English, one per line, in the same order. Keep every "
@@ -3227,7 +3233,8 @@ TASKS = {
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),
-    "code_comments_lang": task(("de", "en"), load_code_comments_lang, score_code_comments_lang, 1024, 20, lang_check=False),
+    "code_comments_lang": task(("de", "en"), load_code_comments_lang, score_code_comments_lang, 1024, 5,
+                               lang_check=False),  # 5 functions (CC_FUNCS)
     "de_konj2": task(("de",), load_de_konj2, score_de_konj2, 32, 24, lang_check=False),
     "i18n_strings": task(("de", "en"), load_i18n_strings, score_i18n_strings, 512, 24, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),

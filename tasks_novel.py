@@ -200,8 +200,8 @@ def last_int(text):
     return int(t) if re.fullmatch(r"-?\d+", t) else None
 
 
-def rng_of(task, i):
-    return random.Random(f"{task}:{i}")  # str seeds hash deterministically (sha512), unlike tuples
+def rng_of(task, i, att=0):  # att > 0: a redraw after a repeated prompt (common.redraws)
+    return random.Random(f"{task}:{i}" + (f"~{att}" if att else ""))  # str seeds hash deterministically (sha512)
 
 
 # ---------------------------------------------------------------- rule_induction
@@ -766,10 +766,11 @@ ABSTAIN_RE = re.compile(r"cannot be determined|can't be determined|not determina
 
 
 def load_math_variants(lang, n, seed):
-    items, i = [], -1
-    while len(items) < (n or 360):
-        i += 1
-        r = rng_of("math_variants", i)
+    items = []
+    for i, att in common.redraws(10 ** 6, items):
+        if len(items) == (n or 360):
+            break
+        r = rng_of("math_variants", i, att)
         variant = ("base", "plus", "noop")[i % 3]
         t = TEMPLATES[(i // 3) % len(TEMPLATES)](r)
         if variant == "plus":
@@ -1048,8 +1049,8 @@ def if_check(name, arg, text, lang):
 
 def load_if_gen(lang, n, seed):
     items = []
-    for i in range(n or 200):
-        r = rng_of("if_gen", i)
+    for i, att in common.redraws(n or 200, items):
+        r = rng_of("if_gen", i, att)
         k = 2 + i % 2
         while True:
             names = r.sample(sorted(IF_C), k)
@@ -1557,8 +1558,8 @@ FA_TEXT = {
 
 def load_false_authority(lang, n, seed):
     items = []
-    for i in range(n or 200):
-        r = rng_of("false_authority", i // 2)
+    for i, att in common.redraws(n or 200, items, pair=True):
+        r = rng_of("false_authority", i // 2, att)
         trap = i % 2 == 1
         kind = ("mul", "pct")[(i // 2) % 2]
         who = r.choice(FA_WHO[lang])
@@ -1792,8 +1793,8 @@ OB_TEXT = {
 
 def load_off_by_one(lang, n, seed):
     items = []
-    for i in range(n or 200):
-        r = rng_of("off_by_one", i)
+    for i, att in common.redraws(n or 200, items):
+        r = rng_of("off_by_one", i, att)
         kind = OB_KINDS[i % len(OB_KINDS)]
         a = r.randint(4, 120)
         if kind == "pages":
@@ -1843,8 +1844,8 @@ MU_ITEM = "{noun} {k}: {v} {u}"
 def load_mixed_units(lang, n, seed):
     items = []
     kinds = list(MU_KINDS)
-    for i in range(n or 200):
-        r = rng_of("mixed_units", i // 2)
+    for i, att in common.redraws(n or 200, items, pair=True):
+        r = rng_of("mixed_units", i // 2, att)
         trap = i % 2 == 1
         kind = kinds[(i // 2) % 3]
         noun, big, small, f, q = MU_KINDS[kind][lang]
@@ -2454,8 +2455,8 @@ def nd_brackets(r, d):
 
 def load_nesting_depth(lang, n, seed):
     items = []
-    for i in range(n or 144):
-        r = rng_of("nesting_depth", i)
+    for i, att in common.redraws(n or 144, items):
+        r = rng_of("nesting_depth", i, att)
         kind = ("eval", "balance")[i % 2]
         d = ND_DEPTH[(i // 2) % len(ND_DEPTH)]
         if kind == "eval":
@@ -2613,8 +2614,8 @@ def bp_optimal(start, goal):
 
 def load_blocks_plan(lang, n, seed):
     items = []
-    for i in range(n or 120):
-        r = rng_of("blocks_plan", i)
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("blocks_plan", i, att)
         k = 3 + i % 4
         blocks = list(BP_NAMES[:k])
         start = bp_random_state(r, blocks)
@@ -2915,8 +2916,8 @@ NC_KINDS = ("decimals", "fractions", "negatives", "control")
 
 def load_number_compare(lang, n, seed):
     items = []
-    for i in range(n or 160):
-        r = rng_of("number_compare", i)
+    for i, att in common.redraws(n or 160, items):
+        r = rng_of("number_compare", i, att)
         kind = NC_KINDS[i % 4]
         if kind == "decimals":
             w = r.randint(1, 20)
@@ -3832,11 +3833,12 @@ PF_PERSONA = common.OwnSet("tasks_novel.PF_PERSONA")  # private: flozi00/weakben
 
 def load_prob_fallacies(lang, n, seed):
     items = []
-    for i in range(n or 120):
-        r = rng_of("prob_fallacies", i)
-        kind = ("gambler", "conjunction", "control")[i % 3]
+    n_conj = 3 * 2 * len(PF_PERSONA[lang])  # every persona in both option orders, then only gambler and control
+    for i, att in common.redraws(n or 120, items):  # a redraw (att > 0) takes values from wider ranges
+        r = rng_of("prob_fallacies", i, att)
+        kind = ("gambler", "conjunction", "control")[i % 3] if i < n_conj else ("gambler", "control")[i % 2]
         if kind == "gambler":
-            k = r.randint(5, 9)
+            k = r.randint(5, 9) if not att else r.randint(3, 25)
             if r.random() < 0.5:
                 q = (f"A fair coin has landed heads {k} times in a row. What is the probability, in percent, that the next "
                      "toss is tails?" if lang == "en" else
@@ -3844,6 +3846,7 @@ def load_prob_fallacies(lang, n, seed):
                      "in Prozent, dass der nächste Wurf Zahl ist?")
                 gold = "50"
             else:
+                k = k if not att else r.randint(2, 50)  # 3k rolls
                 q = (f"A fair die has not shown a six in the last {k * 3} rolls. What is the probability, as a fraction, "
                      "that the next roll is a six?" if lang == "en" else
                      f"Ein fairer Würfel hat in den letzten {k * 3} Würfen keine Sechs gezeigt. Wie groß ist die "
@@ -3857,7 +3860,7 @@ def load_prob_fallacies(lang, n, seed):
                  f"{desc}\nWas ist wahrscheinlicher? A) {opts[0]}. B) {opts[1]}. Antworte mit A oder B.")
             gold = "AB"[opts.index(x)]
         else:
-            k = r.choice([4, 5, 8, 10])
+            k = r.choice([4, 5, 8, 10]) if not att else r.randint(3, 99)
             q = (f"A bag holds {k} balls, exactly one of them red. One ball is drawn at random. What is the probability, "
                  "as a fraction, that it is red?" if lang == "en" else
                  f"In einem Beutel sind {k} Kugeln, genau eine davon rot. Eine Kugel wird zufällig gezogen. Wie groß ist die "
@@ -4009,8 +4012,8 @@ CS_MARKED = {"en": ["Therefore, Lena pays a fee.", "Therefore, this plant needs 
 
 def load_conclusion_spot(lang, n, seed):
     items = []
-    for i in range(n or 120):
-        r = rng_of("conclusion_spot", i)
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("conclusion_spot", i, att)
         k = (i // 2) % len(CS_ARGS[lang])  # every argument appears marked and unmarked
         p1, p2, c, d = CS_ARGS[lang][k]
         marked = i % 2 == 0
@@ -7675,10 +7678,11 @@ def kk_true(st, w):
 
 
 def load_knights(lang, n, seed):
-    items, i = [], -1
-    while len(items) < (n or 150):
-        i += 1
-        r = rng_of("knights_knaves", i)
+    items = []
+    for i, att in common.redraws(10 ** 6, items):
+        if len(items) == (n or 150):
+            break
+        r = rng_of("knights_knaves", i, att)
         k = 3 + i % 2  # three or four islanders
         sts = []
         for sp in range(k):
@@ -7780,8 +7784,8 @@ def cc_run(r, n_):
 def load_copycat(lang, n, seed):
     items = []
     names = sorted(CC_RULES)
-    for i in range(n or 150):
-        r = rng_of("copycat", i)
+    for i, att in common.redraws(n or 150, items):
+        r = rng_of("copycat", i, att)
         rule = names[i % len(names)]
         a = cc_run(r, r.randint(3, 4))
         c = cc_run(r, r.randint(4, 6))
@@ -8056,8 +8060,8 @@ NQ_T = {"en": {"notbut": "Not {a} but {b} bought {x}.", "neither": "{a} bought n
 def load_negation_qa(lang, n, seed):
     items = []
     pats = ("notbut", "neither", "except", "except_not")
-    for i in range(n or 160):
-        r = rng_of("negation_qa", i)
+    for i, att in common.redraws(n or 160, items):
+        r = rng_of("negation_qa", i, att)
         pat = pats[i % 4]
         a, b, c = r.sample(PEOPLE["en"], 3)
         xi, yi = r.sample(range(6), 2)

@@ -54,7 +54,7 @@ def test_quality():
 
 
 def test_grammar():
-    for lang, total in (("de", 2280), ("en", 529)):
+    for lang, total in (("de", 2250), ("en", 502)):  # distinct sentence pairs
         items = tl.load_grammar(lang, None, 0)
         assert len(items) == total and [i["id"] for i in tl.load_grammar(lang, 300, 0)] == [i["id"] for i in items[:300]]
         assert 0.4 < sum(i["gold"] == "A" for i in items) / total < 0.6

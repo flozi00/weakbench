@@ -337,6 +337,32 @@ def distinct(load, pool=600):
     return wrapped
 
 
+def redraws(n, items, pair=False):
+    """Loop of a generated loader that never repeats a prompt: yields (i, attempt) and the body seeds its rng with
+    the attempt (attempt 0 = the old seed, so items without a repeat stay as they were) and appends at most one item.
+    An item whose prompt (turns or messages) an earlier item already had is dropped and drawn again with the next
+    attempt; a body that appends nothing skips that id. pair=True: twins 2k, 2k+1 share one draw (control and trap),
+    so the odd twin reuses the even twin's attempt."""
+    seen, last = set(), 0
+    for i in range(n):
+        for att in range(1000):
+            if pair and i % 2:
+                yield i, last
+                break
+            before = len(items)
+            yield i, att
+            if len(items) == before:
+                break
+            key = json.dumps(items[-1].get("turns") or items[-1]["messages"], sort_keys=True, ensure_ascii=False)
+            if key not in seen:
+                seen.add(key)
+                last = att
+                break
+            items.pop()
+        else:
+            raise RuntimeError(f"no new prompt for item {i} in 1000 draws")
+
+
 class OwnSet(collections.abc.Sequence):
     """A hand-written set from the private DATA_REPO (`sets/<module>.<NAME>.py`, a Python literal), fetched on
     first use so a run without access fails loudly only in the tasks that need it."""

@@ -7285,6 +7285,57 @@ def score_critical_path(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_sum": float(v == item["sum"])}}
 
 
+# ---------------------------------------------------------------- ledger_balance (what is actually booked)
+LB_SHOPS = ["Bakery", "Pharmacy", "Bookshop", "Petrol station", "Supermarket", "Cinema", "Hardware store", "Florist"]
+LB_SHOPS_DE = ["Bäckerei", "Apotheke", "Buchhandlung", "Tankstelle", "Supermarkt", "Kino", "Baumarkt", "Blumenladen"]
+
+
+def load_ledger_balance(lang, n, seed):
+    items = []
+    fmt = (lambda x: f"{x:,.2f} €") if lang == "en" else (lambda x: f"{x:,.2f} €".replace(",", "X").replace(".", ",").replace("X", "."))
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("ledger_balance", i, att)
+        opening = r.randrange(20000, 300000) / 100
+        shops = r.sample(LB_SHOPS if lang == "en" else LB_SHOPS_DE, 5)
+        rows, bal = [], opening
+        for sh in shops[:3]:
+            amt = r.randrange(500, 9000) / 100
+            rows.append((f"{sh}", -amt))
+            bal -= amt
+        cancel = r.randrange(2000, 15000) / 100
+        rows.append(((f"Online shop order" if lang == "en" else "Onlineshop-Bestellung"), -cancel))
+        rows.append(((f"Reversal: online shop order" if lang == "en" else "Storno: Onlineshop-Bestellung"), +cancel))
+        refund = r.randrange(500, 4000) / 100
+        rows.append(((f"Refund {shops[3]}" if lang == "en" else f"Erstattung {shops[3]}"), +refund))
+        bal += refund
+        salary = r.randrange(150000, 350000) / 100 if r.random() < 0.5 else 0
+        if salary:
+            rows.append(("Salary" if lang == "en" else "Gehalt", +salary))
+            bal += salary
+        r.shuffle(rows)
+        pending = r.randrange(1000, 12000) / 100
+        lines = "\n".join(f"- {name}: {'+' if v > 0 else '−'}{fmt(abs(v))}" for name, v in rows)
+        q = (f"Account statement. Opening balance: {fmt(opening)}.\nBooked transactions:\n{lines}\n"
+             f"Pending (reserved, not yet booked): {shops[4]}, −{fmt(pending)}\n"
+             "What is the booked closing balance (pending items not included)?" if lang == "en" else
+             f"Kontoauszug. Anfangssaldo: {fmt(opening)}.\nGebuchte Umsätze:\n{lines}\n"
+             f"Vorgemerkt (reserviert, noch nicht gebucht): {shops[4]}, −{fmt(pending)}\n"
+             "Wie hoch ist der gebuchte Endsaldo (vorgemerkte Umsätze nicht eingerechnet)?")
+        gold = round(bal, 2)
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": round(bal - pending, 2), "bait2": round(bal - cancel, 2),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_ledger_balance(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    eur = re.search(r"(-?−?\d[\d.,  ]*\d)\s*(?:€|\beuros?\b|\beur\b)", fa, re.I)
+    v = parse_number(eur[1].replace("−", "-"), item["lang"]) if eur else answer_value(fa, item["lang"])
+    near = lambda x: v is not None and abs(v - x) < 0.006  # noqa: E731
+    return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],
+            "detail": {"took_pending": float(near(item["bait"])), "took_cancelled": float(near(item["bait2"]))}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8865,6 +8916,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "ledger_balance": task(load_ledger_balance, score_ledger_balance, 24, 120),
     "critical_path": task(load_critical_path, score_critical_path, 24, 120),
     "counterexample": task(load_counterexample, score_counterexample, 24, 60),
     "cidr_check": task(load_cidr_check, score_cidr_check, 24, 120),

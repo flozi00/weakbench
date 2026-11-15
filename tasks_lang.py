@@ -2807,6 +2807,63 @@ def score_de_als_wie(item, reply):
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- collocations (which verb goes with the noun)
+# (sentence with gap, options, gold, calque = the verb a literal translation from the other language suggests)
+CO_ITEMS = {"de": [("Wir müssen bis Freitag eine Entscheidung ___.", ("treffen", "machen", "nehmen"), "treffen", "machen"),
+                   ("Bitte ___ Rücksicht auf die Nachbarn.", ("nimm", "gib", "mach"), "nimm", "gib"),
+                   ("Die Opposition ___ scharfe Kritik an dem Plan.", ("übte", "machte", "gab"), "übte", "machte"),
+                   ("Darf ich Ihnen eine Frage ___?", ("stellen", "fragen", "machen"), "stellen", "fragen"),
+                   ("Er hat im Test viele Fehler ___.", ("gemacht", "getan", "begangen"), "gemacht", "getan"),
+                   ("Sie ___ großen Wert auf Pünktlichkeit.", ("legt", "gibt", "macht"), "legt", "gibt"),
+                   ("Wir müssen das Risiko in Kauf ___.", ("nehmen", "geben", "machen"), "nehmen", "machen"),
+                   ("Kannst du mir einen Gefallen ___?", ("tun", "machen", "geben"), "tun", "geben"),
+                   ("Der Minister hat eine Rede ___.", ("gehalten", "gegeben", "gemacht"), "gehalten", "gegeben"),
+                   ("Er ___ sich große Mühe mit dem Geschenk.", ("gab", "machte", "nahm"), "gab", "machte"),
+                   ("Die Polizei ___ den Verdächtigen fest.", ("nahm", "machte", "hielt"), "nahm", "machte"),
+                   ("Wir sollten eine Pause ___.", ("machen", "nehmen", "halten"), "machen", "nehmen"),
+                   ("Sie hat die Prüfung ___ – sie war erfolgreich.", ("bestanden", "genommen", "gemacht"), "bestanden", "genommen"),
+                   ("Bitte ___ mir Bescheid, wenn du ankommst.", ("gib", "mach", "nimm"), "gib", "mach"),
+                   ("Er ___ einen Antrag auf Elterngeld.", ("stellte", "machte", "gab"), "stellte", "machte"),
+                   ("Sie musste eine schwere Krankheit ___.", ("durchmachen", "nehmen", "machen"), "durchmachen", "nehmen")],
+            "en": [("We have to ___ a decision by Friday.", ("make", "take", "do"), "make", "take"),
+                   ("Did you ___ your homework?", ("do", "make", "take"), "do", "make"),
+                   ("Please ___ attention to the safety rules.", ("pay", "give", "make"), "pay", "give"),
+                   ("She ___ a speech at the conference.", ("gave", "held", "made"), "gave", "held"),
+                   ("He ___ a lot of mistakes in the test.", ("made", "did", "took"), "made", "did"),
+                   ("Can you ___ me a favour?", ("do", "make", "give"), "do", "make"),
+                   ("They ___ a break after two hours.", ("took", "made", "did"), "took", "made"),
+                   ("She ___ the exam with excellent marks.", ("passed", "made", "took"), "passed", "made"),
+                   ("The police ___ the suspect.", ("arrested", "took fixed", "made fixed"), "arrested", "took fixed"),
+                   ("He ___ an application for the job.", ("submitted", "put", "made"), "submitted", "put"),
+                   ("We need to ___ the risk.", ("take", "make", "do"), "take", "make"),
+                   ("I'd like to ___ a question.", ("ask", "put up", "make"), "ask", "put up"),
+                   ("She ___ a lot of effort into the gift.", ("put", "gave", "made"), "put", "gave"),
+                   ("Please ___ me know when you arrive.", ("let", "give", "make"), "let", "give"),
+                   ("The opposition ___ the plan sharply.", ("criticised", "practised critic on", "made critic on"), "criticised", "made critic on"),
+                   ("He ___ a photo of the bridge.", ("took", "made", "did"), "took", "made")]}
+
+
+def load_collocations(lang, n, seed):
+    rows = CO_ITEMS[lang][:min(n or 16, 16)]
+    out = []
+    for i, (sent, opts, gold, calque) in enumerate(rows):
+        o = list(opts)
+        random.Random(f"collocations:{lang}:{i}").shuffle(o)  # the gold is not always first
+        ask = (f"Fill the gap with the most natural option ({', '.join(o)}). Answer with that option only.\n\n" if lang == "en" else
+               f"Setze die natürlichste Option ein ({', '.join(o)}). Antworte nur mit der Option.\n\n")
+        out.append({"id": str(i), "lang": lang, "gold": gold, "opts": o, "calque": calque,
+                    "messages": [{"role": "user", "content": ask + sent}]})
+    return out
+
+
+def score_collocations(item, reply):
+    t = " " + " ".join(re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())) + " "
+    hit = [o for o in item["opts"] if f" {o.lower()} " in t]
+    v = hit[0] if len(hit) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3121,6 +3178,7 @@ TASKS = {
     "en_usage": task(("en",), load_en_usage, score_en_usage, 16, 24, lang_check=False),
     "sentence_order": task(("de", "en"), load_sentence_order, score_sentence_order, 512, 12, lang_check=False),
     "de_als_wie": task(("de",), load_de_als_wie, score_de_als_wie, 16, 24, lang_check=False),
+    "collocations": task(("de", "en"), load_collocations, score_collocations, 16, 16, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

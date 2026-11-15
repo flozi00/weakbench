@@ -1032,6 +1032,11 @@ def test_de_case_identify():
     for c in (x["gold"], f"Antwort: {x['gold']}", f"{x['gold']} (Wer wartet?)", f"{x['gold'][:3]}."):
         assert tl.score_de_case_identify(x, {"content": c})["correct"], c
     assert not tl.score_de_case_identify(x, {"content": "Nominativ oder Akkusativ"})["correct"]
+    from collections import Counter
+    assert set(Counter(y["gold"] for y in xs).values()) == {12}
+    d = next(y for y in xs if y["gold"] == "Dativ")
+    for c in ("Wem-Fall", "3. Fall", "dritter Fall"):
+        assert tl.score_de_case_identify(d, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

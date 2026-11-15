@@ -4173,7 +4173,7 @@ def score_denglisch_spot(item, reply):
 # answer needs the sentence structure, not the article. No wegen/trotz frames: colloquial dative would make them ambiguous.
 CI_FRAMES = [("[{np}] wartet vor dem Haus.", "Nominativ", "nom"), ("Ich sehe [{np}] im Garten.", "Akkusativ", "acc"),
              ("Wir helfen [{np}] beim Umzug.", "Dativ", "dat"), ("Das Auto [{np2}] steht vor der Tür.", "Genitiv", "gen"),
-             ("Er dankt [{np}] für die Hilfe.", "Dativ", "dat"), ("Kennst du [{np}]?", "Akkusativ", "acc"),
+             ("Gestern hat [{np}] angerufen.", "Nominativ", "nom"), ("Kennst du [{np}]?", "Akkusativ", "acc"),
              ("Die Tasche [{np2}] ist rot.", "Genitiv", "gen"), ("Morgen kommt [{np}] zu Besuch.", "Nominativ", "nom"),
              ("Sie schenkt [{np}] einen Kuchen.", "Dativ", "dat"), ("Wir warten auf [{np}].", "Akkusativ", "acc"),
              ("Der Name [{np2}] ist mir entfallen.", "Genitiv", "gen"), ("Das gefällt [{np}] gut.", "Dativ", "dat")]
@@ -4211,6 +4211,10 @@ def load_de_case_identify(lang, n, seed):
 def score_de_case_identify(item, reply):
     t = strip_lead(reply["content"]).lower()
     t = re.sub(r"(?i)\b(?:not|nicht|kein\w*)\s+\w+", " ", t)
+    for latin, ask, num in (("nominativ", "wer", "1|erste"), ("genitiv", "wessen", "2|zweite"), ("dativ", "wem", "3|dritte"),
+                            ("akkusativ", "wen", "4|vierte")):  # school terms: Wem-Fall, 3. Fall
+        t = re.sub(rf"\b{ask}-?fall\b|\b(?:{num.split('|')[0]}\.|{num.split('|')[1]}[rn]?)\s*fall\b", latin, t)
+    t = t.replace("accusative", "akkusativ").replace("nominative", "nominativ")
     named = {c for c in ("nominativ", "akkusativ", "dativ", "genitiv") if re.search(rf"\b{c}", t) or
              re.search(rf"\b{c[:3]}\b\.?", t)}
     ok = named == {item["gold"].lower()}

@@ -5286,10 +5286,11 @@ def load_split_bill(lang, n, seed):
             share = "" if len(among) == len(people) else (
                 f" (shared only by {', '.join(among)})" if lang == "en" else f" (nur geteilt von {', '.join(among)})")
             lines.append(f"- {payer} paid {amt} € for {nm}{share}" if lang == "en" else f"- {payer} hat {amt} € für {nm} bezahlt{share}")
-        q = (f"{', '.join(people)} went on a trip. Every expense is split equally among the people who share it.\n"
+        grp = ", ".join(people[:-1]) + (" and " if lang == "en" else " und ") + people[-1]
+        q = (f"{grp} went on a trip. Every expense is split equally among the people who share it.\n"
              + "\n".join(lines) + f"\nAfter settling up, how much money does {who} get back in total? If {who} has to pay, "
              "answer with a negative number." if lang == "en" else
-             f"{', '.join(people)} waren zusammen verreist. Jede Ausgabe wird gleichmäßig auf die Personen verteilt, die sie teilen.\n"
+             f"{grp} waren zusammen verreist. Jede Ausgabe wird gleichmäßig auf die Personen verteilt, die sie teilen.\n"
              + "\n".join(lines) + f"\nWie viel Geld bekommt {who} nach der Abrechnung insgesamt zurück? Wenn {who} zahlen muss, "
              "antworte mit einer negativen Zahl.")
         items.append({"id": str(i), "lang": lang, "gold": float(g), "partial": partial, "plain": float(plain[who]),

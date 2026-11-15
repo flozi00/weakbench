@@ -3991,8 +3991,7 @@ def load_dual_output(lang, n, seed):
     items = []
     for i, att in common.redraws(n or 16, items):
         r = random.Random(f"dual_output:{lang}:{i}" + (f"~{att}" if att else ""))
-        msg_lang, note_lang = [("en", "de"), ("de", "en"), ("en", "en"), ("de", "de")][i % 4] if i % 4 < 2 else \
-            [("en", "de"), ("de", "en")][i % 2]  # mostly mixed; the instruction language never decides
+        msg_lang, note_lang = [("en", "de"), ("de", "en")][i % 2]  # both directions; the instruction language never decides
         name, d_old, d_new = r.choice(DO_NAMES), *r.sample(range(5), 2)
         hh = r.choice(["9:30", "10:00", "11:15", "14:00", "15:30"])
         L = {"en": "English", "de": "German"} if lang == "en" else {"en": "Englisch", "de": "Deutsch"}

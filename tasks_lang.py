@@ -3758,8 +3758,9 @@ IQ_ITEMS = [("Can you tell me where ___?", "the station is", ("the station is", 
 
 
 def load_en_indirect_q(lang, n, seed):
+    first = lambda i, g, o: (g, [x for x in o if x != g][0]) if (i // 2) % 2 == 0 else ([x for x in o if x != g][0], g)  # noqa: E731
     return [{"id": str(i), "lang": "en", "gold": g, "opts": o, "kind": kind,
-             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with that "
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{first(i, g, o)[0]}\" or \"{first(i, g, o)[1]}\". Answer with that "
                            f"phrase only.\n\n{sent}"}]}
             for i, (sent, g, o, kind) in enumerate(IQ_ITEMS[:min(n or 16, 16)])]
 

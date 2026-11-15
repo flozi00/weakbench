@@ -1529,3 +1529,18 @@ def test_reorder_day():
 
 if __name__ == "__main__":
     test_reorder_day()
+
+
+def test_league_table():
+    import tasks_novel as tn
+    xs = tn.load_league_table("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    from collections import Counter
+    assert max(Counter(x["gold"] for x in xs).values()) < 40
+    x = xs[0]
+    assert tn.score_league_table(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+    assert not tn.score_league_table(x, {"content": f"Antwort: {x['gold']} oder {x['tied'][0]}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_league_table()

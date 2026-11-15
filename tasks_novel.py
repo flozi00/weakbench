@@ -7771,6 +7771,59 @@ def score_reorder_day(item, reply):
             "detail": {"ignored_lead_time": float(v == item["bait"]), "one_day_late": float(v == item["late"])}}
 
 
+# ---------------------------------------------------------------- league_table (points, then goal difference, then goals)
+LT_TEAMS = ["Ashford", "Brenning", "Calder", "Dunmore", "Elstow", "Farley", "Garnet", "Holm"]
+
+
+def load_league_table(lang, n, seed):
+    import itertools
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("league_table", i, att)
+        while True:
+            teams = r.sample(LT_TEAMS, 4)
+            games = [(a, b, r.randint(0, 4), r.randint(0, 4)) for a, b in itertools.combinations(teams, 2)]
+            r.shuffle(games)
+            st = {t: [0, 0, 0, 0] for t in teams}  # points, goal diff, goals for, wins
+            for a, b, x, y in games:
+                st[a][1] += x - y; st[b][1] += y - x; st[a][2] += x; st[b][2] += y  # noqa: E702
+                if x > y:
+                    st[a][0] += 3; st[a][3] += 1  # noqa: E702
+                elif y > x:
+                    st[b][0] += 3; st[b][3] += 1  # noqa: E702
+                else:
+                    st[a][0] += 1; st[b][0] += 1  # noqa: E702
+            key = lambda t: (st[t][0], st[t][1], st[t][2])  # noqa: E731
+            order = sorted(teams, key=key, reverse=True)
+            if len({key(t) for t in teams}) < 4:
+                continue
+            pos = r.randrange(4)
+            tied = [t for t in teams if t != order[pos] and st[t][0] == st[order[pos]][0]]
+            by_goals = sorted(teams, key=lambda t: (st[t][2], st[t][0]), reverse=True)
+            if tied and by_goals[pos] != order[pos]:  # the tie-break decides, and "most goals" gives another team
+                break
+        place = ["1st", "2nd", "3rd", "4th"][pos] if lang == "en" else str(pos + 1)
+        res = "\n".join(f"{a} {x}:{y} {b}" for a, b, x, y in games)
+        q = (f"Results of a small football tournament (everyone plays everyone once):\n{res}\nA win gives 3 points, a draw 1, a "
+             f"loss 0. Teams level on points are ranked by goal difference, then by goals scored. Which team finishes {place}?"
+             if lang == "en" else
+             f"Ergebnisse eines kleinen Fußballturniers (jeder spielt einmal gegen jeden):\n{res}\nEin Sieg bringt 3 Punkte, ein "
+             f"Unentschieden 1, eine Niederlage 0. Bei Punktgleichheit entscheidet die Tordifferenz, dann die Zahl der geschossenen "
+             f"Tore. Welche Mannschaft belegt Platz {place}?")
+        items.append({"id": str(i), "lang": lang, "gold": order[pos], "teams": teams, "bait": by_goals[pos],
+                      "tied": tied, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_league_table(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    named = [t for t in item["teams"] if re.search(rf"\b{t}\b", fa)]
+    v = named[0] if len(named) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ranked_by_goals": float(v == item["bait"]), "lost_tie_break": float(v in item["tied"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9355,6 +9408,7 @@ TASKS = {
     "break_even": task(load_break_even, score_break_even, 24, 120),
     "night_shift": task(load_night_shift, score_night_shift, 24, 120),
     "reorder_day": task(load_reorder_day, score_reorder_day, 24, 120),
+    "league_table": task(load_league_table, score_league_table, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

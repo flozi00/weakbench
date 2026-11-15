@@ -3882,7 +3882,7 @@ DVP_ITEMS = [("Wir warten seit einer Stunde ___ den Bus.", "auf", ("auf", "für"
              ("Ich freue mich schon ___ die Ferien nächsten Monat.", "auf", ("auf", "über")),
              ("Er freut sich ___ das Geschenk, das er gestern bekommen hat.", "über", ("auf", "über")),
              ("Das hängt ganz ___ dem Wetter ab.", "von", ("von", "auf")),
-             ("Wir müssen uns ___ den Termin am Montag vorbereiten.", "auf", ("auf", "für")),
+             ("Sie ist sehr stolz ___ ihre Tochter.", "auf", ("auf", "von")),
              ("Sie hat sich ___ den Lärm beschwert.", "über", ("über", "von")),
              ("Ich kümmere mich ___ die Blumen, während ihr weg seid.", "um", ("um", "für")),
              ("Sie bittet ihren Chef ___ einen freien Tag.", "um", ("um", "für")),

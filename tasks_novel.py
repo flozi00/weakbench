@@ -6255,6 +6255,54 @@ def score_pack_buy(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- sql_result (SQL NULL semantics, computed with sqlite3)
+SR_KINDS = ("count_col", "avg", "neq", "having")
+
+
+def load_sql_result(lang, n, seed):
+    import sqlite3
+    items = []
+    for i in range(n or 120):
+        r = rng_of("sql_result", i)
+        kind = SR_KINDS[i % 4]
+        while True:
+            rows = [(k + 1, r.choice(["north", "south", "east"]), r.choice([None, r.randint(1, 9) * 10]),
+                     r.choice([None, "paid", "open"])) for k in range(r.randint(6, 9))]
+            db = sqlite3.connect(":memory:")
+            db.execute("CREATE TABLE orders (id INTEGER, region TEXT, amount INTEGER, status TEXT)")
+            db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?)", rows)
+            if kind == "count_col":
+                sql, naive_sql = "SELECT COUNT(amount) FROM orders;", "SELECT COUNT(*) FROM orders;"
+            elif kind == "avg":
+                sql, naive_sql = "SELECT AVG(amount) FROM orders;", "SELECT SUM(COALESCE(amount, 0)) * 1.0 / COUNT(*) FROM orders;"
+            elif kind == "neq":
+                sql = "SELECT COUNT(*) FROM orders WHERE status <> 'paid';"
+                naive_sql = "SELECT COUNT(*) FROM orders WHERE status IS NOT 'paid';"
+            else:
+                sql = "SELECT COUNT(*) FROM (SELECT region FROM orders GROUP BY region HAVING SUM(amount) > 100);"
+                naive_sql = "SELECT COUNT(*) FROM (SELECT region FROM orders GROUP BY region HAVING SUM(COALESCE(amount, 0)) > 100);"
+            gold, naive = db.execute(sql).fetchone()[0], db.execute(naive_sql).fetchone()[0]
+            if gold is not None and naive is not None and round(gold, 2) != round(naive, 2) and kind != "having" or \
+                    (kind == "having" and gold is not None and naive is not None and any(x[2] is None for x in rows)):
+                break
+        gold = round(gold, 2)
+        table = "\n".join(f"| {a} | {b} | {'NULL' if c is None else c} | {'NULL' if d is None else d} |" for a, b, c, d in rows)
+        q = (("Table orders:\n" if lang == "en" else "Tabelle orders:\n") + "| id | region | amount | status |\n|---|---|---|---|\n"
+             + table + f"\nQuery: `{sql}`\n" + ("What single number does the query return? (Standard SQL semantics.)" if lang == "en" else
+                                                  "Welche einzelne Zahl liefert die Abfrage? (Standard-SQL-Semantik.)"))
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": round(naive, 2), "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_sql_result(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.01
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok),
+                       "took_null_naive": float(v is not None and abs(v - item["naive"]) < 0.01 and item["naive"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7831,6 +7879,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "sql_result": task(load_sql_result, score_sql_result, 24, 120),
     "pack_buy": task(load_pack_buy, score_pack_buy, 24, 120),
     "growth_rel": task(load_growth_rel, score_growth_rel, 24, 120),
     "dose_calc": task(load_dose_calc, score_dose_calc, 24, 120),

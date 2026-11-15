@@ -6361,6 +6361,45 @@ def score_meet_time(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_same_start": float(v == item["naive"])}}
 
 
+# ---------------------------------------------------------------- regex_eval (read a regex, gold from re)
+RE_PATTERNS = [r"^ab+c$", r"^a|b$", r"colou?r", r"^\d{3}-\d{2}$", r"^[A-Z][a-z]*$", r"x\.y", r"x.y", r"^(ha)+!$", r"^[^aeiou]+$",
+               r"\bcat\b", r"^a.*z$", r"^(cat|dog)s?$", r"^cat|dogs$", r"[0-9]{2,3}", r"^\w+@\w+\.de$", r"^.{3}$"]
+RE_POOL = ["abc", "abbbc", "ac", "abcd", "xabc", "a", "b", "ab", "ba", "color", "colour", "colr", "123-45", "12-345", "123-456",
+           "Hello", "hello", "HeLLo", "H", "x.y", "xzy", "x..y", "haha!", "ha!", "hah!", "rhythm", "sky", "tree", "the cat sat",
+           "concat", "cat", "cats", "dogs", "catdog", "az", "abcz", "za", "a z", "7", "42", "1234", "anna@web.de", "anna@web.com",
+           "a@b.de", "abc", "ab", "abcd", "doggy", "dog", "x-y"]
+
+
+def load_regex_eval(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("regex_eval", i)
+        pat = RE_PATTERNS[i % len(RE_PATTERNS)]
+        while True:
+            cands = r.sample(sorted(set(RE_POOL)), 6)
+            hits = [c for c in cands if re.search(pat, c)]
+            if 1 <= len(hits) <= 4:
+                break
+        lst = "\n".join(f"{k + 1}. {c}" for k, c in enumerate(cands))
+        q = (f"Regular expression (Python `re.search`, no flags): `{pat}`\nWhich of these strings contain a match?\n{lst}\n"
+             "Answer with the numbers of the matching strings, separated by commas." if lang == "en" else
+             f"Regulärer Ausdruck (Python `re.search`, ohne Flags): `{pat}`\nIn welchen dieser Zeichenketten gibt es einen Treffer?\n{lst}\n"
+             "Antworte mit den Nummern der passenden Zeichenketten, durch Kommas getrennt.")
+        gold = sorted(k + 1 for k, c in enumerate(cands) if c in hits)
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(map(str, gold)), "set": gold,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_regex_eval(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    got = {int(x) for x in re.findall(r"\b[1-6]\b", fa)}
+    want = set(item["set"])
+    jac = len(got & want) / len(got | want) if got | want else 1.0
+    ok = got == want
+    return {"correct": ok, "score": float(ok), "pred": sorted(got), "gold": item["gold"], "detail": {"jaccard": round(jac, 4)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7940,6 +7979,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "regex_eval": task(load_regex_eval, score_regex_eval, 24, 120),
     "meet_time": task(load_meet_time, score_meet_time, 24, 120),
     "sql_result": task(load_sql_result, score_sql_result, 24, 120),
     "pack_buy": task(load_pack_buy, score_pack_buy, 24, 120),

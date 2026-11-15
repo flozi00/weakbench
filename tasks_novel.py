@@ -7676,6 +7676,8 @@ def stated_int(reply, unit):
     """The integer an answer states before `unit` ("3212 Lampen (bei 3211 Verlust)", "25 h 15 min = 1515 minutes,
     i.e. 25.25 h"); a range ("3211-3212", "3211 oder 3212") is None."""
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    tail = re.split(r"\b(?:so|also|insgesamt|in total)\b", fa)  # "6 full payments and a partial one, so 7 in total"
+    fa = next((t for t in reversed(tail[1:]) if re.search(r"\d", t)), fa)
     fa = re.split(r"[;,]\s+|\bi\.e\.|\bd\.h\.", fa)[0]
     fa = fa.split("=")[-1]
     if re.search(r"\d\s*(?:[–-]|bis|to|oder|or)\s*\d", fa):

@@ -3277,6 +3277,8 @@ def gap_pick(item, reply, opts):
     # "mir - nicht mich": a negated option is the rejected one (only here; the gap read above needs the full words)
     kept = re.sub(r"(?<![a-zäöüß'])(?:nicht|not|never|nie|statt|instead of)\s+[„\"'“*]*[a-zäöüß']+", " ", text)
     named = [o for o in low if re.search(r"(?<![a-zäöüß'])" + re.escape(o) + r"(?![a-zäöüß'])", kept)]
+    if len(named) > 1 and words and words[0] in low and words[1:2] not in (["oder"], ["or"], ["und"], ["and"], ["bzw"]):  # "good, because well is an adverb": the word it leads with
+        return words[0]
     return named[0] if len(named) == 1 else None
 
 

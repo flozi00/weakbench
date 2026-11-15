@@ -8042,7 +8042,7 @@ def load_check_digit(lang, n, seed):
 
 
 def score_check_digit(item, reply):
-    fa = re.sub(re.escape(item["num"]) + r"\d?", " ", final_answer(reply["content"]) or "")  # "...9781234 -> 97812343": the code itself
+    fa = re.sub(re.escape(item["num"]), " ", final_answer(reply["content"]) or "")  # "...9781234 -> 97812343": the code itself
     v = stated_int({"content": "Answer: " + fa}, r"\b")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
@@ -8096,7 +8096,8 @@ def load_auction_price(lang, n, seed):
 
 
 def score_auction_price(item, reply):
-    v = stated_int(reply, r"(?:€|euro|eur\b)")
+    paid = re.search(r"\b(?:pays?|paid|zahlt|bezahlt)\s+(?:only\s+|nur\s+)?(?:€\s*)?(\d[\d.,]*)", final_answer(reply["content"]) or "", re.I)
+    v = last_int(paid[1].rstrip(".,")) if paid else stated_int(reply, r"(?:€|euro|eur\b)")  # "wins with 240 € and pays 185 €"
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok), "paid_own_bid": float(v == item["bait"])}}

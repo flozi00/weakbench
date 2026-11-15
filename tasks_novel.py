@@ -6865,10 +6865,19 @@ def load_iso_week(lang, n, seed):
 
 def score_iso_week(item, reply):
     fa = final_answer(reply["content"]) or ""
-    w = re.search(r"(?:week|KW|Woche)\s*(\d{1,2})", fa, re.I)
-    yr = re.search(r"\b((?:19|20)\d\d)\b", fa)
-    wk = int(w[1]) if w else None
-    ok = wk == item["week"] and (yr is not None and int(yr[1]) == item["year"])
+    iso = re.search(r"\b((?:19|20)\d\d)-?W(\d{1,2})\b", fa)  # 2004-W01
+    w = re.search(r"(?:week|KW|Woche|W)\s*0?(\d{1,2})\b\D{0,25}?((?:19|20)\d\d)?", fa, re.I) or \
+        re.search(r"\b(\d{1,2})(?:st|nd|rd|th|\.)\s*(?:week|Woche)\D{0,25}?((?:19|20)\d\d)?", fa, re.I)
+    if iso:
+        wk, year = int(iso[2]), int(iso[1])
+    elif w:
+        wk = int(w[1])
+        yrs = re.findall(r"\b((?:19|20)\d\d)\b", fa)
+        year = int(w[2]) if w[2] else (int(yrs[-1]) if yrs else None)  # the year next to the week, else the last one
+    else:
+        wk = year = None
+    yr = [None, str(year)] if year else None
+    ok = wk == item["week"] and year == item["year"]
     d = {"ok_edge" if item["edge"] else "ok_inside": float(ok)}
     if item["naive"] != item["week"]:
         d["took_naive"] = float(wk == item["naive"])

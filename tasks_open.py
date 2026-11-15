@@ -1243,8 +1243,13 @@ CS_EVENTS = {"en": [("the city marathon", "runners"), ("the book fair", "visitor
                     ("the harbour festival", "visitors"), ("the climate demonstration", "participants"), ("the open day", "guests")],
              "de": [("dem Stadtmarathon", "Läufer"), ("der Buchmesse", "Besucher"), ("dem Benefizkonzert", "Konzertbesucher"),
                     ("dem Hafenfest", "Besucher"), ("der Klimademo", "Teilnehmende"), ("dem Tag der offenen Tür", "Gäste")]}
+CS_DAT = {"Läufer": "Läufern", "Besucher": "Besuchern", "Konzertbesucher": "Konzertbesuchern", "Teilnehmende": "Teilnehmenden",
+          "Gäste": "Gästen"}  # after "sprechen von"
 CS_SRC = {"en": ("The city press office", "The organisers"), "de": ("Die Pressestelle der Stadt", "Die Veranstalter")}
 CS_JUDGE = """Two reports about one event disagree on a number: source 1 says {a}, source 2 says {b}. The rest agrees.
+REPORTS:
+{reports}
+
 SUMMARY:
 {text}
 
@@ -1260,8 +1265,11 @@ def load_conflict_summary(lang, n, seed):
     for i in range(n or 24):
         r = random.Random(f"conflict_summary:{i}")
         ev, what = CS_EVENTS[lang][i % 6]
-        a = r.randrange(800, 9000, 50)
-        b = a + r.choice([-1, 1]) * r.randrange(200, 2500, 50)
+        while True:
+            a = r.randrange(800, 9000, 50)
+            b = a + r.choice([-1, 1]) * r.randrange(200, 2500, 50)
+            if b >= 300 and str(a) not in str(b) and str(b) not in str(a):  # no negative figure, neither inside the other
+                break
         s1, s2 = CS_SRC[lang]
         day = r.choice(["Saturday", "Sunday"]) if lang == "en" else r.choice(["Samstag", "Sonntag"])
         fmt = (lambda x: f"{x:,}") if lang == "en" else (lambda x: f"{x:,}".replace(",", "."))
@@ -1273,9 +1281,9 @@ def load_conflict_summary(lang, n, seed):
             zu = ev.replace("dem ", "zum ", 1) if ev.startswith("dem ") else ev.replace("der ", "zur ", 1)
             bei = ev.replace("dem ", "beim ", 1) if ev.startswith("dem ") else "bei " + ev
             rep = (f"Bericht 1: {s1} meldet, dass am {day} {fmt(a)} {what} {zu} kamen. Das Wetter war trocken, es gab keine Zwischenfälle.\n"
-                   f"Bericht 2: {s2} sprechen von {fmt(b)} {what} {bei} am {day}. Sie dankten den Helfern; es gab keine Zwischenfälle.")
+                   f"Bericht 2: {s2} sprechen von {fmt(b)} {CS_DAT[what]} {bei} am {day}. Sie dankten den Helfern; es gab keine Zwischenfälle.")
             req = f"{rep}\n\nSchreib eine Zusammenfassung in zwei Sätzen für einen Newsletter."
-        items.append({"id": str(i), "lang": lang, "a": a, "b": b, "fa": fmt(a), "fb": fmt(b),
+        items.append({"id": str(i), "lang": lang, "a": a, "b": b, "fa": fmt(a), "fb": fmt(b), "reports": rep,
                       "messages": [{"role": "user", "content": req}]})
     return items
 
@@ -1284,8 +1292,9 @@ def score_conflict_summary(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     digits = re.sub(r"(?<=\d)[.,\s](?=\d{3}\b)", "", text)
-    both = str(item["a"]) in digits and str(item["b"]) in digits
-    out = tasks_judge.judge("", CS_JUDGE.format(a=item["fa"], b=item["fb"], text=text or "(empty)"), max_tokens=64)
+    has = lambda x: bool(re.search(rf"(?<!\d){x}(?!\d)", digits))  # noqa: E731
+    both = has(item["a"]) and has(item["b"])
+    out = tasks_judge.judge("", CS_JUDGE.format(a=item["fa"], b=item["fb"], reports=item["reports"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 3:

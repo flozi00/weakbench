@@ -7891,6 +7891,42 @@ def score_access_rules(item, reply):
                        "took_last_match": float(v == item["last_match"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- loan_payoff (interest each month, step by step)
+def load_loan_payoff(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("loan_payoff", i, att)
+        while True:
+            debt = r.randrange(600, 4001, 50)
+            rate = r.choice([1, 1.5, 2, 2.5, 3])  # percent per month
+            pay = r.randrange(100, 701, 25)
+            bal, months = F(debt), 0
+            while bal > 0 and months < 60:
+                bal = bal * (1 + F(str(rate)) / 100) - pay  # interest on the balance, then the payment
+                months += 1
+            naive = -(-debt // pay)
+            last = bal + pay  # what the last payment covers: keep it clear of 0 and of a full payment (cent rounding)
+            if 3 <= months < 60 and months != naive and debt * F(str(rate)) / 100 < pay * F(1, 2) and 5 <= last <= pay - 5:
+                break
+        q = (f"Sam owes {debt} €. At the end of every month, {rate:g} % interest is added to the remaining debt, and then Sam "
+             f"pays {pay} € (in the last month only what is left). After how many monthly payments is the debt fully paid?"
+             if lang == "en" else
+             f"Sam hat {debt} € Schulden. Am Ende jedes Monats kommen {str(rate).replace('.', ',').removesuffix(',0')} % Zinsen auf "
+             f"die Restschuld dazu, danach zahlt Sam {pay} € (im letzten Monat nur den Rest). Nach wie vielen Monatsraten ist die "
+             f"Schuld vollständig getilgt?")
+        items.append({"id": str(i), "lang": lang, "gold": months, "bait": naive,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_loan_payoff(item, reply):
+    v = stated_int(reply, r"(?:monat|month|rate|payment|zahlung)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ignored_interest": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9477,6 +9513,7 @@ TASKS = {
     "reorder_day": task(load_reorder_day, score_reorder_day, 24, 120),
     "league_table": task(load_league_table, score_league_table, 24, 120),
     "access_rules": task(load_access_rules, score_access_rules, 24, 120),
+    "loan_payoff": task(load_loan_payoff, score_loan_payoff, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

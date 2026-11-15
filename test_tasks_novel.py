@@ -1562,3 +1562,18 @@ def test_access_rules():
 
 if __name__ == "__main__":
     test_access_rules()
+
+
+def test_loan_payoff():
+    import tasks_novel as tn
+    xs = tn.load_loan_payoff("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert all(x["gold"] > x["bait"] for x in xs)
+    x = xs[0]
+    for c in (f"Antwort: {x['gold']} Monate", f"Antwort: nach {x['gold']} Monatsraten (die letzte ist kleiner)", f"Antwort: {x['gold']}"):
+        assert tn.score_loan_payoff(x, {"content": c})["correct"], c
+    assert tn.score_loan_payoff(x, {"content": f"Antwort: {x['bait']} Monate"})["detail"]["ignored_interest"] == 1
+
+
+if __name__ == "__main__":
+    test_loan_payoff()

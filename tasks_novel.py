@@ -5608,6 +5608,71 @@ def score_cell_rule(item, reply):
             "detail": {f"ok_steps{item['steps']}": float(ok), "cells_right": round(right, 4)}}
 
 
+# ---------------------------------------------------------------- fifo_cost (follow a stated accounting rule)
+def _fifo(events, lifo=False):
+    stock, cost = [], 0
+    for kind, q, p in events:
+        if kind == "buy":
+            stock.append([q, p])
+        else:
+            while q:
+                lot = stock[-1] if lifo else stock[0]
+                take = min(q, lot[0])
+                cost += take * lot[1]
+                lot[0] -= take
+                q -= take
+                if not lot[0]:
+                    stock.remove(lot)
+    return cost
+
+
+def load_fifo_cost(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("fifo_cost", i)
+        while True:
+            events, have = [], 0
+            for _ in range(r.randint(4, 6)):
+                if have < 5 or r.random() < 0.5:
+                    q = r.randrange(10, 60, 5)
+                    events.append(("buy", q, r.randint(3, 15)))
+                    have += q
+                else:
+                    q = r.randrange(5, have + 1, 5)
+                    events.append(("sell", q, None))
+                    have -= q
+            if not any(e[0] == "sell" for e in events):
+                continue
+            gold = _fifo(events)
+            lifo = _fifo(events, lifo=True)
+            bought = [(q, p) for k, q, p in events if k == "buy"]
+            sold = sum(q for k, q, _ in events if k == "sell")
+            avg = round(sold * sum(q * p for q, p in bought) / sum(q for q, _ in bought), 2)
+            if len({gold, lifo, avg}) == 3:
+                break
+        lines = []
+        for k, q, p in events:
+            lines.append((f"- bought {q} units at {p} € each" if lang == "en" else f"- {q} Stück zu je {p} € gekauft") if k == "buy"
+                         else (f"- sold {q} units" if lang == "en" else f"- {q} Stück verkauft"))
+        q = ("A shop records its stock of one product in this order (it started with none):\n" + "\n".join(lines) +
+             "\nThe shop uses first in, first out: units sold always come from the oldest purchase still in stock. "
+             "What did all the units sold cost the shop when it bought them, in euros?" if lang == "en" else
+             "Ein Laden verbucht den Bestand eines Produkts in dieser Reihenfolge (am Anfang war nichts da):\n" + "\n".join(lines) +
+             "\nDer Laden rechnet nach First In, First Out: verkaufte Stücke stammen immer aus dem ältesten Einkauf, der noch "
+             "auf Lager ist. Was haben alle verkauften Stücke den Laden beim Einkauf gekostet, in Euro?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "avg": avg, "lifo": lifo,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_fifo_cost(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.006
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_average": float(v is not None and abs(v - item["avg"]) < 0.51),
+                       "took_lifo": float(v is not None and abs(v - item["lifo"]) < 0.006)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7183,6 +7248,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "fifo_cost": task(load_fifo_cost, score_fifo_cost, 24, 120),
     "cell_rule": task(load_cell_rule, score_cell_rule, 24, 120),
     "exam_slots": task(load_exam_slots, score_exam_slots, 24, 120),
     "json_repair": task(load_json_repair, score_json_repair, 24, 120),

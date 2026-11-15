@@ -2937,10 +2937,10 @@ def load_de_ersatzinfinitiv(lang, n, seed):
         if sub:
             s_ = subj if subj == "Anna" else subj[0].lower() + subj[1:]  # "dass die Kinder", "dass er"
             sent = f"Ich weiß, dass {s_} {rest} {fin}."
-            ask = "Setze den Nebensatz ins Perfekt. Antworte nur mit dem ganzen Satz.\n\n"
+            ask = "Setze den Nebensatz ins Perfekt (Standardschriftdeutsch). Antworte nur mit dem ganzen Satz.\n\n"
             gold = f"{aux} {verb} {inf}"
         else:
-            ask = "Setze den Satz ins Perfekt. Antworte nur mit dem Satz.\n\n"
+            ask = "Setze den Satz ins Perfekt (Standardschriftdeutsch). Antworte nur mit dem Satz.\n\n"
             gold = f"{aux} {obj + ' ' if obj else ''}{verb} {inf}"
         items.append({"id": str(i), "lang": "de", "gold": gold, "sub": sub, "aux": aux, "verb": verb, "inf": inf, "part": part,
                       "messages": [{"role": "user", "content": ask + sent}]})
@@ -2948,8 +2948,9 @@ def load_de_ersatzinfinitiv(lang, n, seed):
 
 
 def score_de_ersatzinfinitiv(item, reply):
-    t = re.sub(r"\s+", " ", (reply["content"] or "").strip().splitlines()[0] if (reply["content"] or "").strip() else "").lower()
     aux, verb, inf = item["aux"], item["verb"], item["inf"]
+    lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
+    t = re.sub(r"\s+", " ", next((x for x in lines if inf in x.lower()), lines[0] if lines else "")).lower()  # skip a lead-in
     participle = item["part"] in t
     if item["sub"]:
         ok = f"{aux} {verb} {inf}" in t  # "dass er hat arbeiten müssen"

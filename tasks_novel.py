@@ -6718,12 +6718,13 @@ def load_refund_policy(lang, n, seed):
                "Sale items cannot be returned. A receipt is required, except for loyalty-club members, who are identified by "
                "their card." if lang == "en" else
                f"Rückgaberegeln: Artikel können innerhalb von {days} Tagen nach dem Kauf zurückgegeben werden. Geöffnete Artikel werden "
-               f"abzüglich einer Gebühr von {fee} % erstattet. Reduzierte Artikel sind vom Umtausch ausgeschlossen. Ein Kassenbon ist "
+               f"abzüglich einer Gebühr von {fee} % erstattet. Reduzierte Artikel können nicht zurückgegeben werden. Ein Kassenbon ist "
                "nötig, außer bei Mitgliedern des Kundenclubs, die sich mit ihrer Karte ausweisen.")
-        case = (f"Customer: I bought {thing} for {price} € {age} days ago. It was {'a sale item' if sale else 'not on sale'}, the box is "
+        case = (f"Customer: I bought {thing} for {price} € {age} day{'s' if age > 1 else ''} ago. It was {'a sale item' if sale else 'not on sale'}, the box is "
                 f"{'opened' if opened else 'still sealed'}. I {'have' if receipt else 'lost'} the receipt"
                 + (" and I am a loyalty-club member (here is my card)." if member else ".") if lang == "en" else
-                f"Kunde: Ich habe vor {age} Tagen {thing} für {price} € gekauft. Der Artikel war {'reduziert' if sale else 'nicht reduziert'}, "
+                f"Kunde: Ich habe vor {age} Tag{'en' if age > 1 else ''} {thing} für {price} € gekauft. "
+                f"{'Die Kopfhörer waren' if thing == 'Kopfhörer' else 'Der Artikel war'} {'reduziert' if sale else 'nicht reduziert'}, "
                 f"die Verpackung ist {'geöffnet' if opened else 'noch versiegelt'}. Den Kassenbon habe ich {'dabei' if receipt else 'verloren'}"
                 + (" und ich bin Mitglied im Kundenclub (hier ist meine Karte)." if member else "."))
         q = (f"{pol}\n\n{case}\n\nHow many euros does the customer get back under this policy? (0 if none.)" if lang == "en" else

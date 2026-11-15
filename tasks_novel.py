@@ -5683,9 +5683,7 @@ def _tc_earliest(trains, src, dst, t0, change=5):
         ready = best.get(dep_s)
         if ready is None:
             continue
-        need = ready if dep_s == src and ready == t0 else ready + change
-        if dep_s == src and best[src] == t0:
-            need = t0
+        need = t0 if dep_s == src and ready == t0 else ready + change  # no change time before the first train
         if dep >= need and arr < best.get(arr_s, 10 ** 9):
             best[arr_s] = arr
     return best.get(dst)

@@ -9965,8 +9965,8 @@ def load_genetics_cross(lang, n, seed):
                 kids = ["".join(sorted(g1[j] + g2[j])) for j in range(k)]  # "Pp": the upper case sorts first
                 gold += w * all(kids[j][0].isupper() == want[j] for j in range(k))
                 bait += w * all(kids[j] == (kids[j][0].upper() if want[j] else kids[j][0].lower()) * 2 for j in range(k))
-            if 0 < gold < 1 and gold != bait and sum(it["gold"] == str(gold) for it in items) < max(2, (n or 72) // 6):
-                break  # "always 1/2" must not pay
+            if 0 < gold < 1 and gold != bait and sum(it["gold"] == str(gold) for it in items) < len(items) // 6 + 2:
+                break  # "always 1/2" must not pay; the cap grows with the position, so quick stays a prefix of full
         G = [GC_GENES[lang][g] for g in genes]
         geno = lambda pp: " ".join("".join(x) for x in pp)  # noqa: E731
         traits = [f"{G[j][1] if want[j] else G[j][2]} {G[j][3]}" for j in range(k)]

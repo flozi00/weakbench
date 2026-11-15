@@ -5389,9 +5389,10 @@ def load_csv_field(lang, n, seed):
             if nv != gold and gold != "":
                 break
         q = (f"Here is a CSV file:\n```\n{text}```\nWhat is the value of the column \"{head[col]}\" in the row with id {rows[k][0]}? "
-             "Give the value without quotes." if lang == "en" else
+             "Give the value as it reads after CSV unquoting: no surrounding quotes, but keep quotation marks that are part of the value." if lang == "en" else
              f"Hier ist eine CSV-Datei:\n```\n{text}```\nWelchen Wert hat die Spalte „{head[col]}“ in der Zeile mit der id {rows[k][0]}? "
-             "Gib den Wert ohne Anführungszeichen an.")
+             "Gib den Wert so an, wie er nach dem CSV-Entquoten lautet: ohne umschließende Anführungszeichen, aber mit "
+             "Anführungszeichen, die zum Wert gehören.")
         items.append({"id": str(i), "lang": lang, "gold": gold, "naive": nv.strip('"'),
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items

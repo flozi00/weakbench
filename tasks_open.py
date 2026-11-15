@@ -1059,6 +1059,58 @@ def score_honest_headline(item, reply):
                        "within_limit": float(met[4])}}
 
 
+# ---------------------------------------------------------------- rhyme_poem (judge + exact: a short rhymed poem)
+# Four lines in a given rhyme scheme on a topic, containing a given word. Rhyme in German and English is a sound
+# property that tokenised models often fake with eye rhymes or near-misses. Lines and the word are checked exactly.
+RP_TOPICS = {"en": [("autumn rain", "umbrella"), ("a lost key", "pocket"), ("the night train", "window"), ("a cat on a roof", "chimney"),
+                    ("Monday morning", "coffee"), ("an old bicycle", "chain")],
+             "de": [("Herbstregen", "Schirm"), ("ein verlorener Schlüssel", "Tasche"), ("der Nachtzug", "Fenster"),
+                    ("eine Katze auf dem Dach", "Schornstein"), ("Montagmorgen", "Kaffee"), ("ein altes Fahrrad", "Kette")]}
+RP_SCHEMES = ["AABB", "ABAB", "ABBA"]
+RP_JUDGE = """A poem was requested: four lines, rhyme scheme {scheme}, topic "{topic}", in {language}.
+
+POEM:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The line endings follow the scheme {scheme} with TRUE rhymes when read aloud in {language} (same stressed vowel and
+   everything after it; eye rhymes like "love/move" or near-rhymes like "Haus/raus" are fine only if they truly rhyme).
+   Lines with different letters in the scheme must NOT rhyme with each other.
+2. The poem is about the topic and makes sense as a whole.
+3. Grammar and word forms are correct (poetic word order is fine)."""
+
+
+def load_rhyme_poem(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 18):
+        topic, word = RP_TOPICS[lang][i % 6]
+        scheme = RP_SCHEMES[(i // 6) % 3]
+        req = (f"Write a poem of exactly four lines about {topic} with the rhyme scheme {scheme}. Use the word \"{word}\". "
+               "Reply with the poem only." if lang == "en" else
+               f"Schreib ein Gedicht aus genau vier Zeilen über {topic} mit dem Reimschema {scheme}. Verwende das Wort „{word}“. "
+               "Antworte nur mit dem Gedicht.")
+        items.append({"id": str(i), "lang": lang, "topic": topic, "word": word, "scheme": scheme,
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_rhyme_poem(item, reply):
+    tasks_judge.check_judge()
+    lines = [x.strip() for x in (reply["content"] or "").splitlines() if x.strip() and not x.strip().startswith("#")]
+    has_word = bool(re.search(r"\b" + item["word"], " ".join(lines), re.I))
+    out = tasks_judge.judge("", RP_JUDGE.format(scheme=item["scheme"], topic=item["topic"], text="\n".join(lines) or "(empty)",
+                                                language="German" if item["lang"] == "de" else "English"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable poem verdict {out[:120]!r}")
+    met = [_yes(x) for x in v] + [len(lines) == 4, has_word]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": " / ".join(lines)[:200], "gold": None,
+            "detail": {"rhyme_ok": float(met[0]), "on_topic": float(met[1]), "grammar": float(met[2]),
+                       "four_lines": float(met[3]), "has_word": float(met[4]), f"rhyme_{item['scheme']}": float(met[0])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1456,6 +1508,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "rhyme_poem": {"langs": ("de", "en"), "load": load_rhyme_poem, "score": score_rhyme_poem,
+                        "think": False, "max_tokens": 256,
+                        "counts": {"quick": {"de": 9, "en": 9}, "full": {"de": None, "en": None}},
+                        "lang_check": True, "opt_in": True, "needs_judge": True},
          "honest_headline": {"langs": ("de", "en"), "load": load_honest_headline, "score": score_honest_headline,
                              "think": False, "max_tokens": 128,
                              "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},

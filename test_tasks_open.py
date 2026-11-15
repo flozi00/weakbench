@@ -341,6 +341,21 @@ def test_honest_headline():
         tasks_judge.configure(None, None, None)
 
 
+def test_rhyme_poem():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_rhyme_poem("de", None, 0)
+        assert len(it) == 18 and {x["scheme"] for x in it} == {"AABB", "ABAB", "ABBA"}
+        poem = "Der Regen fällt aufs Dach,\nich halte meinen Schirm,\nund bleibe lange wach,\nim herbstlichen Gewirr."
+        assert to.score_rhyme_poem(it[0], {"content": poem})["correct"]
+        r = to.score_rhyme_poem(it[0], {"content": poem + "\nNoch eine Zeile."})
+        assert r["detail"]["four_lines"] == 0.0 and r["score"] == 0.8
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -453,6 +468,7 @@ if __name__ == "__main__":
     test_ask_or_answer()
     test_de_dialect()
     test_honest_headline()
+    test_rhyme_poem()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

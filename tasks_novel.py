@@ -6217,15 +6217,9 @@ def _pb_best(packs, need):
 
 
 def _pb_greedy(packs, need):
-    cost, left = 0, need
-    for q, p in sorted(packs, key=lambda x: x[1] / x[0]):  # cheapest per unit first, as many as fit
-        k = left // q
-        cost += k * p
-        left -= k * q
-    if left > 0:  # then the cheapest single pack that covers the rest
-        cost += min(p for q, p in packs if q >= left) if any(q >= left for q, _ in packs) else \
-            min(p * (-(-left // q)) for q, p in packs)
-    return cost
+    """The natural shortcut: buy only the pack with the lowest price per roll, as many as needed."""
+    q, p = min(packs, key=lambda x: x[1] / x[0])
+    return -(-need // q) * p
 
 
 def load_pack_buy(lang, n, seed):

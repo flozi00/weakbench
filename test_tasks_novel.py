@@ -1328,8 +1328,22 @@ def test_unit_price():
         assert not tn.score_unit_price(x, {"content": "Answer: A or B"})["correct"]
 
 
+
+def test_recipe_scale():
+    import tasks_novel as tn
+    xs = tn.load_recipe_scale("de", 8, 0)
+    g = xs[0]["gold"]
+    for t in (f"Antwort: Für 8 Portionen {g} g", f"Antwort: {g / 1000:g} kg".replace(".", ","), f"Antwort: {g}"):
+        assert tn.score_recipe_scale(xs[0], {"content": t})["correct"], t
+    t = xs[7]  # minutes trap
+    assert "Minuten" in t["messages"][0]["content"].split("\n\n")[-1]
+    assert tn.score_recipe_scale(t, {"content": f"Antwort: 2 Bleche à {t['gold']} Minuten"})["correct"]
+    assert not tn.score_recipe_scale(t, {"content": f"Antwort: {t['gold']} °C"})["correct"]
+
+
 if __name__ == "__main__":
     test_weekday_calc()
+    test_recipe_scale()
     test_unit_price()
     test_count_mentions()
     test_interval_math()

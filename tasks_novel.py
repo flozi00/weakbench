@@ -4594,8 +4594,24 @@ def load_recipe_scale(lang, n, seed):
     return items
 
 
+RS_UNIT = r"(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|°\s*c|°|grad|min\w*)?\b"
+
+
 def score_recipe_scale(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    # the number that carries the asked unit ("Für 8 Portionen 480 g" -> 480, "2 Bleche à 40 Minuten" -> 40); kg/l -> g/ml
+    fa = (final_answer(reply["content"]) or "").lower()
+    q = item["messages"][0]["content"].lower()
+    want = ("min" if "minut" in q.split("\n\n")[-1] else "°") if item["trap"] else ("ml" if " ml " in q.split("\n\n")[-1] else "g")
+    cands, bare = [], []
+    for num, unit in re.findall(RS_UNIT, fa):
+        x = float(num.replace(",", "."))
+        u = (unit or "").replace(" ", "")
+        if u in ("kg", "l"):
+            x, u = x * 1000, "g" if u == "kg" else "ml"
+        u = "°" if u.startswith("°") or u == "grad" else "min" if u.startswith("min") else u
+        (cands if u == want else bare if not u else []).append(x)
+    vals = set(cands) or (set(bare) if len(set(bare)) == 1 else set())
+    v = vals.pop() if len(vals) == 1 else None
     ok = v is not None and abs(v - item["gold"]) <= 0.051
     d = {"ok_trap" if item["trap"] else "ok_scaled": float(ok)}
     if item["trap"]:

@@ -2441,11 +2441,11 @@ QK_QUOTES = ["On se voit demain à dix heures.", "La reunión está cancelada.",
 QK_TRANS = r"morgen|tomorrow|abgesagt|cancel|verspät|delay|late|geduld|patience|rechnung|invoice|bill|montag|monday"
 QK_FRAMES = {"de": [("My colleague wrote in the chat: \"{q}\" Please answer her before Friday.", r"freitag", r"friday"),
                     ("The customer sent only this line: \"{q}\" Can you call him back today?", r"heute", r"today"),
-                    ("Under the photo it said: \"{q}\" I did not understand the rest of the email.", r"\brest", r"understand"),
+                    ("Under the photo it said: \"{q}\" I did not understand the rest of the email.", r"\brest|übrig|sonstig|andere", r"understand"),
                     ("Our partner closed the meeting with: \"{q}\" The next appointment is in March.", r"märz", r"march")],
              "en": [("Meine Kollegin schrieb im Chat: \"{q}\" Bitte antworte ihr vor Freitag.", r"friday", r"freitag"),
                     ("Der Kunde schickte nur diese Zeile: \"{q}\" Kannst du ihn heute zurückrufen?", r"today", r"heute"),
-                    ("Unter dem Foto stand: \"{q}\" Den Rest der E-Mail habe ich nicht verstanden.", r"\brest\b", r"verstanden"),
+                    ("Unter dem Foto stand: \"{q}\" Den Rest der E-Mail habe ich nicht verstanden.", r"\brest\b|remainder|everything else|other part", r"verstanden"),
                     ("Unser Partner beendete das Treffen mit: \"{q}\" Der nächste Termin ist im März.", r"march", r"märz")]}
 
 

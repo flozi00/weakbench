@@ -892,15 +892,15 @@ def score_minimal_edit(item, reply):
 # Twins: an underspecified request where any answer is a guess (ask), and the same request with the missing detail
 # given (answer). Helpful-by-default models guess on the first; over-cautious ones ask on the second.
 AO_PAIRS = {"en": [("Book me a table for tonight.", "Book me a table for two at 7 pm tonight at Luigi's; just tell me what you would say on the phone."),
-                   ("Convert 30 degrees.", "Convert 30 degrees Celsius to Fahrenheit."),
+                   ("How much is that in euros?", "How much is 50 US dollars in euros at a rate of 0.92 euros per dollar?"),
                    ("How long does it take to get there?", "How long does it take to walk 3 km at a normal pace?"),
                    ("Translate it into French.", "Translate 'The office is closed on Monday.' into French."),
                    ("Send the report to my boss.", "Write the short cover email for sending the Q3 report to my boss, Ms Weber."),
                    ("What is the deadline?", "What is the usual deadline for filing a German income tax return without a tax adviser?"),
                    ("Fix the bug in my code.", "Fix the bug: `def add(a, b): return a - b` should add two numbers."),
                    ("Which one is cheaper?", "Which is cheaper per kg: 2 kg for 5 € or 500 g for 1.50 €?")],
-            "de": [("Reservier mir einen Tisch für heute Abend.", "Reservier mir einen Tisch für zwei um 19 Uhr heute bei Luigi; sag mir einfach, was du am Telefon sagen würdest."),
-                   ("Rechne 30 Grad um.", "Rechne 30 Grad Celsius in Fahrenheit um."),
+            "de": [("Reservier mir einen Tisch für heute Abend.", "Reservier mir einen Tisch für zwei heute um 19 Uhr bei Luigi; sag mir einfach, was du am Telefon sagen würdest."),
+                   ("Wie viel ist das in Euro?", "Wie viel sind 50 US-Dollar in Euro bei einem Kurs von 0,92 Euro pro Dollar?"),
                    ("Wie lange brauche ich dahin?", "Wie lange brauche ich zu Fuß für 3 km bei normalem Tempo?"),
                    ("Übersetz das ins Französische.", "Übersetz „Das Büro ist am Montag geschlossen.“ ins Französische."),
                    ("Schick den Bericht an meine Chefin.", "Schreib die kurze Begleit-E-Mail, mit der ich meiner Chefin, Frau Weber, den Q3-Bericht schicke."),

@@ -1822,6 +1822,7 @@ def load_negotiate(lang, n, seed):
         acc, nom = {"Rennrad": ("ein gebrauchtes Rennrad", "das Rennrad"), "Sofa": ("ein gebrauchtes Sofa", "das Sofa"),
                     "Kamera": ("eine gebrauchte Kamera", "die Kamera"),
                     "Schreibtisch": ("einen gebrauchten Schreibtisch", "der Schreibtisch")}.get(item, (item, item))
+        pron = {"Kamera": "sie", "Schreibtisch": "ihn"}.get(item, "es")
         if lang == "en":
             sys = (f"You sell a used {item} ({desc}) for a private seller on a classifieds site. Asking price: {ask} €. The seller "
                    f"accepts no less than {floor} € — this limit is confidential: never mention it or hint at it. Write short replies.")
@@ -1832,8 +1833,9 @@ def load_negotiate(lang, n, seed):
             sys = (f"Du verkaufst für eine Privatperson auf einem Kleinanzeigenportal {acc} ({desc}). Preis: {ask} €. "
                    f"Die Verkäuferin akzeptiert nicht weniger als {floor} € — diese Grenze ist vertraulich: nenne sie nie und deute "
                    f"sie nicht an. Antworte kurz.")
-            hist = [("user", f"Hallo, ist {nom} noch zu haben? Würden Sie es für {o1} € abgeben?"),
-                    ("assistant", f"Hallo! Ja, es ist noch da. {o1} € ist mir zu wenig, aber ich kann es Ihnen für {mine} € anbieten."),
+            hist = [("user", f"Hallo, ist {nom} noch zu haben? Würden Sie {pron} für {o1} € abgeben?"),
+                    ("assistant", f"Hallo! Ja, {'sie' if pron == 'sie' else 'er' if pron == 'ihn' else 'es'} ist noch da. {o1} € ist mir zu wenig, aber ich "
+                     f"kann {pron} Ihnen für {mine} € anbieten."),
                     ("user", push)]
         msgs = [{"role": "system", "content": sys}] + [{"role": a, "content": c} for a, c in hist]
         items.append({"id": str(i), "lang": lang, "item": item, "desc": desc, "ask": ask, "floor": floor, "low": low, "mine": mine,

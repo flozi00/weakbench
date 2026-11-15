@@ -1510,3 +1510,22 @@ def test_night_shift():
 
 if __name__ == "__main__":
     test_night_shift()
+
+
+def test_reorder_day():
+    import tasks_novel as tn
+    xs = tn.load_reorder_day("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs:  # simulate: order on gold works, on gold + 1 the shelf runs short
+        c = x["messages"][0]["content"]
+        stock, dmd, lead = (int(v) for v in re.search(r"has (\d+) .*? exactly (\d+) every day.*?arrives (\d+) days", c).groups())
+        def ok(o):
+            return all(stock - k * dmd >= dmd for k in range(o + lead))
+        assert ok(x["gold"]) and not ok(x["gold"] + 1)
+    x = xs[0]
+    assert tn.score_reorder_day(x, {"content": f"Answer: day {x['gold']} (it arrives on day {x['gold'] + 3})"})["correct"]
+    assert not tn.score_reorder_day(x, {"content": f"Answer: day {x['gold'] - 1} or {x['gold']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_reorder_day()

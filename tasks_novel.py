@@ -7732,6 +7732,45 @@ def score_night_shift(item, reply):
                        "kept_breaks": float(v == item["with_breaks"] and item["with_breaks"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- reorder_day (stock, demand, lead time)
+RO_GOODS = {"en": ["bags of flour", "printer cartridges", "boxes of gloves", "bottles of shampoo", "bags of cement"],
+            "de": ["Säcke Mehl", "Druckerpatronen", "Kartons Handschuhe", "Flaschen Shampoo", "Säcke Zement"]}
+
+
+def load_reorder_day(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("reorder_day", i, att)
+        while True:
+            dmd, lead = r.randint(3, 25), r.randint(2, 9)
+            stock = r.randint(dmd * (lead + 2), dmd * (lead + 20))
+            gold = stock // dmd - lead  # the order must arrive before the morning stock is used up
+            if stock % dmd and gold >= 1:
+                break
+        g = r.choice(RO_GOODS[lang])
+        q = (f"A shop has {stock} {g} in stock this morning (day 0). It sells exactly {dmd} every day, and a day's sales can only "
+             f"happen if all {dmd} are on the shelf. A new delivery arrives {lead} days after the order is placed, in the morning "
+             f"before the shop opens (ordered on day 0 -> arrives on the morning of day {lead}). On which day at the latest must it "
+             f"order so that every day's sales can happen? Give the day number."
+             if lang == "en" else
+             f"Ein Laden hat heute Morgen (Tag 0) {stock} {g} auf Lager. Er verkauft jeden Tag genau {dmd} Stück, und ein Tagesverkauf "
+             f"klappt nur, wenn alle {dmd} im Regal sind. Eine Lieferung kommt {lead} Tage nach der Bestellung morgens vor "
+             f"Ladenöffnung an (bestellt an Tag 0 -> kommt am Morgen von Tag {lead}). An welchem Tag muss er spätestens bestellen, "
+             f"damit jeder Tagesverkauf klappt? Gib die Nummer des Tages an.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": stock // dmd, "late": gold + 1,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_reorder_day(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = re.split(r"[;,]\s+|\bi\.e\.|\bd\.h\.", fa)[0].split("=")[-1]
+    v = None if re.search(r"\d\s*(?:[–-]|bis|to|oder|or)\s*\d", fa) else last_int(fa)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ignored_lead_time": float(v == item["bait"]), "one_day_late": float(v == item["late"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9315,6 +9354,7 @@ TASKS = {
     "risk_stats": task(load_risk_stats, score_risk_stats, 24, 120),
     "break_even": task(load_break_even, score_break_even, 24, 120),
     "night_shift": task(load_night_shift, score_night_shift, 24, 120),
+    "reorder_day": task(load_reorder_day, score_reorder_day, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

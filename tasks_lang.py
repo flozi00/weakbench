@@ -3264,6 +3264,9 @@ def gap_pick(item, reply, opts):
     low = [o.lower() for o in opts]
     gap_line = next((ln for ln in reversed(item["messages"][-1]["content"].splitlines()) if "___" in ln), "")
     pre = re.findall(r"[a-zäöüß']+", gap_line.split("___")[0].lower())[-3:]
+    post = re.findall(r"[a-zäöüß']+", gap_line.split("___")[1].lower())[:2] if "___" in gap_line else []
+    if not pre and post and len(words) > 2 and words[0] in low and words[1:3] == post:
+        return words[0]  # the sentence starts with the gap and was repeated: its first word
     if pre:
         for k in range(len(words) - len(pre)):
             if words[k:k + len(pre)] == pre:
@@ -3280,12 +3283,12 @@ SV_ITEMS = [("Ich wohne ___ drei Jahren in Leipzig.", "seit"), ("Ich bin ___ dre
             ("___ nächstem Montag gilt der neue Fahrplan.", "ab"), ("Der Zug fährt ___ zehn Minuten ab.", "in"),
             ("Wir kennen uns ___ der Schulzeit.", "seit"), ("Sie hat ___ einer Woche angerufen.", "vor"),
             ("___ nächstem Jahr arbeite ich in Teilzeit.", "ab"), ("Das Paket kommt ___ zwei Tagen an.", "in"),
-            ("Er wartet schon ___ einer Stunde auf dich.", "seit"), ("Das Geschäft hat ___ einem Monat geschlossen.", "vor"),
+            ("Er wartet schon ___ einer Stunde auf dich.", "seit"), ("Das Geschäft wurde ___ einem Monat eröffnet.", "vor"),
             ("Die Praxis öffnet morgen erst ___ 10 Uhr.", "ab"), ("___ einer halben Stunde beginnt der Film.", "in"),
-            ("___ dem Umzug fährt sie mit dem Rad zur Arbeit.", "seit"), ("Ich habe ihn ___ zwei Wochen zuletzt gesehen.", "vor"),
+            ("___ ihrem Umzug letztes Jahr fährt sie mit dem Rad zur Arbeit.", "seit"), ("Ich habe ihn ___ zwei Wochen zuletzt gesehen.", "vor"),
             ("Die Brücke ist ___ morgen gesperrt.", "ab"), ("___ drei Wochen beginnen die Ferien.", "in"),
             ("Es regnet ___ Stunden ohne Pause.", "seit"), ("___ hundert Jahren gab es hier noch keinen Strom.", "vor"),
-            ("Kinder zahlen ___ sechs Jahren den vollen Preis.", "ab"), ("Ich rufe dich ___ fünf Minuten zurück.", "in")]
+            ("Kinder ___ sechs Jahren zahlen den vollen Preis.", "ab"), ("Ich rufe dich ___ fünf Minuten zurück.", "in")]
 
 
 def load_de_seit_vor(lang, n, seed):

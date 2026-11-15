@@ -1415,10 +1415,10 @@ LF_ITEMS = [("Gestern ich bin ins Kino gegangen.", "Gestern bin ich ins Kino geg
             ("Wir fahren mit der Bus zur Arbeit.", "Wir fahren mit dem Bus zur Arbeit.", "Dativ nach mit"),
             ("Ich weiß nicht, ob er kommt morgen.", "Ich weiß nicht, ob er morgen kommt.", "Verb am Ende im Nebensatz"),
             ("Sie ist größer wie ihr Bruder.", "Sie ist größer als ihr Bruder.", "als beim Komparativ"),
-            ("Ich interessiere mich für die deutsche Kultur seit zwei Jahren.", "Ich interessiere mich seit zwei Jahren für die deutsche Kultur.", "Satzstellung temporal vor präpositional"),
+            ("Ich habe gestern in die Stadt gegangen.", "Ich bin gestern in die Stadt gegangen.", "Perfekt mit sein bei Bewegung"),
             ("Das ist der Mann, die ich gestern getroffen habe.", "Das ist der Mann, den ich gestern getroffen habe.", "Relativpronomen Akkusativ"),
-            ("Ich bin in Berlin seit 2020.", "Ich bin seit 2020 in Berlin.", "Satzstellung temporal vor lokal"),
-            ("Kannst du mir helfen, bitte?", "Kannst du mir bitte helfen?", "Stellung von bitte"),
+            ("Er kann gut schwimmen nicht.", "Er kann nicht gut schwimmen.", "Stellung von nicht"),
+            ("Mein Bruder ist ein Jahr älter als mich.", "Mein Bruder ist ein Jahr älter als ich.", "Nominativ nach als"),
             ("Wegen dem Regen bleiben wir zu Hause.", "Wegen des Regens bleiben wir zu Hause.", "Genitiv nach wegen"),
             ("Er hat gesagt, dass er hat keine Zeit.", "Er hat gesagt, dass er keine Zeit hat.", "Verb am Ende im dass-Satz"),
             ("Ich gehe zu Hause.", "Ich gehe nach Hause.", "nach Hause vs. zu Hause")]

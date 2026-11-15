@@ -4733,7 +4733,7 @@ def load_median_traps(lang, n, seed):
             med = statistics.median(xs)
             mid = xs[k // 2] if k % 2 else (xs[k // 2 - 1] + xs[k // 2]) / 2
             mean = sum(xs) / k
-            if mid != med and abs(mean - med) > 1 and med == int(med) * 1.0 or (mid != med and abs(mean - med) > 1 and k % 2 == 0):
+            if mid != med and abs(mean - med) > 1:  # both baits give a wrong number
                 break
         else:
             raise RuntimeError(f"median_traps: no list for item {i}")

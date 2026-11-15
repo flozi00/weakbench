@@ -3275,6 +3275,31 @@ def gap_pick(item, reply, opts):
     return named[0] if len(named) == 1 else None
 
 
+# ---------------------------------------------------------------- de_seit_vor (seit / vor / ab / in)
+SV_ITEMS = [("Ich wohne ___ drei Jahren in Leipzig.", "seit"), ("Ich bin ___ drei Jahren nach Leipzig gezogen.", "vor"),
+            ("___ Montag gilt der neue Fahrplan.", "ab"), ("Der Zug fährt ___ zehn Minuten ab.", "in"),
+            ("Wir kennen uns ___ der Schulzeit.", "seit"), ("Sie hat ___ einer Woche angerufen.", "vor"),
+            ("___ nächstem Jahr arbeite ich in Teilzeit.", "ab"), ("Das Paket kommt ___ zwei Tagen an.", "in"),
+            ("Er wartet schon ___ einer Stunde auf dich.", "seit"), ("Das Geschäft hat ___ einem Monat geschlossen.", "vor"),
+            ("Die Praxis ist ___ 8 Uhr geöffnet.", "ab"), ("___ einer halben Stunde beginnt der Film.", "in"),
+            ("___ dem Umzug fährt sie mit dem Rad zur Arbeit.", "seit"), ("Ich habe ihn ___ zwei Wochen zuletzt gesehen.", "vor"),
+            ("Die Brücke ist ___ morgen gesperrt.", "ab"), ("___ drei Wochen sind Ferien.", "in"),
+            ("Es regnet ___ Stunden ohne Pause.", "seit"), ("___ hundert Jahren gab es hier noch keinen Strom.", "vor"),
+            ("Kinder zahlen ___ sechs Jahren den vollen Preis.", "ab"), ("Ich rufe dich ___ fünf Minuten zurück.", "in")]
+
+
+def load_de_seit_vor(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": "Setze „seit“, „vor“, „ab“ oder „in“ ein. Antworte nur mit dem Wort.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(SV_ITEMS[:min(n or 20, 20)])]
+
+
+def score_de_seit_vor(item, reply):
+    v = gap_pick(item, reply, ("seit", "vor", "ab", "in"))
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3604,6 +3629,7 @@ TASKS = {
     "en_relative_commas": task(("en",), load_en_relative_commas, score_en_relative_commas, 16, 16, lang_check=False),
     "en_phrasal_sense": task(("en",), load_en_phrasal_sense, score_en_phrasal_sense, 16, 20, lang_check=False),
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
+    "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

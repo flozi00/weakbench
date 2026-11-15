@@ -1919,3 +1919,23 @@ def test_meet_city():
 
 if __name__ == "__main__":
     test_meet_city()
+
+
+def test_geo_coords():
+    import tasks_novel as tn
+    from collections import Counter
+    xs = tn.load_geo_coords("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert max(Counter(x["cc"] for x in xs).values()) < 15
+    c = next(x for x in xs if x["kind"] == "country")
+    assert tn.score_geo_coords(c, {"content": f"Antwort: {c['gold']}"})["correct"]
+    other = "Japan" if c["cc"] != "JP" else "Peru"
+    assert not tn.score_geo_coords(c, {"content": f"Antwort: {c['gold']} oder {other}"})["correct"]
+    y = next(x for x in xs if x["kind"] == "city")
+    assert tn.score_geo_coords(y, {"content": f"Antwort: {y['names'][0]}"})["correct"]
+    e = next(x for x in tn.load_geo_coords("en", None, 0) if x["kind"] == "country")
+    assert tn.score_geo_coords(e, {"content": f"Answer: {e['gold']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_geo_coords()

@@ -8881,6 +8881,58 @@ def score_meet_city(item, reply):
             "detail": {f"ok_{item['obj']}": float(ok), "other_objective": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- geo_coords (coordinates -> country or city: world knowledge)
+# Places from GeoNames cities15000 (CC BY 4.0, geonames.org), sampled once into the private set: towns of 15k+ people in
+# 50 countries (country questions) and cities of 1.5M+ (city questions). The coordinates are the town's own, so the
+# country is never a border case of the point itself. Formats vary: decimal with N/S/E/W, signed decimal, or DMS.
+GEO_PLACES = common.OwnSet("tasks_novel.GEO_PLACES")  # private: flozi00/weakbench-data
+
+
+def _geo_fmt(la, lo, style):
+    if style == 0:
+        return f"{abs(la):.2f}° {'N' if la >= 0 else 'S'}, {abs(lo):.2f}° {'E' if lo >= 0 else 'W'}"
+    if style == 1:
+        return f"{la:.3f}, {lo:.3f}"
+    dms = lambda v: f"{int(abs(v))}°{int(abs(v) * 60 % 60):02d}′{int(abs(v) * 3600 % 60):02d}″"  # noqa: E731
+    return f"{dms(la)}{'N' if la >= 0 else 'S'} {dms(lo)}{'E' if lo >= 0 else 'W'}"
+
+
+def load_geo_coords(lang, n, seed):
+    g = GEO_PLACES.value
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("geo_coords", i, att)
+        style = i % 3
+        if i % 3 != 2:  # country
+            la, lo, cc, _ = r.choice(g["country_points"])
+            coord = _geo_fmt(la, lo, style)
+            q = (f"Which country is the place at these coordinates (latitude, longitude) in?\n{coord}" if lang == "en" else
+                 f"In welchem Land liegt der Ort mit diesen Koordinaten (Breite, Länge)?\n{coord}")
+            items.append({"id": str(i), "lang": lang, "kind": "country", "gold": g["countries"][cc][lang == "de"][0], "cc": cc,
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+        else:  # city
+            cc = r.choice(sorted({c[2] for c in g["big_cities"]}))  # a country first: big cities are mostly Chinese and Indian
+            la, lo, cc, _, names = r.choice([c for c in g["big_cities"] if c[2] == cc])
+            coord = _geo_fmt(la, lo, r.randrange(3))
+            q = (f"Which city lies at these coordinates (latitude, longitude)? Name the city.\n{coord}" if lang == "en" else
+                 f"Welche Stadt liegt bei diesen Koordinaten (Breite, Länge)? Nenne die Stadt.\n{coord}")
+            items.append({"id": str(i), "lang": lang, "kind": "city", "gold": names[0], "names": names, "cc": cc,
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_geo_coords(item, reply):
+    g = GEO_PLACES.value
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    has = lambda nm: re.search(rf"(?<![\w]){re.escape(nm)}(?![\w])", fa, re.I)  # noqa: E731
+    named = {cc for cc, (en, de) in g["countries"].items() if any(has(x) for x in en + de)}
+    if item["kind"] == "country":
+        ok = named == {item["cc"]}  # one country, the right one ("Germany or Austria" fails)
+    else:
+        ok = any(has(x) for x in item["names"]) and named <= {item["cc"]}  # the city; naming its country too is fine
+    return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10488,6 +10540,7 @@ TASKS = {
     "trip_cost": task(load_trip_cost, score_trip_cost, 24, 120),
     "password_rules": task(load_password_rules, score_password_rules, 24, 120),
     "meet_city": task(load_meet_city, score_meet_city, 24, 120),
+    "geo_coords": task(load_geo_coords, score_geo_coords, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

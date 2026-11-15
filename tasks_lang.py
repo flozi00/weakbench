@@ -3523,6 +3523,43 @@ def score_de_paronyms(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- de_nominal_adj (etwas Neues, mit etwas Neuem, alles Gute)
+# Nominalised adjectives after etwas/nichts/viel/wenig take the strong ending (Neues, Neuem), after alles/das the weak
+# one (Gute, Nötige); the case comes from the preposition or the verb.
+NA_ITEMS = [("Gibt es etwas ___? (neu)", "Neues", ("Neues", "Neue", "Neuem")),
+            ("Wir haben mit etwas ___ angefangen. (neu)", "Neuem", ("Neues", "Neue", "Neuem")),
+            ("Alles ___ zum Geburtstag! (gut)", "Gute", ("Gutes", "Gute", "Guten")),
+            ("Ich wünsche dir nur ___. (gut)", "Gutes", ("Gutes", "Gute", "Gutem")),
+            ("Heute ist nichts ___ passiert. (besonder-)", "Besonderes", ("Besonderes", "Besondere", "Besonderem")),
+            ("Sie sprach von nichts ___. (wichtig)", "Wichtigem", ("Wichtiges", "Wichtige", "Wichtigem")),
+            ("Er hat viel ___ erlebt. (schön)", "Schönes", ("Schönes", "Schöne", "Schönem")),
+            ("Das ___ an der Sache ist der Preis. (gut)", "Gute", ("Gutes", "Gute", "Guten")),
+            ("Wir sind mit allem ___ versorgt. (nötig)", "Nötigen", ("Nötiges", "Nötige", "Nötigen")),
+            ("Ich habe wenig ___ gehört. (neu)", "Neues", ("Neues", "Neue", "Neuem")),
+            ("Hast du schon etwas ___ gegessen? (warm)", "Warmes", ("Warmes", "Warme", "Warmem")),
+            ("Nach etwas ___ sehnt sich jeder. (schön)", "Schönem", ("Schönes", "Schöne", "Schönem")),
+            ("Er erzählte uns alles ___ über die Reise. (wichtig)", "Wichtige", ("Wichtiges", "Wichtige", "Wichtigem")),
+            ("Es gab viel ___ zu essen. (lecker)", "Leckeres", ("Leckeres", "Leckere", "Leckerem")),
+            ("Ich bin auf etwas ___ gestoßen. (seltsam)", "Seltsames", ("Seltsames", "Seltsame", "Seltsamem")),
+            ("Sie träumt von etwas ___. (groß)", "Großem", ("Großes", "Große", "Großem"))]
+
+
+def load_de_nominal_adj(lang, n, seed):
+    out = []
+    for i, (sent, g, o) in enumerate(NA_ITEMS[:min(n or 16, 16)]):
+        opts = o[i % 3:] + o[:i % 3]
+        out.append({"id": str(i), "lang": "de", "gold": g, "opts": o,
+                    "messages": [{"role": "user", "content": "Setze die richtige Form ein: " + ", ".join(f"„{x}“" for x in opts)
+                                  + ". Antworte nur mit dem Wort.\n\n" + sent}]})
+    return out
+
+
+def score_de_nominal_adj(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v is not None and v == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4056,6 +4093,7 @@ TASKS = {
     "en_countable": task(("en",), load_en_countable, score_en_countable, 20, 20, lang_check=False),
     "en_adj_adv": task(("en",), load_en_adj_adv, score_en_adj_adv, 20, 20, lang_check=False),
     "de_paronyms": task(("de",), load_de_paronyms, score_de_paronyms, 16, 16, lang_check=False),
+    "de_nominal_adj": task(("de",), load_de_nominal_adj, score_de_nominal_adj, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

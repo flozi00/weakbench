@@ -7241,6 +7241,49 @@ def score_counterexample(item, reply):
     return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- critical_path (longest path through dependencies)
+CP_NAMES = {"en": ["Planning", "Design", "Permits", "Foundation", "Walls", "Roof", "Wiring", "Plumbing", "Painting", "Inspection"],
+            "de": ["Planung", "Entwurf", "Genehmigung", "Fundament", "Wände", "Dach", "Elektrik", "Sanitär", "Malerarbeiten", "Abnahme"]}
+
+
+def load_critical_path(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("critical_path", i, att)
+        k = r.randint(6, 8)
+        names = CP_NAMES[lang][:k]
+        dur = [r.randint(1, 9) for _ in range(k)]
+        deps = [[]] + [sorted(r.sample(range(j), r.randint(1, min(2, j)))) for j in range(1, k)]
+        finish = []
+        for j in range(k):
+            finish.append(dur[j] + max((finish[d] for d in deps[j]), default=0))
+        gold = max(finish)
+        total = sum(dur)
+        lines = []
+        for j in range(k):
+            if deps[j]:
+                after = " and ".join(names[d] for d in deps[j]) if lang == "en" else " und ".join(names[d] for d in deps[j])
+                lines.append(f"- {names[j]}: {dur[j]} days, can only start after {after} is finished" if lang == "en" else
+                             f"- {names[j]}: {dur[j]} Tage, kann erst beginnen, wenn {after} fertig ist")
+            else:
+                lines.append(f"- {names[j]}: {dur[j]} days, can start at once" if lang == "en" else f"- {names[j]}: {dur[j]} Tage, kann sofort beginnen")
+        q = ("A project consists of these tasks. Any number of tasks can run at the same time if their requirements are met.\n"
+             + "\n".join(lines) + "\nWhat is the shortest possible duration of the whole project in days?" if lang == "en" else
+             "Ein Projekt besteht aus diesen Aufgaben. Beliebig viele Aufgaben können gleichzeitig laufen, wenn ihre Voraussetzungen "
+             "erfüllt sind.\n" + "\n".join(lines) + "\nWie viele Tage dauert das ganze Projekt mindestens?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "sum": total,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_critical_path(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    m = re.search(r"(\d+)\s*(?:days?|Tage?n?)\b", fa, re.I)
+    v = int(m[1]) if m else answer_value(fa, item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_sum": float(v == item["sum"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8821,6 +8864,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "critical_path": task(load_critical_path, score_critical_path, 24, 120),
     "counterexample": task(load_counterexample, score_counterexample, 24, 60),
     "cidr_check": task(load_cidr_check, score_cidr_check, 24, 120),
     "roman_arith": task(load_roman_arith, score_roman_arith, 24, 120),

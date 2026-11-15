@@ -8051,6 +8051,57 @@ def score_check_digit(item, reply):
                        "gave_ten": float(v == 10)}}
 
 
+# ---------------------------------------------------------------- auction_price (stated auction rules)
+AU_NAMES = ["Ada", "Ben", "Cleo", "Dev", "Emil", "Fay", "Gus", "Hana"]
+
+
+def load_auction_price(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("auction_price", i, att)
+        kind = ("second", "reserve", "increment")[i % 3]
+        while True:
+            names = r.sample(AU_NAMES, r.randint(3, 5))
+            bids = {nm: r.randrange(40, 401, 5) for nm in names}
+            top = sorted(bids.values(), reverse=True)
+            if top[0] == top[1]:
+                continue
+            reserve = r.randrange(top[1] + 5, top[0] + 1, 5) if kind == "reserve" and top[0] - top[1] >= 10 else None
+            if kind == "reserve" and reserve is None:
+                continue
+            inc = r.choice([5, 10]) if kind == "increment" else 0
+            if kind == "second":
+                gold = top[1]
+            elif kind == "reserve":
+                gold = reserve  # only one bid reaches the reserve: the winner pays the reserve
+            else:
+                gold = min(top[0], top[1] + inc)
+            if gold != top[0]:
+                break
+        lines = "\n".join(f"- {nm}: {b} €" for nm, b in bids.items())
+        rule = {"second": ("The highest bidder wins and pays the second-highest bid.",
+                           "Wer am höchsten bietet, gewinnt und zahlt das zweithöchste Gebot."),
+                "reserve": (f"The highest bidder wins and pays the second-highest bid, but never less than the reserve price of {reserve} €; "
+                            f"bids below the reserve are ignored.",
+                            f"Wer am höchsten bietet, gewinnt und zahlt das zweithöchste Gebot, aber nie weniger als den Mindestpreis von "
+                            f"{reserve} €; Gebote unter dem Mindestpreis zählen nicht."),
+                "increment": (f"The highest bidder wins and pays the second-highest bid plus {inc} €, but never more than their own bid.",
+                              f"Wer am höchsten bietet, gewinnt und zahlt das zweithöchste Gebot plus {inc} €, aber nie mehr als das "
+                              f"eigene Gebot.")}[kind][lang == "de"]
+        q = (f"Sealed bids for a used bicycle:\n{lines}\nRule: {rule} How many euros does the winner pay?" if lang == "en" else
+             f"Verdeckte Gebote für ein gebrauchtes Fahrrad:\n{lines}\nRegel: {rule} Wie viele Euro zahlt die Person, die gewinnt?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "kind": kind, "bait": top[0],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_auction_price(item, reply):
+    v = stated_int(reply, r"(?:€|euro|eur\b)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "paid_own_bid": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9641,6 +9692,7 @@ TASKS = {
     "seat_pairs": task(load_seat_pairs, score_seat_pairs, 24, 120),
     "version_pick": task(load_version_pick, score_version_pick, 24, 120),
     "check_digit": task(load_check_digit, score_check_digit, 24, 120),
+    "auction_price": task(load_auction_price, score_auction_price, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

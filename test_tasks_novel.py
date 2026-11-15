@@ -1624,3 +1624,17 @@ def test_check_digit():
 
 if __name__ == "__main__":
     test_check_digit()
+
+
+def test_auction_price():
+    import tasks_novel as tn
+    xs = tn.load_auction_price("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    for c in (f"Antwort: {x['gold']} €", f"Antwort: {x['gold']} Euro (Gebot von {x['bait']} €)", f"Antwort: {x['gold']}"):
+        assert tn.score_auction_price(x, {"content": c})["correct"], c
+    assert tn.score_auction_price(x, {"content": f"Antwort: {x['bait']} €"})["detail"]["paid_own_bid"] == 1
+
+
+if __name__ == "__main__":
+    test_auction_price()

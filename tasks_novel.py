@@ -5761,17 +5761,19 @@ def load_date_locale(lang, n, seed):
                 break
         q = (f"Emily from Boston writes in an email: \"The order ships on {a:02d}/{b:02d}/{y}.\" Jonas from Hamburg writes: "
              f"\"Die Rechnung kommt am {de_d:02d}.{de_m:02d}.{y}.\" Each wrote the date the usual way in their country. "
-             "How many days lie between the two dates?" if lang == "en" else
+             "How many days after the earlier of the two dates is the later one?" if lang == "en" else
              f"Emily aus Boston schreibt in einer E-Mail: „The order ships on {a:02d}/{b:02d}/{y}.“ Jonas aus Hamburg schreibt: "
              f"„Die Rechnung kommt am {de_d:02d}.{de_m:02d}.{y}.“ Beide haben das Datum so geschrieben, wie es in ihrem Land üblich "
-             "ist. Wie viele Tage liegen zwischen den beiden Daten?")
+             "ist. Wie viele Tage nach dem früheren der beiden Daten liegt das spätere?")
         items.append({"id": str(i), "lang": lang, "gold": gold, "naive": sorted(naive),
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_date_locale(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    m = re.search(r"(\d+)\s*(?:days?|Tage?n?)\b", fa, re.I)  # "From 9 June to 6 August: 58 days"
+    v = int(m[1]) if m else last_int(re.sub(r"\d{1,2}\.\d{1,2}\.(?:\d{4})?", " ", fa))
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"took_same_format": float(v in item["naive"])}}
@@ -5800,10 +5802,11 @@ def load_weighted_mean(lang, n, seed):
             t1, t2 = r.randrange(10, 40, 5), r.randrange(50, 95, 5)
             gold = (l1 * t1 + l2 * t2) / (l1 + l2)
             plain = (t1 + t2) / 2
-            q = (f"You pour {l1} litres of water at {t1} °C and {l2} litres at {t2} °C into one bucket. Ignoring heat loss, what is "
-                 "the temperature of the mixture in °C?" if lang == "en" else
+            lt = lambda k: f"{k} litre" + ("s" if k > 1 else "")  # noqa: E731
+            q = (f"You pour {lt(l1)} of water at {t1} °C and {lt(l2)} at {t2} °C into one bucket. Ignoring heat loss, what is "
+                 "the temperature of the mixture in °C? Round to one decimal." if lang == "en" else
                  f"Du gießt {l1} Liter Wasser mit {t1} °C und {l2} Liter mit {t2} °C in einen Eimer. Ohne Wärmeverlust: Welche "
-                 "Temperatur hat die Mischung in °C?")
+                 "Temperatur hat die Mischung in °C? Runde auf eine Nachkommastelle.")
         else:
             while True:  # the weighting must matter
                 cps = r.sample([2, 3, 5, 6, 8, 10], 3)

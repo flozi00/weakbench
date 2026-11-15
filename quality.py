@@ -259,6 +259,47 @@ def load_belebele(lang, n, seed):
             for i in ids if i in rows]
 
 
+LID_LANGS = {"spa_Latn": (["Spanish"], ["Spanisch"]), "por_Latn": (["Portuguese"], ["Portugiesisch"]),
+             "cat_Latn": (["Catalan"], ["Katalanisch"]), "ita_Latn": (["Italian"], ["Italienisch"]), "ron_Latn": (["Romanian"], ["Rumänisch"]),
+             "ces_Latn": (["Czech"], ["Tschechisch"]), "slk_Latn": (["Slovak"], ["Slowakisch"]), "pol_Latn": (["Polish"], ["Polnisch"]),
+             "dan_Latn": (["Danish"], ["Dänisch"]), "swe_Latn": (["Swedish"], ["Schwedisch"]),
+             "nob_Latn": (["Norwegian", "Bokmål", "Bokmal"], ["Norwegisch", "Bokmål"]),
+             "nld_Latn": (["Dutch"], ["Niederländisch", "Holländisch"]), "afr_Latn": (["Afrikaans"], ["Afrikaans"]),
+             "ukr_Cyrl": (["Ukrainian"], ["Ukrainisch"]), "rus_Cyrl": (["Russian"], ["Russisch"]),
+             "fin_Latn": (["Finnish"], ["Finnisch"]), "est_Latn": (["Estonian"], ["Estnisch"]), "hun_Latn": (["Hungarian"], ["Ungarisch"]),
+             "ind_Latn": (["Indonesian"], ["Indonesisch"]), "zsm_Latn": (["Malay", "Malaysian"], ["Malaiisch", "Malaysisch"])}
+
+
+def load_lang_id(lang, n, seed):
+    """Language identification on FLORES passages (Belebele): 20 languages in confusable groups (es/pt/ca/it/ro, cs/sk/pl,
+    da/sv/no, nl/af, uk/ru, fi/et/hu, id/ms); two sentences of one passage, the language named in the cell language."""
+    codes = sorted(LID_LANGS)
+    links = sorted({r["link"] for r in rows_of(BELEBELE, "data/eng_Latn.jsonl")})
+    items, cache = [], {}
+    for i in range(n or 120):
+        r = random.Random(f"lang_id:{lang}:{i}")
+        code = codes[i % len(codes)]
+        if code not in cache:
+            cache[code] = {x["link"]: x for x in rows_of(BELEBELE, f"data/{code}.jsonl")}
+        rows = cache[code]
+        link = r.choice([lk for lk in links if lk in rows])
+        sents = re.split(r"(?<=[.!?])\s+", rows[link]["flores_passage"])
+        text = " ".join(sents[:2])
+        q = (f"Which language is this text written in? Name the language.\n\n{text}\n\nReply with a line \"Answer: <language>\"."
+             if lang == "en" else
+             f"In welcher Sprache ist dieser Text geschrieben? Nenne die Sprache.\n\n{text}\n\nAntworte mit einer Zeile \"Antwort: <Sprache>\".")
+        items.append({"id": f"{code}-{i}", "lang": lang, "gold": LID_LANGS[code][lang == "de"][0], "code": code,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_lang_id(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", tasks_novel.final_answer(reply["content"]) or "")
+    named = {c for c, (en, de) in LID_LANGS.items() if any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in en + de)}
+    ok = named == {item["code"]}
+    return {"correct": ok, "score": float(ok), "pred": sorted(named), "gold": item["gold"], "detail": {f"ok_{item['code'][:3]}": float(ok)}}
+
+
 def load_gpqa(lang, n, seed):
     rows = {r["Record ID"]: r for r in rows_of(GPQA, f"gpqa_{lang}.jsonl")}
     items = []
@@ -746,6 +787,7 @@ TASKS = {
     "sycophancy": task(("en", "de"), load_sycophancy, score_sycophancy, False, 4096, 150, 588),
     "global_mmlu_lite": task(LANGS5, load_gmmlu, score_mc, False, 4096, 0, 400),
     "belebele": task(LANGS5, load_belebele, score_mc, False, 4096, 200, None),
+    "lang_id": task(("de", "en"), load_lang_id, score_lang_id, False, 256, 40, 120, lang_check=False),
     "mgsm": task(("en", "de", "fr", "es"), load_mgsm, score_math, True, 12288, None, None),
     # code-switched input: sentences alternate DE/EN, the answer must come in the instruction's language
     "mgsm_mixed": task(("en", "de"), load_mgsm_mixed, score_math, True, 12288, 100, None),

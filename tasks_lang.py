@@ -3418,6 +3418,43 @@ def score_de_reflexive_case(item, reply):
             "detail": {"ok_dative" if item["dative"] else "ok_accusative": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_countable (much/many, few/little, amount/number)
+# Uncountable nouns that are countable in German (information, advice, furniture, luggage, news, research, equipment)
+# are the trap for German speakers and for models translating in their head.
+CN_ITEMS = [("How ___ information do you need?", "much", ("much", "many")),
+            ("How ___ suitcases do you have?", "many", ("much", "many")),
+            ("She gave me a lot of useful ___.", "advice", ("advice", "advices")),
+            ("We bought some new ___ for the living room.", "furniture", ("furniture", "furnitures")),
+            ("There is too ___ luggage in the hall.", "much", ("much", "many")),
+            ("There were too ___ people at the concert.", "many", ("much", "many")),
+            ("Could you send me some ___ about the course?", "information", ("information", "informations")),
+            ("I have very ___ time this week, sorry.", "little", ("little", "few")),
+            ("Very ___ students passed the exam.", "few", ("little", "few")),
+            ("The lab needs more ___ for the tests.", "equipment", ("equipment", "equipments")),
+            ("A large ___ of people signed the petition.", "number", ("number", "amount")),
+            ("A large ___ of money went missing.", "amount", ("number", "amount")),
+            ("How ___ homework did you get?", "much", ("much", "many")),
+            ("How ___ times have you been to Spain?", "many", ("much", "many")),
+            ("The team did a lot of ___ on the topic.", "research", ("research", "researches")),
+            ("There ___ some important news for you.", "is", ("is", "are")),
+            ("His advice ___ very helpful.", "was", ("was", "were")),
+            ("The police ___ looking for the driver.", "are", ("is", "are")),
+            ("We only have a ___ eggs left.", "few", ("little", "few")),
+            ("Add a ___ salt to the soup.", "little", ("little", "few"))]
+
+
+def load_en_countable(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with the word only.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(CN_ITEMS[:min(n or 20, 20)])]
+
+
+def score_en_countable(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -3948,6 +3985,7 @@ TASKS = {
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "de_wenn_als": task(("de",), load_de_wenn_als, score_de_wenn_als, 20, 20, lang_check=False),
     "de_reflexive_case": task(("de",), load_de_reflexive_case, score_de_reflexive_case, 20, 20, lang_check=False),
+    "en_countable": task(("en",), load_en_countable, score_en_countable, 20, 20, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

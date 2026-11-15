@@ -2788,7 +2788,7 @@ AW_ITEMS = [("comparative", "Mein Bruder ist größer ___ ich.", "als"), ("compa
             ("equative", "Der Film war nicht halb so gut ___ das Buch.", "wie"),
             ("other", "Sie macht es genau so, ___ ihre Mutter es gemacht hat.", "wie"),
             ("equative", "Der neue Laptop ist so leicht ___ ein Buch.", "wie"),
-            ("equative", "Wir kamen so früh ___ möglich.", "wie"), ("other", "Er tat so, ___ wäre nichts passiert.", "als")]
+            ("equative", "Wir kamen so früh ___ möglich.", "wie"), ("other", "Sie redet ___ ein Wasserfall.", "wie")]
 
 
 def load_de_als_wie(lang, n, seed):

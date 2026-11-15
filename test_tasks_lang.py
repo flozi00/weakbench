@@ -761,3 +761,18 @@ def test_quote_keep():
 
 if __name__ == "__main__":
     test_quote_keep()
+
+
+def test_md_translate():
+    import tasks_lang as tl
+    x = tl.load_md_translate("de", None, 0)[0]
+    good = ("## Installation\n\nInstalliere das Paket mit pip und starte den Server neu. Führe einmal `pip` aus.\n\n"
+            "- Öffne ein Terminal\n- Aktiviere die virtuelle Umgebung\n\n```bash\npip install fastgrid==2.1\n```\n\n"
+            "[Doku](https://example.org/docs/install)")
+    assert tl.score_md_translate(x, {"content": good})["correct"]
+    assert not tl.score_md_translate(x, {"content": good.replace("fastgrid==2.1", "fastgrid")})["correct"]
+    assert not tl.score_md_translate(x, {"content": x["messages"][0]["content"].split("\n\n", 1)[1]})["correct"]  # untranslated
+
+
+if __name__ == "__main__":
+    test_md_translate()

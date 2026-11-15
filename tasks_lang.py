@@ -2990,6 +2990,76 @@ def score_en_question_tags(item, reply):
     return {"correct": ok, "score": float(ok), "pred": t[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- md_translate (translate prose, keep the Markdown and the code)
+MT_DOCS = {"de": [("Installation", "Install the package with pip and restart the server.", "Run `{cmd}` once.",
+                   "pip install fastgrid==2.1", "https://example.org/docs/install", ["Open a terminal", "Activate the virtual environment"],
+                   r"install|paket|server|terminal|umgebung"),
+                  ("Configuration", "Set the timeout in the configuration file before the first start.", "Change `{cmd}` if needed.",
+                   "timeout_seconds = 30", "https://example.org/docs/config", ["Open config.toml", "Save the file"],
+                   r"konfiguration|datei|start|speicher|öffne"),
+                  ("Troubleshooting", "If the import fails, check your Python version.", "Use `{cmd}` to see it.",
+                   "python3 --version", "https://example.org/docs/faq", ["Read the error message", "Update Python if needed"],
+                   r"fehler|version|prüf|aktualisier"),
+                  ("Backup", "Create a backup of the database every night.", "The command is `{cmd}`.",
+                   "pg_dump shop > shop.sql", "https://example.org/docs/backup", ["Stop the shop at midnight", "Copy the file to the server"],
+                   r"sicherung|backup|datenbank|nacht|kopier"),
+                  ("Logging", "Logs are written to the folder below.", "Rotate them with `{cmd}`.",
+                   "logrotate -f /etc/logrotate.conf", "https://example.org/docs/logs", ["Check the disk space", "Delete old logs"],
+                   r"protokoll|logs|ordner|speicherplatz|lösch"),
+                  ("Updates", "Update the app before you report a bug.", "Check with `{cmd}`.",
+                   "fastgrid --check-update", "https://example.org/docs/update", ["Close all windows", "Start the update"],
+                   r"aktualisier|update|fehler|schließ|fenster")],
+           "en": [("Installation", "Installiere das Paket mit pip und starte den Server neu.", "Führe einmal `{cmd}` aus.",
+                   "pip install fastgrid==2.1", "https://example.org/docs/install", ["Öffne ein Terminal", "Aktiviere die virtuelle Umgebung"],
+                   r"install|package|server|terminal|environment"),
+                  ("Konfiguration", "Stelle das Timeout vor dem ersten Start in der Konfigurationsdatei ein.", "Ändere bei Bedarf `{cmd}`.",
+                   "timeout_seconds = 30", "https://example.org/docs/config", ["Öffne config.toml", "Speichere die Datei"],
+                   r"configur|file|start|save|open"),
+                  ("Fehlersuche", "Wenn der Import fehlschlägt, prüfe deine Python-Version.", "Mit `{cmd}` siehst du sie.",
+                   "python3 --version", "https://example.org/docs/faq", ["Lies die Fehlermeldung", "Aktualisiere Python bei Bedarf"],
+                   r"error|version|check|update|fails"),
+                  ("Sicherung", "Erstelle jede Nacht eine Sicherung der Datenbank.", "Der Befehl lautet `{cmd}`.",
+                   "pg_dump shop > shop.sql", "https://example.org/docs/backup", ["Stoppe den Shop um Mitternacht", "Kopiere die Datei auf den Server"],
+                   r"backup|database|night|copy|midnight"),
+                  ("Protokolle", "Die Protokolle werden in den Ordner unten geschrieben.", "Rotiere sie mit `{cmd}`.",
+                   "logrotate -f /etc/logrotate.conf", "https://example.org/docs/logs", ["Prüfe den Speicherplatz", "Lösche alte Protokolle"],
+                   r"log|folder|disk|delete|space"),
+                  ("Aktualisierungen", "Aktualisiere die App, bevor du einen Fehler meldest.", "Prüfe mit `{cmd}`.",
+                   "fastgrid --check-update", "https://example.org/docs/update", ["Schließe alle Fenster", "Starte die Aktualisierung"],
+                   r"update|bug|report|close|window")]}
+
+
+def _mt_doc(head, para, inline, cmd, url, bullets):
+    return (f"## {head}\n\n{para} {inline.format(cmd=cmd.split()[0])}\n\n" + "\n".join(f"- {b}" for b in bullets)
+            + f"\n\n```bash\n{cmd}\n```\n\n[Docs]({url})")
+
+
+def load_md_translate(lang, n, seed):
+    rows = MT_DOCS[lang][:min(n or 6, 6)]
+    ask = ("Translate this Markdown into German. Keep the Markdown structure, the code and the link exactly as they are. "
+           "Reply with the translated Markdown only.\n\n" if lang == "de" else
+           "Übersetze dieses Markdown ins Englische. Lass die Markdown-Struktur, den Code und den Link genau so, wie sie sind. "
+           "Antworte nur mit dem übersetzten Markdown.\n\n")
+    return [{"id": str(i), "lang": lang, "cmd": cmd, "url": url, "inline": cmd.split()[0], "want": want, "nb": len(b),
+             "src_para": para, "messages": [{"role": "user", "content": ask + _mt_doc(h, para, inl, cmd, url, b)}]}
+            for i, (h, para, inl, cmd, url, b, want) in enumerate(rows)]
+
+
+def score_md_translate(item, reply):
+    t = reply["content"] or ""
+    t = re.sub(r"^```(?:markdown|md)\s*\n(.*)\n```\s*$", r"\1", t.strip(), flags=re.S)  # a wrapping fence
+    structure = (len(re.findall(r"^##\s+\S", t, re.M)) == 1 and len(re.findall(r"^\s*[-*]\s+\S", t, re.M)) == item["nb"])
+    code = bool(re.search(r"```\w*\n" + re.escape(item["cmd"]) + r"\n```", t))
+    url = f"]({item['url']})" in t
+    inline = f"`{item['inline']}`" in t
+    prose = re.sub(r"```.*?```|`[^`]*`|\(http[^)]*\)", " ", t, flags=re.S).lower()
+    translated = bool(re.search(item["want"], prose)) and item["src_para"].lower()[:30] not in prose
+    ok = structure and code and url and inline and translated
+    return {"correct": ok, "score": float(ok), "pred": t[:120], "gold": None,
+            "detail": {"structure_kept": float(structure), "code_verbatim": float(code and inline), "url_verbatim": float(url),
+                       "translated": float(translated)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3308,6 +3378,7 @@ TASKS = {
     "de_umlaut_input": task(("de",), load_de_umlaut_input, score_de_umlaut_input, 512, 16),
     "en_grammar_fix": task(("en",), load_en_grammar_fix, score_en_grammar_fix, 64, 16, lang_check=False),
     "en_question_tags": task(("en",), load_en_question_tags, score_en_question_tags, 16, 20, lang_check=False),
+    "md_translate": task(("de", "en"), load_md_translate, score_md_translate, 1024, 6, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

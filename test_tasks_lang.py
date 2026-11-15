@@ -1123,6 +1123,9 @@ def test_antonym_context():
             assert tl.score_antonym_context(x, {"content": x["gold"].capitalize() + "."})["correct"]
             for b in x["bait"]:
                 assert not tl.score_antonym_context(x, {"content": b})["correct"]
+    w = tl.load_antonym_context("de", None, 0)[2]
+    for c in ("Das Gegenteil ist stark.", "Gegenteil: stark", "**Stärker**".replace("Stärker", "Starker")):
+        assert tl.score_antonym_context(w, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

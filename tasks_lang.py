@@ -4401,29 +4401,31 @@ def score_en_that_function(item, reply):
 # The same word needs a different opposite per sentence ("leichte Tasche" -> schwer, "leichte Aufgabe" -> schwer/schwierig,
 # "leichter Wind" -> stark). Gold lists all standard opposites; the other sense's opposite is the bait.
 AC_ITEMS = {"de": [("Die Tasche ist [leicht], ich trage sie gern.", ["schwer"], ["schwierig"]),
-                   ("Die Aufgabe war [leicht], alle hatten sie richtig.", ["schwer", "schwierig"], []),
-                   ("Heute weht nur ein [leichter] Wind.", ["starker", "stark", "kräftiger", "kräftig", "heftiger", "heftig"], ["schwer"]),
-                   ("Das Brot ist noch [frisch].", ["alt", "altbacken", "trocken", "hart"], ["warm"]),
-                   ("Am Morgen ist die Luft [frisch].", ["warm", "mild", "stickig", "schwül"], ["alt", "altbacken"]),
-                   ("Er hat ein [hartes] Herz.", ["weiches", "weich", "gütiges", "mitfühlendes", "warmes"], []),
+                   ("Die Aufgabe war [leicht], alle hatten sie richtig.", ["schwer", "schwierig", "anspruchsvoll", "kompliziert"], []),
+                   ("Heute weht nur ein [leichter] Wind.", ["starker", "stark", "kräftiger", "kräftig", "heftiger", "heftig", "steifer", "steif"],
+                    ["schwer", "schwerer"]),
+                   ("Das Brot ist noch [frisch].", ["alt", "altbacken", "trocken", "hart"], ["stickig", "abgestanden"]),
+                   ("Am Morgen ist die Luft [frisch].", ["warm", "mild", "stickig", "schwül", "lau", "verbraucht", "abgestanden"], ["alt", "altbacken"]),
+                   ("Er hat ein [hartes] Herz.", ["weiches", "weich", "gutes", "gut", "sanftes", "sanft", "gütiges", "gütig", "mitfühlendes",
+                                                  "mitfühlend", "warmes", "warm"], []),
                    ("Das Bett ist mir zu [hart].", ["weich"], ["gütig"]),
                    ("Die Suppe ist schon [kalt].", ["warm", "heiß"], ["herzlich"]),
-                   ("Sie hat mich sehr [kalt] begrüßt.", ["herzlich", "warm", "freundlich"], ["heiß"]),
+                   ("Sie hat mich sehr [kalt] begrüßt.", ["herzlich", "warm", "freundlich", "warmherzig"], ["heiß"]),
                    ("Die Straße ist hier sehr [breit].", ["schmal", "eng"], ["nüchtern"]),
-                   ("Der Laden hat heute [offen].", ["geschlossen", "zu"], ["verschlossen"]),
+                   ("Der Laden ist heute bis 20 Uhr [geöffnet].", ["geschlossen", "zu"], ["verschlossen"]),
                    ("Sie ist ein sehr [offener] Mensch.", ["verschlossener", "verschlossen", "zurückhaltender", "zurückhaltend"], ["geschlossen"])],
             "en": [("The box is [light], you can carry it easily.", ["heavy"], ["dark"]),
-                   ("The room is very [light] in the morning.", ["dark", "dim"], ["heavy"]),
+                   ("The room is very [light] in the morning.", ["dark", "dim", "gloomy"], ["heavy"]),
                    ("The bread is still [fresh].", ["stale", "old"], ["stuffy"]),
-                   ("Open the window, the air is not [fresh].", ["stale", "stuffy"], []),
-                   ("He gave a very [hard] answer to that easy question.", ["soft", "gentle", "kind"], ["easy"]),
+                   ("Let's go outside and get some [fresh] air.", ["stale", "stuffy"], ["old"]),
+                   ("He has a [hard] heart.", ["soft", "kind", "warm", "gentle", "tender"], ["easy"]),
                    ("The exam was [hard].", ["easy", "simple"], ["soft"]),
                    ("The water is [cold].", ["hot", "warm"], ["friendly"]),
-                   ("She gave me a [cold] look.", ["warm", "friendly", "kind"], ["hot"]),
+                   ("She gave me a [cold] look.", ["warm", "friendly", "kind", "affectionate"], ["hot"]),
                    ("The shop is [open] until six.", ["closed", "shut"], ["reserved"]),
-                   ("He is very [open] about his feelings.", ["reserved", "secretive", "guarded", "closed"], []),
+                   ("He is very [open] about his feelings.", ["reserved", "secretive", "guarded", "closed", "private"], []),
                    ("This knife is [sharp].", ["blunt", "dull"], ["vague"]),
-                   ("The photo is [sharp].", ["blurry", "blurred", "fuzzy", "unsharp"], ["blunt"])]}
+                   ("The photo is nice and [sharp].", ["blurry", "blurred", "fuzzy", "soft", "out"], ["blunt"])]}
 
 
 def load_antonym_context(lang, n, seed):
@@ -4436,8 +4438,10 @@ def load_antonym_context(lang, n, seed):
 
 def score_antonym_context(item, reply):
     t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
+    t = re.sub(r"^\W*(?:das\s+|the\s+)?(?:gegenteil|opposite)(?:\s+(?:davon|of\s+\S+))?\s*(?:ist|is|wäre|would\s+be|lautet|hier)?\s*:?\s*", "", t)
     w = re.findall(r"[a-zäöüß]+", t)
-    v = w[0] if w else None
+    known = item["ok"] + item["bait"]
+    v = next((x for x in w if x in known), w[0] if w else None)  # "Das Gegenteil ist stark": the listed word
     ok = v in item["ok"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"other_sense": float(v in item["bait"])}}
 

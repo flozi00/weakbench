@@ -7353,29 +7353,41 @@ DP_LABELS = {"en": ["false urgency", "confirmshaming", "hidden costs", "pre-tick
              "de": ["falsche Dringlichkeit", "Beschämung beim Ablehnen (Confirmshaming)", "versteckte Kosten",
                     "vorangekreuzte Einwilligung", "erzwungene Verlängerung", "keines davon (fair)"]}
 DP_TEXT = {"en": {"urgency": ["Only {k} left! Offer ends in 00:{m}:59 — {p} at this price will never come back.",
-                              "{k} people are looking at {p} right now. Buy within {m} minutes or lose your discount!"],
+                              "{k} people are looking at {p} right now. Buy within {m} minutes or lose your discount! (The timer restarts on every visit.)",
+                              "Last chance! {p} sale ends TONIGHT. (The same banner has been shown every day for {m} weeks.)"],
                   "confirmshaming": ["Get 10 % off {p}! [Yes please] [No thanks, I prefer paying full price like a fool]",
-                                     "Join our newsletter for {p} tips? [Sign me up] [No, I don't care about saving money]"],
-                  "hidden_costs": ["{p}: {k}9.99 €. (At the last checkout step: service fee 4.90 €, 'handling' 2.50 €.)",
-                                   "Ticket for {p}: {k}5 €. Final page adds a booking fee of 7 € and a 'mandatory' insurance of 3 €."],
-                  "preticked": ["Checkout for {p}: [x] Yes, share my data with partners for offers  [x] Add travel insurance (3.99 €)",
-                                "Order {p}. Box already ticked: [x] I agree to receive marketing calls."],
-                  "continuity": ["Free {m}-day trial of {p}! After the trial you are charged {k}9.99 € per month unless you cancel by phone.",
-                                 "{p} trial for 0 €. Card required; renews automatically at {k}4.99 € monthly, cancellation only by letter."],
-                  "none": ["{p}: {k}9.99 € including VAT and shipping. Free returns within 30 days. [Buy] [Not now]",
-                           "Try {p} for {m} days. We will remind you 3 days before the trial ends; cancel with one click."]},
+                                     "Join our newsletter for {p} tips? [Sign me up] [No, I don't care about saving money]",
+                                     "Enable {p} notifications? [Turn on] [No, I like missing out on everything]"],
+                  "hidden_costs": ["{p}: {k}9.99 €. (Only at the last checkout step: service fee 4.90 €, 'handling' 2.50 €.)",
+                                   "Concert ticket ({p} Live): {k}5 €. Only the final page adds a booking fee of 7 € and a service charge of 3 €.",
+                                   "{p} for {k}9 €! (Shipping of 8.90 € appears after you have entered your card details.)"],
+                  "preticked": ["Checkout for {p}: [x] Yes, share my data with partners for offers  [x] Subscribe me to the newsletter",
+                                "Order {p}. Box already ticked: [x] I agree to receive marketing calls.",
+                                "Create your {p} account: [x] Allow tracking across other websites and apps (ticked by default)"],
+                  "continuity": ["Free {m}-day trial of {p}! After the trial you are charged {k}9.99 € per month automatically, without a reminder.",
+                                 "{p} trial for 0 €. Card required; it silently turns into a paid plan at {k}4.99 € a month when the trial ends.",
+                                 "Get {p} for 1 € for the first month. From month two {k}9 € per month are charged; we do not notify you."],
+                  "none": ["{p}: {k}9.99 € including VAT and shipping. Final price, no further fees. Free returns within 30 days. [Buy] [Not now]",
+                           "Try {p} for {m} days. We will remind you 3 days before the trial ends; cancel with one click.",
+                           "Newsletter for {p} news? [Subscribe] [No, thanks] — you can unsubscribe at any time."]},
            "de": {"urgency": ["Nur noch {k} Stück! Angebot endet in 00:{m}:59 – {p} gibt es nie wieder zu diesem Preis.",
-                              "{k} Personen sehen sich {p} gerade an. Kauf innerhalb von {m} Minuten, sonst ist dein Rabatt weg!"],
+                              "{k} Personen sehen sich {p} gerade an. Kauf innerhalb von {m} Minuten, sonst ist dein Rabatt weg! (Der Timer startet bei jedem Besuch neu.)",
+                              "Letzte Chance! Der {p}-Sale endet HEUTE NACHT. (Dasselbe Banner steht seit {m} Wochen jeden Tag da.)"],
                   "confirmshaming": ["10 % Rabatt auf {p}! [Ja, gern] [Nein danke, ich zahle lieber den vollen Preis wie ein Dummkopf]",
-                                     "Newsletter mit Tipps zu {p}? [Anmelden] [Nein, Sparen ist mir egal]"],
-                  "hidden_costs": ["{p}: {k}9,99 €. (Im letzten Bestellschritt: Servicegebühr 4,90 €, „Bearbeitung“ 2,50 €.)",
-                                   "Ticket für {p}: {k}5 €. Die letzte Seite addiert 7 € Buchungsgebühr und eine „Pflicht“-Versicherung von 3 €."],
-                  "preticked": ["Kasse für {p}: [x] Ja, meine Daten für Angebote an Partner weitergeben  [x] Reiseversicherung hinzufügen (3,99 €)",
-                                "Bestellung {p}. Schon angekreuzt: [x] Ich willige in Werbeanrufe ein."],
-                  "continuity": ["{m} Tage {p} gratis testen! Danach kostet es {k}9,99 € pro Monat, außer du kündigst telefonisch.",
-                                 "{p}-Test für 0 €. Kreditkarte nötig; verlängert sich automatisch für {k}4,99 € monatlich, Kündigung nur per Brief."],
-                  "none": ["{p}: {k}9,99 € inklusive MwSt. und Versand. Kostenlose Rückgabe innerhalb von 30 Tagen. [Kaufen] [Jetzt nicht]",
-                           "Teste {p} {m} Tage lang. Wir erinnern dich 3 Tage vor Ende des Tests; Kündigung mit einem Klick."]}}
+                                     "Newsletter mit Tipps zu {p}? [Anmelden] [Nein, Sparen ist mir egal]",
+                                     "{p}-Benachrichtigungen aktivieren? [Einschalten] [Nein, ich verpasse gern alles]"],
+                  "hidden_costs": ["{p}: {k}9,99 €. (Erst im letzten Bestellschritt: Servicegebühr 4,90 €, „Bearbeitung“ 2,50 €.)",
+                                   "Konzertticket ({p} Live): {k}5 €. Erst die letzte Seite addiert 7 € Buchungsgebühr und 3 € Servicegebühr.",
+                                   "{p} für {k}9 €! (Versandkosten von 8,90 € erscheinen erst nach Eingabe der Kartendaten.)"],
+                  "preticked": ["Kasse für {p}: [x] Ja, meine Daten für Angebote an Partner weitergeben  [x] Newsletter abonnieren",
+                                "Bestellung {p}. Schon angekreuzt: [x] Ich willige in Werbeanrufe ein.",
+                                "{p}-Konto anlegen: [x] Tracking über andere Websites und Apps erlauben (standardmäßig angekreuzt)"],
+                  "continuity": ["{m} Tage {p} gratis testen! Danach werden automatisch {k}9,99 € pro Monat abgebucht, ohne Erinnerung.",
+                                 "{p}-Test für 0 €. Kreditkarte nötig; nach dem Test wird daraus still ein Bezahl-Abo für {k}4,99 € im Monat.",
+                                 "{p} im ersten Monat für 1 €. Ab dem zweiten Monat werden {k}9 € monatlich abgebucht; wir informieren dich nicht."],
+                  "none": ["{p}: {k}9,99 € inklusive MwSt. und Versand. Endpreis, keine weiteren Gebühren. Kostenlose Rückgabe innerhalb von 30 Tagen. [Kaufen] [Jetzt nicht]",
+                           "Teste {p} {m} Tage lang. Wir erinnern dich 3 Tage vor Ende des Tests; Kündigung mit einem Klick.",
+                           "Newsletter mit {p}-Neuigkeiten? [Abonnieren] [Nein, danke] – Abmeldung jederzeit möglich."]}}
 DP_BRANDS = ["SoundMax", "Yogaflow", "BeanBox", "Lingo+", "CloudSafe", "Readly", "KochKiste", "FitBand", "PixFix", "Dreamrest",
              "KeyVault", "Grünkraft"]  # brand names work in every case slot without an article
 DP_PRODUCTS = {"en": DP_BRANDS, "de": DP_BRANDS}
@@ -7387,7 +7399,7 @@ def load_dark_patterns(lang, n, seed):
     for i, att in common.redraws(n or 120, items):
         r = rng_of("dark_patterns", i, att)
         kind = DP_KINDS[i % 6]
-        text = r.choice(DP_TEXT[lang][kind]).format(p=r.choice(DP_PRODUCTS[lang]), k=r.randint(1, 9), m=r.randint(10, 30))
+        text = r.choice(DP_TEXT[lang][kind]).format(p=r.choice(DP_PRODUCTS[lang]), k=r.randint(2, 9), m=r.randint(10, 30))
         opts = "\n".join(f"{letters[j]}: {lab}" for j, lab in enumerate(DP_LABELS[lang]))
         q = (f"Shop text:\n\"{text}\"\nWhich manipulative design pattern does this text use?\n{opts}\nAnswer with one letter."
              if lang == "en" else
@@ -7399,8 +7411,12 @@ def load_dark_patterns(lang, n, seed):
 
 def score_dark_patterns(item, reply):
     fa = final_answer(reply["content"]) or ""
-    m = re.findall(r"\b([A-F])\b", fa)
-    v = m[0] if len(set(m)) == 1 else None
+    m0 = re.match(r"\W*([A-Fa-f])\b(?!\s+[a-z]+\s+[a-z])", fa)  # "B (Confirmshaming), not A", "**b**"; not "A classic case"
+    m = re.findall(r"\b([A-F])\b(?!\s+[a-z])", fa)
+    v = m0[1].upper() if m0 else (m[0] if len(set(m)) == 1 else None)
+    if v is None:  # the label written out
+        hits = [j for j, lab in enumerate(DP_LABELS[item["lang"]]) if lab.split(" (")[0].lower() in fa.lower()]
+        v = "ABCDEF"[hits[0]] if len(hits) == 1 else None
     ok = v == item["gold"]
     d = {f"ok_{item['kind']}": float(ok)}
     if item["kind"] == "none":

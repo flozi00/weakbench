@@ -9051,6 +9051,70 @@ def score_town_country(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- country_facts (borders, area, capitals: world knowledge)
+# From GeoNames countryInfo (same private set): do two countries share a land border (half yes, half same-continent
+# no), which of two is larger by area (ratio >= 1.3), or the capital (contested or multiple capitals left out: IL, ZA).
+def load_country_facts(lang, n, seed):
+    g = GEO_PLACES.value
+    F, nm = g["facts"], (lambda cc: g["countries"][cc][lang == "de"][0])  # noqa: E731
+    ccs = sorted(F)
+    pos = sorted({tuple(sorted((a, b))) for a in ccs for b in F[a]["neighbours"] if b in F})
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("country_facts", i, att)
+        kind = ("border", "area", "capital")[i % 3]
+        if kind == "border":
+            if i % 2 == 0:
+                a, b = r.choice(pos)
+            else:
+                while True:
+                    a, b = r.sample(ccs, 2)
+                    if F[a]["continent"] == F[b]["continent"] and b not in F[a]["neighbours"] and a not in F[b]["neighbours"]:
+                        break
+            if r.random() < 0.5:
+                a, b = b, a
+            yes = b in F[a]["neighbours"] or a in F[b]["neighbours"]
+            gold = ("yes" if yes else "no") if lang == "en" else ("ja" if yes else "nein")
+            q = (f"Do {nm(a)} and {nm(b)} share a land border? Answer yes or no." if lang == "en" else
+                 f"Haben {nm(a)} und {nm(b)} eine gemeinsame Landgrenze? Antworte mit ja oder nein.")
+            items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+        elif kind == "area":
+            while True:
+                a, b = r.sample(ccs, 2)
+                big, small = max(F[a]["area"], F[b]["area"]), min(F[a]["area"], F[b]["area"])
+                if small > 0 and big / small >= 1.3:
+                    break
+            gold_cc = a if F[a]["area"] > F[b]["area"] else b
+            q = (f"Which country has the larger area: {nm(a)} or {nm(b)}?" if lang == "en" else
+                 f"Welches Land hat die größere Fläche: {nm(a)} oder {nm(b)}?")
+            items.append({"id": str(i), "lang": lang, "kind": kind, "gold": nm(gold_cc), "cc": gold_cc, "pair": [a, b],
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+        else:
+            cc = r.choice([c for c in ccs if c not in ("IL", "ZA")])
+            q = f"What is the capital of {nm(cc)}?" if lang == "en" else f"Wie heißt die Hauptstadt von {nm(cc)}?"
+            items.append({"id": str(i), "lang": lang, "kind": kind, "gold": F[cc]["capital"][0], "names": F[cc]["capital"],
+                          "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_country_facts(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    if item["kind"] == "border":
+        yn = [w for w in re.findall(r"[a-z]+", fa.lower()) if w in ("yes", "no", "ja", "nein")]
+        v = ({"yes": "ja", "no": "nein"} if item["lang"] == "de" else {"ja": "yes", "nein": "no"}).get(yn[0], yn[0]) if yn else None
+        ok = v == item["gold"]
+    elif item["kind"] == "area":
+        g = GEO_PLACES.value
+        fa2 = re.sub(r"\b(?:than|als)\b.*$", " ", fa, flags=re.I)  # "Brazil is larger than Peru": the first one
+        named = [cc for cc in item["pair"] if any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa2, re.I) for x in sum(g["countries"][cc], []))]
+        ok = named == [item["cc"]]
+        v = named
+    else:
+        v = fa[:40]
+        ok = any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in item["names"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10661,6 +10725,7 @@ TASKS = {
     "geo_coords": task(load_geo_coords, score_geo_coords, 24, 120),
     "geo_locate": task(load_geo_locate, score_geo_locate, 24, 120),
     "town_country": task(load_town_country, score_town_country, 24, 120),
+    "country_facts": task(load_country_facts, score_country_facts, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

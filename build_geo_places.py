@@ -1,6 +1,6 @@
 """Builds the private set tasks_novel.GEO_PLACES from GeoNames (CC BY 4.0, https://www.geonames.org/):
-download cities15000.zip and admin1CodesASCII.txt into geo_dl/, unzip, run `python build_geo_places.py`, upload
-wbdata/sets/tasks_novel.GEO_PLACES.py to the dataset repo and bump common.DATA_REV."""
+download cities15000.zip, countryInfo.txt and admin1CodesASCII.txt into geo_dl/, unzip, run `python build_geo_places.py`,
+upload wbdata/sets/tasks_novel.GEO_PLACES.py to the dataset repo and bump common.DATA_REV."""
 import random, re, json, sys
 # ISO code -> (English names, German names); only countries with stable, well-known names
 C = {"DE": (["Germany"], ["Deutschland"]), "FR": (["France"], ["Frankreich"]), "IT": (["Italy"], ["Italien"]), "ES": (["Spain"], ["Spanien"]),
@@ -96,7 +96,20 @@ for ascii_name, cc, pop, fcode, nalt, name in recs:
 for cc in sorted(by):
     lst = sorted(by[cc])
     unique_towns += r.sample(lst, min(10, len(lst)))
-out = {"countries": C, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city, "towns": unique_towns}
+# country facts from countryInfo.txt: area (km²), continent, land neighbours; the capital's names from its PPLC row
+facts = {}
+for ln in open("geo_dl/countryInfo.txt", encoding="utf-8"):
+    if ln.startswith("#"):
+        continue
+    f = ln.rstrip("\n").split("\t")
+    if f[0] in C:
+        facts[f[0]] = {"area": float(f[6] or 0), "continent": f[8], "neighbours": [x for x in f[17].split(",") if x], "capital": [f[5]]}
+for ln in open("geo_dl/cities15000.txt", encoding="utf-8"):
+    f = ln.rstrip("\n").split("\t")
+    if f[7] == "PPLC" and f[8] in facts:
+        alts = [x for x in f[3].split(",") if re.fullmatch(r"[A-Za-zÀ-ÿ' .-]{3,}", x) and x.lower() not in COUNTRY_WORDS]
+        facts[f[8]]["capital"] = sorted({f[1], f[2], *facts[f[8]]["capital"], *alts}, key=lambda x: x != f[1])
+out = {"countries": C, "facts": facts, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city, "towns": unique_towns}
 s = repr(out)
 open("wbdata/sets/tasks_novel.GEO_PLACES.py", "w", encoding="utf-8").write(s)
 print(len(pool_country), len(pool_city), len(s))

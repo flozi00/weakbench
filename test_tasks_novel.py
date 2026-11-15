@@ -1993,3 +1993,24 @@ def test_town_country():
 
 if __name__ == "__main__":
     test_town_country()
+
+
+def test_country_facts():
+    import tasks_novel as tn
+    from collections import Counter
+    xs = tn.load_country_facts("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    b = [x for x in xs if x["kind"] == "border"]
+    assert 0.35 < sum(x["gold"] == "ja" for x in b) / len(b) < 0.65
+    for x in xs[:12]:
+        g = x["gold"]
+        assert tn.score_country_facts(x, {"content": f"Antwort: {g}"})["correct"], x
+    a = next(x for x in xs if x["kind"] == "area")
+    other = [c for c in a["pair"] if c != a["cc"]][0]
+    on = tn.GEO_PLACES.value["countries"][other][1][0]
+    assert tn.score_country_facts(a, {"content": f"Antwort: {a['gold']} ist größer als {on}"})["correct"]
+    assert not tn.score_country_facts(a, {"content": f"Antwort: {on}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_country_facts()

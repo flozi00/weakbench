@@ -5288,12 +5288,12 @@ def load_split_bill(lang, n, seed):
             lines.append(f"- {payer} paid {amt} € for {nm}{share}" if lang == "en" else f"- {payer} hat {amt} € für {nm} bezahlt{share}")
         grp = ", ".join(people[:-1]) + (" and " if lang == "en" else " und ") + people[-1]
         q = (f"{grp} went on a trip. Every expense is split equally among the people who share it.\n"
-             + "\n".join(lines) + f"\nAfter settling up, how much money does {who} get back in total? If {who} has to pay, "
-             "answer with a negative number." if lang == "en" else
+             + "\n".join(lines) + f"\nWhat is {who}'s balance after settling up? Answer with one number: positive if {who} "
+             "receives money, negative if {who} has to pay." if lang == "en" else
              f"{grp} waren zusammen verreist. Jede Ausgabe wird gleichmäßig auf die Personen verteilt, die sie teilen.\n"
-             + "\n".join(lines) + f"\nWie viel Geld bekommt {who} nach der Abrechnung insgesamt zurück? Wenn {who} zahlen muss, "
-             "antworte mit einer negativen Zahl.")
-        items.append({"id": str(i), "lang": lang, "gold": float(g), "partial": partial, "plain": float(plain[who]),
+             + "\n".join(lines) + f"\nWie hoch ist der Saldo von {who} nach der Abrechnung? Antworte mit einer Zahl: positiv, "
+             f"wenn {who} Geld bekommt, negativ, wenn {who} zahlen muss.")
+        items.append({"id": str(i), "lang": lang, "gold": float(g), "partial": partial, "plain": float(plain[who]), "who": who,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
@@ -5301,8 +5301,8 @@ def load_split_bill(lang, n, seed):
 def score_split_bill(item, reply):
     fa = (final_answer(reply["content"]) or "").replace("−", "-")
     v = answer_value(fa, item["lang"])
-    if v is not None and v > 0 and re.search(r"\b(pays?|owes?|zahlt|schuldet|muss .*zahlen)\b", fa, re.I) and item["gold"] < 0:
-        v = -v  # "Max pays 42.50 €" stated in words
+    if v is not None and v > 0 and re.search(r"\b" + item["who"] + r"\b\s+(?:pays|owes|has to pay|zahlt|schuldet|muss)\b", fa, re.I):
+        v = -v  # "Lea pays 42.50 €": the sign from the reply's own words, about the person asked
     ok = v is not None and abs(v - item["gold"]) < 0.006
     d = {"ok_partial" if item["partial"] else "ok_all_share": float(ok)}
     if item["partial"]:

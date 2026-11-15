@@ -7175,6 +7175,69 @@ def score_cidr_check(item, reply):
             "detail": {"jaccard": round(jac, 4), "took_octet_prefix": float(got == item["bait"])}}
 
 
+# ---------------------------------------------------------------- counterexample (refute or confirm, verified)
+def _ce_claims(r, lang):
+    """(text, predicate that must hold for every n in 1..200)."""
+    import math
+    a, b = r.sample([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15], 2)
+    d = r.choice([1, 4, 5, 6, 9])
+    k = r.choice([2, 3, 4, 5, 6, 9])
+    en = {"div": f"Every number from 1 to 200 that is divisible by {a} and by {b} is also divisible by {a * b}.",
+          "sq": f"Every number from 1 to 200 whose square ends in the digit {d} itself ends in the digit {d}.",
+          "sum": f"For every number from 1 to 200, if its digit sum is divisible by {k}, the number is divisible by {k}.",
+}
+    de = {"div": f"Jede Zahl von 1 bis 200, die durch {a} und durch {b} teilbar ist, ist auch durch {a * b} teilbar.",
+          "sq": f"Jede Zahl von 1 bis 200, deren Quadrat auf die Ziffer {d} endet, endet selbst auf die Ziffer {d}.",
+          "sum": f"Für jede Zahl von 1 bis 200 gilt: Ist ihre Quersumme durch {k} teilbar, dann ist die Zahl durch {k} teilbar."}
+    preds = {"div": lambda n: not (n % a == 0 and n % b == 0) or n % (a * b) == 0,
+             "sq": lambda n: (n * n) % 10 != d or n % 10 == d,
+             "sum": lambda n: sum(map(int, str(n))) % k != 0 or n % k == 0}
+    kind = r.choice(list(preds))
+    return (en if lang == "en" else de)[kind], preds[kind], kind, {"a": a, "b": b, "d": d, "k": k}
+
+
+def load_counterexample(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 60, items):  # only so many true claims exist
+        r = rng_of("counterexample", i, att)
+        want_true = i % 2 == 1
+        while True:
+            text, pred, kind, par = _ce_claims(r, lang)
+            true = all(pred(m) for m in range(1, 201))
+            if true == want_true:
+                break
+        q = (f"Claim: {text}\nIf the claim is false, give one counterexample (a single number). If it is true, answer \"true\"."
+             if lang == "en" else
+             f"Behauptung: {text}\nWenn die Behauptung falsch ist, nenne ein Gegenbeispiel (eine einzelne Zahl). Wenn sie stimmt, "
+             "antworte „wahr“.")
+        smallest = next((m for m in range(1, 201) if not pred(m)), None)  # gold shows one; any valid counterexample counts
+        gold = ("true" if lang == "en" else "wahr") if true else str(smallest)
+        items.append({"id": str(i), "lang": lang, "gold": gold, "is_true": true, "kind": kind, "par": par,
+                      "text": text, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_counterexample(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower()
+    says_true = bool(re.search(r"\b(true|wahr|stimmt|richtig)\b", fa)) and not re.search(r"\b(false|falsch|nicht wahr)\b", fa)
+    nums = [int(x) for x in re.findall(r"\b\d{1,3}\b", fa)]
+    p_ = item["par"]
+    if item["kind"] == "div":
+        pred = lambda m: not (m % p_["a"] == 0 and m % p_["b"] == 0) or m % (p_["a"] * p_["b"]) == 0  # noqa: E731
+    elif item["kind"] == "sq":
+        pred = lambda m: (m * m) % 10 != p_["d"] or m % 10 == p_["d"]  # noqa: E731
+    else:
+        pred = lambda m: sum(map(int, str(m))) % p_["k"] != 0 or m % p_["k"] == 0  # noqa: E731
+    valid_ce = len(set(nums)) == 1 and 1 <= nums[0] <= 200 and not pred(nums[0])
+    ok = says_true and not nums if item["is_true"] else valid_ce
+    d = {"ok_true_claim" if item["is_true"] else "ok_false_claim": float(ok)}
+    if not item["is_true"]:
+        d["invented_counterexample"] = float(len(set(nums)) == 1 and not valid_ce)
+    else:
+        d["invented_counterexample"] = float(bool(nums))
+    return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8755,6 +8818,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "counterexample": task(load_counterexample, score_counterexample, 24, 60),
     "cidr_check": task(load_cidr_check, score_cidr_check, 24, 120),
     "roman_arith": task(load_roman_arith, score_roman_arith, 24, 120),
     "rooms_needed": task(load_rooms_needed, score_rooms_needed, 24, 120),

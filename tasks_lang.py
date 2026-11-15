@@ -4348,7 +4348,8 @@ def load_de_das_function(lang, n, seed):
 
 def score_de_das_function(item, reply):
     t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
-    t = re.sub(r"\b(?:nicht|kein\w*)\s+\w+", " ", t)
+    t = t.replace("-", "")  # "Relativ-pronomen"
+    t = re.sub(r"\b(?:nicht|kein\w*)\s+(?:(?:der|die|das|den|dem|ein\w*|um|als)\s+)?(?:(?:un)?bestimmt\w*\s+)?\w+", " ", t)
     found = set()
     for k in ("Demonstrativpronomen", "Relativpronomen", "Artikel", "Konjunktion"):  # longest/specific first
         for a in DF_LABELS[k]:

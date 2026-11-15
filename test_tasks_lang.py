@@ -1090,6 +1090,8 @@ def test_de_das_function():
     assert not tl.score_de_das_function(r, {"content": "Pronomen"})["correct"]
     assert tl.score_de_das_function(r, {"content": "Relativpronomen (bezieht sich auf 'Buch')"})["correct"]
     assert not tl.score_de_das_function(r, {"content": "Relativpronomen oder Demonstrativpronomen"})["correct"]
+    for c in ("Es ist nicht der Artikel, sondern ein Relativpronomen", "Kein bestimmter Artikel, sondern Relativpronomen", "Relativ-pronomen"):
+        assert tl.score_de_das_function(r, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

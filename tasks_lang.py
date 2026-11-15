@@ -2196,6 +2196,36 @@ def score_de_grammar_fix(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_grammar_fix (one error, change nothing else)
+EG_ITEMS = [("agreement", "The list of names are on the desk.", "The list of names is on the desk.", []),
+            ("agreement", "Neither the manager nor her assistants was at the meeting.", "Neither the manager nor her assistants were at the meeting.", []),
+            ("agreement", "Each of the rooms have a balcony.", "Each of the rooms has a balcony.", []),
+            ("tense", "Yesterday we go to the cinema and watched a comedy.", "Yesterday we went to the cinema and watched a comedy.", []),
+            ("tense", "I have seen him last week at the station.", "I saw him last week at the station.", []),
+            ("tense", "By the time we arrived, the film already started.", "By the time we arrived, the film had already started.", []),
+            ("article", "She is engineer at a large company.", "She is an engineer at a large company.", []),
+            ("article", "He played the piano for an hour and then went to the bed.", "He played the piano for an hour and then went to bed.", []),
+            ("preposition", "We arrived to the hotel late at night.", "We arrived at the hotel late at night.", []),
+            ("preposition", "She is married with a doctor from Leeds.", "She is married to a doctor from Leeds.", []),
+            ("preposition", "It depends of the weather tomorrow.", "It depends on the weather tomorrow.", []),
+            ("pronoun", "Me and my brother built the shed ourselves.", "My brother and I built the shed ourselves.", ["I and my brother built the shed ourselves."]),
+            ("pronoun", "The teacher gave the books to Anna and I.", "The teacher gave the books to Anna and me.", []),
+            ("word_order", "I don't know what is his name.", "I don't know what his name is.", []),
+            ("word_order", "She speaks very well English.", "She speaks English very well.", []),
+            ("comparative", "This road is more narrow than the old one.", "This road is narrower than the old one.", [])]
+
+
+def load_en_grammar_fix(lang, n, seed):
+    rows = EG_ITEMS[:min(n or len(EG_ITEMS), len(EG_ITEMS))]
+    return [{"id": str(i), "lang": "en", "gold": g, "alts": alts, "kind": k,
+             "messages": [{"role": "user", "content": "This sentence contains exactly one grammar error. Correct it and change "
+                           "nothing else. Reply with the corrected sentence only.\n\n" + bad}]}
+            for i, (k, bad, g, alts) in enumerate(rows)]
+
+
+score_en_grammar_fix = score_de_grammar_fix  # same exact-match scorer
+
+
 # ---------------------------------------------------------------- bilingual_notice (the same notice in German and English)
 # Generated facts (event, weekday, date, time, room, price) to announce in two sections "DE:" and "EN:". Each section
 # must be in its language (no mixing) and carry every fact; numbers must agree between the sections.
@@ -3230,6 +3260,7 @@ TASKS = {
     "de_als_wie": task(("de",), load_de_als_wie, score_de_als_wie, 16, 24, lang_check=False),
     "collocations": task(("de", "en"), load_collocations, score_collocations, 16, 16, lang_check=False),
     "de_umlaut_input": task(("de",), load_de_umlaut_input, score_de_umlaut_input, 512, 16),
+    "en_grammar_fix": task(("en",), load_en_grammar_fix, score_en_grammar_fix, 64, 16, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

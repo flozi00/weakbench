@@ -6839,12 +6839,15 @@ def load_iso_week(lang, n, seed):
     for i, att in common.redraws(n or 120, items):
         r = rng_of("iso_week", i, att)
         edge = i % 2 == 0
-        y = r.randint(2015, 2032)
-        if edge:
-            d = r.choice([_dt.date(y, 1, r.randint(1, 4)), _dt.date(y, 12, r.randint(28, 31))])
-        else:
-            d = _dt.date(y, r.randint(2, 11), r.randint(1, 28))
-        iy, iw, _ = d.isocalendar()
+        while True:
+            y = r.randint(1990, 2060)
+            if edge:
+                d = r.choice([_dt.date(y, 1, r.randint(1, 4)), _dt.date(y, 12, r.randint(28, 31))])
+            else:
+                d = _dt.date(y, r.randint(2, 11), r.randint(1, 28))
+            iy, iw, _ = d.isocalendar()
+            if not edge or iy != d.year or iw == 53:  # a real edge: the week belongs to the other year, or is week 53
+                break
         naive = (d.timetuple().tm_yday - 1) // 7 + 1
         jan1 = _dt.date(d.year, 1, 1)
         wdn = WD[lang]
@@ -6863,7 +6866,7 @@ def load_iso_week(lang, n, seed):
 def score_iso_week(item, reply):
     fa = final_answer(reply["content"]) or ""
     w = re.search(r"(?:week|KW|Woche)\s*(\d{1,2})", fa, re.I)
-    yr = re.search(r"\b(20\d\d)\b", fa)
+    yr = re.search(r"\b((?:19|20)\d\d)\b", fa)
     wk = int(w[1]) if w else None
     ok = wk == item["week"] and (yr is not None and int(yr[1]) == item["year"])
     d = {"ok_edge" if item["edge"] else "ok_inside": float(ok)}

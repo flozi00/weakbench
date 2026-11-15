@@ -5847,7 +5847,7 @@ def load_tax_brackets(lang, n, seed):
         bounds = [b * 1000 for b in bounds]
         rates = sorted(r.sample([0, 5, 10, 15, 20, 25, 30, 35, 40, 45], k))
         income = r.randrange(bounds[-1] + 1000, bounds[-1] + 60000, 500) if i % 2 == 0 else \
-            r.randrange(bounds[0] + 1000, bounds[-1], 500) if len(bounds) > 1 else r.randrange(bounds[0] + 1000, bounds[0] + 40000, 500)
+            r.randrange(bounds[0] + 1000, bounds[-1], 500)  # top band / a lower band
         tax, lo = 0, 0
         top = 0
         for b, rate in zip(bounds + [None], rates):
@@ -5903,7 +5903,7 @@ def load_overlap_count(lang, n, seed):
             total = a_ + b_ + ab + none
             gold, naive = (total, A + B + none) if not ask_only else (a_, A)
             facts = (f"{A} like {T[0]}, {B} like {T[1]}, {ab} of them like both, and {none} like neither." if lang == "en" else
-                     f"{A} mögen {T[0]}, {B} mögen {T[1]}, {ab} davon mögen beides, und {none} mögen keins von beiden.")
+                     f"{A} mögen {T[0]}, {B} mögen {T[1]}, {ab} davon mögen beides und {none} mögen keins von beidem.")
         else:
             abc = r.randint(2, 6)
             ab, ac, bc = (r.randint(2, 8) for _ in range(3))  # exactly two
@@ -5956,7 +5956,8 @@ def answer_value(line, lang):
     bare = re.sub(r"\([^()]*\)", " ", line)  # a working note in brackets: "64 m² (= 8 x 6 - 4)"
     if re.search(r"\d", bare):
         line = bare
-    return parse_number(line.rsplit("=", 1)[1] if "=" in line else line, lang, first=True)
+    tail = re.split(r"=|→|->", line)
+    return parse_number(tail[-1] if len(tail) > 1 else line, lang, first=True)
 
 
 def load_table_qa(lang, n, seed):

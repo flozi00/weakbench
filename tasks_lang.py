@@ -4373,12 +4373,13 @@ TF_ITEMS = [("[That] car belongs to my aunt.", "determiner"), ("Could you pass m
             ("It is clear [that] we need help.", "conjunction"), ("She was so tired [that] she fell asleep.", "conjunction")]
 TF_LABELS = {"determiner": ["determiner", "demonstrative determiner", "demonstrative adjective"],
              "demonstrative pronoun": ["demonstrative pronoun"], "relative pronoun": ["relative pronoun"],
-             "conjunction": ["conjunction", "subordinating conjunction", "complementizer", "complementiser"]}
+             "conjunction": ["conjunction", "subordinating conjunction", "complementizer", "complementiser", "subordinator"]}
 
 
 def load_en_that_function(lang, n, seed):
     return [{"id": str(i), "lang": "en", "gold": g,
-             "messages": [{"role": "user", "content": "What is the word class of the word in brackets? Choose from: determiner, demonstrative "
+             "messages": [{"role": "user", "content": "Using traditional school-grammar labels, what is the word class of the word in brackets? "
+                           "Choose from: determiner, demonstrative "
                            "pronoun, relative pronoun, conjunction. Answer with the word class only.\n\n" + sent}]}
             for i, (sent, g) in enumerate(TF_ITEMS[:min(n or 16, 16)])]
 

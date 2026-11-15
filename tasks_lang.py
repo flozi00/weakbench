@@ -3906,6 +3906,33 @@ def score_de_verb_preps(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- en_confusables (make/do, say/tell, borrow/lend, so/such, ...)
+# Word pairs German maps onto one word (machen, sagen, leihen, so) — the classic transfer errors.
+ECF_ITEMS = [("Could you ___ me a favour?", "do", ("make", "do")), ("I need to ___ a phone call.", "make", ("make", "do")),
+             ("She ___ her homework after dinner.", "did", ("made", "did")), ("He ___ a lot of mistakes in the test.", "made", ("made", "did")),
+             ("Can you ___ me the way to the station?", "tell", ("say", "tell")), ("What did she ___ about the plan?", "say", ("say", "tell")),
+             ("Could you ___ me your pen for a minute?", "lend", ("borrow", "lend")), ("May I ___ your pen for a minute?", "borrow", ("borrow", "lend")),
+             ("It was ___ a long film that I fell asleep.", "such", ("so", "such")), ("The film was ___ long that I fell asleep.", "so", ("so", "such")),
+             ("This coffee is too hot ___ drink.", "to", ("to", "for")), ("The box is not big ___ for all the books.", "enough", ("enough", "too")),
+             ("Please ___ the table for dinner.", "set", ("set", "sit")), ("Please ___ down, the meeting is starting.", "sit", ("set", "sit")),
+             ("Can you ___ me how to use this app?", "show", ("show", "explain")), ("Can you ___ this word to me?", "explain", ("show", "explain")),
+             ("We ___ a great time at the party.", "had", ("had", "made")), ("I can't ___ the noise any longer.", "stand", ("stand", "stay")),
+             ("He forgot to ___ his medicine this morning.", "take", ("take", "make")), ("I ___ a cake for her birthday.", "made", ("made", "did"))]
+
+
+def load_en_confusables(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{two_opts(i, g, o)[0]}\" or \"{two_opts(i, g, o)[1]}\". "
+                           f"Answer with the word only.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(ECF_ITEMS[:min(n or 20, 20)])]
+
+
+def score_en_confusables(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4449,6 +4476,7 @@ TASKS = {
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),
     "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
+    "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

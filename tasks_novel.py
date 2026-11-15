@@ -6406,7 +6406,8 @@ def score_regex_eval(item, reply):
 
 
 # ---------------------------------------------------------------- negated_filter (negation scope over a table)
-NF_PRODUCTS = ["Kettle", "Lamp", "Mixer", "Toaster", "Radio", "Fan", "Heater", "Scale"]
+NF_PRODUCTS = {"en": ["Kettle", "Lamp", "Mixer", "Toaster", "Radio", "Fan", "Heater", "Scale"],
+               "de": ["Wasserkocher", "Lampe", "Mixer", "Toaster", "Radio", "Ventilator", "Heizlüfter", "Waage"]}
 NF_RULES = [  # (en, de, predicate on (cheap, stock), the misreading)
     ("not both cheap and in stock", "nicht zugleich günstig und vorrätig",
      lambda c, s: not (c and s), lambda c, s: (not c) and (not s)),
@@ -6424,7 +6425,7 @@ def load_negated_filter(lang, n, seed):
         r = rng_of("negated_filter", i)
         en, de, pred, bait = NF_RULES[i % len(NF_RULES)]
         while True:
-            prods = r.sample(NF_PRODUCTS, 6)
+            prods = r.sample(NF_PRODUCTS[lang], 6)
             rows = [(p, r.randint(8, 90), r.choice([True, False])) for p in prods]
             thr = r.choice([30, 40, 50])
             gold = sorted(p for p, price, st in rows if pred(price < thr, st))

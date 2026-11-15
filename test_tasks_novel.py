@@ -1896,6 +1896,10 @@ def test_password_rules():
     x = xs[0]
     for c in (f"Answer: {x['gold']}", "Answer: " + " and ".join(map(str, x["set"])), "Answer: numbers " + ", ".join(map(str, x["set"]))):
         assert tn.score_password_rules(x, {"content": c})["correct"], c
+    listed = ", ".join(f"{k}. pw{k}" for k in x["set"])
+    others = [k for k in range(1, 7) if k not in x["set"]]
+    for c in (f"Answer: {listed}", f"Answer: {x['gold']} sind gültig, {others[0]} nicht"):
+        assert tn.score_password_rules(x, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

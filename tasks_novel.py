@@ -8776,7 +8776,7 @@ PW_USERS = ["mila", "jonas", "petra", "ömer", "lukas", "sanna"]
 
 def _pw_checks(pw, user, minlen):
     return {"length": len(pw) >= minlen, "digit": any(c.isdigit() for c in pw), "upper": any(c.isupper() for c in pw),
-            "repeat": not re.search(r"(.)\1\1", pw), "user": user.lower() not in pw.lower()}
+            "repeat": not re.search(r"(.)\1\1", pw, re.I), "user": user.lower() not in pw.lower()}  # mMm is a triple
 
 
 def load_password_rules(lang, n, seed):
@@ -8808,12 +8808,14 @@ def load_password_rules(lang, n, seed):
                         break
                 cands.append(pw)
             ok = [pw for pw in cands if all(_pw_checks(pw, user, minlen).values())]
-            if 1 <= len(ok) <= 4:
+            sneaky = any(all(c[k] for k in ("length", "digit", "upper")) and not (c["repeat"] and c["user"])
+                         for c in (_pw_checks(pw, user, minlen) for pw in cands))  # length/digit/capital alone is not enough
+            if 1 <= len(ok) <= 4 and sneaky:
                 break
         rules = ([f"at least {minlen} characters", "at least one digit", "at least one capital letter",
-                  "no character three times in a row", f"must not contain the user name '{user}' (in any case)"] if lang == "en" else
+                  "no character three times in a row (capital and small letter count as the same)", f"must not contain the user name '{user}' (in any case)"] if lang == "en" else
                  [f"mindestens {minlen} Zeichen", "mindestens eine Ziffer", "mindestens ein Großbuchstabe",
-                  "kein Zeichen dreimal hintereinander", f"darf den Benutzernamen „{user}“ nicht enthalten (egal ob groß oder klein)"])
+                  "kein Zeichen dreimal hintereinander (Groß- und Kleinbuchstabe zählen gleich)", f"darf den Benutzernamen „{user}“ nicht enthalten (egal ob groß oder klein)"])
         lst = "\n".join(f"{k + 1}. {pw}" for k, pw in enumerate(cands))
         q = (f"Password policy:\n- " + "\n- ".join(rules) + f"\nWhich of these candidate passwords are valid? Give their numbers.\n{lst}"
              if lang == "en" else
@@ -8826,7 +8828,10 @@ def load_password_rules(lang, n, seed):
 
 def score_password_rules(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    got = sorted({int(x) for x in re.findall(r"(?<![\w.])([1-9])(?![\w.]|\.\d)", fa) if 1 <= int(x) <= item["n"]})
+    m = re.search(r"\b(?:sind|is|are)\s+(?:gültig|valid)\b", fa)
+    fa = fa[:m.start()] if m else fa  # "3 und 6 sind gültig, 1, 2, 4 und 5 nicht": the numbers before the verdict
+    fa = re.split(r"\s[—–-]\s|\b(?:not|nicht|because|weil|da)\b", fa)[0]  # "3 — 1 has no digit"
+    got = sorted({int(x) for x in re.findall(r"(?<![\w.])([1-9])(?!\w|\.\S)", fa) if 1 <= int(x) <= item["n"]})
     ok = got == item["set"]
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],
             "detail": {"too_many": float(bool(set(got) - set(item["set"]))), "too_few": float(bool(set(item["set"]) - set(got)))}}

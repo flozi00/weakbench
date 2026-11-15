@@ -2106,6 +2106,73 @@ def score_rule_explain(item, reply):
                        "output_without_rule": float(out_ok and not rule_ok), f"ok_d{item['depth']}": float(all(met))}}
 
 
+# ---------------------------------------------------------------- transcript_clean (judge + exact: spoken to written language)
+# A generated voicemail transcript with fillers (ähm, also, halt, sozusagen / um, like, you know), a false start, a
+# repetition and a self-correction ("um drei, nein, um vier"). The clean written version must drop the fillers and keep
+# only the corrected fact (code), and read as natural written language (judge).
+TCL_NAMES = ["Frau Becker", "Herr Yıldız", "Frau Nowak", "Herr Lindqvist", "Frau Haddad", "Herr Okafor"]
+TCL_FILL = {"de": ["ähm", "äh", "also", "halt", "sozusagen", "quasi"], "en": ["um", "uh", "like", "you know", "basically", "sort of"]}
+TCL_JUDGE = """VOICEMAIL TRANSCRIPT (spoken, messy):
+{src}
+
+CLEAN WRITTEN VERSION:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Every fact of the message is kept and nothing is added; where the speaker corrected themselves, only the corrected
+   fact appears.
+2. It reads as natural written {language}: complete sentences, no filler words, no repetitions or false starts.
+3. Grammar and spelling are correct."""
+
+
+def load_transcript_clean(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 16):
+        r = random.Random(f"transcript_clean:{i}")
+        name = TCL_NAMES[i % 6]
+        wrong_h, right_h = r.sample([9, 10, 11, 14, 15, 16], 2)
+        room, day = r.choice(["2.14", "3.05", "1.20", "4.11"]), r.choice(["Dienstag", "Mittwoch", "Donnerstag"] if lang == "de" else ["Tuesday", "Wednesday", "Thursday"])
+        f = TCL_FILL[lang]
+        if lang == "de":
+            src = (f"Ja, hallo, {f[0]}, hier ist {name}, {f[2]} ich wollte, ich wollte nur sagen, dass unser Termin am {day} "
+                   f"{f[3]} nicht um {wrong_h} Uhr, {f[1]}, nein, Moment, um {right_h} Uhr ist, {f[4]} im Raum {room}. Und {f[0]} "
+                   f"bringen Sie bitte die, die Unterlagen vom letzten Mal mit, {f[5]} die Verträge. Danke, tschüss.")
+            req = "Schreib diese Sprachnachricht als saubere schriftliche Notiz in ganzen Sätzen. Antworte nur mit der Notiz.\n\n"
+        else:
+            src = (f"Yeah, hi, {f[0]}, this is {name}, {f[2]} I just wanted, I wanted to say that our meeting on {day} is, {f[3]}, "
+                   f"not at {wrong_h if wrong_h <= 12 else wrong_h - 12}, {f[1]}, no, wait, at {right_h if right_h <= 12 else right_h - 12} "
+                   f"{'am' if right_h < 12 else 'pm'}, {f[4]} in room {room}. And {f[0]} please bring the, the documents from last time, "
+                   f"{f[5]} the contracts. Thanks, bye.")
+            req = "Write this voicemail as a clean written note in full sentences. Reply with the note only.\n\n"
+        right_txt = str(right_h) if lang == "de" else str(right_h if right_h <= 12 else right_h - 12)
+        wrong_txt = str(wrong_h) if lang == "de" else str(wrong_h if wrong_h <= 12 else wrong_h - 12)
+        items.append({"id": str(i), "lang": lang, "src": src, "right": right_txt, "wrong": wrong_txt, "room": room, "day": day,
+                      "surname": name.split()[-1], "messages": [{"role": "user", "content": req + src}]})
+    return items
+
+
+def score_transcript_clean(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    low = text.lower()
+    fills = [w for w in TCL_FILL[item["lang"]] if w not in ("also", "like") and re.search(rf"(?<!\w){re.escape(w)}(?!\w)", low)]
+    hrs = re.findall(r"(?<![\d.])(\d{1,2})(?::\d{2})?\s*(?:uhr|am|pm|a\.m\.|p\.m\.|o'clock)", low)
+    facts = (item["right"] in hrs and item["wrong"] not in hrs and item["room"] in text and item["day"].lower() in low
+             and item["surname"].lower() in low)
+    out = tasks_judge.judge("", TCL_JUDGE.format(src=item["src"], text=text or "(empty)",
+                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable transcript_clean verdict {out[:120]!r}")
+    faithful, written, grammar = (_yes(x) for x in v)
+    met = [not fills, bool(facts), faithful, written, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"no_fillers": float(not fills), "facts_corrected": float(bool(facts)), "faithful": float(faithful),
+                       "written_style": float(written), "grammar": float(grammar)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2687,6 +2754,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                           "think": False, "max_tokens": 1024,
                           "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
                           "lang_check": False, "opt_in": True, "needs_judge": True},
+         "transcript_clean": {"langs": ("de", "en"), "load": load_transcript_clean, "score": score_transcript_clean,
+                              "think": False, "max_tokens": 384,
+                              "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
+                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

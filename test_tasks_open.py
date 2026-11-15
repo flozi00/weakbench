@@ -819,3 +819,26 @@ def test_rule_explain():
 
 if __name__ == "__main__":
     test_rule_explain()
+
+
+def test_transcript_clean():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_transcript_clean("de", None, 0)[0]
+        good = f"{x['surname']} teilt mit, dass der Termin am {x['day']} um {x['right']} Uhr in Raum {x['room']} stattfindet. Bitte die Verträge mitbringen."
+        assert to.score_transcript_clean(x, {"content": good})["correct"]
+        bad = good.replace(f"um {x['right']} Uhr", f"um {x['wrong']} Uhr")
+        assert to.score_transcript_clean(x, {"content": bad})["detail"]["facts_corrected"] == 0
+        assert to.score_transcript_clean(x, {"content": good + " Ähm, danke."})["detail"]["no_fillers"] == 0
+        e = to.load_transcript_clean("en", None, 0)[0]
+        h = int(e["right"])
+        ok = f"{e['surname']} says the meeting on {e['day']} is at {h} {'am' if 'am' in e['src'].split('wait, at')[1][:8] else 'pm'} in room {e['room']}; please bring the contracts."
+        assert to.score_transcript_clean(e, {"content": ok})["detail"]["facts_corrected"] == 1, ok
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_transcript_clean()

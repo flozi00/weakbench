@@ -1165,3 +1165,15 @@ def test_en_reflexive():
 
 if __name__ == "__main__":
     test_en_reflexive()
+
+
+def test_en_adverb_position():
+    import tasks_lang as tl
+    xs = tl.load_en_adverb_position("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 40 and sum(x["gold"] == "A" for x in xs) == 20
+    for x in xs:
+        assert tl.score_en_adverb_position(x, {"content": f"Answer: {x['gold']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_adverb_position()

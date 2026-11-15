@@ -4557,6 +4557,42 @@ def score_en_reflexive(item, reply):
             "detail": {"ok_none" if item["gold"] == "—" else "ok_pronoun": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_adverb_position (frequency adverbs: always, never, often)
+# Before a main verb and after a modal — German puts them after the finite verb ("Sie trinkt immer Tee"), so "She
+# drinks always tea" is the transfer error. Only verb-adverb-object twins: "She often is late" (before be) is marked but
+# possible English, so no be/auxiliary frames. Generated pairs, the correct one at A or B.
+EAP_SUBJ = [("She", 3), ("My parents", 0), ("Tom", 3), ("We", 0)]
+EAP_ADV = ["always", "never", "often", "usually", "sometimes", "rarely"]
+EAP_FRAMES = [("main3", "{s} {a} {rd} the newspaper at breakfast.", "{s} {rd} {a} the newspaper at breakfast."),
+              ("main", "{s} {a} {v} tea in the morning.", "{s} {v} {a} tea in the morning."),
+              ("modal2", "{s} will {a} forget this day.", "{s} will forget {a} this day."),
+              ("modal", "{s} can {a} find a parking space here.", "{s} can find {a} a parking space here."),
+              ("main2", "{s} {a} {w} the bus to school.", "{s} {w} {a} the bus to school.")]
+
+
+def load_en_adverb_position(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 40, items):
+        r = random.Random(f"en_adverb_position:{i}" + (f"~{att}" if att else ""))
+        kind, good, bad = EAP_FRAMES[i % len(EAP_FRAMES)]
+        (s_, p), a = r.choice(EAP_SUBJ), r.choice(EAP_ADV)
+        f = dict(s=s_, a=a, be="is" if p == 3 else "are", have="has" if p == 3 else "have", v="drinks" if p == 3 else "drink",
+                 w="takes" if p == 3 else "take", rd="reads" if p == 3 else "read")
+        g, b = good.format(**f), bad.format(**f)
+        first = (i // len(EAP_FRAMES)) % 2 == 0
+        A, B = (g, b) if first else (b, g)
+        q = f"Which sentence is correct English?\nA. {A}\nB. {B}\nReply with just one line \"Answer: A\" or \"Answer: B\"."
+        items.append({"id": str(i), "lang": "en", "gold": "A" if first else "B", "kind": kind,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_en_adverb_position(item, reply):
+    v = _ab_letter(reply["content"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -5116,6 +5152,7 @@ TASKS = {
     "de_comparison": task(("de",), load_de_comparison, score_de_comparison, 16, 16, lang_check=False),
     "de_verb_case": task(("de",), load_de_verb_case, score_de_verb_case, 16, 16, lang_check=False),
     "en_reflexive": task(("en",), load_en_reflexive, score_en_reflexive, 16, 16, lang_check=False),
+    "en_adverb_position": task(("en",), load_en_adverb_position, score_en_adverb_position, 20, 40, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

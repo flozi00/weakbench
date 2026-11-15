@@ -7095,12 +7095,17 @@ def load_roman_arith(lang, n, seed):
     items = []
     for i, att in common.redraws(n or 120, items):
         r = rng_of("roman_arith", i, att)
+        sub = i % 2 == 1
         while True:
             a, b = r.randint(14, 1999), r.randint(4, 999)
+            if sub and a <= b:
+                continue
             ra, rb = _ra_to(a), _ra_to(b)
-            if any(x in ra + rb for x in ("IV", "IX", "XL", "XC", "CD", "CM")):  # a subtractive pair to read
+            pairs = ("IV", "IX", "XL", "XC", "CD", "CM")
+            res_ = a - b if sub else a + b
+            naive_ = _ra_additive(ra) - _ra_additive(rb) if sub else _ra_additive(ra) + _ra_additive(rb)
+            if any(x in ra or x in rb for x in pairs) and naive_ != res_:  # a real subtractive pair; the misreading differs
                 break
-        sub = i % 2 == 1 and a > b
         res = a - b if sub else a + b
         naive = _ra_additive(ra) - _ra_additive(rb) if sub else _ra_additive(ra) + _ra_additive(rb)
         op = "−" if sub else "+"
@@ -7112,9 +7117,15 @@ def load_roman_arith(lang, n, seed):
 
 
 def score_roman_arith(item, reply):
-    lines = re.findall(r"(?:Answer|Antwort)\W*:?\s*(.+)", reply["content"] or "", re.I)
-    toks = re.findall(r"\b[MDCLXVI]+\b", lines[-1] if lines else "")
-    v = toks[-1] if toks else None
+    text = reply["content"] or ""
+    m = list(re.finditer(r"^\W*(?:Answer|Antwort)\W*:\s*", text, re.I | re.M))  # a proper answer line, not the bare word
+    line = text[m[-1].end():].strip().split("\n\n")[0] if m else ""
+    line = re.sub(r"=.*?=", "=", line)
+    if "=" in line:
+        line = line.rsplit("=", 1)[1]  # "CCCXVII + CCXCVIII = DCXV"
+    toks = [t for t in re.findall(r"\b[MDCLXVI]+\b", line) if t != "I" or line.strip(" .*") == "I"]  # the pronoun "I" is no numeral
+    v = toks[0] if toks else None
+    lines = [line]
     ok = v == item["gold"]
     digits = re.findall(r"\d+", lines[-1] if lines else "")
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],

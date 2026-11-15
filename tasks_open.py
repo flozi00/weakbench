@@ -1364,7 +1364,7 @@ DCW_PROMPTS = [("Ich-Perspektive", "Präteritum", "ein verlorener Schlüssel", "
                ("Ich-Perspektive", "Präsens", "ein vergessener Geburtstag", "Eine Zugfahrt neben einer fremden Person."),
                ("Er-/Sie-Perspektive", "Präsens", "eine kaputte Straßenlaterne", "Eine Nachbarschaft streitet über einen Baum."),
                ("Ich-Perspektive", "Präteritum", "der Geruch von frischem Brot", "Die letzte Schicht in einer Bäckerei, die schließt."),
-               ("Du-Perspektive", "Präsens", "ein Anruf um drei Uhr nachts", "Jemand findet heraus, dass er adoptiert wurde."),
+               ("Du-Perspektive", "Präsens", "ein Anruf um drei Uhr nachts", "Ein Brief verrät, dass die Hauptfigur adoptiert wurde."),
                ("Er-/Sie-Perspektive", "Präteritum", "ein leeres Vogelnest", "Eine alte Frau lernt, ein Smartphone zu benutzen.")]
 DCW_JUDGE = """A German short story was requested with these constraints:
 - perspective: {persp}; tense: {tense}; the motif "{motif}" must appear and matter to the story; situation: {sit}

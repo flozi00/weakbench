@@ -2433,6 +2433,48 @@ def score_false_friends(item, reply):
     return {"correct": ok, "score": float(ok), "pred": t[:80], "gold": item["gold"], "detail": {"took_bait": float(bait)}}
 
 
+# ---------------------------------------------------------------- quote_keep (translate around a foreign quote)
+# A message quotes a sentence in a third language. Translate the message, keep the quote verbatim. Models either
+# translate the quote too (bait) or leave the whole message untranslated.
+QK_QUOTES = ["On se voit demain à dix heures.", "La reunión está cancelada.", "Il treno è in ritardo.",
+             "Merci pour votre patience.", "¿Dónde está la factura?", "Ci vediamo lunedì."]
+QK_TRANS = r"morgen|tomorrow|abgesagt|cancel|verspät|delay|late|geduld|patience|rechnung|invoice|bill|montag|monday"
+QK_FRAMES = {"de": [("My colleague wrote in the chat: \"{q}\" Please answer her before Friday.", r"freitag", r"friday"),
+                    ("The customer sent only this line: \"{q}\" Can you call him back today?", r"heute", r"today"),
+                    ("Under the photo it said: \"{q}\" I did not understand the rest of the email.", r"\brest", r"understand"),
+                    ("Our partner closed the meeting with: \"{q}\" The next appointment is in March.", r"märz", r"march")],
+             "en": [("Meine Kollegin schrieb im Chat: \"{q}\" Bitte antworte ihr vor Freitag.", r"friday", r"freitag"),
+                    ("Der Kunde schickte nur diese Zeile: \"{q}\" Kannst du ihn heute zurückrufen?", r"today", r"heute"),
+                    ("Unter dem Foto stand: \"{q}\" Den Rest der E-Mail habe ich nicht verstanden.", r"\brest\b", r"verstanden"),
+                    ("Unser Partner beendete das Treffen mit: \"{q}\" Der nächste Termin ist im März.", r"march", r"märz")]}
+
+
+def load_quote_keep(lang, n, seed):
+    items = []
+    for i in range(min(n or 24, 24)):
+        frame, want, src = QK_FRAMES[lang][i % 4]
+        quote = QK_QUOTES[(i // 4) % 6]
+        ask = ("Translate into German. Keep the quoted sentence exactly as it is, in its original language. "
+               "Reply with the translation only.\n\n" if lang == "de" else
+               "Übersetze ins Englische. Lass den zitierten Satz genau so, wie er ist, in seiner Originalsprache. "
+               "Antworte nur mit der Übersetzung.\n\n")
+        items.append({"id": str(i), "lang": lang, "gold": quote, "want": want, "src": src,
+                      "messages": [{"role": "user", "content": ask + frame.format(q=quote)}]})
+    return items
+
+
+def score_quote_keep(item, reply):
+    norm = lambda t: re.sub(r"\s+", " ", t.replace("’", "'"))  # noqa: E731
+    text = norm(reply["content"] or "")
+    kept = norm(item["gold"]) in text
+    rest = text.replace(norm(item["gold"]), " ").lower()
+    translated = bool(re.search(item["want"], rest)) and not re.search(item["src"], rest)
+    q_trans = not kept and bool(re.search(QK_TRANS, rest))
+    ok = kept and translated
+    return {"correct": ok, "score": float(ok), "pred": text[:120], "gold": item["gold"],
+            "detail": {"quote_kept": float(kept), "translated": float(translated), "quote_translated": float(q_trans)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2738,6 +2780,7 @@ TASKS = {
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
     "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 24, lang_check=False),
     "false_friends": task(("de", "en"), load_false_friends, score_false_friends, 128, 12),
+    "quote_keep": task(("de", "en"), load_quote_keep, score_quote_keep, 256, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

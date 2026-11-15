@@ -747,3 +747,17 @@ if __name__ == "__main__":
     test_en_homophones()
     test_de_reported()
     test_de_homophones()
+
+
+def test_quote_keep():
+    import tasks_lang as tl
+    x = tl.load_quote_keep("de", None, 0)[0]
+    q = x["gold"]
+    assert tl.score_quote_keep(x, {"content": f'Meine Kollegin schrieb im Chat: „{q}" Bitte antworte ihr vor Freitag.'})["correct"]
+    r = tl.score_quote_keep(x, {"content": 'Meine Kollegin schrieb im Chat: „Wir sehen uns morgen um zehn." Bitte antworte ihr vor Freitag.'})
+    assert not r["correct"] and r["detail"]["quote_translated"] == 1.0
+    assert not tl.score_quote_keep(x, {"content": x["messages"][0]["content"].split("\n\n")[1]})["correct"]  # untranslated
+
+
+if __name__ == "__main__":
+    test_quote_keep()

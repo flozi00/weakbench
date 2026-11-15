@@ -2375,9 +2375,9 @@ def load_time_prep(lang, n, seed):
 
 def score_time_prep(item, reply):
     opts = ("at", "on", "in") if item["lang"] == "en" else ("um", "am", "im", "in")
-    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower()) if x in opts]
-    ok = w[:1] == [item["gold"]] or (item["gold"] == "at" and item["kind"] == 7 and w[:1] == ["on"])  # on the weekend (US)
-    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
+    v = gap_pick(item, reply, opts)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
 
 
 # ---------------------------------------------------------------- de_case_article (case after prepositions)
@@ -2493,9 +2493,9 @@ def load_en_article_sound(lang, n, seed):
 
 
 def score_en_article_sound(item, reply):
-    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in ("a", "an")]
-    ok = w[:1] == [item["gold"]]
-    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"],
+    v = gap_pick(item, reply, ("a", "an"))
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ok_sound_vs_letter" if item["tricky"] else "ok_plain": float(ok)}}
 
 
@@ -2653,10 +2653,9 @@ def load_en_usage(lang, n, seed):
 
 
 def score_en_usage(item, reply):
-    low = [o.lower() for o in item["opts"]]
-    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in low]
-    ok = len(set(w)) == 1 and w[0] == item["gold"].lower()
-    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
 # ---------------------------------------------------------------- sentence_order (coherence from discourse cues)
@@ -2704,12 +2703,12 @@ def load_de_als_wie(lang, n, seed):
 
 
 def score_de_als_wie(item, reply):
-    w = [x for x in re.findall(r"[a-zäöü]+", (reply["content"] or "").lower()) if x in ("als", "wie")]
-    ok = len(set(w)) == 1 and w[0] == item["gold"]
+    v = gap_pick(item, reply, ("als", "wie"))
+    ok = v == item["gold"]
     d = {f"ok_{item['kind']}": float(ok)}
     if item["gold"] == "als":
-        d["took_wie"] = float(w[:1] == ["wie"])
-    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": d}
+        d["took_wie"] = float(v == "wie")
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
 # ---------------------------------------------------------------- collocations (which verb goes with the noun)
@@ -2731,10 +2730,8 @@ def load_collocations(lang, n, seed):
 
 
 def score_collocations(item, reply):
-    t = " " + " ".join(re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())) + " "
-    hit = [o for o in item["opts"] if f" {o.lower()} " in t]
-    v = hit[0] if len(hit) == 1 else None
-    ok = v == item["gold"]
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"].lower()
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])} if item["calque"] != "-" else {}}  # "-": no calque
 
 
@@ -3079,8 +3076,7 @@ def load_en_dependent_preps(lang, n, seed):
 
 
 def score_en_dependent_preps(item, reply):
-    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in item["opts"]]
-    v = w[0] if len(set(w)) == 1 else None
+    v = gap_pick(item, reply, item["opts"])
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])}}
 
@@ -3258,6 +3254,25 @@ def score_de_das_was(item, reply):
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_{item['gold']}": float(ok), **({"took_das": float(v == "das")} if item["gold"] == "was" else {})}}
+
+
+def gap_pick(item, reply, opts):
+    """The option a gap-fill reply chose. A reply that repeats the sentence is read at the gap (the words before "___" in
+    the prompt, then an option); otherwise the reply must name exactly one option. Brackets are notes."""
+    text = re.sub(r"\([^()]*\)", " ", (reply["content"] or "").lower().replace("’", "'"))
+    words = re.findall(r"[a-zäöüß']+", text)
+    low = [o.lower() for o in opts]
+    gap_line = next((ln for ln in reversed(item["messages"][-1]["content"].splitlines()) if "___" in ln), "")
+    pre = re.findall(r"[a-zäöüß']+", gap_line.split("___")[0].lower())[-3:]
+    if pre:
+        for k in range(len(words) - len(pre)):
+            if words[k:k + len(pre)] == pre:
+                nxt = " ".join(words[k + len(pre):k + len(pre) + 2])
+                hit = [o for o in low if nxt == o or nxt.startswith(o + " ")]
+                if hit:
+                    return max(hit, key=len)
+    named = [o for o in low if re.search(r"(?<![a-zäöüß'])" + re.escape(o) + r"(?![a-zäöüß'])", " ".join(words))]
+    return named[0] if len(named) == 1 else None
 
 
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)

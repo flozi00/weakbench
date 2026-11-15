@@ -1534,14 +1534,14 @@ def score_en_learner_feedback(item, reply):
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
 # free upgrade, express shipping) or blame the customer or a named colleague. The note has an internal detail that
 # must not reach the customer.
-DN_ITEMS = {"en": [("a dining table", "Our supplier in Poland shipped the wrong wood; Jan in purchasing missed it."),
-                   ("a road bike", "The frame failed our quality check; the warehouse team blames the courier."),
-                   ("a washing machine", "The pallet was damaged in our own warehouse by a forklift."),
-                   ("a sofa", "The fabric order was placed two weeks late by our team.")],
-            "de": [("einen Esstisch", "Unser Lieferant in Polen hat das falsche Holz geschickt; Jan aus dem Einkauf hat es übersehen."),
-                   ("ein Rennrad", "Der Rahmen ist bei unserer Qualitätsprüfung durchgefallen; das Lager schiebt es auf den Kurier."),
-                   ("eine Waschmaschine", "Die Palette wurde in unserem eigenen Lager von einem Gabelstapler beschädigt."),
-                   ("ein Sofa", "Der Stoff wurde von unserem Team zwei Wochen zu spät bestellt.")]}
+DN_ITEMS = {"en": [("dining table", "Our supplier in Poland shipped the wrong wood; Jan in purchasing missed it."),
+                   ("road bike", "The frame failed our quality check; the warehouse team blames the courier."),
+                   ("washing machine", "The pallet was damaged in our own warehouse by a forklift."),
+                   ("sofa", "The fabric order was placed two weeks late by our team.")],
+            "de": [("Esstisch", "Unser Lieferant in Polen hat das falsche Holz geschickt; Jan aus dem Einkauf hat es übersehen."),
+                   ("Rennrad", "Der Rahmen ist bei unserer Qualitätsprüfung durchgefallen; das Lager schiebt es auf den Kurier."),
+                   ("Waschmaschine", "Die Palette wurde in unserem eigenen Lager von einem Gabelstapler beschädigt."),
+                   ("Sofa", "Der Stoff wurde von unserem Team zwei Wochen zu spät bestellt.")]}
 DN_NAMES = ["Petra Lindner", "Murat Aydın", "Claire Dubois", "Henrik Olsen", "Sofia Rossi", "Daniel Weber"]
 DN_JUDGE = """INTERNAL NOTE given to the support agent:
 {note}
@@ -1556,7 +1556,7 @@ For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 2. The email does not blame the customer, a courier, a supplier or a named colleague, and does not reveal internal
    details (people's names, the warehouse incident, who made the mistake); a general reason like "a quality problem"
    is fine.
-3. The email apologises once, sincerely and without grovelling, and is friendly and professional.
+3. The email apologises sincerely without grovelling (no repeated, excessive apologies), and is friendly and professional.
 4. The email is clear and complete as a customer email: greeting with the customer's name, the delay, the new date,
    the offer and how to accept it, a sign-off; nothing confusing.
 5. The email is written in correct {language}."""
@@ -1574,11 +1574,13 @@ def load_delay_notice(lang, n, seed):
         voucher = r.choice([15, 20, 25, 30, 40])
         date = f"{day}. {month}" if lang == "de" else f"{month} {day}"
         note = (f"Customer: {name}. Order: {product}. Original date has passed. New delivery date: {date}. Reason (internal only): "
-                f"{internal} Allowed offer: a {voucher} € voucher for the next order, nothing else. Cancellation is not offered."
+                f"{internal} Allowed offer: a €{voucher} voucher for the next order, nothing else; the code arrives automatically in a separate "
+                f"email. Cancellation is not offered. Sender: Lena Brandt, customer service, Nordhaus Living."
                 if lang == "en" else
-                f"Kunde/Kundin: {name}. Bestellung: {product}. Der ursprüngliche Termin ist verstrichen. Neuer Liefertermin: {date}. "
+                f"Name: {name}. Bestellung: {product}. Der ursprüngliche Termin ist verstrichen. Neuer Liefertermin: {date}. "
                 f"Grund (nur intern): {internal} Erlaubtes Angebot: ein Gutschein über {voucher} € für die nächste Bestellung, "
-                f"sonst nichts. Eine Stornierung wird nicht angeboten.")
+                f"sonst nichts; der Code kommt automatisch per separater E-Mail. Eine Stornierung wird nicht angeboten. "
+                f"Absenderin: Lena Brandt, Kundenservice Nordhaus Wohnen.")
         req = ("You work in customer support. Write the email to the customer based on this internal note. Reply with the email only.\n\n"
                if lang == "en" else
                "Du arbeitest im Kundenservice. Schreib auf Basis dieser internen Notiz die E-Mail an den Kunden bzw. die Kundin. "
@@ -1595,8 +1597,9 @@ def score_delay_notice(item, reply):
     mm = {"März": 3, "April": 4, "Mai": 5, "Juni": 6, "March": 3, "May": 5, "June": 6}[item["month"]]
     d, mo = item["day"], re.escape(item["month"])
     date_ok = bool(re.search(rf"(?<!\d)0?{d}(?:\.|st|nd|rd|th)?\s*(?:of\s+)?{mo}\b|\b{mo}\s+0?{d}(?:st|nd|rd|th)?\b"
-                             rf"|(?<![\d.])0?{d}\.\s?0?{mm}\.", flat))
-    offer_ok = bool(re.search(rf"(?<![\d.,]){item['voucher']}(?:[.,]00)?\s*(?:€|euro|eur\b)|€\s*{item['voucher']}\b", flat, re.I))
+                             rf"|(?<![\d.])0?{d}\.\s?0?{mm}(?:\.|(?!\d))", flat))
+    v = item["voucher"]
+    offer_ok = bool(re.search(rf"(?<![\d.,]){v}(?:[.,]00|,-{{1,2}})?[\s-]*(?:€|euro|eur\b)|(?:€|\beuro?)\s*{v}(?!\d|[.,]\d)", flat, re.I))
     out = tasks_judge.judge("", DN_JUDGE.format(note=item["note"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)

@@ -779,3 +779,17 @@ def test_md_translate():
 
 if __name__ == "__main__":
     test_md_translate()
+
+
+def test_gap_pick():
+    import tasks_lang as tl
+    item = {"messages": [{"role": "user", "content": "Setze ein.\n\nMein Bruder ist größer ___ ich."}]}
+    pick = lambda t: tl.gap_pick(item, {"content": t}, ("als", "wie"))  # noqa: E731
+    assert pick("als") == "als" and pick("Antwort: als") == "als"
+    assert pick("Mein Bruder ist größer als ich, nicht so groß wie ich.") == "als"  # read at the gap
+    assert pick("als oder wie") is None  # a hedge
+    assert pick("als (nicht wie)") == "als"  # a note in brackets
+
+
+if __name__ == "__main__":
+    test_gap_pick()

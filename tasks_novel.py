@@ -4746,7 +4746,12 @@ def load_median_traps(lang, n, seed):
 
 
 def score_median_traps(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    # after the last "=" / "->" the first number counts; otherwise the line must hold exactly one distinct number
+    # (a sorted list or a hedge "41.5 (or 46)" is no answer)
+    fa = final_answer(reply["content"]) or ""
+    tail = re.split(r"=|->|→", fa)[-1]
+    nums = [float(x.replace(",", ".")) for x in re.findall(r"-?\d+(?:[.,]\d+)?(?![\d])", tail)]
+    v = (nums[0] if nums else None) if tail != fa else (nums[0] if len(set(nums)) == 1 else None)
     ok = v is not None and abs(v - item["gold"]) < 1e-6
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ok_odd" if item["odd"] else "ok_even": float(ok),

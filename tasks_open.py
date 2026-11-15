@@ -1004,6 +1004,8 @@ HH_CITY = ["Bielefeld", "Kassel", "Rostock", "Ulm", "Trier", "Jena"]
 HH_JUDGE = """NEWS TEXT:
 {text}
 
+MAIN FACT (for your check): {main}. The neighbouring district's figure is NOT the main fact.
+
 HEADLINE:
 {head}
 
@@ -1011,7 +1013,8 @@ For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 1. The headline is accurate: the direction of the main change is right and any number in it matches the text.
 2. The headline does not exaggerate (no "record", "explodes", "collapses", "dramatic" or similar for a small change) and
    claims nothing the text does not say.
-3. The headline names the main topic of the text."""
+3. The headline names the main topic of the text.
+4. The headline is written in {language}."""
 
 
 def load_honest_headline(lang, n, seed):
@@ -1022,33 +1025,38 @@ def load_honest_headline(lang, n, seed):
         topic, up, down = HH_TOPIC[lang][i % 4]
         c = HH_CITY[(i // 4) % 6]
         pct = r.choice([1.5, 2, 2.5, 3, 4])
-        rise = r.random() < 0.5
+        rise = (i // 4) % 2 == 0  # balanced per topic
         other = r.choice([6, 8, 9])
         ps = f"{pct:g}".replace(".", ",") if lang == "de" else f"{pct:g}"
         t = topic.format(c=c)
         text = (f"Last year {t} {up if rise else down} by {ps} percent compared with the year before, according to the city. "
-                f"In the neighbouring district the change was {other} percent. The city expects similar figures next year."
+                f"In the neighbouring district the figure {down if rise else up} by {other} percent. The city expects similar figures next year."
                 if lang == "en" else
                 f"Im vergangenen Jahr {up if rise else down} {t} laut Stadt um {ps} Prozent gegenüber dem Vorjahr. "
-                f"Im Nachbarkreis lag die Veränderung bei {other} Prozent. Die Stadt erwartet für das nächste Jahr ähnliche Zahlen.")
+                f"Im Nachbarkreis {down if rise else up} der Wert um {other} Prozent. Die Stadt erwartet für das nächste Jahr ähnliche Zahlen.")
         req = ("Write a headline for this news text, at most 10 words. Reply with the headline only.\n\n" if lang == "en" else
                "Schreib eine Schlagzeile für diese Meldung, höchstens 10 Wörter. Antworte nur mit der Schlagzeile.\n\n")
-        items.append({"id": str(i), "lang": lang, "text": text, "messages": [{"role": "user", "content": req + text}]})
+        main = f"{t}: {'up' if rise else 'down'} {pct:g} %"
+        items.append({"id": str(i), "lang": lang, "text": text, "main": main, "messages": [{"role": "user", "content": req + text}]})
     return items
 
 
 def score_honest_headline(item, reply):
     tasks_judge.check_judge()
-    head = (reply["content"] or "").strip().strip("#*\"„“ ")
+    lines = [x for x in (reply["content"] or "").strip().splitlines() if x.strip()]
+    head = re.sub(r"^(?:headline|schlagzeile)\s*:\s*", "", (lines[0] if lines else "").strip().strip("#*\"„“”'`» «"),
+                  flags=re.I).strip().strip("*\"„“”'` ")
     words = len([w for w in head.split() if re.search(r"\w", w)])
-    out = tasks_judge.judge("", HH_JUDGE.format(text=item["text"], head=head or "(empty)"), max_tokens=64)
+    out = tasks_judge.judge("", HH_JUDGE.format(text=item["text"], head=head or "(empty)", main=item["main"],
+                                                language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")
-    if not isinstance(v, list) or len(v) != 3:
+    if not isinstance(v, list) or len(v) != 4:
         raise ValueError(f"unusable headline verdict {out[:120]!r}")
-    met = [_yes(x) for x in v] + [1 <= words <= 10]
-    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": head[:120], "gold": None,
-            "detail": {"accurate": float(met[0]), "no_hype": float(met[1]), "on_topic": float(met[2]), "within_limit": float(met[3])}}
+    met = [_yes(x) for x in v] + [1 <= words <= 10 and len(lines) == 1]  # extra lines (a self-justification) break the limit
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": head[:120], "gold": None,
+            "detail": {"accurate": float(met[0]), "no_hype": float(met[1]), "on_topic": float(met[2]), "right_language": float(met[3]),
+                       "within_limit": float(met[4])}}
 
 
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)

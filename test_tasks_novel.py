@@ -1341,8 +1341,20 @@ def test_recipe_scale():
     assert not tn.score_recipe_scale(t, {"content": f"Antwort: {t['gold']} °C"})["correct"]
 
 
+
+def test_median_traps():
+    import tasks_novel as tn
+    x = next(x for x in tn.load_median_traps("en", 40, 0) if x["gold"] != int(x["gold"]))
+    g = x["gold"]
+    ok = lambda t: tn.score_median_traps(x, {"content": t})["correct"]  # noqa: E731
+    assert ok(f"Answer: {g}") and ok(f"Answer: Median = {g} (sorted: 4, 7, 9)") and ok(f"Answer: 3, 26, 35 -> {g}")
+    assert ok(f"Antwort: {g}".replace(".", ","))
+    assert not ok(f"Answer: {g} (or 46 if unsorted)")
+
+
 if __name__ == "__main__":
     test_weekday_calc()
+    test_median_traps()
     test_recipe_scale()
     test_unit_price()
     test_count_mentions()

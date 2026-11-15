@@ -326,14 +326,16 @@ def test_de_dialect():
 
 
 def test_honest_headline():
-    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "1. YES", "YES"]}', "finish_reason": "stop"})
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "1. YES", "YES", "YES"]}', "finish_reason": "stop"})
     try:
         tasks_judge.configure(url, "mock", 32768)
         it = to.load_honest_headline("de", None, 0)
         assert len(it) == 24 and len({x["text"] for x in it}) == 24
         assert to.score_honest_headline(it[0], {"content": "Busfahrgäste in Bielefeld: leichtes Plus"})["correct"]
         r = to.score_honest_headline(it[0], {"content": "Wort " * 12})
-        assert not r["correct"] and r["score"] == 0.75
+        assert not r["correct"] and r["score"] == 0.8
+        r = to.score_honest_headline(it[0], {"content": "**Schlagzeile:** Leichtes Plus\n\nDas ist genau."})
+        assert r["pred"] == "Leichtes Plus" and r["detail"]["within_limit"] == 0.0
     finally:
         stop()
         tasks_judge.configure(None, None, None)

@@ -4568,7 +4568,8 @@ def load_recipe_scale(lang, n, seed):
         r = rng_of("recipe_scale", i)
         p = r.choice([2, 4, 6])
         q = r.choice([x for x in (3, 8, 10, 12, 1) if x != p])
-        amounts = [r.choice([2, 3, 4, 5, 6]) * 50 * p // 2 for _ in RS_ING[lang]]
+        per = [r.randrange(lo, hi + 1, 5) for lo, hi in ((60, 90), (40, 80), (15, 30), (10, 25))]  # per serving
+        amounts = [x * p for x in per]
         temp, mins = r.choice([160, 175, 180, 200]), r.choice([20, 25, 35, 40])
         ings = "\n".join(f"- {a} {u} {name}" for (name, u), a in zip(RS_ING[lang], amounts))
         trap = i % 4 == 3
@@ -4582,10 +4583,7 @@ def load_recipe_scale(lang, n, seed):
         else:
             k = (i // 4) % 4
             name, u = RS_ING[lang][k]
-            gold = amounts[k] * q / p
-            if gold != int(gold):
-                gold = round(gold, 1)
-            gold = int(gold) if gold == int(gold) else gold
+            gold = per[k] * q
             qq = (f"How many {u} of {name} do you need for {q} servings?" if lang == "en" else
                   f"Wie viel {u} {name} brauchst du für {q} Portionen?")
         intro = (f"Recipe for {p} servings:\n{ings}\nBake at {temp} °C for {mins} minutes per tray.\n\n" if lang == "en" else

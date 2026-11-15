@@ -2578,6 +2578,54 @@ def score_de_capitals(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "wrong_words": wrong, "changed_words": float(not same)}}
 
 
+# ---------------------------------------------------------------- en_conditionals (verb form in conditionals)
+# (type, sentence with the gap, verb, accepted forms). Contractions are expanded before comparing.
+EC_ITEMS = [("first", "If it rains tomorrow, we ___ at home.", "stay", ["will stay"]),
+            ("first", "If you heat ice, it ___.", "melt", ["melts"]),
+            ("first", "Unless you hurry, you ___ the bus.", "miss", ["will miss"]),
+            ("first", "If she ___ early, she will catch the train.", "leave", ["leaves"]),
+            ("first", "We will start as soon as everyone ___.", "arrive", ["arrives", "has arrived"]),
+            ("second", "If I ___ you, I would take the job.", "be", ["were"]),
+            ("second", "If we had more time, we ___ the museum.", "visit", ["would visit"]),
+            ("second", "If he ___ the answer, he would tell us.", "know", ["knew"]),
+            ("second", "She would buy a house if she ___ enough money.", "have", ["had"]),
+            ("second", "What would you do if you ___ the lottery?", "win", ["won"]),
+            ("third", "If she had studied, she ___ the exam.", "pass", ["would have passed"]),
+            ("third", "If we ___ earlier, we would have caught the train.", "leave", ["had left"]),
+            ("third", "They would have come if you ___ them.", "invite", ["had invited"]),
+            ("third", "If it had not rained, the match ___ cancelled.", "not be", ["would not have been"]),
+            ("third", "If I ___ about the problem, I would have helped.", "know", ["had known"]),
+            ("mixed", "If I had taken that job, I ___ in Berlin now.", "live", ["would be living", "would live"]),
+            ("mixed", "If she were more careful, she ___ the mistake yesterday.", "not make", ["would not have made"]),
+            ("mixed", "If he had not missed the flight, he ___ here now.", "be", ["would be"]),
+            ("wish", "I wish I ___ taller.", "be", ["were"]),
+            ("wish", "I wish I ___ that email yesterday.", "not send", ["had not sent"]),
+            ("wish", "She wishes she ___ speak French.", "can", ["could"]),
+            ("wish", "If only we ___ more time last week.", "have", ["had had"]),
+            ("first", "If the alarm ___, leave the building.", "ring", ["rings"]),
+            ("second", "It would be easier if the instructions ___ clearer.", "be", ["were"])]
+EC_EXPAND = [(r"won't", "will not"), (r"wouldn't", "would not"), (r"hadn't", "had not"), (r"'d have", " would have"),
+             (r"'ll", " will"), (r"'d", " would")]
+
+
+def load_en_conditionals(lang, n, seed):
+    rows = EC_ITEMS[:min(n or len(EC_ITEMS), len(EC_ITEMS))]
+    return [{"id": str(i), "lang": "en", "gold": forms[0], "forms": forms, "kind": k,
+             "messages": [{"role": "user", "content": f"Fill the gap with the correct form of the verb in brackets ({verb}). "
+                           f"Answer with the missing words only.\n\n{sent}"}]}
+            for i, (k, sent, verb, forms) in enumerate(rows)]
+
+
+def score_en_conditionals(item, reply):
+    t = (reply["content"] or "").lower().replace("’", "'")
+    for a, b in EC_EXPAND:
+        t = t.replace(a, b)
+    t = " ".join(re.findall(r"[a-z]+", t))
+    got = [f for f in item["forms"] if re.search(r"(?:^| )" + f + r"(?: |$)", t)]
+    ok = bool(got) and len(t.split()) <= len(item["forms"][0].split()) + 3  # not the whole sentence with every option
+    return {"correct": ok, "score": float(ok), "pred": t[:60], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2887,6 +2935,7 @@ TASKS = {
     "en_article_sound": task(("en",), load_en_article_sound, score_en_article_sound, 16, 27, lang_check=False),
     "de_weil_denn": task(("de",), load_de_weil_denn, score_de_weil_denn, 64, 30, lang_check=False),
     "de_capitals": task(("de",), load_de_capitals, score_de_capitals, 96, 20, lang_check=False),
+    "en_conditionals": task(("en",), load_en_conditionals, score_en_conditionals, 32, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

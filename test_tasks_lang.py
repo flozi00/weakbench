@@ -993,6 +993,15 @@ def test_dual_output():
             r = tl.score_dual_output(x, {"content": f"{msg}\n---\n{note}"})
             assert r["correct"], (x["gold"], r)
             assert not tl.score_dual_output(x, {"content": msg})["correct"]
+        x = xs[0]
+        first = x["name"].split()[0]
+        dn = x["day"][0] if x["msg_lang"] == "en" else x["day"][1]
+        h = int(x["time"].split(":")[0])
+        msg = (f"Hi {first},\n\nour project meeting moves to {dn.lower()}, same time ({x['time']}). See you then!\n\nBest,\nAnna"
+               if x["msg_lang"] == "en" else
+               f"Hallo {first},\n\nunser Projekttermin wird auf {dn} verschoben, gleiche Uhrzeit ({x['time']} Uhr). Viele Grüße")
+        note = "Notiz: Termin mit Haddad auf Mittwoch verschoben." if x["note_lang"] == "de" else "Note: Meeting moved to the new day."
+        assert tl.score_dual_output(x, {"content": f"{msg}\n\n***\n\n{note}"})["correct"], (msg, note)
 
 
 if __name__ == "__main__":

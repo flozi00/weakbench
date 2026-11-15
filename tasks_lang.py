@@ -3975,16 +3975,25 @@ def score_de_imperative(item, reply):
 
 # ---------------------------------------------------------------- dual_output (two languages in one reply, each in its place)
 # The instruction is in the cell language; the reply has a message in one language and, after a "---" line, a one-sentence
-# note in the other (or the same) language. Language per part by function words; the moved time and the name must
-# survive in both parts. Measures switching inside one reply, the case where models drift into a single language.
+# note in the other language. Language per part by function words; the moved day, time and name must be in the
+# message. Measures switching inside one reply, the case where models drift into a single language.
 DO_NAMES = ["Nora Novak", "Sami Haddad", "Elin Lindqvist", "Chidi Okafor", "Claire Moreau", "Piotr Kowalczyk"]
 DO_DAYS = {"en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "de": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"]}
 
 
+DO_EXTRA = {"de": {"unser", "unseren", "wird", "wurde", "von", "vom", "auf", "am", "um", "uhr", "bleibt", "gleich",
+                                    "gleiche", "den", "dem", "ich", "es", "zu", "im", "verschoben", "herr", "frau", "hallo", "grüße",
+                                    "lieber", "liebe", "termin", "uhrzeit", "statt", "jetzt", "bis", "dann", "danke"},
+            "en": {"our", "on", "at", "from", "moved", "moves", "meeting", "same", "time", "now", "see", "hi", "dear",
+                                    "best", "regards", "thanks", "i", "me", "be", "will", "this"}}
+
+
 def _de_en(text):
+    """de / en by function words (own sets: ML_WORDS is tuned to customer service); a short note needs 1 word if it leads."""
     words = re.findall(r"[a-zäöüß']+", text.lower())
-    de, en = sum(w in ML_WORDS["de"] for w in words), sum(w in ML_WORDS["en"] for w in words)
-    return "de" if de >= 2 and de > en else "en" if en >= 2 and en > de else None
+    sets = {k: ML_WORDS[k] | DO_EXTRA[k] for k in ("de", "en")}  # ML_WORDS is defined further down
+    de, en = sum(w in sets["de"] for w in words), sum(w in sets["en"] for w in words)
+    return "de" if de >= 1 and de > en else "en" if en >= 1 and en > de else None
 
 
 def load_dual_output(lang, n, seed):
@@ -4001,19 +4010,23 @@ def load_dual_output(lang, n, seed):
              f"Unser Projekttermin mit {name} wird von {DO_DAYS['de'][d_old]} auf {DO_DAYS['de'][d_new]} verschoben, gleiche Uhrzeit "
              f"({hh}). Schreib eine kurze Nachricht (2-3 Sätze) an {name} auf {L[msg_lang]}, die das mitteilt. Dann eine Zeile nur "
              f"mit ---, und darunter einen Satz auf {L[note_lang]} für meine eigenen Notizen, der die Änderung zusammenfasst.")
-        items.append({"id": str(i), "lang": lang, "msg_lang": msg_lang, "note_lang": note_lang, "name": name.split()[-1], "time": hh,
+        items.append({"id": str(i), "lang": lang, "msg_lang": msg_lang, "note_lang": note_lang, "name": name, "time": hh,
                       "day": (DO_DAYS["en"][d_new], DO_DAYS["de"][d_new]), "gold": f"{msg_lang}/{note_lang}",
                       "messages": [{"role": "user", "content": q}]})
     return items
 
 
 def score_dual_output(item, reply):
-    parts = [p.strip() for p in re.split(r"^\s*-{3,}\s*$", reply["content"] or "", flags=re.M) if p.strip()]
+    parts = [p.strip() for p in re.split(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$", reply["content"] or "", flags=re.M) if p.strip()]
     two = len(parts) == 2
     m_lang = _de_en(parts[0]) if two else None
     n_lang = _de_en(parts[1]) if two else None
     day = item["day"][0] if item["msg_lang"] == "en" else item["day"][1]
-    facts = two and item["time"] in parts[0] and item["name"] in parts[0] and day.lower() in parts[0].lower()
+    h, mi = map(int, item["time"].split(":"))
+    tpat = rf"(?<!\d)0?{h}[:.]{mi:02d}" + (rf"|(?<!\d)0?{h}\s*(?:uhr|h)\b" if mi == 0 else "") + \
+        rf"|(?<!\d){h % 12 or 12}(?::{mi:02d})?\s*[ap]\.?\s?m"  # 10:00, 10 Uhr, 2 pm
+    facts = two and bool(re.search(tpat, parts[0], re.I)) and any(p in parts[0] for p in item["name"].split()) \
+        and day.lower() in parts[0].lower()
     one = two and len(re.findall(r"[.!?](?:\s|$)", parts[1])) <= 1
     met = [two, m_lang == item["msg_lang"], n_lang == item["note_lang"], bool(facts), bool(one)]
     return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": f"{m_lang}/{n_lang}", "gold": item["gold"],

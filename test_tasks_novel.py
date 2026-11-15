@@ -1400,8 +1400,18 @@ def test_queue_sim():
     assert tn._qs_rr([("A", 0, 2), ("C", 6, 3)], 2) == {"A": 2, "C": 9}
 
 
+
+def test_result_side():
+    import tasks_novel as tn
+    assert tn.result_side("3 days + 5 days = 34 days") == "34 days"
+    assert tn.result_side("7.004,06 € = 7.000 € + 4,06 €") == "7.004,06 €"
+    assert tn.result_side("−12,50 €") == "−12,50 €"
+    assert tn.result_side("2.718,28 € − 90,09 € = 2.628,19 €") == "2.628,19 €"
+
+
 if __name__ == "__main__":
     test_weekday_calc()
+    test_result_side()
     test_median_traps()
     test_work_rates()
     test_spot_change()

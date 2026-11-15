@@ -4619,6 +4619,53 @@ def score_recipe_scale(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- coin_change (greedy bait)
+def _cc_dp(coins, amount):
+    best = [0] + [None] * amount
+    for a in range(1, amount + 1):
+        opts = [best[a - c] for c in coins if c <= a and best[a - c] is not None]
+        best[a] = min(opts) + 1 if opts else None
+    return best[amount]
+
+
+def _cc_greedy(coins, amount):
+    k = 0
+    for c in sorted(coins, reverse=True):
+        k += amount // c
+        amount %= c
+    return k if amount == 0 else None
+
+
+def load_coin_change(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("coin_change", i)
+        trap = i % 2 == 0
+        for _ in range(1000):
+            coins = sorted({1, *r.sample(range(2, 30), 3)})
+            amount = r.randint(15, 80)
+            g, gr = _cc_dp(coins, amount), _cc_greedy(coins, amount)
+            if (gr != g) == trap:
+                break
+        cs = ", ".join(map(str, coins))
+        q = (f"In a country the only coins are worth {cs} crowns (any number of each). What is the smallest number of coins "
+             f"that add up to exactly {amount} crowns?" if lang == "en" else
+             f"In einem Land gibt es nur Münzen im Wert von {cs} Kronen (beliebig viele von jeder). Wie viele Münzen braucht man "
+             f"mindestens, um genau {amount} Kronen zu bezahlen?")
+        items.append({"id": str(i), "lang": lang, "gold": g, "greedy": gr, "trap": trap,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_coin_change(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    d = {"ok_trap" if item["trap"] else "ok_control": float(ok)}
+    if item["trap"]:
+        d["took_greedy"] = float(v == item["greedy"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6191,6 +6238,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "coin_change": task(load_coin_change, score_coin_change, 24, 120),
     "recipe_scale": task(load_recipe_scale, score_recipe_scale, 24, 120),
     "unit_price": task(load_unit_price, score_unit_price, 24, 120),
     "count_mentions": task(load_count_mentions, score_count_mentions, 24, 120),

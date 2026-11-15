@@ -1391,12 +1391,22 @@ def test_floor_area():
         assert area == x["gold"] != x["bbox"], (x["id"], area, x["gold"])
 
 
+
+def test_queue_sim():
+    import tasks_novel as tn
+    # hand-checked: q=2; A(0,3) B(1,2): A 0-2, B 2-4 (arrived during A's turn, ahead of A), A 4-5
+    assert tn._qs_rr([("A", 0, 3), ("B", 1, 2)], 2) == {"B": 4, "A": 5}
+    # idle gap: C arrives after everyone is done
+    assert tn._qs_rr([("A", 0, 2), ("C", 6, 3)], 2) == {"A": 2, "C": 9}
+
+
 if __name__ == "__main__":
     test_weekday_calc()
     test_median_traps()
     test_work_rates()
     test_spot_change()
     test_floor_area()
+    test_queue_sim()
     test_recipe_scale()
     test_unit_price()
     test_count_mentions()

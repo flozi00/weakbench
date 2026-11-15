@@ -4928,6 +4928,74 @@ def score_floor_area(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "took_bbox": float(v == item["bbox"])}}
 
 
+# ---------------------------------------------------------------- queue_sim (execute an unfamiliar procedure)
+QS_NAMES = ["Ada", "Ben", "Cem", "Dora", "Eli"]
+
+
+def _qs_rr(cust, q):
+    """cust: [(name, arrival, need)], sorted by arrival. Round robin with slice q; a customer arriving at the moment a
+    slice ends joins the queue before the preempted one. Returns {name: finish minute}."""
+    t, queue, left, done, i = 0, [], {c[0]: c[2] for c in cust}, {}, 0
+    while len(done) < len(cust):
+        while i < len(cust) and cust[i][1] <= t:
+            queue.append(cust[i][0])
+            i += 1
+        if not queue:
+            t = cust[i][1]
+            continue
+        nm = queue.pop(0)
+        run = min(q, left[nm])
+        t += run
+        left[nm] -= run
+        while i < len(cust) and cust[i][1] <= t:
+            queue.append(cust[i][0])
+            i += 1
+        if left[nm]:
+            queue.append(nm)
+        else:
+            done[nm] = t
+    return done
+
+
+def load_queue_sim(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("queue_sim", i)
+        k = (3, 4, 5)[i % 3]
+        q = r.choice([2, 3, 4])
+        while True:
+            arr = sorted(r.sample(range(0, 8), k))
+            cust = [(QS_NAMES[j], arr[j], r.randint(2, 9)) for j in range(k)]
+            done = _qs_rr(cust, q)
+            t, fifo = 0, {}
+            for nm, a, need in cust:
+                t = max(t, a) + need
+                fifo[nm] = t
+            who = r.choice([c[0] for c in cust])
+            if done[who] != fifo[who]:
+                break
+        lines = "\n".join((f"- {nm} arrives at minute {a} and needs {need} minutes" if lang == "en" else
+                           f"- {nm} kommt in Minute {a} und braucht {need} Minuten") for nm, a, need in cust)
+        rule = (f"One clerk serves a queue in turns of at most {q} minutes. A customer who is not finished after a turn goes to "
+                "the back of the queue. Customers who arrive while a turn is running, or at the moment it ends, join the queue "
+                "before the customer whose turn just ended. The clerk starts at minute 0 and never waits if someone is queued."
+                if lang == "en" else
+                f"Eine Sachbearbeiterin bedient eine Warteschlange in Runden von höchstens {q} Minuten. Wer nach einer Runde nicht "
+                "fertig ist, stellt sich hinten an. Wer während einer Runde oder genau an ihrem Ende ankommt, reiht sich vor der "
+                "Person ein, deren Runde gerade endete. Sie beginnt in Minute 0 und wartet nie, wenn jemand ansteht.")
+        ask = (f"In which minute is {who} finished?" if lang == "en" else f"In welcher Minute ist {who} fertig?")
+        items.append({"id": str(i), "lang": lang, "gold": done[who], "fifo": fifo[who], "k": k,
+                      "messages": [{"role": "user", "content": f"{rule}\n{lines}\n{ask}\n" + ASK[lang]}]})
+    return items
+
+
+def score_queue_sim(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_n{item['k']}": float(ok), "took_fifo": float(v == item["fifo"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6500,6 +6568,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "queue_sim": task(load_queue_sim, score_queue_sim, 24, 120),
     "floor_area": task(load_floor_area, score_floor_area, 24, 120),
     "spot_change": task(load_spot_change, score_spot_change, 24, 120),
     "work_rates": task(load_work_rates, score_work_rates, 24, 120),

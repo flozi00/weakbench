@@ -3303,6 +3303,44 @@ def score_de_seit_vor(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_gerund_inf (verb patterns)
+GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
+            ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
+            ("fixed", "I suggest ___ earlier tomorrow.", "leave", "gerund"), ("fixed", "She refused ___ the contract.", "sign", "inf"),
+            ("fixed", "Do you mind ___ the window?", "open", "gerund"), ("fixed", "He promised ___ on time.", "be", "inf"),
+            ("fixed", "We finished ___ the kitchen at midnight.", "paint", "gerund"), ("fixed", "I hope ___ you soon.", "see", "inf"),
+            ("fixed", "She keeps ___ the same mistake.", "make", "gerund"), ("fixed", "They agreed ___ the costs.", "share", "inf"),
+            ("meaning", "He stopped ___ ten years ago; he hasn't had a cigarette since.", "smoke", "gerund"),
+            ("meaning", "On the way home he stopped ___ a newspaper at the kiosk.", "buy", "inf"),
+            ("meaning", "I remember ___ the door, but now it is open.", "lock", "gerund"),
+            ("meaning", "Remember ___ the door when you leave!", "lock", "inf"),
+            ("meaning", "I will never forget ___ the Alps for the first time.", "see", "gerund"),
+            ("meaning", "Don't forget ___ your mother tonight.", "call", "inf"),
+            ("meaning", "The printer didn't work, so I tried ___ it off and on again, and it worked.", "switch", "gerund"),
+            ("meaning", "I tried ___ the box, but it was too heavy.", "lift", "inf")]
+
+
+def _gi_forms(v):
+    ing = {"swim": "swimming", "make": "making", "leave": "leaving", "share": "sharing", "smoke": "smoking", "be": "being",
+           "see": "seeing", "lift": "lifting", "lock": "locking", "buy": "buying", "call": "calling", "switch": "switching"}.get(v)
+    return ing or (v + "ing"), "to " + v
+
+
+def load_en_gerund_inf(lang, n, seed):
+    out = []
+    for i, (kind, sent, v, form) in enumerate(GI_ITEMS[:min(n or 20, 20)]):
+        ger, inf = _gi_forms(v)
+        out.append({"id": str(i), "lang": "en", "gold": ger if form == "gerund" else inf, "opts": (ger, inf), "kind": kind,
+                    "messages": [{"role": "user", "content": f"Fill the gap with \"{ger}\" or \"{inf}\". Answer with that form only.\n\n{sent}"}]})
+    return out
+
+
+def score_en_gerund_inf(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3633,6 +3671,7 @@ TASKS = {
     "en_phrasal_sense": task(("en",), load_en_phrasal_sense, score_en_phrasal_sense, 16, 20, lang_check=False),
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
+    "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

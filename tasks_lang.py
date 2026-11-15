@@ -2911,7 +2911,7 @@ def score_en_hyphens(item, reply):
 
 # ---------------------------------------------------------------- de_ersatzinfinitiv (modal verbs in the Perfekt)
 # "Er muss arbeiten." -> "Er hat arbeiten müssen." (infinitive, not "gemusst"); in a subordinate clause the auxiliary
-# goes before the verb cluster: "..., weil er hat arbeiten müssen." (not "weil er arbeiten müssen hat").
+# goes before the verb cluster: "..., dass er hat arbeiten müssen." (not "dass er arbeiten müssen hat").
 EI_ROWS = [("Er", "muss", "müssen", "gemusst", "heute lange arbeiten", "arbeiten"),
            ("Sie", "kann", "können", "gekonnt", "den Termin nicht wahrnehmen", "wahrnehmen"),
            ("Wir", "dürfen", "dürfen", "gedurft", "im Garten grillen", "grillen"),
@@ -2935,8 +2935,8 @@ def load_de_ersatzinfinitiv(lang, n, seed):
         sent = f"{subj} {fin} {rest}."
         aux = EI_AUX[subj]
         if sub:
-            s_ = subj if subj in ("Ich", "Du", "Ihr", "Wir") else subj[0].lower() + subj[1:] if subj in ("Er", "Sie") else subj
-            sent = f"Ich weiß, dass {s_.lower() if subj in ('Ich', 'Du', 'Ihr', 'Wir') else s_} {rest} {fin}."
+            s_ = subj if subj == "Anna" else subj[0].lower() + subj[1:]  # "dass die Kinder", "dass er"
+            sent = f"Ich weiß, dass {s_} {rest} {fin}."
             ask = "Setze den Nebensatz ins Perfekt. Antworte nur mit dem ganzen Satz.\n\n"
             gold = f"{aux} {verb} {inf}"
         else:

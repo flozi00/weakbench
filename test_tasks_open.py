@@ -845,3 +845,22 @@ def test_transcript_clean():
 
 if __name__ == "__main__":
     test_transcript_clean()
+
+
+def test_subtitle_mt():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_subtitle_mt("de", None, 0)[0]
+        good = "1. Fass mein Auto nicht an, hab ich gesagt.\n2. Es war ein Notfall, ehrlich.\n3. Und wo sind jetzt die Schlüssel?"
+        assert to.score_subtitle_mt(x, {"content": good})["correct"]
+        long = good.replace("Es war ein Notfall, ehrlich.", "Es war wirklich ein absoluter Notfall, das schwöre ich dir.")
+        assert to.score_subtitle_mt(x, {"content": long})["detail"]["within_42"] == 0
+        assert to.score_subtitle_mt(x, {"content": good.replace("3.", "4.")})["detail"]["numbering"] == 0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_subtitle_mt()

@@ -2174,6 +2174,67 @@ def score_transcript_clean(item, reply):
                        "written_style": float(written), "grammar": float(grammar)}}
 
 
+# ---------------------------------------------------------------- subtitle_mt (judge + exact: translation under a length limit)
+# Subtitles: each numbered line translated into the other language, same numbering, at most 42 characters per line
+# (checked in code) — German runs ~30 % longer than English, so the model must condense without losing meaning (judge).
+SUB_SCENES = {"en": [["I told you not to touch my car.", "It was an emergency, I swear.", "Then where are the keys now?"],
+                     ["We're closing in five minutes.", "Can I still get a coffee to go?", "Only if you pay by card."],
+                     ["The train is cancelled again.", "Then we'll have to take a taxi.", "Do you have any idea what that costs?"],
+                     ["Did you finish the report?", "Almost, I just need the numbers from finance.", "They promised them for this morning."],
+                     ["Why didn't you call me back?", "My phone died on the way home.", "You could have borrowed one."],
+                     ["This soup is far too salty.", "I followed the recipe exactly.", "Then the recipe is wrong."]],
+              "de": [["Ich habe dir gesagt, du sollst mein Auto nicht anfassen.", "Es war ein Notfall, ich schwöre.", "Und wo sind jetzt die Schlüssel?"],
+                     ["Wir schließen in fünf Minuten.", "Kann ich noch einen Kaffee zum Mitnehmen bekommen?", "Nur wenn Sie mit Karte zahlen."],
+                     ["Der Zug fällt schon wieder aus.", "Dann müssen wir ein Taxi nehmen.", "Weißt du eigentlich, was das kostet?"],
+                     ["Bist du mit dem Bericht fertig?", "Fast, mir fehlen nur noch die Zahlen aus der Buchhaltung.", "Die wollten sie heute Morgen schicken."],
+                     ["Warum hast du mich nicht zurückgerufen?", "Mein Akku war auf dem Heimweg leer.", "Du hättest dir eins leihen können."],
+                     ["Diese Suppe ist viel zu salzig.", "Ich habe mich genau ans Rezept gehalten.", "Dann ist das Rezept falsch."]]}
+SUB_JUDGE = """SOURCE SUBTITLES ({src_lang}):
+{src}
+
+TRANSLATED SUBTITLES ({tgt_lang}):
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Each line keeps the meaning of the source line with the same number (condensing is fine, a changed or lost point is not).
+2. It sounds like natural spoken {tgt_lang} dialogue, as a viewer would read it in subtitles.
+3. Grammar and spelling are correct."""
+
+
+def load_subtitle_mt(lang, n, seed):
+    tasks_judge.check_judge()
+    src_lang = "de" if lang == "en" else "en"  # the cell language is the target
+    items = []
+    for i, scene in enumerate(SUB_SCENES[src_lang][:n or 6]):
+        src = "\n".join(f"{k + 1}. {ln}" for k, ln in enumerate(scene))
+        q = (f"Translate these subtitles into English. Keep the numbering, one line per number, at most 42 characters per line "
+             f"(without the number). Reply with the subtitles only.\n\n{src}" if lang == "en" else
+             f"Übersetze diese Untertitel ins Deutsche. Behalte die Nummerierung bei, eine Zeile pro Nummer, höchstens 42 Zeichen pro "
+             f"Zeile (ohne die Nummer). Antworte nur mit den Untertiteln.\n\n{src}")
+        items.append({"id": str(i), "lang": lang, "src": src, "n_lines": len(scene), "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_subtitle_mt(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    lines = re.findall(r"^\s*(\d+)[.)]\s*(.+?)\s*$", text, re.M)
+    numbered = [int(k) for k, _ in lines] == list(range(1, item["n_lines"] + 1))
+    short = bool(lines) and all(len(t.strip("*\"„“")) <= 42 for _, t in lines)
+    names = {"de": "German", "en": "English"}
+    out = tasks_judge.judge("", SUB_JUDGE.format(src_lang=names["en" if item["lang"] == "de" else "de"], tgt_lang=names[item["lang"]],
+                                                 src=item["src"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable subtitle_mt verdict {out[:120]!r}")
+    meaning, natural, grammar = (_yes(x) for x in v)
+    met = [numbered, short, meaning, natural, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"numbering": float(numbered), "within_42": float(short), "meaning": float(meaning), "natural": float(natural),
+                       "grammar": float(grammar)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2759,6 +2820,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                               "think": False, "max_tokens": 384,
                               "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
                               "lang_check": True, "opt_in": True, "needs_judge": True},
+         "subtitle_mt": {"langs": ("de", "en"), "load": load_subtitle_mt, "score": score_subtitle_mt,
+                         "think": False, "max_tokens": 256,
+                         "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},
+                         "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

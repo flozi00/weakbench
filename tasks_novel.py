@@ -6744,9 +6744,10 @@ def score_refund_policy(item, reply):
 
 
 # ---------------------------------------------------------------- cond_table (which conditional?)
+CT_GEN = {"Radfahrende": "Radfahrenden", "Geimpfte": "Geimpften", "Studierende": "Studierenden"}  # genitive plural
 CT_SETS = [({"en": ("cyclists", "drivers"), "de": ("Radfahrende", "Autofahrende")},
             {"en": ("late", "on time"), "de": ("zu spät", "pünktlich")}),
-           ({"en": ("vaccinated", "unvaccinated"), "de": ("geimpft", "ungeimpft")},
+           ({"en": ("vaccinated", "unvaccinated"), "de": ("Geimpfte", "Ungeimpfte")},
             {"en": ("ill", "healthy"), "de": ("krank", "gesund")}),
            ({"en": ("students", "employees"), "de": ("Studierende", "Angestellte")},
             {"en": ("satisfied", "unsatisfied"), "de": ("zufrieden", "unzufrieden")})]
@@ -6773,7 +6774,7 @@ def load_cond_table(lang, n, seed):
             q = (f"What percentage of the {g1} were {o1}?" if ask_g else f"What percentage of those who were {o1} were {g1}?")
             text = f"Counts from a survey:\n{head}\n{q} Round to one decimal."
         else:
-            q = (f"Wie viel Prozent der {g1} waren {o1}?" if ask_g else f"Wie viel Prozent derer, die {o1} waren, waren {g1}?")
+            q = (f"Wie viel Prozent der {CT_GEN[g1]} waren {o1}?" if ask_g else f"Wie viel Prozent derer, die {o1} waren, waren {g1}?")
             text = f"Zählung aus einer Umfrage:\n{head}\n{q} Runde auf eine Nachkommastelle."
         items.append({"id": str(i), "lang": lang, "gold": round(gold, 1), "bait": round(rev, 1), "joint": round(joint, 1),
                       "messages": [{"role": "user", "content": text + "\n" + ASK[lang]}]})

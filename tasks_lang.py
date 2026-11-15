@@ -3220,7 +3220,7 @@ def load_en_phrasal_sense(lang, n, seed):
 
 def score_en_phrasal_sense(item, reply):
     text = reply["content"] or ""
-    for pat in (r"Answer\W*:?\W*\b([ABC])\b", r"\A\W*([ABC])\b", r"\b(?:option|answer)\s+([ABC])\b"):
+    for pat in (r"Answer\W*:?\W*\b([ABC])\b", r"\A\W*([ABC])\b", r"\b(?:option|answer)\s+(?:is\s+)?([ABC])\b"):
         m = re.findall(pat, text, re.I)
         if m:
             break

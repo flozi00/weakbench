@@ -7143,10 +7143,11 @@ def load_cidr_check(lang, n, seed):
             plen = r.choice([20, 21, 22, 23, 25, 26, 27, 28, 29])
             base = ipaddress.IPv4Address(r.choice([10 << 24, (172 << 24) | (16 << 16), (192 << 24) | (168 << 16)]) + r.randrange(0, 1 << 16))
             net = ipaddress.IPv4Network(f"{base}/{plen}", strict=False)
-            octet = ipaddress.IPv4Network(f"{base}/{plen // 8 * 8}", strict=False)  # the misreading: prefix rounded down to an octet
+            octet = ipaddress.IPv4Network(f"{base}/{(plen + 4) // 8 * 8}", strict=False)  # the misreading: the nearest octet (/20 -> /24)
             lo, hi = int(net.network_address), int(net.broadcast_address)
             cands = {lo + r.randrange(0, hi - lo + 1), lo, hi, lo - 1, hi + 1, lo + r.randrange(-300, 300), hi + r.randrange(1, 40)}
-            cands = [ipaddress.IPv4Address(c) for c in cands if 0 < c < (1 << 32)]
+            top16 = int(base) >> 16 << 16
+            cands = [ipaddress.IPv4Address(c) for c in cands if top16 <= c < top16 + (1 << 16)]  # inside the private /16
             r.shuffle(cands)
             cands = cands[:6]
             gold = [k + 1 for k, c in enumerate(cands) if c in net]
@@ -7166,6 +7167,7 @@ def load_cidr_check(lang, n, seed):
 def score_cidr_check(item, reply):
     fa = final_answer(reply["content"]) or ""
     fa = re.sub(r"\d+\.\d+\.\d+\.\d+(?:/\d+)?", " ", fa)  # an address quoted back is no item number
+    fa = re.sub(r"\(?\b(?:out of|of|von)\s+6\)?", " ", fa, flags=re.I)  # "2, 4 out of 6"
     got = sorted({int(x) for x in re.findall(r"\b[1-6]\b", fa)})
     want = set(item["set"])
     jac = len(set(got) & want) / len(set(got) | want) if set(got) | want else 1.0

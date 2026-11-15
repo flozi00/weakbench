@@ -9193,6 +9193,48 @@ def score_element_facts(item, reply):
     return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- country_currency (the currency of a country)
+# ISO 4217 code and name per country (GeoNames countryInfo, checked); EN and DE names with common variants accepted.
+CUR = {"AR": ("ARS", ["peso"], ["peso"]), "AU": ("AUD", ["dollar"], ["dollar"]), "BR": ("BRL", ["real", "reais"], ["real"]),
+       "CA": ("CAD", ["dollar"], ["dollar"]), "CH": ("CHF", ["franc"], ["franken"]), "CL": ("CLP", ["peso"], ["peso"]),
+       "CN": ("CNY", ["yuan", "renminbi"], ["yuan", "renminbi"]), "CO": ("COP", ["peso"], ["peso"]),
+       "CZ": ("CZK", ["koruna", "crown"], ["krone", "koruna"]), "DE": ("EUR", ["euro"], ["euro"]), "DK": ("DKK", ["krone", "crown"], ["krone"]),
+       "EG": ("EGP", ["pound"], ["pfund"]), "ET": ("ETB", ["birr"], ["birr"]), "GB": ("GBP", ["pound", "sterling"], ["pfund"]),
+       "HU": ("HUF", ["forint"], ["forint"]), "ID": ("IDR", ["rupiah"], ["rupiah"]), "IL": ("ILS", ["shekel", "sheqel"], ["schekel", "shekel"]),
+       "IN": ("INR", ["rupee"], ["rupie"]), "IS": ("ISK", ["krona", "crown"], ["krone"]), "JP": ("JPY", ["yen"], ["yen"]),
+       "KE": ("KES", ["shilling"], ["schilling"]), "KR": ("KRW", ["won"], ["won"]), "KZ": ("KZT", ["tenge"], ["tenge"]),
+       "MA": ("MAD", ["dirham"], ["dirham"]), "MX": ("MXN", ["peso"], ["peso"]), "NG": ("NGN", ["naira"], ["naira"]),
+       "NO": ("NOK", ["krone", "crown"], ["krone"]), "NZ": ("NZD", ["dollar"], ["dollar"]), "PE": ("PEN", ["sol"], ["sol"]),
+       "PH": ("PHP", ["peso"], ["peso"]), "PK": ("PKR", ["rupee"], ["rupie"]), "PL": ("PLN", ["zloty", "złoty"], ["zloty", "złoty"]),
+       "RO": ("RON", ["leu"], ["leu"]), "RU": ("RUB", ["ruble", "rouble"], ["rubel"]), "SE": ("SEK", ["krona", "crown"], ["krone"]),
+       "TH": ("THB", ["baht"], ["baht"]), "TR": ("TRY", ["lira"], ["lira"]), "UA": ("UAH", ["hryvnia", "hryvnya"], ["hrywnja", "griwna", "hryvnia"]),
+       "US": ("USD", ["dollar"], ["dollar"]), "VN": ("VND", ["dong", "đồng"], ["dong", "đồng"]), "ZA": ("ZAR", ["rand"], ["rand"]),
+       "IR": ("IRR", ["rial"], ["rial"]), "SA": ("SAR", ["riyal", "rial"], ["riyal", "rial"])}
+
+
+def load_country_currency(lang, n, seed):
+    g = GEO_PLACES.value
+    items = []
+    ccs = sorted(CUR)
+    for i in range(min(n or len(ccs), len(ccs))):
+        cc = ccs[(i * 17) % len(ccs)]  # a fixed shuffle that visits every country once
+        name = g["countries"][cc][lang == "de"][0]
+        q = (f"What is the currency of {name}? Give its name or ISO code." if lang == "en" else
+             f"Wie heißt die Währung von {name}? Nenne ihren Namen oder den ISO-Code.")
+        items.append({"id": cc, "lang": lang, "gold": CUR[cc][1 + (lang == "de")][0].capitalize(), "cc": cc,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_country_currency(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "").lower()
+    code, en, de = CUR[item["cc"]]
+    ok = bool(re.search(rf"\b{code.lower()}\b", fa)) or any(re.search(rf"(?<![a-zäöüßđồ]){re.escape(x)}", fa) for x in en + de)
+    if code != "EUR" and re.search(r"\beuro\b|\beur\b", fa):
+        ok = False  # a non-euro country answered with the euro
+    return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10805,6 +10847,7 @@ TASKS = {
     "town_country": task(load_town_country, score_town_country, 24, 120),
     "country_facts": task(load_country_facts, score_country_facts, 24, 120),
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
+    "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

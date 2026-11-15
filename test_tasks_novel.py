@@ -2039,3 +2039,19 @@ def test_element_facts():
 
 if __name__ == "__main__":
     test_element_facts()
+
+
+def test_country_currency():
+    import tasks_novel as tn
+    xs = tn.load_country_currency("de", None, 0)
+    assert len({x["cc"] for x in xs}) == len(tn.CUR)
+    for x in xs:
+        assert tn.score_country_currency(x, {"content": f"Antwort: {x['gold']}"})["correct"], x
+        assert tn.score_country_currency(x, {"content": f"Antwort: {tn.CUR[x['cc']][0]}"})["correct"]
+    pl = next(x for x in xs if x["cc"] == "PL")
+    assert not tn.score_country_currency(pl, {"content": "Antwort: Euro"})["correct"]
+    assert tn.score_country_currency(pl, {"content": "Antwort: Polnischer Złoty"})["correct"]
+
+
+if __name__ == "__main__":
+    test_country_currency()

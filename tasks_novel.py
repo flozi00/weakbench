@@ -6515,8 +6515,11 @@ def load_claim_check(lang, n, seed):
 
 def score_claim_check(item, reply):
     fa = (final_answer(reply["content"]) or "").lower()
+    fa = re.sub(r"cannot be decided|can't be decided|undecidable|not determinable|unentscheidbar|nicht zu entscheiden|"
+                r"kann nicht entschieden werden", " not decidable nicht entscheidbar ", fa)
+    fa = re.sub(r"\b(?:not|nicht)\s+(?:supported|contradicted|belegt|widerlegt)\b", " ", fa)  # "not supported" names no label
     L = CC_LABELS[item["lang"]]
-    hits = [lab for lab in (L[2], L[0], L[1]) if lab in fa]  # "not decidable" first: it contains no other label
+    hits = [lab for lab in (L[2], L[0], L[1]) if lab in fa]
     v = hits[0] if len(hits) == 1 else None
     ok = v == item["gold"]
     d = {f"ok_{item['kind']}": float(ok)}
@@ -6552,7 +6555,7 @@ def load_board_moves(lang, n, seed):
     for i in range(n or 120):
         r = rng_of("board_moves", i)
         piece = ("knight", "king", "rook")[i % 3]
-        with_block = piece == "rook" or (i // 3) % 2 == 1  # an unblocked rook always reaches 14
+        with_block = piece != "knight" or (i // 3) % 2 == 1  # an unblocked rook always reaches 14; edge kings mostly 5
         while True:
             f, rk = r.randrange(8), r.randrange(8)
             blockers = set()

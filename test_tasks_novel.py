@@ -1975,3 +1975,17 @@ def test_geo_locate():
 
 if __name__ == "__main__":
     test_geo_locate()
+
+
+def test_town_country():
+    import tasks_novel as tn
+    from collections import Counter
+    xs = tn.load_town_country("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120 and max(Counter(x["cc"] for x in xs).values()) < 12
+    x = xs[0]
+    assert tn.score_town_country(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+    assert not tn.score_town_country(x, {"content": "Antwort: keine Ahnung"})["correct"]
+
+
+if __name__ == "__main__":
+    test_town_country()

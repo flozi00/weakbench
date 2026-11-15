@@ -9021,6 +9021,33 @@ def score_geo_locate(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pick, "gold": item["gold"], "detail": {"ok_north": float(ok)}}
 
 
+# ---------------------------------------------------------------- town_country (which country is this town in?)
+# Towns of 100k+ whose name occurs only once in GeoNames (no Paris, Texas), from 50 countries, balanced by country.
+# Tiers by size: famous 1M+, mid 300k-1M, small 100k-300k (detail), so the score shows how deep the knowledge goes.
+def load_town_country(lang, n, seed):
+    g = GEO_PLACES.value
+    by_cc = {}
+    for t in g["towns"]:
+        by_cc.setdefault(t[1], []).append(t)
+    ccs = sorted(by_cc)
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("town_country", i, att)
+        name, cc, pop = r.choice(by_cc[r.choice(ccs)])
+        q = (f"In which country is the city of {name}? Name the country." if lang == "en" else
+             f"In welchem Land liegt die Stadt {name}? Nenne das Land.")
+        tier = "famous" if pop >= 1_000_000 else "mid" if pop >= 300_000 else "small"
+        items.append({"id": str(i), "lang": lang, "kind": "country", "gold": g["countries"][cc][lang == "de"][0], "cc": cc,
+                      "tier": tier, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_town_country(item, reply):
+    r = score_geo_coords(item, reply)  # the same country matching (aliases, decoys, one country only)
+    r["detail"] = {f"ok_{item['tier']}": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10630,6 +10657,7 @@ TASKS = {
     "meet_city": task(load_meet_city, score_meet_city, 24, 120),
     "geo_coords": task(load_geo_coords, score_geo_coords, 24, 120),
     "geo_locate": task(load_geo_locate, score_geo_locate, 24, 120),
+    "town_country": task(load_town_country, score_town_country, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

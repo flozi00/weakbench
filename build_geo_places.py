@@ -68,7 +68,18 @@ for la, lo, c, p, nm in big:
     names = [nm[0]] + [n for n in nm[1:] if n.lower() not in primaries]  # no other city as an alias (Giza is not Cairo)
     near = [y[4][0] for y in large if y[4][0] != nm[0] and km((la, lo), y[:2]) <= 30]  # accepted for geo_coords only
     pool_city.append((la, lo, c, p, names, near, GEO_DE.get(nm[0], nm[0])))
-out = {"countries": C, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city}
+# towns whose name exists only once in the whole GeoNames file (no Paris, Texas): for "which country is X in?"
+allnames = {}
+for ln in open("geo_dl/cities15000.txt", encoding="utf-8"):
+    f = ln.split("\t")
+    for nm in {f[1], f[2]}:
+        allnames[nm.lower()] = allnames.get(nm.lower(), 0) + 1
+unique_towns = []
+for cc, lst in sorted(towns.items()):
+    ok = [x for x in lst if allnames.get(x[4][0].lower()) == 1 and re.fullmatch(r"[A-Za-zÀ-ÿ' -]{4,}", x[4][0]) and 100_000 <= x[3] and not x[4][0].startswith("City of")]
+    ok = sorted(ok, key=lambda x: (x[0], x[1]))
+    unique_towns += [(x[4][0], cc, x[3]) for x in r.sample(ok, min(10, len(ok)))]
+out = {"countries": C, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city, "towns": unique_towns}
 s = repr(out)
 open("wbdata/sets/tasks_novel.GEO_PLACES.py", "w", encoding="utf-8").write(s)
 print(len(pool_country), len(pool_city), len(s))

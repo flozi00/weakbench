@@ -3068,20 +3068,20 @@ def score_md_translate(item, reply):
 # (sentence, meaning of the separable verb, meaning of the inseparable one, which applies)
 PM_PAIRS = [("Der Lkw hat die Absperrung umgefahren.", "Der Lkw hat die Absperrung umfahren.",
              "er hat sie umgestoßen, sodass sie umfiel", "er ist um sie herumgefahren"),
-            ("Sie hat die Reisegruppe übergesetzt.", "Sie hat für die Reisegruppe übersetzt.",
-             "sie hat sie ans andere Ufer gebracht", "sie hat Gesagtes in eine andere Sprache übertragen"),
-            ("Er hat den Satz umgeschrieben.", "Er hat den Satz umschrieben.",
-             "er hat ihn neu formuliert und aufgeschrieben", "er hat den Inhalt angedeutet, ohne den Satz direkt zu nennen"),
+            ("Am Morgen hat sie die Gäste übergesetzt.", "Am Morgen hat sie den Gästen übersetzt.",
+             "sie hat sie ans andere Ufer gebracht", "sie hat für sie Gesagtes in eine andere Sprache übertragen"),
+            ("Er hat das Wort umgeschrieben.", "Er hat das Wort umschrieben.",
+             "er hat es anders geschrieben (geändert)", "er hat es mit anderen Worten erklärt, ohne es zu nennen"),
             ("In der Sitzung ist sie zum nächsten Punkt übergegangen.", "In der Sitzung hat sie den nächsten Punkt übergangen.",
              "sie hat mit dem nächsten Punkt weitergemacht", "sie hat den nächsten Punkt ausgelassen"),
             ("Die Soldaten haben die Zelte umgestellt.", "Die Soldaten haben die Zelte umstellt.",
              "sie haben sie an einen anderen Platz gestellt", "sie haben sie von allen Seiten eingekreist"),
             ("Sie ist geschickt mit dem Problem umgegangen.", "Sie hat das Problem geschickt umgangen.",
              "sie hat es behandelt und bewältigt", "sie hat es vermieden, sich damit zu befassen"),
-            ("Die Absperrung ist durchgebrochen.", "Die Fans haben die Absperrung durchbrochen.",
-             "sie ist von selbst in zwei Teile zerbrochen", "jemand hat sich gewaltsam einen Weg hindurch gebahnt"),
-            ("Der Turm ist im Sturm umgeflogen.", "Der Hubschrauber hat den Turm umflogen.",
-             "er ist umgefallen", "er wurde im Bogen umrundet")]
+            ("Der Bulle hat den Zaun durchgebrochen.", "Der Bulle hat den Zaun durchbrochen.",
+             "er hat ihn in zwei Teile gebrochen", "er hat sich gewaltsam einen Weg hindurch gebahnt"),
+            ("Man hat das alte Rathaus umgebaut.", "Man hat das alte Rathaus umbaut.",
+             "man hat es baulich verändert", "man hat rundherum Gebäude errichtet")]
 PM_ITEMS = [x for a, b, ma, mb in PM_PAIRS for x in ((a, ma, mb, "A"), (b, ma, mb, "B"))]  # same options within a pair
 
 
@@ -3094,8 +3094,10 @@ def load_de_prefix_meaning(lang, n, seed):
 
 
 def score_de_prefix_meaning(item, reply):
-    m = re.findall(r"\b([AB])\b", reply["content"] or "")
-    v = m[0] if len(set(m)) == 1 else None
+    text = reply["content"] or ""
+    line = re.findall(r"Antwort\W*:?\W*\b([AB])\b", text, re.I)  # an answer line wins over a mention in an explanation
+    m = line[-1:] or re.findall(r"\b([AaBb])\b", text)
+    v = m[0].upper() if len({x.upper() for x in m}) == 1 else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 

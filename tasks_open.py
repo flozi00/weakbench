@@ -1270,8 +1270,10 @@ def load_conflict_summary(lang, n, seed):
                    f"Report 2: {s2} report {fmt(b)} {what} at {ev} on {day}. They thanked the volunteers; there were no incidents.")
             req = f"{rep}\n\nWrite a two-sentence summary of what happened for a newsletter."
         else:
-            rep = (f"Bericht 1: {s1} meldet, dass am {day} {fmt(a)} {what} zu {ev} kamen. Das Wetter war trocken, es gab keine Zwischenfälle.\n"
-                   f"Bericht 2: {s2} sprechen von {fmt(b)} {what} bei {ev} am {day}. Sie dankten den Helfern; es gab keine Zwischenfälle.")
+            zu = ev.replace("dem ", "zum ", 1) if ev.startswith("dem ") else ev.replace("der ", "zur ", 1)
+            bei = ev.replace("dem ", "beim ", 1) if ev.startswith("dem ") else "bei " + ev
+            rep = (f"Bericht 1: {s1} meldet, dass am {day} {fmt(a)} {what} {zu} kamen. Das Wetter war trocken, es gab keine Zwischenfälle.\n"
+                   f"Bericht 2: {s2} sprechen von {fmt(b)} {what} {bei} am {day}. Sie dankten den Helfern; es gab keine Zwischenfälle.")
             req = f"{rep}\n\nSchreib eine Zusammenfassung in zwei Sätzen für einen Newsletter."
         items.append({"id": str(i), "lang": lang, "a": a, "b": b, "fa": fmt(a), "fb": fmt(b),
                       "messages": [{"role": "user", "content": req}]})

@@ -3959,6 +3959,33 @@ def score_de_capitals_rules(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- en_agreement_quant (agreement after quantifiers and collectives)
+# "Each of the students has", "The number of ... is" but "A number of ... are", "None of the water is": the nearby plural
+# noun pulls toward the wrong form. Singular gold in half the items.
+EAQ_ITEMS = [("Each of the students ___ a laptop.", "has", "have"), ("A number of complaints ___ been filed.", "have", "has"),
+             ("The number of visitors ___ growing every year.", "is", "are"), ("Neither of the answers ___ correct.", "is", "are"),
+             ("Both of my sisters ___ in Berlin.", "live", "lives"), ("Everyone in these photos ___ smiling.", "is", "are"),
+             ("Few of the guests ___ stayed until midnight.", "have", "has"), ("None of the milk ___ left.", "is", "are"),
+             ("Many of the windows ___ broken.", "were", "was"), ("Every one of these chairs ___ wobbly.", "is", "are"),
+             ("Most of the cookies ___ gone.", "are", "is"), ("Either of the two dates ___ fine for me.", "is", "are"),
+             ("Some of the paintings ___ been sold.", "have", "has"), ("One of my friends ___ a vet.", "is", "are"),
+             ("All of the lights ___ off.", "were", "was"), ("Several of the trains ___ late today.", "were", "was")]
+
+
+def load_en_agreement_quant(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Which form is correct in standard written English: "
+                           f"\"{two_opts(i, g, (g, w))[0]}\" or \"{two_opts(i, g, (g, w))[1]}\"? Reply with the word only.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(EAQ_ITEMS[:n or len(EAQ_ITEMS)])]
+
+
+def score_en_agreement_quant(item, reply):
+    r = score_de_eszett(item, {"content": strip_lead(reply["content"] or "")})  # one offered word, case-insensitive
+    sing = item["gold"] in ("is", "has", "was", "lives")
+    r["detail"] = {"ok_singular" if sing else "ok_plural": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5257,6 +5284,7 @@ TASKS = {
     "de_genitive": task(("de",), load_de_genitive, score_de_genitive, 16, None, lang_check=False),
     "de_joined_spelling": task(("de",), load_de_joined_spelling, score_de_joined_spelling, 16, None, lang_check=False),
     "de_capitals_rules": task(("de",), load_de_capitals_rules, score_de_capitals_rules, 16, None, lang_check=False),
+    "en_agreement_quant": task(("en",), load_en_agreement_quant, score_en_agreement_quant, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

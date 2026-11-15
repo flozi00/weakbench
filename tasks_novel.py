@@ -5539,8 +5539,19 @@ def load_exam_slots(lang, n, seed):
     return items
 
 
+ES_WORDS = {w: k for k, ws in enumerate([("one", "eins", "einen"), ("two", "zwei"), ("three", "drei"), ("four", "vier"),
+                                           ("five", "fünf"), ("six", "sechs"), ("seven", "sieben")], 1) for w in ws}
+
+
 def score_exam_slots(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    if re.search(r"\b(?:slot|termin)\s*\d", fa, re.I):  # "Slot 1: Maths, Art; Slot 2: ...; so 3" -> the last number
+        v = last_int(fa)
+    else:
+        v = answer_value(fa, item["lang"])
+        if v is None:
+            w = [ES_WORDS[x] for x in re.findall(r"[a-zäöü]+", fa.lower()) if x in ES_WORDS]
+            v = w[0] if len(set(w)) == 1 else None  # "drei Termine"
     ok = v == item["gold"]
     d = {"ok_hard" if item["hard"] else "ok_plain": float(ok)}
     if item["hard"]:
@@ -5582,12 +5593,17 @@ def load_cell_rule(lang, n, seed):
 
 
 def score_cell_rule(item, reply):
-    lines = re.findall(r"(?:Answer|Antwort)\s*\**\s*:\s*(.+)", reply["content"] or "", re.I)  # raw: '#' and '...' survive
-    fa = lines[-1] if lines else ""
-    rows = re.findall(r"[#.]{%d,}" % max(4, len(item["gold"]) - 2), re.sub(r"[\s`*]", "", fa))
-    v = rows[-1] if rows else ""
+    text = reply["content"] or ""
+    m = list(re.finditer(r"^\W*(?:Answer|Antwort)\W*:", text, re.I | re.M))  # raw, line-anchored: '#' and '...' survive
+    tail = text[m[-1].end():] if m else ""
+    tail = re.sub(r"\([^()]*\)", " ", tail)  # "(from #.#.....#)"
+    w = len(item["gold"])
+    runs = re.findall(r"[#.](?:[\s`*,|]*[#.])*", tail)
+    runs = [re.sub(r"[^#.]", "", x) for x in runs]
+    exact = [x for x in runs if len(x) == w]
+    v = exact[-1] if exact else next((x[:-1] for x in reversed(runs) if len(x) == w + 1 and x.endswith(".")), runs[-1] if runs else "")
     ok = v == item["gold"]
-    right = sum(a == b for a, b in zip(v, item["gold"])) / len(item["gold"]) if len(v) == len(item["gold"]) else 0.0
+    right = sum(a == b for a, b in zip(v, item["gold"])) / w  # chance level is about 0.5
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_steps{item['steps']}": float(ok), "cells_right": round(right, 4)}}
 

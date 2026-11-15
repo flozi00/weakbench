@@ -10211,6 +10211,84 @@ def score_hanoi_state(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_d{item['disks']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- toy_machine
+# A made-up register machine (instruction names nobody has seen: put / grow / shrink / twice / hop / stop) with a
+# counted loop; what is in a register when it stops? Reading a new spec and executing it for 15-60 steps. Bait: the
+# loop body run once (the jump ignored). `ok_loops<n>`, `no_loop_bait`.
+TM_SPEC = {"en": "A machine has registers A, B and C (all 0 at the start) and runs a numbered program from line 1:\n"
+                 "- put X n: set X to n\n- grow X Y: add the value of Y to X\n- shrink X n: subtract n from X\n"
+                 "- twice X: double X\n- hop L if X > 0: if X is greater than 0, continue at line L, otherwise at the next line\n"
+                 "- stop: end",
+           "de": "Eine Maschine hat die Register A, B und C (am Anfang alle 0) und führt ein nummeriertes Programm ab Zeile 1 aus:\n"
+                 "- put X n: setze X auf n\n- grow X Y: addiere den Wert von Y zu X\n- shrink X n: ziehe n von X ab\n"
+                 "- twice X: verdopple X\n- hop L if X > 0: wenn X größer als 0 ist, weiter bei Zeile L, sonst bei der nächsten Zeile\n"
+                 "- stop: Ende"}
+
+
+def tm_run(prog, max_steps=500):
+    reg, pc, steps = {"A": 0, "B": 0, "C": 0}, 0, 0
+    while steps < max_steps:
+        op = prog[pc]
+        steps += 1
+        if op[0] == "put":
+            reg[op[1]] = op[2]
+        elif op[0] == "grow":
+            reg[op[1]] += reg[op[2]]
+        elif op[0] == "shrink":
+            reg[op[1]] -= op[2]
+        elif op[0] == "twice":
+            reg[op[1]] *= 2
+        elif op[0] == "hop":
+            if reg[op[2]] > 0:
+                pc = op[1] - 1
+                continue
+        elif op[0] == "stop":
+            return reg, steps
+        pc += 1
+    return None, steps
+
+
+def tm_text(op):
+    return {"put": "put {1} {2}", "grow": "grow {1} {2}", "shrink": "shrink {1} {2}", "twice": "twice {1}",
+            "hop": "hop {1} if {2} > 0", "stop": "stop"}[op[0]].format(*op)
+
+
+def load_toy_machine(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("toy_machine", i, att)
+        while True:
+            cnt, x, y = r.sample("ABC", 3)
+            loops = r.randint(3, 6)
+            prog = [("put", cnt, loops), ("put", x, r.randint(1, 5)), ("put", y, r.randint(0, 4))]
+            start = len(prog) + 1
+            body = [r.choice([("grow", y, x), ("grow", x, y), ("twice", x), ("shrink", y, r.randint(1, 3)), ("grow", y, cnt)])
+                    for _ in range(r.randint(2, 3))]
+            prog += body + [("shrink", cnt, 1), ("hop", start, cnt)]
+            prog += [r.choice([("grow", x, y), ("shrink", x, r.randint(1, 4)), ("twice", y)]), ("stop",)]
+            reg, steps = tm_run(prog)
+            once, _ = tm_run([op for op in prog if op[0] != "hop"])
+            ask = r.choice([x, y])
+            if reg and 15 <= steps <= 60 and abs(reg[ask]) < 10000 and once[ask] != reg[ask] and reg[ask] not in (0,):
+                break
+        listing = "\n".join(f"{k + 1}: {tm_text(op)}" for k, op in enumerate(prog))
+        q = (f"{TM_SPEC[lang]}\n\nProgram:\n{listing}\n\n" +
+             (f"What is the value of register {ask} when the machine stops?" if lang == "en" else
+              f"Welchen Wert hat Register {ask}, wenn die Maschine anhält?"))
+        items.append({"id": str(i), "lang": lang, "gold": reg[ask], "bait": once[ask], "loops": loops,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_toy_machine(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    m = re.findall(r"-?\d+", fa.replace("−", "-"))
+    v = int(m[-1]) if m else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_loops{item['loops']}": float(ok), "no_loop_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11319,6 +11397,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "toy_machine": task(load_toy_machine, score_toy_machine, 24, 96),
     "hanoi_state": task(load_hanoi_state, score_hanoi_state, 24, 96),
     "lru_cache": task(load_lru_cache, score_lru_cache, 24, 96),
     "dice_roll": task(load_dice_roll, score_dice_roll, 24, 96),

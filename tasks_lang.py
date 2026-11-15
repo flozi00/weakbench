@@ -3954,10 +3954,15 @@ def load_de_imperative(lang, n, seed):
 
 
 def score_de_imperative(item, reply):
-    t = re.sub(r"\([^()]*\)", " ", reply["content"] or "").strip().lower()
-    t = re.sub(r"^(?:antwort|answer)\s*:\s*", "", t)
+    t = re.sub(r"(?s)<think>.*?</think>", " ", reply["content"] or "")
+    t = re.sub(r"\([^()]*\)", " ", t).strip().lower()
     w = re.findall(r"[a-zäöüß]+", t)
-    v = w[0] if w else None
+    # the first gold or bait form anywhere ("Der Imperativ lautet: nimm", "du-Form: lies"), else the first word after a colon
+    known = item["gold"] + [item["bait"]]
+    v = next((x for x in w if x in known), None)
+    if v is None:
+        tail = re.findall(r"[a-zäöüß]+", t.split(":", 1)[1]) if ":" in t else w
+        v = tail[0] if tail else None
     ok = v in item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"][0], "detail": {"typical_error": float(v == item["bait"])}}
 

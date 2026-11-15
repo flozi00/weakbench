@@ -4499,6 +4499,7 @@ def score_weekday_calc(item, reply):
 # more per unit, against the "bulk is cheaper" heuristic. Gold letter alternates.
 UP_GOODS = {"en": [("coffee", "g", "kg", 1000), ("juice", "ml", "l", 1000), ("rice", "g", "kg", 1000), ("shampoo", "ml", "l", 1000)],
             "de": [("Kaffee", "g", "kg", 1000), ("Saft", "ml", "l", 1000), ("Reis", "g", "kg", 1000), ("Shampoo", "ml", "l", 1000)]}
+UP_BASE = [0.015, 0.002, 0.003, 0.01]  # € per g / ml
 
 
 def load_unit_price(lang, n, seed):
@@ -4509,10 +4510,10 @@ def load_unit_price(lang, n, seed):
         bulk_worse = (i // 4) % 2 == 0
         deal = (i // 8) % 3  # 0 plain, 1 multi-pack, 2 "3 for 2"
         small_q = r.choice([250, 400, 500, 750])
-        p_unit = r.randint(8, 30) / 1000  # € per small unit
+        p_unit = UP_BASE[i % 4] * r.uniform(0.8, 1.25)  # € per small unit
         k = r.choice([1.5, 2, 2.5, 3])  # big pack = k units of the big unit
         diff = r.choice([0.08, 0.12, 0.18])
-        small_cost = small_q * p_unit
+        small_cost = round(small_q * p_unit, 2)
         if deal == 1:
             cnt = r.choice([2, 4, 6])
             small_txt = (f"{cnt} x {small_q} {su} for {small_cost * cnt:.2f} €" if lang == "en" else

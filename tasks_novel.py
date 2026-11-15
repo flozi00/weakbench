@@ -4759,6 +4759,46 @@ def score_median_traps(item, reply):
                        "took_mean": float(v is not None and abs(v - item["mean"]) < 0.051)}}
 
 
+# ---------------------------------------------------------------- work_rates (rates add, a drain subtracts)
+def load_work_rates(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i in range(n or 120):
+        r = rng_of("work_rates", i)
+        drain = i % 2 == 0
+        while True:
+            a, b = r.randint(2, 9), r.randint(3, 12)
+            c = r.randint(4, 15) if drain else None
+            rate = F(1, a) + F(1, b) - (F(1, c) if drain else 0)
+            if rate > 0 and 1 / rate <= 24 and a != b:
+                break
+        mins = 60 / rate
+        no_drain = 60 / (F(1, a) + F(1, b))
+        avg = F(a + b, 2) * 60
+        q = (f"An empty tank is filled by pipe A alone in {a} hours and by pipe B alone in {b} hours."
+             + (f" A drain at the bottom, if open, empties a full tank in {c} hours." if drain else "")
+             + f" Both pipes are opened{' and the drain is open' if drain else ''}. After how many minutes is the tank full? "
+             "Round to whole minutes." if lang == "en" else
+             f"Ein leerer Tank wird von Rohr A allein in {a} Stunden und von Rohr B allein in {b} Stunden gefüllt."
+             + (f" Ein Abfluss am Boden leert, wenn er offen ist, einen vollen Tank in {c} Stunden." if drain else "")
+             + f" Beide Rohre werden geöffnet{', und der Abfluss ist offen' if drain else ''}. Nach wie vielen Minuten ist der Tank voll? "
+             "Runde auf ganze Minuten.")
+        items.append({"id": str(i), "lang": lang, "gold": round(float(mins)), "exact": float(mins), "drain": drain,
+                      "no_drain": float(no_drain), "avg": float(avg),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_work_rates(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["exact"]) <= 1
+    d = {"ok_drain" if item["drain"] else "ok_plain": float(ok),
+         "took_average": float(v is not None and abs(v - item["avg"]) <= 1)}
+    if item["drain"]:
+        d["took_ignore_drain"] = float(v is not None and abs(v - item["no_drain"]) <= 1)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6331,6 +6371,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "work_rates": task(load_work_rates, score_work_rates, 24, 120),
     "median_traps": task(load_median_traps, score_median_traps, 24, 120),
     "alien_calendar": task(load_alien_calendar, score_alien_calendar, 24, 120),
     "coin_change": task(load_coin_change, score_coin_change, 24, 120),

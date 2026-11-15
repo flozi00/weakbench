@@ -6884,6 +6884,49 @@ def score_iso_week(item, reply):
     return {"correct": ok, "score": float(ok), "pred": f"{wk} {yr[1] if yr else None}", "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- resistors (parallel adds reciprocals)
+def load_resistors(lang, n, seed):
+    from fractions import Fraction as F
+    par = lambda *rs: 1 / sum(F(1, x) for x in rs)  # noqa: E731
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("resistors", i, att)
+        kind = ("par2", "par2_series", "par3", "two_pairs")[i % 4]
+        vals = [r.choice([10, 12, 15, 20, 30, 40, 47, 60, 100, 120, 150, 220]) for _ in range(4)]
+        if kind == "par2":
+            g, naive = par(vals[0], vals[1]), vals[0] + vals[1]
+            en = f"Two resistors of {vals[0]} Ω and {vals[1]} Ω are connected in parallel."
+            de = f"Zwei Widerstände mit {vals[0]} Ω und {vals[1]} Ω sind parallel geschaltet."
+        elif kind == "par2_series":
+            g, naive = par(vals[0], vals[1]) + vals[2], vals[0] + vals[1] + vals[2]
+            en = (f"Resistors of {vals[0]} Ω and {vals[1]} Ω are connected in parallel; this pair is connected in series with a "
+                  f"{vals[2]} Ω resistor.")
+            de = (f"Widerstände mit {vals[0]} Ω und {vals[1]} Ω sind parallel geschaltet; dieses Paar ist in Reihe mit einem "
+                  f"Widerstand von {vals[2]} Ω geschaltet.")
+        elif kind == "par3":
+            g, naive = par(*vals[:3]), sum(vals[:3])
+            en = f"Three resistors of {vals[0]} Ω, {vals[1]} Ω and {vals[2]} Ω are connected in parallel."
+            de = f"Drei Widerstände mit {vals[0]} Ω, {vals[1]} Ω und {vals[2]} Ω sind parallel geschaltet."
+        else:
+            g, naive = par(vals[0], vals[1]) + par(vals[2], vals[3]), sum(vals)
+            en = (f"Two parallel pairs are connected in series: {vals[0]} Ω parallel to {vals[1]} Ω, then {vals[2]} Ω parallel to "
+                  f"{vals[3]} Ω.")
+            de = (f"Zwei Parallelpaare sind in Reihe geschaltet: {vals[0]} Ω parallel zu {vals[1]} Ω, dann {vals[2]} Ω parallel "
+                  f"zu {vals[3]} Ω.")
+        q = (en + " What is the total resistance in Ω? Round to two decimals." if lang == "en" else
+             de + " Wie groß ist der Gesamtwiderstand in Ω? Runde auf zwei Nachkommastellen.")
+        items.append({"id": str(i), "lang": lang, "gold": round(float(g), 2), "naive": float(naive), "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_resistors(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.05
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "took_series_sum": float(v is not None and abs(v - item["naive"]) <= 0.05)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8464,6 +8507,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "resistors": task(load_resistors, score_resistors, 24, 120),
     "iso_week": task(load_iso_week, score_iso_week, 24, 120),
     "map_scale": task(load_map_scale, score_map_scale, 24, 120),
     "cond_table": task(load_cond_table, score_cond_table, 24, 120),

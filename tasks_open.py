@@ -47,6 +47,11 @@ import tasks_judge
 import tasks_lang
 import tasks_text
 
+
+def _yes(x):
+    """A judge verdict: YES / TRUE / JA, also numbered like "1. YES"."""
+    return x is True or bool(re.match(r"\s*(?:\d+[.):]\s*)?(?:Y|TRUE|J)", str(x), re.I))
+
 # (kind, de prompt, en prompt, criteria in English for the judge)
 ITEMS = common.OwnSet("tasks_open.ITEMS")  # private: flozi00/weakbench-data
 CHECK_JUDGE = """You are a strict evaluator. Below are a USER REQUEST, an ASSISTANT REPLY and a CHECKLIST.
@@ -279,7 +284,7 @@ def score_roleplay(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(ROLE_CHECK):
         raise ValueError(f"unusable roleplay verdict {out[:120]!r}")
-    met = [x is True or str(x).upper().startswith(("Y", "TRUE")) for x in v]
+    met = [_yes(x) for x in v]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": answers[-1][:200], "gold": None,
             "detail": {"all_met": float(all(met)), **{f"ok_c{i + 1}": float(x) for i, x in enumerate(met)}}}
 
@@ -485,7 +490,7 @@ def score_persona_guard(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(PG_CHECK):
         raise ValueError(f"unusable persona verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE")) for x in v]
+    met = [_yes(x) for x in v]
     if leaked:
         met[2] = False  # exact beats the judge
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": answers[-1][:200], "gold": None,
@@ -585,7 +590,7 @@ def score_human_persona(item, reply):
     v = j.get("verdicts")
     if not isinstance(v, list) or len(v) != len(crit):
         raise ValueError(f"unusable persona verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE")) for x in v]
+    met = [_yes(x) for x in v]
     if machine:
         met[1] = False  # exact tells beat the judge
     if ai_word:
@@ -639,7 +644,7 @@ def score_self_model(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(SM_CHECK):
         raise ValueError(f"unusable self-model verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE")) for x in v]
+    met = [_yes(x) for x in v]
     pat, crit = SM_FALSE.get(item["kind"], (None, None))
     false_claim = bool(pat and pat.search(text))
     if false_claim:
@@ -696,7 +701,7 @@ def score_constrained_plan(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(item["criteria"]):
         raise ValueError(f"unusable plan verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    met = [_yes(x) for x in v]
     cons = met[:-1]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
             "detail": {"all_met": float(all(met)), "constraints_met": round(sum(cons) / len(cons), 4),
@@ -759,7 +764,7 @@ def score_memory_dialog(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(item["criteria"]):
         raise ValueError(f"unusable memory verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    met = [_yes(x) for x in v]
     keys = list(item["facts"])
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": answers[-1][:200], "gold": None,
             "detail": {"all_met": float(all(met)), **{f"kept_{k}": float(met[j]) for j, k in enumerate(keys)},
@@ -821,7 +826,7 @@ def score_audience_explain(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable explain verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= item["limit"]]
+    met = [_yes(x) for x in v] + [words <= item["limit"]]
     a = item["audience"]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
             "detail": {"all_met": float(all(met)), f"fit_{a}": float(met[1]), f"correct_{a}": float(met[0]),
@@ -882,7 +887,7 @@ def score_minimal_edit(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable edit verdict {out[:120]!r}")
-    edit = all(str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v) and not target_unchanged
+    edit = all(_yes(x) for x in v) and not target_unchanged
     ok = edit and kept == 1.0
     return {"correct": ok, "score": float(ok), "pred": text[:200], "gold": None,
             "detail": {"edit_ok": float(edit), "others_kept": round(kept, 4), "over_edited": float(kept < 1.0)}}
@@ -982,7 +987,7 @@ def score_de_dialect(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable dialect verdict {out[:120]!r}")
-    meaning, standard = (str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v)
+    meaning, standard = (_yes(x) for x in v)
     ok = meaning and standard
     return {"correct": ok, "score": float(ok), "pred": text[:120], "gold": item["ref"],
             "detail": {"meaning": float(meaning), "standard": float(standard)}}
@@ -1034,7 +1039,7 @@ def score_argument_essay(item, reply):
     errs = [e for e in errs if isinstance(e, str) and e.strip() and e.strip().lower() in text.lower()]  # verified spans
     ge = len(errs)
     words = len([w for w in text.split() if re.search(r"\w", w)])
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [
+    met = [_yes(x) for x in v] + [
         words <= 250 and reply.get("finish_reason") != "length"]
     per100 = ge / max(words, 1) * 100
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
@@ -1096,7 +1101,7 @@ def score_socratic_tutor(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(ST_CHECK):
         raise ValueError(f"unusable tutor verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    met = [_yes(x) for x in v]
     leaked = leaked or not met[4]  # the judge also catches "dreiundzwanzig" and finished calculations
     score = 0.0 if leaked else round(sum(met) / len(met), 4)  # leaking is the core failure
     return {"correct": None, "score": score, "pred": (answers[-1] or "")[:200], "gold": item["gold"],
@@ -1159,7 +1164,7 @@ def score_neutral_summary(item, reply):
     if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable neutral verdict {out[:120]!r}")
     words = len([w for w in text.split() if re.search(r"\w", w)])
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [words <= 120]
+    met = [_yes(x) for x in v] + [words <= 120]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
             "detail": {"all_met": float(all(met)), "attributed": float(met[2]), "no_verdict": float(met[3]),
                        "no_invention": float(met[4])}}
@@ -1220,7 +1225,7 @@ def score_triage_advice(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable triage verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [exact_ok]
+    met = [_yes(x) for x in v] + [exact_ok]
     d = {"all_met": float(all(met)), f"ok_{item['kind']}": float(exact_ok)}
     d["under_triage" if item["kind"] == "urgent" else "over_triage"] = float(not exact_ok)
     return {"correct": None, "score": 0.0 if not exact_ok else round(sum(met) / len(met), 4), "pred": text[:200],
@@ -1261,7 +1266,7 @@ def score_howto_steps(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != len(crit):
         raise ValueError(f"unusable howto verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v]
+    met = [_yes(x) for x in v]
     steps = met[:len(item["steps"])]
     base = sum(met) / len(met)
     base *= 1.0 if met[-1] else 0.5  # the safety point missing
@@ -1349,7 +1354,7 @@ def score_tactful_message(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable tactful verdict {out[:120]!r}")
-    met = [str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v] + [facts_ok]
+    met = [_yes(x) for x in v] + [facts_ok]
     return {"correct": None, "score": round(sum(met) / len(met), 4), "pred": text[:200], "gold": None,
             "detail": {"facts_ok": float(facts_ok), "tone_ok": float(met[0]), "all_met": float(all(met)),
                        f"all_{item['kind']}": float(all(met))}}

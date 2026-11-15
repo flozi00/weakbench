@@ -766,12 +766,15 @@ if __name__ == "__main__":
 def test_md_translate():
     import tasks_lang as tl
     x = tl.load_md_translate("de", None, 0)[0]
-    good = ("## Installation\n\nInstalliere das Paket mit pip und starte den Server neu. Führe einmal `pip` aus.\n\n"
+    good = ("## Installation\n\nInstalliere das Paket mit pip und starte den Server neu. Führe einmal `pip install fastgrid==2.1` aus.\n\n"
             "- Öffne ein Terminal\n- Aktiviere die virtuelle Umgebung\n\n```bash\npip install fastgrid==2.1\n```\n\n"
             "[Doku](https://example.org/docs/install)")
     assert tl.score_md_translate(x, {"content": good})["correct"]
     assert not tl.score_md_translate(x, {"content": good.replace("fastgrid==2.1", "fastgrid")})["correct"]
     assert not tl.score_md_translate(x, {"content": x["messages"][0]["content"].split("\n\n", 1)[1]})["correct"]  # untranslated
+    assert tl.score_md_translate(x, {"content": good.replace("\n", "\r\n")})["correct"]
+    half = good.replace("- Öffne ein Terminal", "- Open a terminal")
+    assert not tl.score_md_translate(x, {"content": half})["correct"]
 
 
 if __name__ == "__main__":

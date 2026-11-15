@@ -3030,7 +3030,7 @@ MT_DOCS = {"de": [("Installation", "Install the package with pip and restart the
 
 
 def _mt_doc(head, para, inline, cmd, url, bullets):
-    return (f"## {head}\n\n{para} {inline.format(cmd=cmd.split()[0])}\n\n" + "\n".join(f"- {b}" for b in bullets)
+    return (f"## {head}\n\n{para} {inline.format(cmd=cmd)}\n\n" + "\n".join(f"- {b}" for b in bullets)
             + f"\n\n```bash\n{cmd}\n```\n\n[Docs]({url})")
 
 
@@ -3040,20 +3040,24 @@ def load_md_translate(lang, n, seed):
            "Reply with the translated Markdown only.\n\n" if lang == "de" else
            "Übersetze dieses Markdown ins Englische. Lass die Markdown-Struktur, den Code und den Link genau so, wie sie sind. "
            "Antworte nur mit dem übersetzten Markdown.\n\n")
-    return [{"id": str(i), "lang": lang, "cmd": cmd, "url": url, "inline": cmd.split()[0], "want": want, "nb": len(b),
-             "src_para": para, "messages": [{"role": "user", "content": ask + _mt_doc(h, para, inl, cmd, url, b)}]}
+    return [{"id": str(i), "lang": lang, "cmd": cmd, "url": url, "inline": cmd, "want": want, "nb": len(b),
+             "src_para": para, "src_bullets": b, "messages": [{"role": "user", "content": ask + _mt_doc(h, para, inl, cmd, url, b)}]}
             for i, (h, para, inl, cmd, url, b, want) in enumerate(rows)]
 
 
 def score_md_translate(item, reply):
-    t = reply["content"] or ""
+    t = (reply["content"] or "").replace("\r\n", "\n")
     t = re.sub(r"^```(?:markdown|md)\s*\n(.*)\n```\s*$", r"\1", t.strip(), flags=re.S)  # a wrapping fence
     structure = (len(re.findall(r"^##\s+\S", t, re.M)) == 1 and len(re.findall(r"^\s*[-*]\s+\S", t, re.M)) == item["nb"])
-    code = bool(re.search(r"```\w*\n" + re.escape(item["cmd"]) + r"\n```", t))
+    code = bool(re.search(r"```\w*[ \t]*\n" + re.escape(item["cmd"]) + r"[ \t]*\n```", t))
     url = f"]({item['url']})" in t
     inline = f"`{item['inline']}`" in t
     prose = re.sub(r"```.*?```|`[^`]*`|\(http[^)]*\)", " ", t, flags=re.S).lower()
-    translated = bool(re.search(item["want"], prose)) and item["src_para"].lower()[:30] not in prose
+    words = lambda x: re.findall(r"[a-zäöüß]+", x.lower())  # noqa: E731
+    pw = " ".join(words(prose))
+    src = [item["src_para"], *item["src_bullets"]]
+    left = [" ".join(w[k:k + 3]) for x in src for w in [words(x)] for k in range(len(w) - 2)]
+    translated = bool(re.search(item["want"], prose)) and not any(f" {sh} " in f" {pw} " for sh in left)  # no 3-word source run
     ok = structure and code and url and inline and translated
     return {"correct": ok, "score": float(ok), "pred": t[:120], "gold": None,
             "detail": {"structure_kept": float(structure), "code_verbatim": float(code and inline), "url_verbatim": float(url),

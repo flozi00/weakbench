@@ -857,6 +857,9 @@ def test_subtitle_mt():
         long = good.replace("Es war ein Notfall, ehrlich.", "Es war wirklich ein absoluter Notfall, das schwöre ich dir.")
         assert to.score_subtitle_mt(x, {"content": long})["detail"]["within_42"] == 0
         assert to.score_subtitle_mt(x, {"content": good.replace("3.", "4.")})["detail"]["numbering"] == 0
+        assert to.score_subtitle_mt(x, {"content": good.replace("1.", "**1.**")})["correct"]
+        assert to.score_subtitle_mt(x, {"content": "Untertitel:\n" + good})["correct"]
+        assert to.score_subtitle_mt(x, {"content": good.replace("Es war", "Es\nwar")})["detail"]["numbering"] == 0
     finally:
         stop()
         tasks_judge.configure(None, None, None)

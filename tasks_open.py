@@ -2187,7 +2187,7 @@ SUB_SCENES = {"en": [["I told you not to touch my car.", "It was an emergency, I
                      ["Wir schließen in fünf Minuten.", "Kann ich noch einen Kaffee zum Mitnehmen bekommen?", "Nur wenn Sie mit Karte zahlen."],
                      ["Der Zug fällt schon wieder aus.", "Dann müssen wir ein Taxi nehmen.", "Weißt du eigentlich, was das kostet?"],
                      ["Bist du mit dem Bericht fertig?", "Fast, mir fehlen nur noch die Zahlen aus der Buchhaltung.", "Die wollten sie heute Morgen schicken."],
-                     ["Warum hast du mich nicht zurückgerufen?", "Mein Akku war auf dem Heimweg leer.", "Du hättest dir eins leihen können."],
+                     ["Warum hast du mich nicht zurückgerufen?", "Mein Akku war auf dem Heimweg leer.", "Du hättest dir ein Handy leihen können."],
                      ["Diese Suppe ist viel zu salzig.", "Ich habe mich genau ans Rezept gehalten.", "Dann ist das Rezept falsch."]]}
 SUB_JUDGE = """SOURCE SUBTITLES ({src_lang}):
 {src}
@@ -2218,9 +2218,14 @@ def load_subtitle_mt(lang, n, seed):
 def score_subtitle_mt(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    lines = re.findall(r"^\s*(\d+)[.)]\s*(.+?)\s*$", text, re.M)
-    numbered = [int(k) for k, _ in lines] == list(range(1, item["n_lines"] + 1))
-    short = bool(lines) and all(len(t.strip("*\"„“")) <= 42 for _, t in lines)
+    rows = [ln for ln in text.splitlines() if ln.strip()]
+    if rows and rows[0].rstrip().endswith(":") and not re.match(r"\s*\**\s*\d", rows[0]):
+        rows = rows[1:]  # a header such as "Untertitel:"
+    pat = re.compile(r"^\s*\**\s*(\d+)\s*\**\s*[.):\-–]\s*\**\s*(.+?)\s*$")
+    lines = [m.groups() for m in map(pat.match, rows) if m]
+    numbered = len(lines) == len(rows) and [int(k) for k, _ in lines] == list(range(1, item["n_lines"] + 1))
+    # every row counts: a wrapped second row has no number and fails the numbering, and its length is checked too
+    short = bool(rows) and all(len((m[2] if (m := pat.match(r)) else r).strip(" *\"„“”‚‘’»«'")) <= 42 for r in rows)
     names = {"de": "German", "en": "English"}
     out = tasks_judge.judge("", SUB_JUDGE.format(src_lang=names["en" if item["lang"] == "de" else "de"], tgt_lang=names[item["lang"]],
                                                  src=item["src"], text=text or "(empty)"), max_tokens=64)

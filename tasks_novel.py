@@ -4670,7 +4670,7 @@ def score_coin_change(item, reply):
 
 # ---------------------------------------------------------------- alien_calendar (calendar arithmetic without memory)
 # Real calendar arithmetic can lean on memorised facts; here the months, their lengths and the week are invented.
-AC_MONTHS = ["Brin", "Calo", "Dresk", "Fenn", "Gollum", "Hirr"]
+AC_MONTHS = ["Brin", "Calo", "Dresk", "Fenn", "Golm", "Hirr"]
 AC_DAYS = ["Ash", "Bek", "Cor", "Dun", "Eff", "Fal", "Gim", "Hob", "Isk"]
 
 
@@ -4681,7 +4681,6 @@ def load_alien_calendar(lang, n, seed):
         months = AC_MONTHS[:r.randint(4, 6)]
         lens = [r.randint(17, 31) for _ in months]
         week = AC_DAYS[:r.randint(5, 9)]
-        year_len = sum(lens)
         m0, w0 = r.randrange(len(months)), r.randrange(len(week))
         d0 = r.randint(1, lens[m0])
         wrap = i % 2 == 0

@@ -3850,7 +3850,7 @@ SZ_ITEMS = [("Wir wohnen in der ___ hinter dem Bahnhof.", "Straße", "Strasse"),
             ("Ich ___ nicht, wo der Schlüssel ist.", "weiß", "weiss"), ("Die Kinder essen gern ___ mit Honig.", "Nüsse", "Nüße"),
             ("Mein linker ___ tut weh.", "Fuß", "Fuss"), ("Er gab ihr zum Abschied einen ___.", "Kuss", "Kuß"),
             ("Kannst du bitte das Fenster ___?", "schließen", "schliessen"), ("Wir haben den Bus knapp ___.", "verpasst", "verpaßt"),
-            ("Das Wasser ist zu ___ zum Baden.", "heiß", "heiss"), ("Ich warte ___ vor der Tür.", "draußen", "draussen"), ("Er ___ den Ball über den Zaun.", "schoss", "schoß"), ("Bitte ___ den Rasen am Wochenende.", "gieß", "giess"), ("Das Kleid ___ ihr wie angegossen.", "passt", "paßt"), ("Er ist ein ___ Fan des Vereins.", "großer", "grosser")]
+            ("Das Wasser ist zu ___ zum Baden.", "heiß", "heiss"), ("Ich warte ___ vor der Tür.", "draußen", "draussen"), ("Er ___ den Ball über den Zaun.", "schoss", "schoß"), ("Viele ___ an deine Eltern!", "Grüße", "Grüsse"), ("Das Kleid ___ ihr wie angegossen.", "passt", "paßt"), ("Er ist ein ___ Fan des Vereins.", "großer", "grosser")]
 
 
 def load_de_eszett(lang, n, seed):

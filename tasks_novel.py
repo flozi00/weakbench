@@ -8255,7 +8255,8 @@ def load_allergen_check(lang, n, seed):
             target = r.randrange(3)
             safe = sorted(d for d in dishes if not any(target in allergens(b) for b in dish_uses[d]))
             naive = sorted(d for d in dishes if not any(target in contains[b] for b in dish_uses[d]))  # nested components ignored
-            if 1 <= len(safe) <= 3 and naive != safe:
+            # a safe dish must still carry some other allergen (else "dishes of allergen-free components only" scores 45 %)
+            if 1 <= len(safe) <= 3 and naive != safe and any(allergens(b) for d in safe for b in dish_uses[d]):
                 break
         B, D, A = AL_BASES[lang], AL_DISHES[lang], AL_ALLERG[lang]
         comp = "\n".join(f"- {B[b]}: " + (", ".join([A[a] for a in sorted(contains[b])] + [B[u] for u in sorted(uses[b])]) or
@@ -8263,11 +8264,12 @@ def load_allergen_check(lang, n, seed):
                          for b in bases)
         menu = "\n".join(f"- {D[d]}: " + ", ".join(B[b] for b in sorted(dish_uses[d])) for d in dishes)
         q = (f"Kitchen sheet. Components and what they contain (a component can contain another component):\n{comp}\n"
-             f"Dishes and their components:\n{menu}\nWhich dishes are safe for a guest who must avoid {A[target]}? List all of them."
+             f"Dishes and their components:\n{menu}\nWhich dishes are safe for a guest who must avoid {A[target]}? List all of them, "
+             f"and only those, in one line separated by commas."
              if lang == "en" else
              f"Küchenblatt. Komponenten und was sie enthalten (eine Komponente kann eine andere Komponente enthalten):\n{comp}\n"
              f"Gerichte und ihre Komponenten:\n{menu}\nWelche Gerichte sind sicher für einen Gast, der {A[target]} meiden muss? "
-             f"Nenne alle.")
+             f"Nenne alle und nur diese, in einer Zeile durch Kommas getrennt.")
         items.append({"id": str(i), "lang": lang, "gold": [D[d] for d in safe], "bait": [D[d] for d in naive],
                       "dishes": [D[d] for d in dishes], "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
@@ -8275,6 +8277,9 @@ def load_allergen_check(lang, n, seed):
 
 def score_allergen_check(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    m = re.search(r"(?:answer|antwort)\s*:?\s*\n((?:\s*[-*•]\s*.+\n?)+)", reply["content"] or "", re.I)
+    if m and not any(re.search(re.escape(d), fa, re.I) for d in item["dishes"]):
+        fa = m[1]  # "Antwort:" followed by a bullet list
     got = sorted(d for d in item["dishes"] if re.search(rf"(?<![\w-]){re.escape(d)}(?![\w-])", fa, re.I))
     ok = got == sorted(item["gold"])
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],

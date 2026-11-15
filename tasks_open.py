@@ -1064,7 +1064,7 @@ def score_honest_headline(item, reply):
 # property that tokenised models often fake with eye rhymes or near-misses. Lines and the word are checked exactly.
 RP_TOPICS = {"en": [("autumn rain", "umbrella"), ("a lost key", "pocket"), ("the night train", "window"), ("a cat on a roof", "chimney"),
                     ("Monday morning", "coffee"), ("an old bicycle", "chain")],
-             "de": [("Herbstregen", "Schirm"), ("ein verlorener Schlüssel", "Tasche"), ("der Nachtzug", "Fenster"),
+             "de": [("Herbstregen", "Schirm"), ("einen verlorenen Schlüssel", "Tasche"), ("den Nachtzug", "Fenster"),
                     ("eine Katze auf dem Dach", "Schornstein"), ("Montagmorgen", "Kaffee"), ("ein altes Fahrrad", "Kette")]}
 RP_SCHEMES = ["AABB", "ABAB", "ABBA"]
 RP_JUDGE = """A poem was requested: four lines, rhyme scheme {scheme}, topic "{topic}", in {language}.
@@ -1088,7 +1088,8 @@ def load_rhyme_poem(lang, n, seed):
         scheme = RP_SCHEMES[(i // 6) % 3]
         req = (f"Write a poem of exactly four lines about {topic} with the rhyme scheme {scheme}. Use the word \"{word}\". "
                "Reply with the poem only." if lang == "en" else
-               f"Schreib ein Gedicht aus genau vier Zeilen über {topic} mit dem Reimschema {scheme}. Verwende das Wort „{word}“. "
+               f"Schreib ein Gedicht aus genau vier Zeilen über {topic} mit dem Reimschema {scheme}. Verwende das Wort „{word}“ "
+               "(auch als Teil eines zusammengesetzten Worts). "
                "Antworte nur mit dem Gedicht.")
         items.append({"id": str(i), "lang": lang, "topic": topic, "word": word, "scheme": scheme,
                       "messages": [{"role": "user", "content": req}]})
@@ -1097,8 +1098,12 @@ def load_rhyme_poem(lang, n, seed):
 
 def score_rhyme_poem(item, reply):
     tasks_judge.check_judge()
-    lines = [x.strip() for x in (reply["content"] or "").splitlines() if x.strip() and not x.strip().startswith("#")]
-    has_word = bool(re.search(r"\b" + item["word"], " ".join(lines), re.I))
+    raw = [x.strip() for x in (reply["content"] or "").splitlines() if x.strip()]
+    has_word = (item["word"].lower() in " ".join(raw).lower() if item["lang"] == "de" else  # compounds: Regenschirm
+                bool(re.search(r"\b" + item["word"], " ".join(raw), re.I)))
+    lines = [x for x in raw if not x.startswith("#") and not re.fullmatch(r"\*\*[^*]+\*\*|_[^_]+_", x)]  # headings / bold titles
+    if len(lines) == 5 and len(lines[0].split()) <= 4 and not re.search(r"[,.;:!?]$", lines[0]):
+        lines = lines[1:]  # a plain title line above the poem
     out = tasks_judge.judge("", RP_JUDGE.format(scheme=item["scheme"], topic=item["topic"], text="\n".join(lines) or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)

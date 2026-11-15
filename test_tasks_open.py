@@ -351,6 +351,8 @@ def test_rhyme_poem():
         assert to.score_rhyme_poem(it[0], {"content": poem})["correct"]
         r = to.score_rhyme_poem(it[0], {"content": poem + "\nNoch eine Zeile."})
         assert r["detail"]["four_lines"] == 0.0 and r["score"] == 0.8
+        assert to.score_rhyme_poem(it[0], {"content": "**Herbstregen**\n\n" + poem.replace("Schirm", "Regenschirm")})["correct"]
+        assert to.score_rhyme_poem(it[0], {"content": "Herbstregen\n\n" + poem})["correct"]
     finally:
         stop()
         tasks_judge.configure(None, None, None)

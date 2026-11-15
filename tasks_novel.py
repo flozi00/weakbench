@@ -5216,7 +5216,9 @@ def load_new_concept(lang, n, seed):
             pos, exc = conds[:2], conds[2] if nc == 3 else None  # with 3: the third is an "unless" exception
             nums = r.sample(range(10, 100), 8)
             member = [all(c[2](x) for c in pos) and not (exc and exc[2](x)) for x in nums]
-            if 2 <= sum(member) <= 5 and (not exc or any(all(c[2](x) for c in pos) and exc[2](x) for x in nums)):
+            alone = [[c[2](x) and not (exc and exc[2](x)) for x in nums] for c in pos]  # one condition alone solves it?
+            if 2 <= sum(member) <= 5 and member not in alone and \
+                    (not exc or any(all(c[2](x) for c in pos) and exc[2](x) for x in nums)):
                 break
         li = 0 if lang == "en" else 1
         d = (f"A number is a {word} if {pos[0][li]} and {pos[1][li]}" if lang == "en" else
@@ -5228,14 +5230,16 @@ def load_new_concept(lang, n, seed):
              f"{d}.\nWelche dieser Zahlen sind {word.capitalize()}s? {', '.join(map(str, nums))}\nNenne alle, durch Kommas getrennt "
              "(oder schreib keine).")
         gold = sorted(x for x, m in zip(nums, member) if m)
-        items.append({"id": str(i), "lang": lang, "gold": ", ".join(map(str, gold)), "set": gold, "nc": nc,
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(map(str, gold)), "set": gold, "nc": nc, "nums": nums,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_new_concept(item, reply):
     fa = final_answer(reply["content"]) or ""
-    got = {int(x) for x in re.findall(r"\b\d+\b", fa)}
+    fa = re.split(r"\b(?:are|sind)\b|=", fa)[-1]  # "Of 12, 36, 41 the florps are 36"
+    fa = re.sub(r"\([^()]*\)", " ", fa)  # "36 (even, 3<6)"
+    got = {int(x) for x in re.findall(r"\b\d+\b", fa)} & set(item["nums"])
     want = set(item["set"])
     ok = got == want
     jac = len(got & want) / len(got | want) if got | want else 1.0

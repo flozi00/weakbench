@@ -5067,6 +5067,49 @@ def score_card_score(item, reply):
             "detail": {f"ok_r{item['k']}": float(ok), "took_plain_sum": float(v == item["naive"])}}
 
 
+# ---------------------------------------------------------------- parallel_work (does the work split?)
+# split: k workers need t minutes for a fixed job -> m workers need t*k/m. fixed: k items take t minutes side by side
+# (shirts in the sun, eggs in one pot, a band playing a song) -> m items take t as well (if they fit). The proportional
+# answer on the fixed items is the bait.
+PW_SPLIT = {"en": ["{k} painters paint a fence in {t} minutes. How many minutes do {m} equally fast painters need for the same fence?",
+                   "{k} pickers harvest a field in {t} minutes. How many minutes do {m} equally fast pickers need for the same field?",
+                   "{k} movers empty a flat in {t} minutes. How many minutes do {m} equally fast movers need for the same flat?"],
+            "de": ["{k} Maler streichen einen Zaun in {t} Minuten. Wie viele Minuten brauchen {m} gleich schnelle Maler für denselben Zaun?",
+                   "{k} Erntehelfer ernten ein Feld in {t} Minuten. Wie viele Minuten brauchen {m} gleich schnelle Helfer für dasselbe Feld?",
+                   "{k} Umzugshelfer räumen eine Wohnung in {t} Minuten leer. Wie viele Minuten brauchen {m} gleich schnelle Helfer für dieselbe Wohnung?"]}
+PW_FIXED = {"en": ["{k} shirts hung side by side on a long line dry in the sun in {t} minutes. How many minutes do {m} shirts take, "
+                   "also side by side on the same long line?",
+                   "{k} eggs boil hard in one large pot in {t} minutes. How many minutes do {m} eggs take in the same pot, all at once?",
+                   "A band of {k} musicians plays a song in {t} minutes. How many minutes does a band of {m} musicians take for the same song?"],
+            "de": ["{k} Hemden, nebeneinander auf einer langen Leine, trocknen in der Sonne in {t} Minuten. Wie viele Minuten brauchen "
+                   "{m} Hemden, ebenfalls nebeneinander auf derselben langen Leine?",
+                   "{k} Eier werden in einem großen Topf in {t} Minuten hart. Wie viele Minuten brauchen {m} Eier im selben Topf, alle gleichzeitig?",
+                   "Eine Band aus {k} Musikern spielt ein Lied in {t} Minuten. Wie viele Minuten braucht eine Band aus {m} Musikern für dasselbe Lied?"]}
+
+
+def load_parallel_work(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("parallel_work", i)
+        split = i % 2 == 0
+        k, m = r.sample([2, 3, 4, 5, 6, 8], 2)
+        t = k * m * r.choice([2, 3, 5])  # t*k/m stays whole
+        tpl = (PW_SPLIT if split else PW_FIXED)[lang][(i // 2) % 3]
+        prop = t * k // m
+        gold = prop if split else t
+        bait = t * m // k if split else prop  # split: the direct (not inverse) proportion; fixed: the proportional answer
+        items.append({"id": str(i), "lang": lang, "gold": gold, "split": split, "bait": bait,
+                      "messages": [{"role": "user", "content": tpl.format(k=k, t=t, m=m) + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_parallel_work(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_split" if item["split"] else "ok_fixed": float(ok), "took_proportion": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6642,6 +6685,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "parallel_work": task(load_parallel_work, score_parallel_work, 24, 120),
     "card_score": task(load_card_score, score_card_score, 24, 120),
     "queue_sim": task(load_queue_sim, score_queue_sim, 24, 120),
     "floor_area": task(load_floor_area, score_floor_area, 24, 120),

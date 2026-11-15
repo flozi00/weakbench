@@ -2875,6 +2875,18 @@ def score_de_prefix_meaning(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+def _ab_letter(text):
+    """The A/B choice of a reply: an answer line, a leading letter ("B is correct ..."), "option B", else the only letter
+    (the article "A hyphen ..." is no vote)."""
+    for pat in (r"Answer\W*:?\W*\b([AB])\b", r"\A\W*([AB])\b", r"\b(?:option|sentence|answer)\s+([AB])\b",
+                r"\b([AB])\s+is\s+(?:correct|right)"):
+        m = re.findall(pat, text, re.I | re.M)
+        if m:
+            return m[-1].upper() if len({x.upper() for x in m}) == 1 else None
+    m = re.findall(r"\b([AB])\b(?!\s+[a-z])", text)
+    return m[0] if len(set(m)) == 1 else None
+
+
 # ---------------------------------------------------------------- en_hyphens (compound modifiers)
 EH_ITEMS = [("before", "She is a ___ author.", "well-known", "well known"), ("after", "The child is ___.", "five years old", "five-years-old"),
             ("before", "We bought a ___ car.", "two-year-old", "two year old"), ("after", "The car is ___.", "two years old", "two-years-old"),
@@ -2901,10 +2913,7 @@ def load_en_hyphens(lang, n, seed):
 
 
 def score_en_hyphens(item, reply):
-    text = reply["content"] or ""
-    line = re.findall(r"Answer\W*:?\W*\b([AB])\b", text, re.I)
-    m = line[-1:] or re.findall(r"\b([AB])\b(?!\s+[a-z])", text)  # the article "A hyphen ..." is no vote
-    v = m[0].upper() if len({x.upper() for x in m}) == 1 else None
+    v = _ab_letter(reply["content"] or "")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
@@ -3164,10 +3173,7 @@ def load_en_relative_commas(lang, n, seed):
 
 
 def score_en_relative_commas(item, reply):
-    text = reply["content"] or ""
-    line = re.findall(r"Answer\W*:?\W*\b([AB])\b", text, re.I)
-    m = line[-1:] or re.findall(r"\b([AB])\b(?!\s+[a-z])", text)
-    v = m[0].upper() if len({x.upper() for x in m}) == 1 else None
+    v = _ab_letter(reply["content"] or "")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_one" if item["one"] else "ok_several": float(ok)}}
 

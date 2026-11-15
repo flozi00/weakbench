@@ -7060,7 +7060,12 @@ def load_rooms_needed(lang, n, seed):
 
 
 def score_rooms_needed(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    m = re.search(r"(\d+)\s*(?:rooms?|räume?n?)\b", fa, re.I)  # "From 10:00 to 11:00, 4 rooms"
+    v = int(m[1]) if m else answer_value(fa, item["lang"])
+    if v is None:
+        w = [ES_WORDS[x] for x in re.findall(r"[a-zäöü]+", fa.lower()) if x in ES_WORDS]
+        v = w[0] if len(set(w)) == 1 else None  # "vier Räume"
     ok = v == item["gold"]
     d = {}
     if item["touch"] != item["gold"]:

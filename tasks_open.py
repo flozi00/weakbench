@@ -1611,6 +1611,67 @@ def score_de_gender_fair(item, reply):
                        "neutral_judge": float(neutral), "grammar": float(grammar), "natural": float(natural)}}
 
 
+# ---------------------------------------------------------------- double_meaning (judge + exact: a pun on a homonym)
+# Humour production is a language skill the suite did not touch: a two- or three-sentence joke whose punchline turns on
+# both meanings of a given homonym. The word must appear (checked in code); the judge checks that both meanings are
+# really used, that it works as a joke and that the language is correct. Homonyms with two clearly separate meanings.
+DBL_WORDS = {"de": [("Bank", "Sitzbank", "Geldinstitut"), ("Schloss", "Türschloss", "Burg/Palast"), ("Kiefer", "Baum", "Knochen"),
+                   ("Leiter", "Steiggerät", "Chef/Chefin"), ("Strauß", "Blumenstrauß", "Vogel"), ("Birne", "Obst", "Glühbirne"),
+                   ("Mutter", "Elternteil", "Schraubenmutter"), ("Hahn", "Wasserhahn", "Vogel"), ("Maus", "Tier", "Computermaus"),
+                   ("Zug", "Bahn", "Schachzug")],
+            "en": [("bank", "river bank", "money bank"), ("bat", "animal", "baseball bat"), ("bark", "tree bark", "dog's bark"),
+                   ("match", "game", "matchstick"), ("spring", "season", "coil"), ("seal", "animal", "stamp/closure"),
+                   ("crane", "bird", "machine"), ("bow", "ribbon/weapon", "bending forward"), ("mouse", "animal", "computer mouse"),
+                   ("pitch", "football field", "sound frequency")]}
+DBL_JUDGE = """A short joke (two or three sentences) was requested in {language} whose punchline plays on BOTH meanings of the word
+"{word}" ({m1} / {m2}).
+
+JOKE:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The joke really uses BOTH meanings ({m1} and {m2}); the double meaning is what makes it funny, not just a mention.
+2. It works as a joke: a setup and a punchline that a native speaker would get; it is not an explanation of the pun.
+3. The language is correct and natural {language}; no offensive or mean-spirited content."""
+
+
+def load_double_meaning(lang, n, seed):
+    tasks_judge.check_judge()
+    words = DBL_WORDS[lang]
+    return [{"id": str(i), "lang": lang, "word": w, "m1": a, "m2": b,
+             "messages": [{"role": "user", "content": (
+                 f"Schreib einen kurzen Witz (zwei oder drei Sätze), dessen Pointe auf beiden Bedeutungen des Wortes „{w}“ beruht. "
+                 f"Antworte nur mit dem Witz, ohne Erklärung." if lang == "de" else
+                 f"Write a short joke (two or three sentences) whose punchline relies on both meanings of the word \"{w}\". "
+                 f"Reply with the joke only, no explanation.")}]}
+            for i, (w, a, b) in enumerate(words[:min(n or 10, 10)])]
+
+
+def score_double_meaning(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    w = item["word"]
+    if item["lang"] == "de":  # inflected and umlaut plurals count: Bänke, Schlösser, Kiefern, Züge
+        uml = re.sub(r"[aou]", lambda m: {"a": "ä", "o": "ö", "u": "ü"}[m[0]], w, count=1)
+        pat = rf"\b(?:{re.escape(w)}|{re.escape(uml)})\w{{0,4}}\b"
+    else:
+        pat = rf"\b{re.escape(w)}(?:s|es)?\b"
+    has_word = bool(re.search(pat, text, re.I))
+    words = len(re.findall(r"\w+", text))
+    out = tasks_judge.judge("", DBL_JUDGE.format(language="German" if item["lang"] == "de" else "English", word=item["word"],
+                                                m1=item["m1"], m2=item["m2"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable double_meaning verdict {out[:120]!r}")
+    both, joke, lang_ok = (_yes(x) for x in v)
+    short = 0 < words <= 80
+    met = [has_word, short, both, joke, lang_ok]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"word_used": float(has_word), "short": float(short), "both_meanings": float(both), "is_joke": float(joke),
+                       "language": float(lang_ok)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2167,6 +2228,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "de_gender_fair": {"langs": ("de",), "load": load_de_gender_fair, "score": score_de_gender_fair,
                             "think": False, "max_tokens": 512,
                             "counts": {"quick": {"de": 8}, "full": {"de": None}},
+                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "double_meaning": {"langs": ("de", "en"), "load": load_double_meaning, "score": score_double_meaning,
+                            "think": False, "max_tokens": 256,
+                            "counts": {"quick": {"de": 10, "en": 10}, "full": {"de": None, "en": None}},
                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,

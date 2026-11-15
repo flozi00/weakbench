@@ -671,3 +671,23 @@ def test_de_gender_fair():
 
 if __name__ == "__main__":
     test_de_gender_fair()
+
+
+def test_double_meaning():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        de = to.load_double_meaning("de", None, 0)
+        assert len(de) == 10 and de[0]["word"] == "Bank"
+        assert to.score_double_meaning(de[0], {"content": "Warum sitzt der Banker im Park? Er wollte sein Geld auf die Bank bringen."})["correct"]
+        assert to.score_double_meaning(de[1], {"content": "Der König hat zwei Schlösser: eins am Rhein und eins an der Tür."})["correct"]
+        assert not to.score_double_meaning(de[0], {"content": "Ein Witz ohne das Wort."})["correct"]
+        en = to.load_double_meaning("en", None, 0)
+        assert not to.score_double_meaning(en[1], {"content": "He took a bath."})["detail"]["word_used"]
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_double_meaning()

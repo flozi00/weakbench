@@ -2774,6 +2774,36 @@ def score_sentence_order(item, reply):
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {"pairs_right": pairs}}
 
 
+# ---------------------------------------------------------------- de_als_wie (als / wie after comparisons)
+AW_ITEMS = [("comparative", "Mein Bruder ist größer ___ ich.", "als"), ("comparative", "Heute ist es kälter ___ gestern.", "als"),
+            ("comparative", "Der Zug war schneller ___ das Auto.", "als"), ("comparative", "Sie verdient mehr ___ ihr Chef.", "als"),
+            ("comparative", "Das dauerte länger ___ geplant.", "als"), ("comparative", "Es kostet weniger ___ erwartet.", "als"),
+            ("comparative", "Er spielt besser Klavier ___ seine Lehrerin.", "als"),
+            ("equative", "Mein Bruder ist so groß ___ ich.", "wie"), ("equative", "Heute ist es genauso kalt ___ gestern.", "wie"),
+            ("equative", "Das Hotel war nicht so teuer ___ befürchtet.", "wie"), ("equative", "Sie läuft fast so schnell ___ ihr Trainer.", "wie"),
+            ("equative", "Die Wohnung ist doppelt so groß ___ unsere alte.", "wie"), ("equative", "Er ist ebenso müde ___ du.", "wie"),
+            ("other", "Das Ergebnis war anders ___ erwartet.", "als"), ("other", "Das ist nichts anderes ___ ein Trick.", "als"),
+            ("other", "Niemand ___ sie kennt die Antwort.", "als"), ("other", "Sie arbeitet ___ Ärztin in Köln.", "als"),
+            ("other", "Er singt ___ ein Profi.", "wie"), ("other", "Es kam ganz anders, ___ wir dachten.", "als"),
+            ("equative", "Der Film war nicht halb so gut ___ das Buch.", "wie")]
+
+
+def load_de_als_wie(lang, n, seed):
+    rows = AW_ITEMS[:min(n or len(AW_ITEMS), len(AW_ITEMS))]
+    return [{"id": str(i), "lang": "de", "gold": g, "kind": k,
+             "messages": [{"role": "user", "content": "Setze „als“ oder „wie“ ein (Standardschriftdeutsch). Antworte nur mit dem Wort.\n\n" + sent}]}
+            for i, (k, sent, g) in enumerate(rows)]
+
+
+def score_de_als_wie(item, reply):
+    w = [x for x in re.findall(r"[a-zäöü]+", (reply["content"] or "").lower()) if x in ("als", "wie")]
+    ok = len(set(w)) == 1 and w[0] == item["gold"]
+    d = {f"ok_{item['kind']}": float(ok)}
+    if item["gold"] == "als":
+        d["took_wie"] = float(w[:1] == ["wie"])
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3087,6 +3117,7 @@ TASKS = {
     "de_passive": task(("de",), load_de_passive, score_de_passive, 64, 24, lang_check=False),
     "en_usage": task(("en",), load_en_usage, score_en_usage, 16, 24, lang_check=False),
     "sentence_order": task(("de", "en"), load_sentence_order, score_sentence_order, 512, 12, lang_check=False),
+    "de_als_wie": task(("de",), load_de_als_wie, score_de_als_wie, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

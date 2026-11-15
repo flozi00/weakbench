@@ -6800,28 +6800,28 @@ def load_map_scale(lang, n, seed):
             cm = r.randint(3, 250) / 10
             gold = cm * scale / 100000  # km
             bait = cm * scale / 1000  # a unit slip: metres read as km
-            q = (f"On a map with scale 1:{scale:,} two villages are {cm:g} cm apart. How many kilometres apart are they in reality?"
+            q = (f"On a map with scale 1:{scale:,} two villages are {cm:g} cm apart. How many kilometres apart are they in reality? Round to two decimals."
                  if lang == "en" else
                  f"Auf einer Karte im Maßstab 1:{scale:,} liegen zwei Dörfer {f'{cm:g}'.replace('.', ',')} cm auseinander. "
-                 "Wie viele Kilometer sind sie in Wirklichkeit voneinander entfernt?")
+                 "Wie viele Kilometer sind sie in Wirklichkeit voneinander entfernt? Runde auf zwei Nachkommastellen.")
         else:
             cm2 = r.randint(1, 40)
             gold = cm2 * scale ** 2 / 10000 / 10000  # cm² -> m² -> ha
             bait = cm2 * scale / 10000 / 10000
             q = (f"On a map with scale 1:{scale:,} a field covers {cm2} cm². How many hectares is the field in reality? "
-                 "(1 ha = 10,000 m²)" if lang == "en" else
+                 "(1 ha = 10,000 m²) Round to two decimals." if lang == "en" else
                  f"Auf einer Karte im Maßstab 1:{scale:,} bedeckt ein Feld {cm2} cm². Wie viele Hektar ist das Feld in Wirklichkeit? "
-                 "(1 ha = 10.000 m²)")
+                 "(1 ha = 10.000 m²) Runde auf zwei Nachkommastellen.")
         if lang == "de":
             q = q.replace(f"1:{scale:,}", "1:" + f"{scale:,}".replace(",", "."))
-        items.append({"id": str(i), "lang": lang, "gold": round(gold, 4), "bait": round(bait, 4), "area": area,
+        items.append({"id": str(i), "lang": lang, "gold": round(gold, 2), "bait": round(bait, 4), "area": area,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_map_scale(item, reply):
     v = answer_value(final_answer(reply["content"]), item["lang"])
-    near = lambda x, y: x is not None and abs(x - y) <= 0.005 * abs(y) + 1e-9  # noqa: E731
+    near = lambda x, y: x is not None and abs(x - y) <= max(0.0051, 0.005 * abs(y))  # noqa: E731
     ok = near(v, item["gold"])
     d = {"ok_area" if item["area"] else "ok_length": float(ok)}
     if item["area"]:

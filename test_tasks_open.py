@@ -280,6 +280,24 @@ def test_audience_explain():
 
 
 
+def test_minimal_edit():
+    url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES", "YES"]}), "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_minimal_edit("en", None, 0)
+        assert len(it) == 12
+        x = it[1]
+        good = " ".join(["Maria stood at the counter and sold bread." if j == 1 else s for j, s in enumerate(x["sents"])])
+        assert to.score_minimal_edit(x, {"content": good})["correct"]
+        bad = good.replace("Many customers come", "Lots of customers come")
+        r = to.score_minimal_edit(x, {"content": bad})
+        assert not r["correct"] and r["detail"]["over_edited"] == 1.0
+        assert not to.score_minimal_edit(x, {"content": " ".join(x["sents"])})["correct"]  # nothing changed
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -388,6 +406,7 @@ if __name__ == "__main__":
     test_socratic_tutor()
     test_argument_essay()
     test_audience_explain()
+    test_minimal_edit()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

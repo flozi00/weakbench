@@ -828,6 +828,66 @@ def score_audience_explain(item, reply):
                        "within_limit": float(met[3]), "words": words}}
 
 
+# ---------------------------------------------------------------- minimal_edit (judge + exact: change one sentence, keep the rest)
+# Over-editing: asked to change one sentence, models often rewrite the whole paragraph. The other sentences must come
+# back verbatim (checked exactly); the judge checks that the target sentence is in the past tense and keeps its meaning.
+ME_TEXTS = {"en": [["The bakery opens at seven.", "Maria stands at the counter and sells bread.", "Many customers come before work.",
+                    "By noon most shelves are empty."],
+                   ["The train leaves the station late.", "A conductor checks the tickets.", "Two children look out of the window.",
+                    "Outside, the fields are covered in snow."],
+                   ["Our team meets every Monday.", "Jonas presents the numbers.", "Everyone asks questions about the budget.",
+                    "The meeting usually ends after an hour."]],
+            "de": [["Die Bäckerei öffnet um sieben Uhr.", "Maria steht an der Theke und verkauft Brot.", "Viele Kunden kommen vor der Arbeit.",
+                    "Bis Mittag sind die meisten Regale leer."],
+                   ["Der Zug verlässt den Bahnhof mit Verspätung.", "Ein Schaffner kontrolliert die Fahrkarten.",
+                    "Zwei Kinder schauen aus dem Fenster.", "Draußen liegt Schnee auf den Feldern."],
+                   ["Unser Team trifft sich jeden Montag.", "Jonas stellt die Zahlen vor.", "Alle stellen Fragen zum Budget.",
+                    "Das Treffen endet meistens nach einer Stunde."]]}
+ME_ORD = {"en": ["first", "second", "third", "fourth"], "de": ["ersten", "zweiten", "dritten", "vierten"]}
+ME_JUDGE = """ORIGINAL SENTENCE: {orig}
+EDITED TEXT:
+{text}
+
+The editor was asked to put only that sentence into the simple past ({tense}). For each criterion answer YES or NO.
+Reply with ONLY {{"verdicts": [...]}}.
+1. The text contains a version of the original sentence in the simple past ({tense}), grammatically correct.
+2. That version keeps the meaning of the original sentence (no added or lost facts)."""
+
+
+def load_minimal_edit(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 12):
+        sents = ME_TEXTS[lang][(i // 4) % 3]
+        k = i % 4
+        req = (f"Put only the {ME_ORD['en'][k]} sentence of this text into the simple past. Leave every other sentence exactly "
+               "as it is. Reply with the whole text only.\n\n" if lang == "en" else
+               f"Setze nur den {ME_ORD['de'][k]} Satz dieses Textes ins Präteritum. Lass alle anderen Sätze genau so, wie sie sind. "
+               "Antworte nur mit dem ganzen Text.\n\n")
+        items.append({"id": str(i), "lang": lang, "k": k, "sents": sents,
+                      "messages": [{"role": "user", "content": req + " ".join(sents)}]})
+    return items
+
+
+def score_minimal_edit(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    flat = re.sub(r"\s+", " ", text)
+    others = [x for j, x in enumerate(item["sents"]) if j != item["k"]]
+    kept = sum(x in flat for x in others) / len(others)
+    target_unchanged = item["sents"][item["k"]] in flat
+    out = tasks_judge.judge("", ME_JUDGE.format(orig=item["sents"][item["k"]], text=text or "(empty)",
+                                                tense="Präteritum" if item["lang"] == "de" else "simple past"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 2:
+        raise ValueError(f"unusable edit verdict {out[:120]!r}")
+    edit = all(str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v) and not target_unchanged
+    ok = edit and kept == 1.0
+    return {"correct": ok, "score": float(ok), "pred": text[:200], "gold": None,
+            "detail": {"edit_ok": float(edit), "others_kept": round(kept, 4), "over_edited": float(kept < 1.0)}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1225,6 +1285,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "minimal_edit": {"langs": ("de", "en"), "load": load_minimal_edit, "score": score_minimal_edit,
+                          "think": False, "max_tokens": 512,
+                          "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                          "lang_check": True, "opt_in": True, "needs_judge": True},
          "audience_explain": {"langs": ("de", "en"), "load": load_audience_explain, "score": score_audience_explain,
                               "think": False, "max_tokens": 512,
                               "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},

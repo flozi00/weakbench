@@ -1457,6 +1457,54 @@ def score_de_learner_feedback(item, reply):
             "detail": {"corrected": float(met[0]), "rule_right": float(met[1]), "simple": float(met[2]), "no_new_errors": float(met[3])}}
 
 
+# ---------------------------------------------------------------- en_learner_feedback (judge + exact: typical errors of German speakers)
+LFE_ITEMS = [("I am living in Berlin since 2020.", "I have been living in Berlin since 2020.", "present perfect with since"),
+             ("He explained me the rule.", "He explained the rule to me.", "explain something to someone"),
+             ("I look forward to see you.", "I look forward to seeing you.", "look forward to + -ing"),
+             ("Can you give me some informations?", "Can you give me some information?", "uncountable information"),
+             ("She said me that she was tired.", "She told me that she was tired.", "say vs tell"),
+             ("I have seen him yesterday.", "I saw him yesterday.", "simple past with a finished time"),
+             ("If I would have time, I would help you.", "If I had time, I would help you.", "no would in the if-clause"),
+             ("He is working here since three years.", "He has been working here for three years.", "for vs since"),
+             ("I am agree with you.", "I agree with you.", "agree is a verb"),
+             ("The people is very friendly here.", "The people are very friendly here.", "people is plural"),
+             ("I want that you come to my party.", "I want you to come to my party.", "want someone to do"),
+             ("She can very good sing.", "She can sing very well.", "adverb well and word order")]
+LFE_JUDGE = """An English learner (level B1, native language German) wrote: "{bad}"
+The correct sentence is: "{good}" (topic: {topic}).
+The tutor replied:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The explanation states the rule behind the correction correctly.
+2. The explanation is simple enough for a B1 learner and written in English.
+3. The reply contains no new English errors and does not "correct" anything that was already right."""
+
+
+def load_en_learner_feedback(lang, n, seed):
+    tasks_judge.check_judge()
+    return [{"id": str(i), "lang": "en", "bad": bad, "good": good, "topic": topic,
+             "messages": [{"role": "user", "content": "I'm learning English (level B1). Is this sentence correct? Please correct it and "
+                           f"briefly explain the rule.\n\n{bad}"}]}
+            for i, (bad, good, topic) in enumerate(LFE_ITEMS[:min(n or 12, 12)])]
+
+
+def score_en_learner_feedback(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    norm = lambda t: re.sub(r"\s+", " ", re.sub(r"[“”\"*]", "", t.replace("’", "'"))).strip().lower()  # noqa: E731
+    corrected = norm(item["good"]) in norm(text)
+    out = tasks_judge.judge("", LFE_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
+                            max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable feedback verdict {out[:120]!r}")
+    met = [corrected] + [_yes(x) for x in v]
+    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": text[:160], "gold": item["good"],
+            "detail": {"corrected": float(met[0]), "rule_right": float(met[1]), "simple": float(met[2]), "no_new_errors": float(met[3])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1854,6 +1902,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "en_learner_feedback": {"langs": ("en",), "load": load_en_learner_feedback, "score": score_en_learner_feedback,
+                                 "think": False, "max_tokens": 512,
+                                 "counts": {"quick": {"en": 12}, "full": {"en": None}},
+                                 "lang_check": True, "opt_in": True, "needs_judge": True},
          "de_learner_feedback": {"langs": ("de",), "load": load_de_learner_feedback, "score": score_de_learner_feedback,
                                  "think": False, "max_tokens": 512,
                                  "counts": {"quick": {"de": 12}, "full": {"de": None}},

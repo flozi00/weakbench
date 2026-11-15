@@ -2870,13 +2870,13 @@ def score_de_prefix_meaning(item, reply):
 
 
 # ---------------------------------------------------------------- en_hyphens (compound modifiers)
-EH_ITEMS = [("before", "She is a ___ author.", "well-known", "well known"), ("after", "The author is ___.", "well known", "well-known"),
+EH_ITEMS = [("before", "She is a ___ author.", "well-known", "well known"), ("after", "The child is ___.", "five years old", "five-years-old"),
             ("before", "We bought a ___ car.", "two-year-old", "two year old"), ("after", "The car is ___.", "two years old", "two-years-old"),
             ("before", "It was a ___ decision.", "last-minute", "last minute"), ("after", "We decided at the ___.", "last minute", "last-minute"),
             ("before", "This is a ___ problem.", "long-term", "long term"), ("after", "In the ___, prices will fall.", "long term", "long-term"),
             ("before", "They live in a ___ flat.", "fourth-floor", "fourth floor"), ("after", "Their flat is on the ___.", "fourth floor", "fourth-floor"),
             ("before", "He gave a ___ answer.", "well-thought-out", "well thought out"),
-            ("after", "His answer was ___.", "well thought out", "well-thought-out"),
+            ("after", "The tower is ___.", "ten storeys high", "ten-storeys-high"),
             ("ly", "It is a ___ job.", "highly paid", "highly-paid"), ("ly", "She wrote a ___ report.", "beautifully written", "beautifully-written"),
             ("ly", "They sell ___ goods.", "locally produced", "locally-produced"), ("ly", "It was a ___ plan.", "carefully planned", "carefully-planned"),
             ("before", "We need a ___ solution.", "short-term", "short term"), ("after", "It helps in the ___.", "short term", "short-term"),

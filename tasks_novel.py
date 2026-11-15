@@ -7376,12 +7376,9 @@ DP_TEXT = {"en": {"urgency": ["Only {k} left! Offer ends in 00:{m}:59 — {p} at
                                  "{p}-Test für 0 €. Kreditkarte nötig; verlängert sich automatisch für {k}4,99 € monatlich, Kündigung nur per Brief."],
                   "none": ["{p}: {k}9,99 € inklusive MwSt. und Versand. Kostenlose Rückgabe innerhalb von 30 Tagen. [Kaufen] [Jetzt nicht]",
                            "Teste {p} {m} Tage lang. Wir erinnern dich 3 Tage vor Ende des Tests; Kündigung mit einem Klick."]}}
-DP_PRODUCTS = {"en": ["the noise-cancelling headphones", "the yoga app", "the coffee subscription", "the language course",
-                      "the cloud storage", "the e-reader", "the meal kit", "the fitness tracker", "the photo editor", "the travel pillow",
-                      "the password manager", "the plant food"],
-               "de": ["die Kopfhörer", "die Yoga-App", "das Kaffee-Abo", "den Sprachkurs", "den Cloud-Speicher", "den E-Reader",
-                      "die Kochbox", "den Fitness-Tracker", "die Fotobearbeitung", "das Reisekissen", "den Passwort-Manager",
-                      "den Pflanzendünger"]}
+DP_BRANDS = ["SoundMax", "Yogaflow", "BeanBox", "Lingo+", "CloudSafe", "Readly", "KochKiste", "FitBand", "PixFix", "Dreamrest",
+             "KeyVault", "Grünkraft"]  # brand names work in every case slot without an article
+DP_PRODUCTS = {"en": DP_BRANDS, "de": DP_BRANDS}
 
 
 def load_dark_patterns(lang, n, seed):

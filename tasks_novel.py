@@ -8012,6 +8012,45 @@ def score_version_pick(item, reply):
             "detail": {"took_prerelease": float(v == item["pre"]), "text_order": float(v == item["text_max"])}}
 
 
+# ---------------------------------------------------------------- check_digit (follow a stated checksum rule)
+# The rule is stated in the prompt (ISBN-13 style weights 1,3 or an invented weight cycle), so this measures careful
+# execution of a procedure, not recall. A quarter of the items have a weighted sum divisible by 10, where
+# "10 - (sum mod 10)" must wrap to 0.
+def load_check_digit(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("check_digit", i, att)
+        weights = (1, 3) if i % 2 == 0 else tuple(r.sample([2, 3, 4, 5, 7], r.choice([2, 3])))
+        length = r.choice([7, 9, 12])
+        while True:
+            digits = [r.randint(0, 9) for _ in range(length)]
+            total = sum(d * weights[k % len(weights)] for k, d in enumerate(digits))
+            if (total % 10 == 0) == (i % 4 == 1):
+                break
+        gold = (10 - total % 10) % 10
+        num = "".join(map(str, digits))
+        w = ", ".join(map(str, weights))
+        q = (f"A code gets one check digit at the end. Rule: multiply the digits from left to right by the weights {w}, {w}, ... "
+             f"(repeating), add up the products, take the remainder when divided by 10, and subtract it from 10; if the result is "
+             f"10, the check digit is 0. What is the check digit for {num}?" if lang == "en" else
+             f"Ein Code bekommt am Ende eine Prüfziffer. Regel: Multipliziere die Ziffern von links nach rechts mit den Gewichten "
+             f"{w}, {w}, ... (wiederholt), addiere die Produkte, nimm den Rest bei Division durch 10 und ziehe ihn von 10 ab; ist "
+             f"das Ergebnis 10, ist die Prüfziffer 0. Wie lautet die Prüfziffer für {num}?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": total % 10, "wrap": total % 10 == 0, "num": num,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_check_digit(item, reply):
+    fa = re.sub(re.escape(item["num"]) + r"\d?", " ", final_answer(reply["content"]) or "")  # "...9781234 -> 97812343": the code itself
+    v = stated_int({"content": "Answer: " + fa}, r"\b")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_wrap" if item["wrap"] else "ok_plain": float(ok),
+                       "forgot_subtraction": float(v == item["bait"] and item["bait"] != item["gold"]),
+                       "gave_ten": float(v == 10)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9601,6 +9640,7 @@ TASKS = {
     "loan_payoff": task(load_loan_payoff, score_loan_payoff, 24, 120),
     "seat_pairs": task(load_seat_pairs, score_seat_pairs, 24, 120),
     "version_pick": task(load_version_pick, score_version_pick, 24, 120),
+    "check_digit": task(load_check_digit, score_check_digit, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

@@ -1608,3 +1608,19 @@ def test_version_pick():
 
 if __name__ == "__main__":
     test_version_pick()
+
+
+def test_check_digit():
+    import tasks_novel as tn
+    xs = tn.load_check_digit("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert sum(x["wrap"] for x in xs) == 30
+    x = next(y for y in xs if y["wrap"])
+    assert x["gold"] == 0
+    for c in ("Answer: 0", f"Answer: 0 (full code {x['num']}0)", f"Answer: {x['num']}0 -> check digit 0"):
+        assert tn.score_check_digit(x, {"content": c})["correct"], c
+    assert tn.score_check_digit(x, {"content": "Answer: 10"})["detail"]["gave_ten"] == 1
+
+
+if __name__ == "__main__":
+    test_check_digit()

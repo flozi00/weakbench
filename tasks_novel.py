@@ -8635,6 +8635,43 @@ def score_elevator_route(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"press_order": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- implausible_value (data sanity: impossible vs merely unusual)
+IV_NAMES = ["Aylin", "Bernd", "Chiara", "Dmitri", "Emma", "Fatih", "Greta", "Hannes", "Ida", "Jonas", "Klara", "Luca"]
+
+
+def load_implausible_value(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("implausible_value", i, att)
+        names = r.sample(IV_NAMES, r.randint(6, 8))
+        rows = {nm: [r.randint(158, 192), r.randint(55, 98), r.randint(22, 61)] for nm in names}
+        bad, odd = r.sample(names, 2)
+        col = r.randrange(3)
+        # the impossible value: a unit slip or an impossible magnitude
+        rows[bad][col] = r.choice({0: ["1.78", "17", "1780"], 1: ["7", "750", "0.8"], 2: ["4", "230", "-3"]}[col])
+        # an unusual but possible value in another row (the bait)
+        ocol = (col + r.randint(1, 2)) % 3
+        rows[odd][ocol] = r.choice({0: [203, 151], 1: [128, 47], 2: [67, 19]}[ocol])
+        head = "| Name | Height (cm) | Weight (kg) | Age |" if lang == "en" else "| Name | Größe (cm) | Gewicht (kg) | Alter |"
+        fmt = lambda v: v if isinstance(v, str) and lang == "en" else (v.replace(".", ",") if isinstance(v, str) else str(v))  # noqa: E731
+        table = "\n".join(f"| {nm} | " + " | ".join(fmt(v) for v in rows[nm]) + " |" for nm in names)
+        q = (f"Employee records of a small company:\n{head}\n|---|---|---|---|\n{table}\nExactly one value in the table cannot "
+             f"be right (a typing or unit error); some others are just unusual. Whose row contains the impossible value?" if lang == "en" else
+             f"Personaldaten einer kleinen Firma:\n{head}\n|---|---|---|---|\n{table}\nGenau ein Wert in der Tabelle kann nicht "
+             f"stimmen (ein Tipp- oder Einheitenfehler); manche anderen sind nur ungewöhnlich. In wessen Zeile steht der unmögliche Wert?")
+        items.append({"id": str(i), "lang": lang, "gold": bad, "bait": odd, "names": names,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_implausible_value(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    hits = sorted((m.start(), nm) for nm in item["names"] if (m := re.search(rf"\b{nm}\b", fa)))
+    v = hits[0][1] if len(hits) == 1 or (len(hits) == 2 and not re.search(r"\b(?:or|oder)\b|/", fa)) else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"picked_unusual": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10237,6 +10274,7 @@ TASKS = {
     "nutrition_portion": task(load_nutrition_portion, score_nutrition_portion, 24, 120),
     "series_runs": task(load_series_runs, score_series_runs, 24, 120),
     "elevator_route": task(load_elevator_route, score_elevator_route, 24, 120),
+    "implausible_value": task(load_implausible_value, score_implausible_value, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

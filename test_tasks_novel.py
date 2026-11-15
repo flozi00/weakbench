@@ -1825,3 +1825,21 @@ def test_elevator_route():
 
 if __name__ == "__main__":
     test_elevator_route()
+
+
+def test_implausible_value():
+    import tasks_novel as tn
+    xs = tn.load_implausible_value("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs:  # exactly one value outside human ranges (height 140-215 cm, weight 40-150 kg, age 16-70)
+        rows = re.findall(r"^\| (\w+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$", x["messages"][0]["content"], re.M)[1:]
+        out = [nm for nm, h, w, a in rows if not (140 <= float(h.replace(",", ".")) <= 215 and 40 <= float(w.replace(",", ".")) <= 150
+                                                   and 16 <= float(a.replace(",", ".")) <= 70)]
+        assert out == [x["gold"]], (out, x["gold"])
+    x = xs[0]
+    assert tn.score_implausible_value(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+    assert tn.score_implausible_value(x, {"content": f"Antwort: {x['bait']}"})["detail"]["picked_unusual"] == 1
+
+
+if __name__ == "__main__":
+    test_implausible_value()

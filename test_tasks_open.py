@@ -298,6 +298,20 @@ def test_minimal_edit():
         tasks_judge.configure(None, None, None)
 
 
+def test_ask_or_answer():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdict": "ASK"}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_ask_or_answer("de", None, 0)
+        assert len(it) == 16 and it[0]["need_ask"] and not it[1]["need_ask"]
+        assert to.score_ask_or_answer(it[0], {"content": "Für wie viele Personen und wo?"})["correct"]
+        r = to.score_ask_or_answer(it[1], {"content": "Für wie viele Personen?"})
+        assert not r["correct"] and r["detail"]["over_asked"] == 1.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -407,6 +421,7 @@ if __name__ == "__main__":
     test_argument_essay()
     test_audience_explain()
     test_minimal_edit()
+    test_ask_or_answer()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

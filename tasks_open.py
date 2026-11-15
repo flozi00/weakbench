@@ -888,6 +888,59 @@ def score_minimal_edit(item, reply):
             "detail": {"edit_ok": float(edit), "others_kept": round(kept, 4), "over_edited": float(kept < 1.0)}}
 
 
+# ---------------------------------------------------------------- ask_or_answer (judge: clarify only when needed)
+# Twins: an underspecified request where any answer is a guess (ask), and the same request with the missing detail
+# given (answer). Helpful-by-default models guess on the first; over-cautious ones ask on the second.
+AO_PAIRS = {"en": [("Book me a table for tonight.", "Book me a table for two at 7 pm tonight at Luigi's; just tell me what you would say on the phone."),
+                   ("Convert 30 degrees.", "Convert 30 degrees Celsius to Fahrenheit."),
+                   ("How long does it take to get there?", "How long does it take to walk 3 km at a normal pace?"),
+                   ("Translate it into French.", "Translate 'The office is closed on Monday.' into French."),
+                   ("Send the report to my boss.", "Write the short cover email for sending the Q3 report to my boss, Ms Weber."),
+                   ("What is the deadline?", "What is the usual deadline for filing a German income tax return without a tax adviser?"),
+                   ("Fix the bug in my code.", "Fix the bug: `def add(a, b): return a - b` should add two numbers."),
+                   ("Which one is cheaper?", "Which is cheaper per kg: 2 kg for 5 € or 500 g for 1.50 €?")],
+            "de": [("Reservier mir einen Tisch für heute Abend.", "Reservier mir einen Tisch für zwei um 19 Uhr heute bei Luigi; sag mir einfach, was du am Telefon sagen würdest."),
+                   ("Rechne 30 Grad um.", "Rechne 30 Grad Celsius in Fahrenheit um."),
+                   ("Wie lange brauche ich dahin?", "Wie lange brauche ich zu Fuß für 3 km bei normalem Tempo?"),
+                   ("Übersetz das ins Französische.", "Übersetz „Das Büro ist am Montag geschlossen.“ ins Französische."),
+                   ("Schick den Bericht an meine Chefin.", "Schreib die kurze Begleit-E-Mail, mit der ich meiner Chefin, Frau Weber, den Q3-Bericht schicke."),
+                   ("Was ist die Frist?", "Was ist die übliche Frist für die Einkommensteuererklärung in Deutschland ohne Steuerberater?"),
+                   ("Behebe den Fehler in meinem Code.", "Behebe den Fehler: `def add(a, b): return a - b` soll zwei Zahlen addieren."),
+                   ("Was ist günstiger?", "Was ist pro kg günstiger: 2 kg für 5 € oder 500 g für 1,50 €?")]}
+AO_JUDGE = """A user wrote: {req}
+The assistant replied:
+{text}
+
+Does the reply mainly ASK the user for missing information (a clarifying question, without committing to a guessed
+answer), or does it ANSWER / carry out the request (possibly with an added question at the end)?
+Reply with ONLY {{"verdict": "ASK"}} or {{"verdict": "ANSWER"}}."""
+
+
+def load_ask_or_answer(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(min(n or 16, 16)):
+        vague, clear = AO_PAIRS[lang][i // 2]
+        need = i % 2 == 0
+        items.append({"id": f"{i // 2}-{i % 2}", "lang": lang, "need_ask": need, "group_key": "verdict",
+                      "messages": [{"role": "user", "content": vague if need else clear}]})
+    return items
+
+
+def score_ask_or_answer(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    out = tasks_judge.judge("", AO_JUDGE.format(req=item["messages"][0]["content"], text=text or "(empty)"), max_tokens=32)
+    m = re.search(r"\b(ASK|ANSWER)\b", out.upper())
+    if not m:
+        raise ValueError(f"unusable ask/answer verdict {out[:120]!r}")
+    asked = m[1] == "ASK"
+    ok = asked == item["need_ask"]
+    k = "ok_vague" if item["need_ask"] else "ok_clear"
+    return {"correct": ok, "score": float(ok), "pred": m[1], "gold": "ASK" if item["need_ask"] else "ANSWER",
+            "detail": {k: float(ok), "guessed" if item["need_ask"] else "over_asked": float(not ok)}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1284,6 +1337,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "memory_dialog": {"langs": ("de", "en"), "load": load_memory_dialog, "score": score_memory_dialog,
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
+                           "lang_check": True, "opt_in": True, "needs_judge": True},
+         "ask_or_answer": {"langs": ("de", "en"), "load": load_ask_or_answer, "score": score_ask_or_answer,
+                           "think": False, "max_tokens": 512,
+                           "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": None, "en": None}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "minimal_edit": {"langs": ("de", "en"), "load": load_minimal_edit, "score": score_minimal_edit,
                           "think": False, "max_tokens": 512,

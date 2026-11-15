@@ -1748,3 +1748,18 @@ def test_tank_level():
 
 if __name__ == "__main__":
     test_tank_level()
+
+
+def test_chord_transpose():
+    import tasks_novel as tn
+    xs = tn.load_chord_transpose("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    for c in (f"Antwort: {x['gold']}", "Antwort: " + ", ".join(x["gold"].split()), "Antwort: " + " | ".join(x["gold"].split())):
+        assert tn.score_chord_transpose(x, {"content": c})["correct"], c
+    y = tn.load_chord_transpose("en", 1, 0)[0]
+    assert tn.score_chord_transpose({"gold": "C# Am", "n": 2}, {"content": "Answer: Db Am"})["detail"]["right_but_flats"] == 1
+
+
+if __name__ == "__main__":
+    test_chord_transpose()

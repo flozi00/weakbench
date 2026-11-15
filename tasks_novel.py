@@ -8443,6 +8443,46 @@ def score_tank_level(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ignored_limits": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- chord_transpose (12-step cyclic arithmetic in music)
+CT_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def load_chord_transpose(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("chord_transpose", i, att)
+        k = r.choice([1, 2, 3, 4, 5, 7, 9, 10])
+        up = r.random() < 0.7
+        while True:
+            prog = [(r.randrange(12), r.choice(["", "", "m", "7", "m7"])) for _ in range(r.randint(4, 6))]
+            shift = k if up else -k
+            out = [CT_NOTES[(nn + shift) % 12] + q for nn, q in prog]
+            if any((nn + shift) // 12 != 0 for nn, _ in prog):  # at least one chord wraps past B / below C
+                break
+        src = " ".join(CT_NOTES[nn] + q for nn, q in prog)
+        word = ({1: "1 semitone", 2: "2 semitones (a whole tone)"}.get(k, f"{k} semitones") if lang == "en" else
+                {1: "1 Halbton", 2: "2 Halbtöne (einen Ganzton)"}.get(k, f"{k} Halbtöne"))
+        q = (f"Transpose this chord progression {'up' if up else 'down'} by {word}. Use sharps only (C# not Db), keep the chord "
+             f"types (m, 7, m7) and give the chords in the same order, separated by spaces.\n{src}" if lang == "en" else
+             f"Transponiere diese Akkordfolge um {word} {'nach oben' if up else 'nach unten'}. Die Akkorde stehen in englischer "
+             f"Notation (B statt H, also C C# D D# E F F# G G# A A# B). Verwende nur Kreuze (C# statt Db), "
+             f"behalte die Akkordtypen (m, 7, m7) und gib die Akkorde in derselben Reihenfolge an, durch Leerzeichen getrennt.\n{src}")
+        items.append({"id": str(i), "lang": lang, "gold": " ".join(out), "n": len(prog),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_chord_transpose(item, reply):
+    fa = (final_answer(reply["content"]) or "").replace("♯", "#").replace("–", " ").replace(",", " ").replace("|", " ")
+    flat = {"Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#"}  # flats are wrong per the prompt, but read for the detail
+    toks = re.findall(r"\b[A-G](?:#|b)?(?:m7|m|7)?(?![\w#])", fa)
+    v = " ".join(toks[-item["n"]:]) if len(toks) >= item["n"] else None
+    ok = v == item["gold"]
+    enh = v is not None and " ".join(re.sub(r"^([A-G]b)", lambda m: flat.get(m[1], m[1]), t) for t in v.split()) == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"right_but_flats": float(enh and not ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10041,6 +10081,7 @@ TASKS = {
     "workday_deadline": task(load_workday_deadline, score_workday_deadline, 24, 120),
     "fare_group": task(load_fare_group, score_fare_group, 24, 120),
     "tank_level": task(load_tank_level, score_tank_level, 24, 120),
+    "chord_transpose": task(load_chord_transpose, score_chord_transpose, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

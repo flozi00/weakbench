@@ -1407,6 +1407,56 @@ def score_de_creative(item, reply):
                        "vivid": float(met[3]), "coherent_arc": float(met[4]), "length_ok": float(met[5]), "words": words}}
 
 
+# ---------------------------------------------------------------- de_learner_feedback (judge + exact: correct and explain)
+# A German learner's sentence with one error. The model corrects it (checked exactly) and explains the rule in simple
+# German for a B1 learner (judged: rule correct, explanation simple, no new errors, encouraging but not padded).
+LF_ITEMS = [("Gestern ich bin ins Kino gegangen.", "Gestern bin ich ins Kino gegangen.", "Verbzweitstellung"),
+            ("Ich habe meinem Freund ein Geschenk gegebt.", "Ich habe meinem Freund ein Geschenk gegeben.", "starkes Partizip"),
+            ("Wir fahren mit der Bus zur Arbeit.", "Wir fahren mit dem Bus zur Arbeit.", "Dativ nach mit"),
+            ("Ich weiß nicht, ob er kommt morgen.", "Ich weiß nicht, ob er morgen kommt.", "Verb am Ende im Nebensatz"),
+            ("Sie ist größer wie ihr Bruder.", "Sie ist größer als ihr Bruder.", "als beim Komparativ"),
+            ("Ich interessiere mich für die deutsche Kultur seit zwei Jahren.", "Ich interessiere mich seit zwei Jahren für die deutsche Kultur.", "Satzstellung temporal vor präpositional"),
+            ("Das ist der Mann, die ich gestern getroffen habe.", "Das ist der Mann, den ich gestern getroffen habe.", "Relativpronomen Akkusativ"),
+            ("Ich bin in Berlin seit 2020.", "Ich bin seit 2020 in Berlin.", "Satzstellung temporal vor lokal"),
+            ("Kannst du mir helfen, bitte?", "Kannst du mir bitte helfen?", "Stellung von bitte"),
+            ("Wegen dem Regen bleiben wir zu Hause.", "Wegen des Regens bleiben wir zu Hause.", "Genitiv nach wegen"),
+            ("Er hat gesagt, dass er hat keine Zeit.", "Er hat gesagt, dass er keine Zeit hat.", "Verb am Ende im dass-Satz"),
+            ("Ich gehe zu Hause.", "Ich gehe nach Hause.", "nach Hause vs. zu Hause")]
+LF_JUDGE = """A German learner (level B1) wrote: "{bad}"
+The correct sentence is: "{good}" (topic: {topic}).
+The tutor replied:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The explanation states the rule behind the correction correctly.
+2. The explanation is simple enough for a B1 learner (short sentences, few technical terms or explained ones) and in German.
+3. The reply contains no new German errors and does not "correct" anything that was already right."""
+
+
+def load_de_learner_feedback(lang, n, seed):
+    tasks_judge.check_judge()
+    return [{"id": str(i), "lang": "de", "bad": bad, "good": good, "topic": topic,
+             "messages": [{"role": "user", "content": "Ich lerne Deutsch (Niveau B1). Ist dieser Satz richtig? Bitte korrigiere ihn und "
+                           f"erkläre mir kurz die Regel.\n\n{bad}"}]}
+            for i, (bad, good, topic) in enumerate(LF_ITEMS[:min(n or 12, 12)])]
+
+
+def score_de_learner_feedback(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    norm = lambda t: re.sub(r"\s+", " ", re.sub(r"[„“\"*]", "", t)).strip().lower()  # noqa: E731
+    corrected = norm(item["good"]) in norm(text)
+    out = tasks_judge.judge("", LF_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
+                            max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable feedback verdict {out[:120]!r}")
+    met = [corrected] + [_yes(x) for x in v]
+    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": text[:160], "gold": item["good"],
+            "detail": {"corrected": float(met[0]), "rule_right": float(met[1]), "simple": float(met[2]), "no_new_errors": float(met[3])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1804,6 +1854,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "de_learner_feedback": {"langs": ("de",), "load": load_de_learner_feedback, "score": score_de_learner_feedback,
+                                 "think": False, "max_tokens": 512,
+                                 "counts": {"quick": {"de": 12}, "full": {"de": None}},
+                                 "lang_check": True, "opt_in": True, "needs_judge": True},
          "de_creative": {"langs": ("de",), "load": load_de_creative, "score": score_de_creative,
                          "think": False, "max_tokens": 1024,
                          "counts": {"quick": {"de": 12}, "full": {"de": None}},

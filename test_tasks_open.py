@@ -443,6 +443,21 @@ def test_de_creative():
         tasks_judge.configure(None, None, None)
 
 
+def test_de_learner_feedback():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_de_learner_feedback("de", None, 0)
+        assert len(it) == 12
+        x = it[0]
+        assert to.score_de_learner_feedback(x, {"content": f"Richtig: „{x['good']}“ Das Verb steht an zweiter Stelle."})["correct"]
+        r = to.score_de_learner_feedback(x, {"content": "Der Satz ist richtig."})
+        assert not r["correct"] and r["detail"]["corrected"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -562,6 +577,7 @@ if __name__ == "__main__":
     test_conflict_summary()
     test_concept_contrast()
     test_de_creative()
+    test_de_learner_feedback()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

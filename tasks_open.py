@@ -1311,7 +1311,7 @@ CC_PAIRS = {"en": [("weather", "climate"), ("correlation", "causation"), ("accur
                    ("a virus", "a bacterium"), ("speed", "acceleration"), ("revenue", "profit"), ("mass", "weight"),
                    ("an epidemic", "a pandemic"), ("inflation", "deflation"), ("a median", "a mean")],
             "de": [("Wetter", "Klima"), ("Korrelation", "Kausalität"), ("Richtigkeit", "Präzision (von Messungen)"),
-                   ("ein Virus", "ein Bakterium"), ("Geschwindigkeit", "Beschleunigung"), ("Umsatz", "Gewinn"),
+                   ("einem Virus", "einem Bakterium"), ("Geschwindigkeit", "Beschleunigung"), ("Umsatz", "Gewinn"),
                    ("Masse", "Gewichtskraft"), ("Epidemie", "Pandemie"), ("Inflation", "Deflation"), ("Median", "Mittelwert")]}
 CC_JUDGE = """The user asked for the difference between "{a}" and "{b}", with one everyday example for each, in at most 120 words.
 
@@ -1344,7 +1344,7 @@ def score_concept_contrast(item, reply):
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable contrast verdict {out[:120]!r}")
-    met = [_yes(x) for x in v] + [words <= 120]
+    met = [_yes(x) for x in v] + [words <= 120 and reply.get("finish_reason") != "length"]  # a cut-off answer is not within
     return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": text[:160], "gold": None,
             "detail": {"definitions_ok": float(met[0]), "examples_fit": float(met[1]), "contrast_explicit": float(met[2]),
                        "within_limit": float(met[3])}}

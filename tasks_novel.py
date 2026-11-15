@@ -5739,6 +5739,44 @@ def score_train_connect(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- date_locale (MM/DD vs DD.MM)
+def load_date_locale(lang, n, seed):
+    import datetime as _dt
+    items = []
+    for i in range(n or 120):
+        r = rng_of("date_locale", i)
+        while True:
+            y = r.choice([2025, 2026])
+            a, b = r.randint(1, 12), r.randint(1, 12)
+            if a == b:
+                continue
+            us = _dt.date(y, a, b)  # written a/b/y: month a, day b
+            de_d, de_m = r.randint(1, 12), r.randint(1, 12)
+            de = _dt.date(y, de_m, de_d)
+            gold = abs((de - us).days)
+            alt_us = _dt.date(y, b, a)  # misreading the US date as day/month
+            alt_de = _dt.date(y, de_d, de_m) if de_d <= 12 else None  # misreading the German date as month/day
+            naive = {abs((de - alt_us).days)} | ({abs((alt_de - us).days)} if alt_de else set())
+            if gold not in naive and gold > 0:
+                break
+        q = (f"Emily from Boston writes in an email: \"The order ships on {a:02d}/{b:02d}/{y}.\" Jonas from Hamburg writes: "
+             f"\"Die Rechnung kommt am {de_d:02d}.{de_m:02d}.{y}.\" Each wrote the date the usual way in their country. "
+             "How many days lie between the two dates?" if lang == "en" else
+             f"Emily aus Boston schreibt in einer E-Mail: „The order ships on {a:02d}/{b:02d}/{y}.“ Jonas aus Hamburg schreibt: "
+             f"„Die Rechnung kommt am {de_d:02d}.{de_m:02d}.{y}.“ Beide haben das Datum so geschrieben, wie es in ihrem Land üblich "
+             "ist. Wie viele Tage liegen zwischen den beiden Daten?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": sorted(naive),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_date_locale(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_same_format": float(v in item["naive"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7314,6 +7352,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "date_locale": task(load_date_locale, score_date_locale, 24, 120),
     "train_connect": task(load_train_connect, score_train_connect, 24, 120),
     "fifo_cost": task(load_fifo_cost, score_fifo_cost, 24, 120),
     "cell_rule": task(load_cell_rule, score_cell_rule, 24, 120),

@@ -392,7 +392,7 @@ def test_interpreter():
     try:
         tasks_judge.configure(url, "mock", 32768)
         it = to.load_interpreter("de", None, 0)
-        assert len(it) == 12 and it[0]["lang"] == "en" and it[1]["lang"] == "de"
+        assert len(it) == 12 and it[0]["tgt"] == "en" and it[1]["tgt"] == "de" and {x["lang"] for x in it} == {"de"}
         r = to.score_interpreter(it[3], {"content": "I'm sorry, I can't prescribe anything."})
         assert not r["correct"] and r["detail"]["stayed_interpreter_on_question"] == 0.0
     finally:

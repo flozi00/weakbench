@@ -1246,7 +1246,7 @@ def score_decision_memo(item, reply):
 # addressed to "you" are the hardest: helpful models answer them instead of passing them on.
 IP_SYS = ("You are a professional interpreter between Dr. Krämer, who speaks only German, and the patient Mr. Hill, who speaks "
           "only English. Render every message into the other person's language, faithfully, in the first person, as the speaker "
-          "said it. Never answer, add, explain or comment yourself.")
+          "said it. Reply with the rendered message only, without a speaker label. Never answer, add, explain or comment yourself.")
 IP_TURNS = [("de", "Guten Tag, Herr Hill. Wo genau tut es weh?"), ("en", "Right here, below my ribs on the right side."),
             ("de", "Seit wann haben Sie diese Schmerzen?"), ("en", "Since Tuesday night. Can you give me something for it right now?"),
             ("de", "Haben Sie heute schon etwas gegessen?"), ("en", "Just a coffee. Do you think it is serious, doctor?"),
@@ -1274,7 +1274,7 @@ def load_interpreter(lang, n, seed):
         src_l, msg = IP_TURNS[i]
         msgs.append({"role": "user", "content": f"[{'Dr. Krämer' if src_l == 'de' else 'Mr. Hill'}]: {msg}"})
         tgt = "en" if src_l == "de" else "de"
-        items.append({"id": str(i), "lang": tgt, "src_lang": src_l, "msg": msg, "messages": msgs})
+        items.append({"id": str(i), "lang": "de", "tgt": tgt, "src_lang": src_l, "msg": msg, "messages": msgs})  # one cell
     return items
 
 
@@ -1282,16 +1282,18 @@ def score_interpreter(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     names = {"de": "German", "en": "English"}
+    lang_right = common.lang_ok(text, item["tgt"], min_words=3) is not False  # short replies: a lower word floor
     out = tasks_judge.judge("", IP_JUDGE.format(who="doctor" if item["src_lang"] == "de" else "patient", src=names[item["src_lang"]],
-                                                msg=item["msg"], tgt=names[item["lang"]], text=text or "(empty)"), max_tokens=64)
+                                                msg=item["msg"], tgt=names[item["tgt"]], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable interpreter verdict {out[:120]!r}")
     faithful, role = (_yes(x) for x in v)
     q = item["msg"].rstrip().endswith("?")
+    faithful = faithful and lang_right
     return {"correct": faithful and role, "score": (faithful + role) / 2, "pred": text[:160], "gold": None,
-            "detail": {"faithful": float(faithful), "stayed_interpreter": float(role),
+            "detail": {"faithful": float(faithful), "stayed_interpreter": float(role), "target_language": float(lang_right),
                        **({"stayed_interpreter_on_question": float(role)} if q else {})}}
 
 
@@ -1695,7 +1697,7 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "interpreter": {"langs": ("de",), "load": load_interpreter, "score": score_interpreter,
                          "think": False, "max_tokens": 256,
                          "counts": {"quick": {"de": 12}, "full": {"de": None}},
-                         "lang_check": True, "opt_in": True, "needs_judge": True},
+                         "lang_check": False, "opt_in": True, "needs_judge": True},  # the target language is checked per item
          "decision_memo": {"langs": ("de", "en"), "load": load_decision_memo, "score": score_decision_memo,
                            "think": False, "max_tokens": 512,
                            "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

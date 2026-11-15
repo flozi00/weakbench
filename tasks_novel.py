@@ -6339,8 +6339,8 @@ def load_meet_time(lang, n, seed):
         q = (f"{a} leaves town A at {fmt(t1)} and travels towards town B at {v1} km/h. {b} leaves town B at {fmt(t1 + lag)} and "
              f"travels towards town A on the same road at {v2} km/h. The road between A and B is {d} km long. At what time do they meet?"
              if lang == "en" else
-             f"{a} fährt um {fmt(t1)} in Ort A los, mit {v1} km/h in Richtung Ort B. {b} fährt um {fmt(t1 + lag)} in Ort B los, auf "
-             f"derselben Straße mit {v2} km/h in Richtung Ort A. Die Straße zwischen A und B ist {d} km lang. Um wie viel Uhr treffen sie sich?")
+             f"{a} {'geht' if v1 <= 6 else 'fährt'} um {fmt(t1)} in Ort A los, mit {v1} km/h in Richtung Ort B. {b} "
+             f"{'geht' if v2 <= 6 else 'fährt'} um {fmt(t1 + lag)} in Ort B los, auf derselben Straße mit {v2} km/h in Richtung Ort A. Die Straße zwischen A und B ist {d} km lang. Um wie viel Uhr treffen sie sich?")
         items.append({"id": str(i), "lang": lang, "gold": fmt(meet), "naive": fmt(naive),
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
@@ -6348,8 +6348,15 @@ def load_meet_time(lang, n, seed):
 
 def score_meet_time(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    t = [f"{int(h):02d}:{m}" for h, m in re.findall(r"\b(\d{1,2})[:.](\d{2})\b", fa)]
-    v = t[0] if len(set(t)) == 1 else None
+    meet = re.search(r"\b(?:meet|treffen)\w*\b(.*)", fa, re.I)  # "from 10:00, they meet at 12:21"
+    zone = meet[1] if meet and re.search(r"\d[:.]\d\d", meet[1]) else fa
+    t = []
+    for h, m, ap, dur in re.findall(r"\b(\d{1,2})[:.](\d{2})\s*(am|pm|a\.m\.|p\.m\.)?(\s*h\b|\s*Std)?", zone, re.I):
+        if dur:
+            continue  # "2:21 h" is a duration
+        hh = int(h) % 12 + (12 if ap.lower().startswith("p") else 0) if ap else int(h)
+        t.append(f"{hh:02d}:{m}")
+    v = t[0] if t and (len(set(t)) == 1 or meet) else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_same_start": float(v == item["naive"])}}
 

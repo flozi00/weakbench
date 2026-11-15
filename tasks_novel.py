@@ -4904,7 +4904,13 @@ def load_floor_area(lang, n, seed):
             bbox = W * H
         else:
             segs, area = _fa_shape(kind, r)
-            bbox = sum(l for d, l in segs if d == "E") * sum(l for d, l in segs if d == "N")
+            xs, ys, px, py = [0], [0], 0, 0
+            for d, l in segs:
+                px += {"E": l, "W": -l}.get(d, 0)
+                py += {"N": l, "S": -l}.get(d, 0)
+                xs.append(px)
+                ys.append(py)
+            bbox = (max(xs) - min(xs)) * (max(ys) - min(ys))
         walk = ", ".join(f"{l} m {FA_DIR[lang][d]}" if lang == "en" else f"{l} m nach {FA_DIR[lang][d]}" for d, l in segs)
         q = (f"A room's walls, walked once around from one corner: {walk}. You are back at the start. "
              "What is the floor area in square metres?" if lang == "en" else

@@ -4565,7 +4565,7 @@ EAP_SUBJ = [("She", 3), ("My parents", 0), ("Tom", 3), ("We", 0)]
 EAP_ADV = ["always", "never", "often", "usually", "sometimes", "rarely"]
 EAP_FRAMES = [("main3", "{s} {a} {rd} the newspaper at breakfast.", "{s} {rd} {a} the newspaper at breakfast."),
               ("main", "{s} {a} {v} tea in the morning.", "{s} {v} {a} tea in the morning."),
-              ("modal2", "{s} will {a} forget this day.", "{s} will forget {a} this day."),
+              ("main4", "{s} {a} {hv} coffee after lunch.", "{s} {hv} {a} coffee after lunch."),
               ("modal", "{s} can {a} find a parking space here.", "{s} can find {a} a parking space here."),
               ("main2", "{s} {a} {w} the bus to school.", "{s} {w} {a} the bus to school.")]
 
@@ -4577,7 +4577,7 @@ def load_en_adverb_position(lang, n, seed):
         kind, good, bad = EAP_FRAMES[i % len(EAP_FRAMES)]
         (s_, p), a = r.choice(EAP_SUBJ), r.choice(EAP_ADV)
         f = dict(s=s_, a=a, be="is" if p == 3 else "are", have="has" if p == 3 else "have", v="drinks" if p == 3 else "drink",
-                 w="takes" if p == 3 else "take", rd="reads" if p == 3 else "read")
+                 w="takes" if p == 3 else "take", rd="reads" if p == 3 else "read", hv="has" if p == 3 else "have")
         g, b = good.format(**f), bad.format(**f)
         first = (i // len(EAP_FRAMES)) % 2 == 0
         A, B = (g, b) if first else (b, g)

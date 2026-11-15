@@ -4972,7 +4972,7 @@ def load_queue_sim(lang, n, seed):
                 t = max(t, a) + need
                 fifo[nm] = t
             who = r.choice([c[0] for c in cust])
-            if done[who] != fifo[who]:
+            if done[who] != fifo[who] and done[who] != max(done.values()):  # the last finisher = total work
                 break
         lines = "\n".join((f"- {nm} arrives at minute {a} and needs {need} minutes" if lang == "en" else
                            f"- {nm} kommt in Minute {a} und braucht {need} Minuten") for nm, a, need in cust)

@@ -3002,6 +3002,46 @@ def score_en_irregular(item, reply):
                        "swapped_forms": float(v == item["other"] and item["other"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- de_direct_speech (Zeichensetzung bei wörtlicher Rede)
+DS_ITEMS = [("before", "Er sagte Ich komme morgen", "Er sagte: „Ich komme morgen.“"),
+            ("before", "Sie fragte Hast du Zeit", "Sie fragte: „Hast du Zeit?“"),
+            ("before", "Der Trainer rief Lauft schneller", "Der Trainer rief: „Lauft schneller!“"),
+            ("before", "Mein Vater meinte Das wird schon", "Mein Vater meinte: „Das wird schon.“"),
+            ("after", "Ich komme morgen sagte er", "„Ich komme morgen“, sagte er."),
+            ("after", "Hast du Zeit fragte sie", "„Hast du Zeit?“, fragte sie."),
+            ("after", "Lauft schneller rief der Trainer", "„Lauft schneller!“, rief der Trainer."),
+            ("after", "Das wird schon meinte mein Vater", "„Das wird schon“, meinte mein Vater."),
+            ("middle", "Ich komme sagte er morgen", "„Ich komme“, sagte er, „morgen.“"),
+            ("middle", "Wenn es regnet sagte sie bleiben wir zu Hause", "„Wenn es regnet“, sagte sie, „bleiben wir zu Hause.“"),
+            ("middle", "Kannst du fragte er mir helfen", "„Kannst du“, fragte er, „mir helfen?“"),
+            ("middle", "Das ist sagte die Lehrerin eine gute Idee", "„Das ist“, sagte die Lehrerin, „eine gute Idee.“"),
+            ("two", "Ich bin müde sagte Tom Ich gehe schlafen", "„Ich bin müde“, sagte Tom. „Ich gehe schlafen.“"),
+            ("two", "Wo warst du fragte die Mutter Es ist schon spät", "„Wo warst du?“, fragte die Mutter. „Es ist schon spät.“"),
+            ("two", "Pass auf rief Anna Das Glas fällt", "„Pass auf!“, rief Anna. „Das Glas fällt!“"),
+            ("two", "Danke sagte er Das war sehr nett", "„Danke“, sagte er. „Das war sehr nett.“")]
+
+
+def load_de_direct_speech(lang, n, seed):
+    rows = DS_ITEMS[:min(n or 16, 16)]
+    return [{"id": str(i), "lang": "de", "gold": g, "kind": k,
+             "messages": [{"role": "user", "content": "Setze die Satzzeichen der wörtlichen Rede nach den Regeln der deutschen "
+                           "Rechtschreibung (Doppelpunkt, Anführungszeichen, Komma, Schlusszeichen). Ändere keine Wörter. Antworte nur "
+                           "mit dem Satz.\n\n" + src}]}
+            for i, (k, src, g) in enumerate(rows)]
+
+
+def score_de_direct_speech(item, reply):
+    def norm(t):
+        t = re.sub(r"[„“”»«\"]", '"', t)  # every quote style counts
+        return re.sub(r"\s+", " ", t).strip()
+    lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
+    gold = norm(item["gold"])
+    got = [norm(x.strip("*` ")) for x in lines]
+    ok = gold in got
+    return {"correct": ok, "score": float(ok), "pred": (got[0] if got else "")[:100], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3325,6 +3365,7 @@ TASKS = {
     "en_hyphens": task(("en",), load_en_hyphens, score_en_hyphens, 16, 20, lang_check=False),
     "de_ersatzinfinitiv": task(("de",), load_de_ersatzinfinitiv, score_de_ersatzinfinitiv, 96, 20, lang_check=False),
     "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 32, lang_check=False),
+    "de_direct_speech": task(("de",), load_de_direct_speech, score_de_direct_speech, 64, 16, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

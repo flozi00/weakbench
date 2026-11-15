@@ -2875,6 +2875,45 @@ def score_collocations(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])} if item["calque"] != "-" else {}}  # "-": no calque
 
 
+# ---------------------------------------------------------------- de_umlaut_input (proper spelling despite a transliterated request)
+# The user types on a keyboard without umlauts. The reply should be correct German (ä, ö, ü, ß), not mirror "fuer".
+UI_REQ = ["Schreib mir bitte eine kurze Absage fuer das Treffen am Montag, ich kann leider nicht. Freundliche Gruesse waeren schoen.",
+          "Koenntest du mir in drei Saetzen erklaeren, warum Baeume im Herbst ihre Blaetter verlieren?",
+          "Ich moechte meiner Nachbarin fuer ihre Hilfe danken. Schreib mir zwei, drei Saetze, die herzlich klingen.",
+          "Was muss ich beachten, wenn ich im Winter mit dem Fahrrad zur Arbeit fahre? Bitte kurz und in ganzen Saetzen.",
+          "Formuliere eine hoefliche Nachricht an meinen Vermieter: Die Heizung in der Kueche funktioniert nicht.",
+          "Erklaer mir kurz den Unterschied zwischen Gruenkohl und Wirsing, ich koche heute zum ersten Mal.",
+          "Schreib eine kurze Einladung zu meinem Geburtstag naechsten Samstag, es gibt Kuchen und Getraenke.",
+          "Wie begruesse ich in einer E-Mail hoeflich jemanden, den ich nicht kenne? Gib mir zwei Beispiele.",
+          "Fasse in zwei Saetzen zusammen, warum regelmaessiger Schlaf fuer die Gesundheit wichtig ist.",
+          "Ich muss meinem Chef sagen, dass ich mich verspaete, weil die Strassenbahn ausgefallen ist. Schreib mir die Nachricht.",
+          "Gib mir drei Tipps, wie ich Muell in der Kueche besser trennen kann.",
+          "Schreib einen kurzen, freundlichen Text fuer einen Zettel an der Haustuer: Bitte die Tuer leise schliessen.",
+          "Erklaere einem Kind in zwei Saetzen, warum der Mond nicht immer gleich aussieht.",
+          "Formuliere eine kurze Entschuldigung, weil ich die Ruecksendung zu spaet abgeschickt habe.",
+          "Was sollte ich fuer eine Wanderung im Gebirge im Fruehling einpacken? Kurz bitte.",
+          "Schreib zwei Saetze Glueckwuensche zur bestandenen Pruefung meiner Schwester."]
+UI_TRANSLIT = re.compile(r"\b(?:fuer|koenn\w*|moecht\w*|waer\w*|schoen\w*|gruess\w*|gruesse|saetze\w*|erklaer\w*|baeum\w*|"
+                         r"blaett\w*|hoeflich\w*|kueche\w*|gruenkohl|naechst\w*|getraenk\w*|begruess\w*|regelmaessig\w*|"
+                         r"verspaet\w*|strasse\w*|muell|tuer\w*|haustuer|schliess\w*|ruecksend\w*|fruehling|glueck\w*|"
+                         r"pruefung\w*|ueber|muess\w*|mueh\w*|zurueck|spaet\w*|frueh\w*|gruen\w*|natuerlich|moeglich\w*|"
+                         r"groess\w*|oeffn\w*|kuerz\w*|wuensch\w*|hoer\w*|fuehl\w*|aender\w*|maedchen|maenner|jaehr\w*)\b", re.I)
+
+
+def load_de_umlaut_input(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "messages": [{"role": "user", "content": q}]}
+            for i, q in enumerate(UI_REQ[:min(n or len(UI_REQ), len(UI_REQ))])]
+
+
+def score_de_umlaut_input(item, reply):
+    t = reply["content"] or ""
+    copied = UI_TRANSLIT.findall(t)
+    has = len(re.findall(r"[äöüÄÖÜß]", t))
+    ok = not copied and has >= 1 and len(t.split()) >= 8
+    return {"correct": ok, "score": float(ok), "pred": ", ".join(copied[:5]), "gold": None,
+            "detail": {"copied_translit": float(bool(copied)), "has_umlauts": float(has >= 1)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3190,6 +3229,7 @@ TASKS = {
     "sentence_order": task(("de", "en"), load_sentence_order, score_sentence_order, 512, 12, lang_check=False),
     "de_als_wie": task(("de",), load_de_als_wie, score_de_als_wie, 16, 24, lang_check=False),
     "collocations": task(("de", "en"), load_collocations, score_collocations, 16, 16, lang_check=False),
+    "de_umlaut_input": task(("de",), load_de_umlaut_input, score_de_umlaut_input, 512, 16),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

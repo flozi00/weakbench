@@ -3274,7 +3274,9 @@ def gap_pick(item, reply, opts):
                 hit = [o for o in low if nxt == o or nxt.startswith(o + " ")]
                 if hit:
                     return max(hit, key=len)
-    named = [o for o in low if re.search(r"(?<![a-zäöüß'])" + re.escape(o) + r"(?![a-zäöüß'])", " ".join(words))]
+    # "mir - nicht mich": a negated option is the rejected one (only here; the gap read above needs the full words)
+    kept = re.sub(r"(?<![a-zäöüß'])(?:nicht|not|statt|instead of)\s+[„\"'“*]*[a-zäöüß']+", " ", text)
+    named = [o for o in low if re.search(r"(?<![a-zäöüß'])" + re.escape(o) + r"(?![a-zäöüß'])", kept)]
     return named[0] if len(named) == 1 else None
 
 

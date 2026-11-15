@@ -7764,7 +7764,7 @@ def load_reorder_day(lang, n, seed):
 
 def score_reorder_day(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    fa = re.split(r"[;,]\s+|\bi\.e\.|\bd\.h\.", fa)[0].split("=")[-1]
+    fa = re.split(r"[;,]\s+|[.:]\s+|\s[–—-]\s|\bi\.e\.|\bd\.h\.", fa)[0].split("=")[-1]  # "Day 12. It arrives on day 17."
     v = None if re.search(r"\d\s*(?:[–-]|bis|to|oder|or)\s*\d", fa) else last_int(fa)
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],

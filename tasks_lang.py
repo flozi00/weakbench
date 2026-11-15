@@ -3986,6 +3986,32 @@ def score_en_agreement_quant(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- de_adj_endings (singular adjective endings: strong, weak, mixed)
+# The ending follows the determiner: "ein kleiner Hund" but "der kleine Hund", "mit kaltem Wasser" but "mit dem kalten
+# Wasser". Wrong forms are the endings of the neighbouring declension; neither the longer nor the shorter form pays.
+DAE_ITEMS = [("Wir haben einen ___ Hund.", "kleinen", "kleine"), ("Das ist ein ___ Auto.", "neues", "neue"),
+             ("Ich trinke gern ___ Kaffee.", "schwarzen", "schwarzer"), ("Der ___ Mann wartet draußen.", "alte", "alter"),
+             ("Mit ___ Wasser geht es besser.", "kaltem", "kalten"), ("Sie wohnt in einem ___ Haus.", "großen", "großem"),
+             ("Das ___ Kind schläft.", "kleine", "kleines"), ("Er kam mit seiner ___ Freundin.", "neuen", "neue"),
+             ("Bei ___ Wetter bleiben wir zu Hause.", "schlechtem", "schlechten"), ("Die ___ Frau lacht.", "junge", "jungen"),
+             ("Wegen des ___ Regens fiel das Spiel aus.", "starken", "starkes"), ("Mein ___ Bruder heißt Tom.", "älterer", "ältere"),
+             ("Ich suche eine ___ Wohnung.", "günstige", "günstigen"), ("Das ist ___ Brot von gestern.", "altes", "alte"),
+             ("Wir sitzen unter dem ___ Baum.", "großen", "großem"), ("Er hat ein ___ Fahrrad gekauft.", "rotes", "rote")]
+
+
+def load_de_adj_endings(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Form ist richtig: „{two_opts(i, g, (g, w))[0]}“ oder "
+                           f"„{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(DAE_ITEMS[:n or len(DAE_ITEMS)])]
+
+
+def score_de_adj_endings(item, reply):
+    r = score_de_eszett(item, {"content": strip_lead(reply["content"] or "")})  # one offered word, word-bounded
+    r["detail"] = {"ok_adj_ending": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5285,6 +5311,7 @@ TASKS = {
     "de_joined_spelling": task(("de",), load_de_joined_spelling, score_de_joined_spelling, 16, None, lang_check=False),
     "de_capitals_rules": task(("de",), load_de_capitals_rules, score_de_capitals_rules, 16, None, lang_check=False),
     "en_agreement_quant": task(("en",), load_en_agreement_quant, score_en_agreement_quant, 16, None, lang_check=False),
+    "de_adj_endings": task(("de",), load_de_adj_endings, score_de_adj_endings, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

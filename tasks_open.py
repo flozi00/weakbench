@@ -1074,7 +1074,7 @@ POEM:
 
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 1. The line endings follow the scheme {scheme} with TRUE rhymes when read aloud in {language} (same stressed vowel and
-   everything after it; eye rhymes like "love/move" or near-rhymes like "Haus/raus" are fine only if they truly rhyme).
+   everything after it). Eye rhymes ("love/move") and near rhymes ("Haus/Baum", "time/mine") do NOT count.
    Lines with different letters in the scheme must NOT rhyme with each other.
 2. The poem is about the topic and makes sense as a whole.
 3. Grammar and word forms are correct (poetic word order is fine)."""

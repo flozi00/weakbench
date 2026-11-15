@@ -1730,3 +1730,21 @@ def test_fare_group():
 
 if __name__ == "__main__":
     test_fare_group()
+
+
+def test_tank_level():
+    import tasks_novel as tn
+    xs = tn.load_tank_level("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs:  # replay from the prompt
+        c = x["messages"][0]["content"]
+        cap, lvl = int(re.search(r"at most (\d+)", c)[1]), int(re.search(r"starts with (\d+)", c)[1])
+        for op, amt in re.findall(r"- (add|remove) (\d+)", c):
+            lvl = min(cap, max(0, lvl + (int(amt) if op == "add" else -int(amt))))
+        assert lvl == x["gold"] != x["bait"]
+    x = xs[0]
+    assert tn.score_tank_level(x, {"content": f"Answer: {x['gold']} litres"})["correct"]
+
+
+if __name__ == "__main__":
+    test_tank_level()

@@ -8401,6 +8401,46 @@ def score_fare_group(item, reply):
             "detail": {"all_full_price": float(v is not None and abs(v - item["bait"]) < 0.006 and item["bait"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- tank_level (state with a ceiling and a floor)
+def load_tank_level(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("tank_level", i, att)
+        while True:
+            cap = r.randrange(500, 2001, 100)
+            level = r.randrange(100, cap, 50)
+            start, steps, clipped = level, [], 0
+            naive = level
+            for _ in range(r.randint(5, 7)):
+                d = r.randrange(-600, 601, 50)
+                if d == 0:
+                    continue
+                steps.append(d)
+                new = min(cap, max(0, level + d))
+                clipped += new != level + d
+                level, naive = new, naive + d
+            edge = level in (0, cap)  # ending empty or full only now and then, so "always 0" stays low
+            if clipped >= 1 and naive != level and len(steps) >= 5 and (not edge or i % 6 == 0):
+                break
+        lines = "\n".join((f"- {'add' if d > 0 else 'remove'} {abs(d)} litres" if lang == "en" else
+                           f"- {'hinzufügen' if d > 0 else 'entnehmen'}: {abs(d)} Liter") for d in steps)
+        q = (f"A rain-water tank holds at most {cap} litres; extra water runs off through the overflow, and you cannot remove "
+             f"more water than is in the tank (removing more just empties it). It starts with {start} litres. In this order:\n"
+             f"{lines}\nHow many litres are in the tank at the end?" if lang == "en" else
+             f"Eine Regentonne fasst höchstens {cap} Liter; was darüber hinausgeht, läuft über den Überlauf ab, und man kann nicht "
+             f"mehr Wasser entnehmen, als drin ist (wer mehr entnehmen will, leert sie nur). Am Anfang sind {start} Liter darin. "
+             f"Nacheinander:\n{lines}\nWie viele Liter sind am Ende in der Tonne?")
+        items.append({"id": str(i), "lang": lang, "gold": level, "bait": naive,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_tank_level(item, reply):
+    v = stated_int(reply, r"(?:litres?|liters?|liter|l\b)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ignored_limits": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9998,6 +10038,7 @@ TASKS = {
     "allergen_check": task(load_allergen_check, score_allergen_check, 24, 120),
     "workday_deadline": task(load_workday_deadline, score_workday_deadline, 24, 120),
     "fare_group": task(load_fare_group, score_fare_group, 24, 120),
+    "tank_level": task(load_tank_level, score_tank_level, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

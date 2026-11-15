@@ -358,6 +358,19 @@ def test_rhyme_poem():
         tasks_judge.configure(None, None, None)
 
 
+def test_analogy_transfer():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "NO", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_analogy_transfer("de", None, 0)
+        assert len(it) == 8 and it[0]["messages"][0]["content"].startswith("Erkläre, wie eine TCP-Verbindung")
+        r = to.score_analogy_transfer(it[0], {"content": "Wort " * 40})
+        assert not r["correct"] and r["score"] == 0.8 and r["detail"]["mapping_holds"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -471,6 +484,7 @@ if __name__ == "__main__":
     test_de_dialect()
     test_honest_headline()
     test_rhyme_poem()
+    test_analogy_transfer()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

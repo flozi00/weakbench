@@ -1116,6 +1116,64 @@ def score_rhyme_poem(item, reply):
                        "four_lines": float(met[3]), "has_word": float(met[4]), f"rhyme_{item['scheme']}": float(met[0])}}
 
 
+# ---------------------------------------------------------------- analogy_transfer (judge: explain X through a given domain)
+# Transfer: the concept must be explained with an analogy from an assigned, unrelated domain, and the mapping must
+# hold (each analogy part corresponds to a real part and the analogy does not imply something false).
+AT_PAIRS = {"en": [("how a TCP connection is opened (three-way handshake)", "booking a table at a restaurant by phone"),
+                   ("how a vaccine trains the immune system", "a football team studying video of the next opponent"),
+                   ("why compound interest grows faster over time", "a snowball rolling down a hill"),
+                   ("how a database index speeds up a search", "the index at the back of a cookbook"),
+                   ("what a CPU cache does", "a cook's countertop versus the pantry"),
+                   ("how public-key encryption lets strangers send secrets", "a mailbox with a slot anyone can use"),
+                   ("why the Moon has phases", "a ball lit by one lamp in a dark room"),
+                   ("how a central bank fights inflation with interest rates", "a thermostat in a house")],
+            "de": [("wie eine TCP-Verbindung aufgebaut wird (Drei-Wege-Handschlag)", "einen Tisch im Restaurant telefonisch reservieren"),
+                   ("wie eine Impfung das Immunsystem trainiert", "eine Fußballmannschaft, die Videos des nächsten Gegners studiert"),
+                   ("warum Zinseszinsen mit der Zeit immer schneller wachsen", "ein Schneeball, der einen Hang hinunterrollt"),
+                   ("wie ein Datenbankindex die Suche beschleunigt", "das Register hinten in einem Kochbuch"),
+                   ("was ein CPU-Cache macht", "die Arbeitsfläche eines Kochs im Vergleich zur Vorratskammer"),
+                   ("wie Public-Key-Verschlüsselung Fremden erlaubt, Geheimnisse zu schicken", "ein Briefkasten mit einem Schlitz, den jeder nutzen kann"),
+                   ("warum der Mond Phasen hat", "ein Ball, der in einem dunklen Raum von einer einzigen Lampe beleuchtet wird"),
+                   ("wie eine Zentralbank mit Zinsen die Inflation bekämpft", "ein Thermostat in einem Haus")]}
+AT_JUDGE = """Task given to a model: explain {concept} using ONLY an analogy from this domain: {domain}. At most 150 words.
+
+EXPLANATION:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Everything it says about the real concept is correct.
+2. The analogy comes from the assigned domain and is used throughout (not swapped for a different, easier analogy).
+3. The mapping holds: the main parts of the analogy correspond to real parts of the concept, and the analogy does not
+   suggest anything false about the concept (e.g. a wrong order of steps or a wrong cause).
+4. A newcomer would understand the core idea from it."""
+
+
+def load_analogy_transfer(lang, n, seed):
+    tasks_judge.check_judge()
+    rows = AT_PAIRS[lang][:min(n or 8, 8)]
+    return [{"id": str(i), "lang": lang, "concept": c, "domain": d,
+             "messages": [{"role": "user", "content": (f"Explain {c} using only an analogy from this domain: {d}. Map the parts "
+                                                       "explicitly. At most 150 words." if lang == "en" else
+                                                       f"Erkläre, {c}, nur mit einer Analogie aus diesem Bereich: {d}. Ordne die Teile "
+                                                       "ausdrücklich zu. Höchstens 150 Wörter.")}]}
+            for i, (c, d) in enumerate(rows)]
+
+
+def score_analogy_transfer(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len([w for w in text.split() if re.search(r"\w", w)])
+    out = tasks_judge.judge("", AT_JUDGE.format(concept=item["concept"], domain=item["domain"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 4:
+        raise ValueError(f"unusable analogy verdict {out[:120]!r}")
+    met = [_yes(x) for x in v] + [words <= 150]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:200], "gold": None,
+            "detail": {"facts_ok": float(met[0]), "domain_kept": float(met[1]), "mapping_holds": float(met[2]),
+                       "understandable": float(met[3]), "within_limit": float(met[4])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1513,6 +1571,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "analogy_transfer": {"langs": ("de", "en"), "load": load_analogy_transfer, "score": score_analogy_transfer,
+                              "think": False, "max_tokens": 512,
+                              "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
+                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "rhyme_poem": {"langs": ("de", "en"), "load": load_rhyme_poem, "score": score_rhyme_poem,
                         "think": False, "max_tokens": 256,
                         "counts": {"quick": {"de": 9, "en": 9}, "full": {"de": None, "en": None}},

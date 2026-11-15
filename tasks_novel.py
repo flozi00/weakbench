@@ -4996,6 +4996,73 @@ def score_queue_sim(item, reply):
             "detail": {f"ok_n{item['k']}": float(ok), "took_fifo": float(v == item["fifo"])}}
 
 
+# ---------------------------------------------------------------- card_score (apply invented rules with exceptions)
+CS_COL = {"en": ["red", "blue", "green", "yellow"], "de": ["rot", "blau", "grün", "gelb"]}
+CS_RULES = {  # (en, de); applied in this order
+    "neg": ("Every {c0} card counts negative (its value is subtracted).", "Jede {c0}e Karte zählt negativ (ihr Wert wird abgezogen)."),
+    "pair": ("If two cards have the same value, both count double.", "Haben zwei Karten denselben Wert, zählen beide doppelt."),
+    "cancel": ("A {c1} card cancels the highest-value card of another colour: that card counts 0.",
+               "Eine {c1}e Karte hebt die höchste Karte einer anderen Farbe auf: diese Karte zählt 0."),
+    "seven": ("A 7 always counts exactly 7, whatever the other rules say.", "Eine 7 zählt immer genau 7, egal was die anderen Regeln sagen."),
+    "cap": ("The total is at most 30; anything above counts as 30.", "Die Summe ist höchstens 30; mehr zählt als 30."),
+}
+
+
+def _cs_score(hand, rules, c0, c1):
+    vals = [v for _, v in hand]
+    if "neg" in rules:
+        vals = [-v if c == c0 else v for (c, _), v in zip(hand, vals)]
+    if "pair" in rules:
+        cnt = {}
+        for _, v in hand:
+            cnt[v] = cnt.get(v, 0) + 1
+        vals = [x * 2 if cnt[v] >= 2 else x for (_, v), x in zip(hand, vals)]
+    if "cancel" in rules and any(c == c1 for c, _ in hand):
+        others = [k for k, (c, _) in enumerate(hand) if c != c1]
+        if others:
+            top = max(others, key=lambda k: hand[k][1])
+            vals[top] = 0
+    if "seven" in rules:
+        vals = [7 if v == 7 else x for (_, v), x in zip(hand, vals)]
+    total = sum(vals)
+    return min(total, 30) if "cap" in rules else total
+
+
+def load_card_score(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("card_score", i)
+        k = (3, 4, 5)[i % 3]
+        cols = CS_COL[lang]
+        while True:
+            rules = [x for x in CS_RULES if x in r.sample(list(CS_RULES), k)]
+            c0, c1 = r.sample(range(4), 2)
+            hand = [(r.randrange(4), r.randint(1, 10)) for _ in range(r.randint(5, 7))]
+            if "pair" in rules:
+                hand[-1] = (hand[-1][0], hand[0][1])  # make a pair exist
+            hand_c = [(cols[c], v) for c, v in hand]
+            gold = _cs_score(hand_c, rules, cols[c0], cols[c1])
+            naive = sum(v for _, v in hand)
+            if gold != naive:
+                break
+        texts = [CS_RULES[x][0 if lang == "en" else 1].format(c0=cols[c0], c1=cols[c1]) for x in rules]
+        cards = ", ".join(f"{c} {v}" for c, v in hand_c)
+        q = ("Card game rules, applied in this order:\n" if lang == "en" else "Regeln eines Kartenspiels, in dieser Reihenfolge angewandt:\n") \
+            + "\n".join(f"{j + 1}. {t}" for j, t in enumerate(texts)) \
+            + (f"\nA card's points start at its value. Hand: {cards}. How many points is the hand worth?" if lang == "en" else
+               f"\nDie Punkte einer Karte sind zuerst ihr Wert. Hand: {cards}. Wie viele Punkte ist die Hand wert?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": naive, "k": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_card_score(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_r{item['k']}": float(ok), "took_plain_sum": float(v == item["naive"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6571,6 +6638,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "card_score": task(load_card_score, score_card_score, 24, 120),
     "queue_sim": task(load_queue_sim, score_queue_sim, 24, 120),
     "floor_area": task(load_floor_area, score_floor_area, 24, 120),
     "spot_change": task(load_spot_change, score_spot_change, 24, 120),

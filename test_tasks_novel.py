@@ -1374,11 +1374,29 @@ def test_spot_change():
     assert ok(neg, "A: nicht / B: —") and ok(neg, "A: „nicht“ / B: (entfällt)")
 
 
+
+def test_floor_area():
+    import tasks_novel as tn
+    step = {"E": (1, 0), "N": (0, 1), "W": (-1, 0), "S": (0, -1)}
+    for x in tn.load_floor_area("en", 60, 0):  # shoelace over the walk the prompt states
+        walk = x["messages"][0]["content"].split(": ", 1)[1].split(". You")[0]
+        pts, px, py = [(0, 0)], 0, 0
+        for seg in walk.split(", "):
+            l, _, d = seg.split()
+            dx, dy = step[{"east": "E", "north": "N", "west": "W", "south": "S"}[d]]
+            px, py = px + dx * int(l), py + dy * int(l)
+            pts.append((px, py))
+        assert pts[-1] == (0, 0), x["id"]
+        area = abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(pts, pts[1:]))) // 2
+        assert area == x["gold"] != x["bbox"], (x["id"], area, x["gold"])
+
+
 if __name__ == "__main__":
     test_weekday_calc()
     test_median_traps()
     test_work_rates()
     test_spot_change()
+    test_floor_area()
     test_recipe_scale()
     test_unit_price()
     test_count_mentions()

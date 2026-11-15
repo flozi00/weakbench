@@ -4874,6 +4874,54 @@ def score_spot_change(item, reply):
             "detail": {f"ok_len{item['len']}": float(ok), f"ok_kind_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- floor_area (area of a walked outline)
+FA_DIR = {"en": {"E": "east", "N": "north", "W": "west", "S": "south"}, "de": {"E": "Osten", "N": "Norden", "W": "Westen", "S": "Süden"}}
+
+
+def _fa_shape(kind, r):
+    """Rectilinear outline as a list of (dir, length), counter-clockwise from the south-west corner."""
+    W, H = r.randint(6, 14), r.randint(5, 12)
+    a, b = r.randint(2, W - 3), r.randint(2, H - 2)
+    if kind == "L":  # notch cut out of the north-east corner
+        return [("E", W), ("N", H - b), ("W", W - a), ("N", b), ("W", a), ("S", H)], W * H - (W - a) * b
+    if kind == "U":  # notch cut into the middle of the north side
+        x0 = r.randint(1, W - a - 1)
+        return [("E", W), ("N", H), ("W", W - x0 - a), ("S", b), ("W", a), ("N", b), ("W", x0), ("S", H)], W * H - a * b
+    raise ValueError(kind)
+
+
+def load_floor_area(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("floor_area", i)
+        kind = ("L", "U", "T")[i % 3]
+        if kind == "T":
+            W, H = r.randint(8, 14), r.randint(6, 12)
+            stem, top = r.randint(2, W - 4), r.randint(2, H - 3)
+            x0 = r.randint(1, W - stem - 1)
+            segs = [("E", stem), ("N", H - top), ("E", W - x0 - stem), ("N", top), ("W", W), ("S", top), ("E", x0), ("S", H - top)]
+            area = W * top + stem * (H - top)
+            bbox = W * H
+        else:
+            segs, area = _fa_shape(kind, r)
+            bbox = sum(l for d, l in segs if d == "E") * sum(l for d, l in segs if d == "N")
+        walk = ", ".join(f"{l} m {FA_DIR[lang][d]}" if lang == "en" else f"{l} m nach {FA_DIR[lang][d]}" for d, l in segs)
+        q = (f"A room's walls, walked once around from one corner: {walk}. You are back at the start. "
+             "What is the floor area in square metres?" if lang == "en" else
+             f"Die Wände eines Raums, einmal von einer Ecke aus abgelaufen: {walk}. Du bist wieder am Start. "
+             "Wie groß ist die Bodenfläche in Quadratmetern?")
+        items.append({"id": str(i), "lang": lang, "gold": area, "bbox": bbox, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_floor_area(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "took_bbox": float(v == item["bbox"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6446,6 +6494,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "floor_area": task(load_floor_area, score_floor_area, 24, 120),
     "spot_change": task(load_spot_change, score_spot_change, 24, 120),
     "work_rates": task(load_work_rates, score_work_rates, 24, 120),
     "median_traps": task(load_median_traps, score_median_traps, 24, 120),

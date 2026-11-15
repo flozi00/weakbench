@@ -3838,9 +3838,7 @@ def load_en_apostrophe(lang, n, seed):
 def score_en_apostrophe(item, reply):
     t = re.sub(r"\([^()]*\)", " ", reply["content"] or "").replace("’", "'").replace("‘", "'")
     found = [o for o in sorted(item["opts"], key=len, reverse=True)
-             if re.search(rf"(?<![\w']){re.escape(o)}(?![\w']|'(?=\w))", t, re.I)]
-    # the two forms differ only in the apostrophe, so match case-insensitively but keep the apostrophe exact
-    found = [o for o in found if not any(o != p and o.lower() == p.lower() for p in found)] or found
+             if re.search(rf"(?<!\w)(?<!\w'){re.escape(o)}(?!\w)(?!'\w)", t, re.I)]  # 'It's' in single quotes counts
     v = found[0] if len(found) == 1 else None
     ok = v is not None and v.lower() == item["gold"].lower()
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}

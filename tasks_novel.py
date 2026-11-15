@@ -6405,6 +6405,53 @@ def score_regex_eval(item, reply):
     return {"correct": ok, "score": float(ok), "pred": sorted(got), "gold": item["gold"], "detail": {"jaccard": round(jac, 4)}}
 
 
+# ---------------------------------------------------------------- negated_filter (negation scope over a table)
+NF_PRODUCTS = ["Kettle", "Lamp", "Mixer", "Toaster", "Radio", "Fan", "Heater", "Scale"]
+NF_RULES = [  # (en, de, predicate on (cheap, stock), the misreading)
+    ("not both cheap and in stock", "nicht zugleich günstig und vorrätig",
+     lambda c, s: not (c and s), lambda c, s: (not c) and (not s)),
+    ("neither cheap nor in stock", "weder günstig noch vorrätig",
+     lambda c, s: (not c) and (not s), lambda c, s: not (c and s)),
+    ("in stock but not cheap", "vorrätig, aber nicht günstig",
+     lambda c, s: s and not c, lambda c, s: not (s and c)),
+    ("not cheap, or cheap but not in stock", "nicht günstig, oder günstig, aber nicht vorrätig",
+     lambda c, s: (not c) or (c and not s), lambda c, s: (not c) and (not s))]
+
+
+def load_negated_filter(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("negated_filter", i)
+        en, de, pred, bait = NF_RULES[i % len(NF_RULES)]
+        while True:
+            prods = r.sample(NF_PRODUCTS, 6)
+            rows = [(p, r.randint(8, 90), r.choice([True, False])) for p in prods]
+            thr = r.choice([30, 40, 50])
+            gold = sorted(p for p, price, st in rows if pred(price < thr, st))
+            bad = sorted(p for p, price, st in rows if bait(price < thr, st))
+            if gold and gold != bad and len(gold) < 6:
+                break
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        table = "\n".join(f"| {p} | {price} € | {yes if st else no} |" for p, price, st in rows)
+        head = "| Product | Price | In stock |" if lang == "en" else "| Produkt | Preis | Vorrätig |"
+        q = (f"{head}\n|---|---|---|\n{table}\n\"Cheap\" means under {thr} €. Which products are {en}? List all of them, separated by commas."
+             if lang == "en" else
+             f"{head}\n|---|---|---|\n{table}\n„Günstig“ heißt unter {thr} €. Welche Produkte sind {de}? Nenne alle, durch Kommas getrennt.")
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(gold), "set": gold, "bait": bad, "prods": prods,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_negated_filter(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    got = sorted(p for p in item["prods"] if re.search(r"\b" + p + r"\b", fa, re.I))
+    want = set(item["set"])
+    jac = len(set(got) & want) / len(set(got) | want) if set(got) | want else 1.0
+    ok = got == item["set"]
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],
+            "detail": {"jaccard": round(jac, 4), "took_scope_bait": float(got == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7984,6 +8031,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "negated_filter": task(load_negated_filter, score_negated_filter, 24, 120),
     "regex_eval": task(load_regex_eval, score_regex_eval, 24, 120),
     "meet_time": task(load_meet_time, score_meet_time, 24, 120),
     "sql_result": task(load_sql_result, score_sql_result, 24, 120),

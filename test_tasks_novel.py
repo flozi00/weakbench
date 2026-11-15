@@ -1593,3 +1593,18 @@ def test_seat_pairs():
 
 if __name__ == "__main__":
     test_seat_pairs()
+
+
+def test_version_pick():
+    import tasks_novel as tn
+    xs = tn.load_version_pick("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    assert tn.score_version_pick(x, {"content": f"Answer: {x['gold']}"})["correct"]
+    assert tn.score_version_pick(x, {"content": f"Answer: {x['gold']} (not {x['pre']})"})["correct"]
+    r = tn.score_version_pick(x, {"content": f"Answer: {x['pre']}"})
+    assert not r["correct"] and r["detail"]["took_prerelease"] == 1
+
+
+if __name__ == "__main__":
+    test_version_pick()

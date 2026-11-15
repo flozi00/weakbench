@@ -7964,6 +7964,54 @@ def score_seat_pairs(item, reply):
             "detail": {"counted_across_aisle": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- version_pick (semantic versions, numeric not text order)
+def load_version_pick(lang, n, seed):
+    items = []
+    key = lambda v: tuple(int(x) for x in v.split("-")[0].split("."))  # noqa: E731
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("version_pick", i, att)
+        while True:
+            major = r.randint(1, 4)
+            lo_minor = r.randint(2, 9)
+            hi_minor = lo_minor + r.randint(2, 5)  # crosses into two digits often: 1.9 < 1.10
+            vers = set()
+            for _ in range(r.randint(6, 8)):
+                mj = r.choice([major, major, major, major + 1, major - 1 if major > 1 else major])
+                vers.add(f"{mj}.{r.randint(max(0, lo_minor - 3), hi_minor + 3)}.{r.randint(0, 12)}")
+            rel = sorted(vers, key=key)
+            ok = [v for v in rel if key(v)[0] == major and lo_minor <= key(v)[1] < hi_minor]
+            if not ok:
+                continue
+            gold = ok[-1]
+            g = key(gold)
+            pre = f"{g[0]}.{g[1]}.{g[2] + 1}-rc.1"  # a newer pre-release inside the range
+            vers.add(pre)
+            text_max = max([v for v in vers if v.startswith(f"{major}.") and "-" not in v])  # string order: "1.9.0" > "1.10.2"
+            if len(ok) >= 2 and text_max != gold and len(vers) >= 6:
+                break
+        shown = sorted(vers)
+        r.shuffle(shown)
+        q = (f"A package is available in these versions: {', '.join(shown)}. Your project requires >= {major}.{lo_minor}.0 and "
+             f"< {major}.{hi_minor}.0. Pre-release versions (with a hyphen) are never installed. Versions are compared number by "
+             f"number (major, then minor, then patch). Which version gets installed, i.e. the highest one that fits?"
+             if lang == "en" else
+             f"Ein Paket gibt es in diesen Versionen: {', '.join(shown)}. Dein Projekt verlangt >= {major}.{lo_minor}.0 und "
+             f"< {major}.{hi_minor}.0. Vorabversionen (mit Bindestrich) werden nie installiert. Versionen werden Zahl für Zahl "
+             f"verglichen (Major, dann Minor, dann Patch). Welche Version wird installiert, also die höchste, die passt?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "pre": pre, "text_max": text_max, "versions": sorted(vers),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_version_pick(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    hits = sorted((m.start(), v) for v in item["versions"] if (m := re.search(rf"(?<![\d.]){re.escape(v)}(?![\d]|\.\d|-)", fa)))
+    v = hits[0][1] if hits else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_prerelease": float(v == item["pre"]), "text_order": float(v == item["text_max"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9552,6 +9600,7 @@ TASKS = {
     "access_rules": task(load_access_rules, score_access_rules, 24, 120),
     "loan_payoff": task(load_loan_payoff, score_loan_payoff, 24, 120),
     "seat_pairs": task(load_seat_pairs, score_seat_pairs, 24, 120),
+    "version_pick": task(load_version_pick, score_version_pick, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

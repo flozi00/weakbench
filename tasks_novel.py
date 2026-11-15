@@ -5320,8 +5320,8 @@ def score_split_bill(item, reply):
 # either miss the exception (double the year) or miss amounts. All numbers of the reply are compared in order.
 ER_LINES = {"en": ["In {y} the club had {a} members.", "The library bought {a} new books in {y}.", "Since {y}, {a} trees were planted.",
                    "The bakery sold {a} loaves on the day it opened in {y}.", "In {y}, {a} people visited the fair."],
-            "de": ["Im Jahr {y} hatte der Verein {a} Mitglieder.", "Die Bibliothek kaufte {y} {a} neue Bücher.",
-                   "Seit {y} wurden {a} Bäume gepflanzt.", "Die Bäckerei verkaufte bei ihrer Eröffnung {y} {a} Brote.",
+            "de": ["Im Jahr {y} hatte der Verein {a} Mitglieder.", "Die Bibliothek kaufte im Jahr {y} insgesamt {a} neue Bücher.",
+                   "Seit {y} wurden {a} Bäume gepflanzt.", "Die Bäckerei verkaufte {a} Brote, als sie {y} eröffnete.",
                    "Im Jahr {y} besuchten {a} Menschen die Messe."]}
 ER_RULE = {"double": ("Double every number in this text, but leave years unchanged.", "Verdopple jede Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a * 2),
            "plus": ("Add 15 to every number in this text, but leave years unchanged.", "Addiere 15 zu jeder Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a + 15),
@@ -5348,15 +5348,13 @@ def load_edit_rule(lang, n, seed):
         ask = ER_RULE[rule][0 if lang == "en" else 1] + (" Reply with the rewritten text only." if lang == "en" else
                                                           " Antworte nur mit dem umgeschriebenen Text.")
         items.append({"id": str(i), "lang": lang, "gold": " ".join(map(str, gold)), "nums": gold, "years": years, "rule": rule,
-                      "messages": [{"role": "user", "content": ask + "\n\n" + " ".join(src) + "\n\n" + ASK[lang]}]})
+                      "messages": [{"role": "user", "content": ask + "\n\n" + " ".join(src)}]})
     return items
 
 
 def score_edit_rule(item, reply):
-    text = reply["content"] or ""
-    fa = final_answer(text)
-    body = text if not fa or len(re.findall(r"\d+", fa)) < len(item["nums"]) else fa
-    got = [int(x) for x in re.findall(r"\d+", body.replace(".", "").replace(",", ""))]
+    body = re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", reply["content"] or "")  # 1.732 / 1,732
+    got = [int(x) for x in re.findall(r"\d+", body)]
     got = got[-len(item["nums"]):] if len(got) >= len(item["nums"]) else got
     ok = got == item["nums"]
     broke = any(y not in got for y in item["years"])

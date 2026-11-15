@@ -3341,6 +3341,55 @@ def score_en_gerund_inf(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- mirror_language (reply in the customer's language)
+ML_MSGS = {"fr": ["Bonjour, ma commande n'est pas encore arrivée. Pouvez-vous me dire où elle se trouve ? Merci.",
+                  "Bonjour, je voudrais changer l'adresse de livraison de ma commande. Est-ce que c'est encore possible ?"],
+           "es": ["Hola, mi pedido todavía no ha llegado. ¿Me pueden decir dónde está? Gracias.",
+                  "Hola, quiero cambiar la dirección de envío de mi pedido. ¿Todavía es posible?"],
+           "it": ["Buongiorno, il mio ordine non è ancora arrivato. Potete dirmi dove si trova? Grazie.",
+                  "Buongiorno, vorrei cambiare l'indirizzo di consegna del mio ordine. È ancora possibile?"],
+           "nl": ["Hallo, mijn bestelling is nog niet aangekomen. Kunt u mij zeggen waar die is? Dank u.",
+                  "Hallo, ik wil het afleveradres van mijn bestelling wijzigen. Is dat nog mogelijk?"],
+           "pl": ["Dzień dobry, moje zamówienie jeszcze nie dotarło. Czy mogą Państwo powiedzieć, gdzie jest? Dziękuję.",
+                  "Dzień dobry, chciałbym zmienić adres dostawy mojego zamówienia. Czy to jeszcze możliwe?"]}
+ML_WORDS = {"fr": {"le", "la", "les", "de", "des", "votre", "vous", "nous", "est", "et", "pour", "une", "un", "que", "commande", "bonjour"},
+            "es": {"el", "la", "los", "su", "de", "que", "y", "es", "para", "pedido", "usted", "hola", "una", "por", "le"},
+            "it": {"il", "la", "di", "che", "e", "è", "per", "suo", "ordine", "un", "una", "buongiorno", "le", "della", "non"},
+            "nl": {"de", "het", "een", "uw", "u", "is", "en", "van", "dat", "bestelling", "wij", "niet", "met", "voor", "hallo"},
+            "pl": {"i", "w", "na", "nie", "się", "jest", "że", "to", "zamówienie", "państwa", "pan", "pani", "dzień", "dobry", "z"},
+            "de": {"der", "die", "das", "und", "ist", "nicht", "sie", "ihre", "wir", "bestellung", "mit", "für", "ein", "eine"},
+            "en": {"the", "and", "is", "your", "you", "we", "order", "to", "of", "for", "not", "a", "with", "it"}}
+
+
+def _ml_lang(text):
+    words = re.findall(r"[a-zàâäçèéêëîïôöûüùñóíúąćęłńśźżß']+", text.lower())
+    score = {k: sum(w in v for w in words) for k, v in ML_WORDS.items()}
+    best = max(score, key=score.get)
+    return best if score[best] >= 3 else None
+
+
+def load_mirror_language(lang, n, seed):
+    sys_ = ("Du bist der Kundenservice von „Lumora“, einem Onlineshop für Lampen. Antworte immer in der Sprache, in der der Kunde "
+            "schreibt. Bestellungen werden innerhalb von 3–5 Werktagen geliefert; Adressänderungen sind möglich, solange die "
+            "Bestellung noch nicht versandt ist." if lang == "de" else
+            "You are customer support for 'Lumora', an online shop for lamps. Always reply in the language the customer writes in. "
+            "Orders are delivered within 3-5 working days; address changes are possible as long as the order has not shipped yet.")
+    items = []
+    for i in range(min(n or 10, 10)):
+        target = list(ML_MSGS)[i % 5]
+        msg = ML_MSGS[target][(i // 5) % 2]
+        items.append({"id": str(i), "lang": lang, "target": target,
+                      "messages": [{"role": "system", "content": sys_}, {"role": "user", "content": msg}]})
+    return items
+
+
+def score_mirror_language(item, reply):
+    got = _ml_lang(reply["content"] or "")
+    ok = got == item["target"] and len((reply["content"] or "").split()) >= 8
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["target"],
+            "detail": {f"ok_{item['target']}": float(ok), "took_system_lang": float(got == item["lang"])}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3672,6 +3721,7 @@ TASKS = {
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
+    "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 10, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

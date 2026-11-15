@@ -814,3 +814,18 @@ def test_gap_tasks_full_sentence():
 
 if __name__ == "__main__":
     test_gap_tasks_full_sentence()
+
+
+def test_mirror_language():
+    import tasks_lang as tl
+    x = tl.load_mirror_language("de", None, 0)[0]
+    assert x["target"] == "fr"
+    fr = "Bonjour, nous sommes désolés. Votre commande est en route et arrivera dans deux jours. Merci de votre patience."
+    de = "Hallo, Ihre Bestellung ist unterwegs und wird in zwei Tagen ankommen. Vielen Dank für Ihre Geduld und Ihr Verständnis."
+    assert tl.score_mirror_language(x, {"content": fr})["correct"]
+    r = tl.score_mirror_language(x, {"content": de})
+    assert not r["correct"] and r["detail"]["took_system_lang"] == 1.0
+
+
+if __name__ == "__main__":
+    test_mirror_language()

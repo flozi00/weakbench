@@ -4814,6 +4814,8 @@ SPC_CLAUSE = {"en": ["The tenant {name} pays {num} euros on the first of each mo
                    "Die Schlüssel übergibt {name} am Tag {num}.", "Der Garten darf {num} {unit} pro Woche genutzt werden."]}
 SPC_NAMES = ["Keller", "Brandt", "Vogel", "Lorenz", "Hahn", "Krüger"]
 SPC_UNITS = {"en": ["weeks", "months", "hours", "days"], "de": ["Wochen", "Monate", "Stunden", "Tage"]}
+SPC_RANGE = [(400, 1500, None), (500, 3000, None), (0, 0, None), (1, 6, (0, 1)), (50, 400, None), (0, 0, None), (1, 28, None),
+             (2, 6, (2, 3))]  # per clause: number range and the two units that fit
 SPC_NEG = {"en": "not ", "de": "nicht "}
 
 
@@ -4824,8 +4826,10 @@ def load_spot_change(lang, n, seed):
         target = (40, 120, 300)[(i // 4) % 3]
         slots = []
         while sum(len(x[0].split()) for x in slots) < target:
-            slots.append((r.choice(SPC_CLAUSE[lang]), {"name": r.choice(SPC_NAMES), "num": str(r.randint(2, 900)),
-                                                       "unit": r.choice(SPC_UNITS[lang]), "neg": r.choice(["", SPC_NEG[lang]])}))
+            c = r.randrange(len(SPC_CLAUSE[lang]))
+            lo, hi, us = SPC_RANGE[c]
+            slots.append((SPC_CLAUSE[lang][c], {"name": r.choice(SPC_NAMES), "num": str(r.randint(lo, hi)), "c": c,
+                                                "unit": SPC_UNITS[lang][r.choice(us)] if us else "", "neg": r.choice(["", SPC_NEG[lang]])}))
         kinds = ("num", "name", "unit", "neg")
         kind = kinds[i % 4]
         cands = [k for k, (c, _) in enumerate(slots) if "{" + kind + "}" in c and k > 0]
@@ -4836,11 +4840,12 @@ def load_spot_change(lang, n, seed):
         tpl, vals = slots[k]
         new = dict(vals)
         if kind == "num":
-            new["num"] = str(int(vals["num"]) + r.choice([1, 10, 100, -1]) if int(vals["num"]) > 100 else int(vals["num"]) + r.choice([1, 10]))
+            new["num"] = str(int(vals["num"]) + (r.choice([10, 50, 100]) if int(vals["num"]) > 100 else 1))
         elif kind == "name":
             new["name"] = r.choice([x for x in SPC_NAMES if x != vals["name"]])
         elif kind == "unit":
-            new["unit"] = r.choice([x for x in SPC_UNITS[lang] if x != vals["unit"]])
+            us = SPC_RANGE[vals["c"]][2]
+            new["unit"] = [SPC_UNITS[lang][u] for u in us if SPC_UNITS[lang][u] != vals["unit"]][0]
         else:
             new["neg"] = "" if vals["neg"] else SPC_NEG[lang]
         old_t = " ".join(c.format(**v) for c, v in slots)

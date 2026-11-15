@@ -6927,6 +6927,39 @@ def score_resistors(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "took_series_sum": float(v is not None and abs(v - item["naive"]) <= 0.05)}}
 
 
+# ---------------------------------------------------------------- savings_plan (compound interest, step by step)
+def load_savings_plan(lang, n, seed):
+    from decimal import Decimal as D, ROUND_HALF_UP
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("savings_plan", i, att)
+        dep = r.randrange(500, 5000, 100)
+        rate = r.choice([1, 2, 2.5, 3, 4, 5])
+        years = r.randint(2, 5)
+        bal, simple = D(0), D(0)
+        for k in range(years):
+            bal += dep
+            bal = (bal * (1 + D(str(rate)) / 100)).quantize(D("0.01"), rounding=ROUND_HALF_UP)  # rounded to cents each year
+            simple += dep * (1 + D(str(rate)) / 100 * (years - k))
+        rs = f"{rate:g}" if lang == "en" else f"{rate:g}".replace(".", ",")
+        q = (f"At the start of each year you pay {dep} € into a savings account. At the end of each year the bank adds {rs} % "
+             f"interest on the whole balance (rounded to the cent). What is the balance after {years} years, just after the last "
+             "interest payment?" if lang == "en" else
+             f"Zu Beginn jedes Jahres zahlst du {dep} € auf ein Sparkonto ein. Am Ende jedes Jahres schreibt die Bank {rs} % Zinsen "
+             f"auf das ganze Guthaben gut (auf den Cent gerundet). Wie hoch ist das Guthaben nach {years} Jahren, direkt nach der "
+             "letzten Zinsgutschrift?")
+        items.append({"id": str(i), "lang": lang, "gold": float(bal), "simple": float(round(simple, 2)),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_savings_plan(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.011
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_simple_interest": float(v is not None and abs(v - item["simple"]) <= 0.011)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8507,6 +8540,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "savings_plan": task(load_savings_plan, score_savings_plan, 24, 120),
     "resistors": task(load_resistors, score_resistors, 24, 120),
     "iso_week": task(load_iso_week, score_iso_week, 24, 120),
     "map_scale": task(load_map_scale, score_map_scale, 24, 120),

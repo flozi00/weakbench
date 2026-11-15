@@ -3087,7 +3087,19 @@ WN_FRAMES = [("akk", "Ich habe gestern den ___ ({n}) getroffen."), ("dat", "Wir 
 
 def load_de_weak_nouns(lang, n, seed):
     items = []
-    for i in range(min(n or 32, 32)):
+    for i in range(min(n or 40, 40)):
+        if i >= 32:  # more controls: strong genitives (-s, not -en) and weak nouns in the nominative
+            k = i - 32
+            if k < 4:
+                nom = ("Lehrer", "Bruder", "Vater", "Onkel")[k]
+                gold, case, frame = nom + "s", "gen", "Das ist das Auto des ___ ({n})."
+            else:
+                nom = gold = ("Mensch", "Junge", "Herr", "Name")[k - 4]
+                case, frame = "nom", ("Der ___ ({n}) ist mir sympathisch." if nom != "Name" else "Der ___ ({n}) steht auf der Liste.")
+            items.append({"id": str(i), "lang": "de", "gold": gold, "nom": nom, "case": case, "control": True,
+                          "messages": [{"role": "user", "content": "Setze das Nomen in Klammern in der richtigen Form ein. "
+                                        "Antworte nur mit dem Wort.\n\n" + frame.format(n=nom)}]})
+            continue
         if i >= 24:  # controls: a strong noun keeps its form, a weak noun in the nominative too
             k = i - 24
             if k < 4:
@@ -3451,7 +3463,7 @@ TASKS = {
     "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 32, lang_check=False),
     "de_direct_speech": task(("de",), load_de_direct_speech, score_de_direct_speech, 64, 16, lang_check=False),
     "en_dependent_preps": task(("en",), load_en_dependent_preps, score_en_dependent_preps, 16, 20, lang_check=False),
-    "de_weak_nouns": task(("de",), load_de_weak_nouns, score_de_weak_nouns, 16, 32, lang_check=False),
+    "de_weak_nouns": task(("de",), load_de_weak_nouns, score_de_weak_nouns, 16, 40, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

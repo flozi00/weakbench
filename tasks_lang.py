@@ -2628,6 +2628,51 @@ def score_en_conditionals(item, reply):
     return {"correct": ok, "score": float(ok), "pred": t[:60], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_passive (Vorgangspassiv, tense kept)
+# The object of the active sentence is masculine, so the new subject shows the case: "den Brief" -> "Der Brief".
+# Perfekt passive is "ist ... worden"; "geworden" is the classic error.
+DPV_VERBS = [("Die Sekretärin", "schreibt", "schrieb", "hat", "geschrieben", "den Brief", "der Brief"),
+            ("Der Mechaniker", "repariert", "reparierte", "hat", "repariert", "den Motor", "der Motor"),
+            ("Die Firma", "baut", "baute", "hat", "gebaut", "den Turm", "der Turm"),
+            ("Der Koch", "bereitet", "bereitete", "hat", "zubereitet", "den Salat", "der Salat"),
+            ("Die Stadt", "öffnet", "öffnete", "hat", "geöffnet", "den Park", "der Park"),
+            ("Der Lehrer", "korrigiert", "korrigierte", "hat", "korrigiert", "den Test", "der Test")]
+DPV_TENSES = ["praesens", "praeteritum", "perfekt", "futur"]
+
+
+def load_de_passive(lang, n, seed):
+    items = []
+    for i in range(min(n or 24, 24)):
+        subj, pres, past, aux, part, obj, nom = DPV_VERBS[i % 6]
+        tense = DPV_TENSES[(i // 6) % 4]
+        if part == "zubereitet":  # separable: bereitet ... zu
+            act = {"praesens": f"{subj} bereitet {obj} zu.", "praeteritum": f"{subj} bereitete {obj} zu.",
+                   "perfekt": f"{subj} hat {obj} zubereitet.", "futur": f"{subj} wird {obj} zubereiten."}[tense]
+        else:
+            inf = {"schreibt": "schreiben", "repariert": "reparieren", "baut": "bauen", "öffnet": "öffnen", "korrigiert": "korrigieren"}[pres]
+            act = {"praesens": f"{subj} {pres} {obj}.", "praeteritum": f"{subj} {past} {obj}.",
+                   "perfekt": f"{subj} {aux} {obj} {part}.", "futur": f"{subj} wird {obj} {inf}."}[tense]
+        gold = {"praesens": f"{nom} wird ... {part}", "praeteritum": f"{nom} wurde ... {part}",
+                "perfekt": f"{nom} ist ... {part} worden", "futur": f"{nom} wird ... {part} werden"}[tense]
+        items.append({"id": str(i), "lang": "de", "gold": gold, "tense": tense, "part": part, "nom": nom, "obj": obj,
+                      "messages": [{"role": "user", "content": "Setze den Satz ins Passiv (Vorgangspassiv) und behalte die Zeitform bei. "
+                                    "Antworte nur mit dem Satz.\n\n" + act}]})
+    return items
+
+
+def score_de_passive(item, reply):
+    t = re.sub(r"\s+", " ", (reply["content"] or "").strip().splitlines()[0] if (reply["content"] or "").strip() else "").lower()
+    p = item["part"]
+    pat = {"praesens": rf"\bwird\b.*\b{p}\b(?! werden| worden)", "praeteritum": rf"\bwurde\b.*\b{p}\b(?! worden)",
+           "perfekt": rf"\bist\b.*\b{p} worden\b", "futur": rf"\bwird\b.*\b{p} werden\b"}[item["tense"]]
+    tense_ok = bool(re.search(pat, t))
+    case_ok = item["nom"].lower() in t and item["obj"].lower() not in t
+    ok = tense_ok and case_ok
+    return {"correct": ok, "score": float(ok), "pred": t[:100], "gold": item["gold"],
+            "detail": {f"ok_{item['tense']}": float(ok), "took_geworden": float(f"{p} geworden" in t),
+                       "kept_accusative": float(item["obj"].lower() in t)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2938,6 +2983,7 @@ TASKS = {
     "de_weil_denn": task(("de",), load_de_weil_denn, score_de_weil_denn, 64, 30, lang_check=False),
     "de_capitals": task(("de",), load_de_capitals, score_de_capitals, 96, 20, lang_check=False),
     "en_conditionals": task(("en",), load_en_conditionals, score_en_conditionals, 32, 24, lang_check=False),
+    "de_passive": task(("de",), load_de_passive, score_de_passive, 64, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

@@ -3455,6 +3455,41 @@ def score_en_countable(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- en_adj_adv (adjective or adverb)
+# Linking verbs (look, feel, smell, sound, seem, taste) take adjectives; action verbs take adverbs. German uses one form
+# for both ("Sie singt gut" / "Das klingt gut"), so this is a classic transfer error.
+AA_ITEMS = [("She sings very ___.", "well", ("good", "well")), ("This soup tastes ___.", "good", ("good", "well")),
+            ("He drives too ___ for my taste.", "fast", ("fast", "fastly")), ("The milk smells ___; throw it away.", "bad", ("bad", "badly")),
+            ("They played ___ and lost 0:5.", "badly", ("bad", "badly")), ("You look ___ in that coat.", "nice", ("nice", "nicely")),
+            ("Please speak more ___; the baby is asleep.", "quietly", ("quiet", "quietly")),
+            ("The room was ___ after the guests left.", "quiet", ("quiet", "quietly")),
+            ("He felt ___ after the long run.", "tired", ("tired", "tiredly")),
+            ("He answered the question ___.", "correctly", ("correct", "correctly")),
+            ("Your answer sounds ___ to me.", "correct", ("correct", "correctly")),
+            ("She worked ___ all weekend.", "hard", ("hard", "hardly")),
+            ("I can ___ hear you; the music is too loud.", "hardly", ("hard", "hardly")),
+            ("The train arrived ___ again.", "late", ("late", "lately")),
+            ("Have you seen him ___?", "lately", ("late", "lately")),
+            ("The plan seems ___ to everyone.", "reasonable", ("reasonable", "reasonably")),
+            ("The flat is ___ priced for the area.", "reasonably", ("reasonable", "reasonably")),
+            ("He looked ___ at the stranger.", "suspiciously", ("suspicious", "suspiciously")),
+            ("The stranger looked ___.", "suspicious", ("suspicious", "suspiciously")),
+            ("The cake smells ___.", "delicious", ("delicious", "deliciously"))]
+
+
+def load_en_adj_adv(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": o, "adverb": g == o[1] and g != "fast",
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with the word only.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(AA_ITEMS[:min(n or 20, 20)])]
+
+
+def score_en_adj_adv(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_adverb" if item["adverb"] else "ok_adjective": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -3986,6 +4021,7 @@ TASKS = {
     "de_wenn_als": task(("de",), load_de_wenn_als, score_de_wenn_als, 20, 20, lang_check=False),
     "de_reflexive_case": task(("de",), load_de_reflexive_case, score_de_reflexive_case, 20, 20, lang_check=False),
     "en_countable": task(("en",), load_en_countable, score_en_countable, 20, 20, lang_check=False),
+    "en_adj_adv": task(("en",), load_en_adj_adv, score_en_adj_adv, 20, 20, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

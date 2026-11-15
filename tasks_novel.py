@@ -5721,9 +5721,17 @@ def load_train_connect(lang, n, seed):
 
 
 def score_train_connect(item, reply):
-    fa = final_answer(reply["content"]) or ""
-    times = [f"{int(h):02d}:{m}" for h, m in re.findall(r"\b(\d{1,2})[:.](\d{2})\b", fa)]
-    v = times[-1] if times else None
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")  # "16:40 (instead of the direct 17:10)"
+
+    def times(t):
+        out = []
+        for h, m, ap in re.findall(r"\b(\d{1,2})[:.](\d{2})\s*(am|pm|a\.m\.|p\.m\.)?", t, re.I):
+            h = int(h) % 12 + (12 if ap.lower().startswith("p") else 0) if ap else int(h)
+            out.append(f"{h:02d}:{m}")
+        return out
+    arr = re.search(r"(?:arriv\w*|ankunft|an(?:kommen|kunft)?|erreich\w*|in \w+ (?:at|um))\W+(?:at |um )?(.*)", fa, re.I)
+    found = times(arr[1])[:1] if arr and times(arr[1]) else times(fa)
+    v = found[0] if len(set(found)) == 1 or (arr and found) else None  # one time, or the one after "arriving"
     ok = v == item["gold"]
     d = {"ok_change" if item["change_wins"] else "ok_direct": float(ok)}
     if item["change_wins"]:

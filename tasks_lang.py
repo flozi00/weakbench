@@ -2187,7 +2187,7 @@ def load_de_grammar_fix(lang, n, seed):
 
 
 def score_de_grammar_fix(item, reply):
-    norm = lambda t: re.sub(r"\s+", " ", t.strip().lstrip(">").strip().strip("„“\"*`").strip())  # noqa: E731
+    norm = lambda t: re.sub(r"\s+", " ", t.replace("’", "'").strip().lstrip(">").strip().strip("„“”\"'*`").strip())  # noqa: E731
     golds = {norm(g) for g in [item["gold"], *item.get("alts", [])]}
     lines = [norm(re.sub(r"^[^:„\"]{1,40}:\s*", "", norm(x))) for x in (reply["content"] or "").splitlines() if norm(x)]
     lines = [re.sub(r"\s*\([^)]*\)$", "", ln) for ln in lines]  # a trailing "(sind statt ist)" note
@@ -2204,15 +2204,15 @@ EG_ITEMS = [("agreement", "The list of names are on the desk.", "The list of nam
             ("tense", "I have seen him last week at the station.", "I saw him last week at the station.", []),
             ("tense", "By the time we arrived, the film already started.", "By the time we arrived, the film had already started.", []),
             ("article", "She is engineer at a large company.", "She is an engineer at a large company.", []),
-            ("article", "She gave me a good advice about the flat.", "She gave me good advice about the flat.", ["She gave me a good piece of advice about the flat."]),
+            ("article", "She gave me a good advice about the flat.", "She gave me good advice about the flat.", ["She gave me a good piece of advice about the flat.", "She gave me some good advice about the flat."]),
             ("preposition", "We arrived to the hotel late at night.", "We arrived at the hotel late at night.", []),
             ("preposition", "She is married with a doctor from Leeds.", "She is married to a doctor from Leeds.", []),
             ("preposition", "It depends of the weather tomorrow.", "It depends on the weather tomorrow.", []),
-            ("pronoun", "Me and my brother built the shed ourselves.", "My brother and I built the shed ourselves.", ["I and my brother built the shed ourselves."]),
+            ("pronoun", "Me and my brother built the shed ourselves.", "My brother and I built the shed ourselves.", []),
             ("pronoun", "The teacher gave the books to Anna and I.", "The teacher gave the books to Anna and me.", []),
             ("word_order", "I don't know what is his name.", "I don't know what his name is.", []),
-            ("word_order", "She speaks very well English.", "She speaks English very well.", []),
-            ("comparative", "This road is more narrow than the old one.", "This road is narrower than the old one.", [])]
+            ("word_order", "She speaks very well English.", "She speaks English very well.", ["She speaks very good English."]),
+            ("comparative", "This box is more heavy than the other one.", "This box is heavier than the other one.", [])]
 
 
 def load_en_grammar_fix(lang, n, seed):

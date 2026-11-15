@@ -1135,7 +1135,8 @@ AT_PAIRS = {"en": [("how a TCP connection is opened (three-way handshake)", "boo
                    ("wie Public-Key-Verschlüsselung Fremden erlaubt, Geheimnisse zu schicken", "ein Briefkasten mit einem Schlitz, den jeder nutzen kann"),
                    ("warum der Mond Phasen hat", "ein Ball, der in einem dunklen Raum von einer einzigen Lampe beleuchtet wird"),
                    ("wie eine Zentralbank mit Zinsen die Inflation bekämpft", "ein Thermostat in einem Haus")]}
-AT_JUDGE = """Task given to a model: explain {concept} using ONLY an analogy from this domain: {domain}. At most 150 words.
+AT_JUDGE = """Task given to a model (in {language}): explain {concept} using ONLY an analogy from this domain: {domain}.
+It had to map the parts explicitly, in at most 150 words.
 
 EXPLANATION:
 {text}
@@ -1143,7 +1144,7 @@ EXPLANATION:
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 1. Everything it says about the real concept is correct.
 2. The analogy comes from the assigned domain and is used throughout (not swapped for a different, easier analogy).
-3. The mapping holds: the main parts of the analogy correspond to real parts of the concept, and the analogy does not
+3. The mapping is stated explicitly and holds: the main parts of the analogy correspond to real parts of the concept, and the analogy does not
    suggest anything false about the concept (e.g. a wrong order of steps or a wrong cause).
 4. A newcomer would understand the core idea from it."""
 
@@ -1163,7 +1164,8 @@ def score_analogy_transfer(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     words = len([w for w in text.split() if re.search(r"\w", w)])
-    out = tasks_judge.judge("", AT_JUDGE.format(concept=item["concept"], domain=item["domain"], text=text or "(empty)"), max_tokens=64)
+    out = tasks_judge.judge("", AT_JUDGE.format(concept=item["concept"], domain=item["domain"], text=text or "(empty)",
+                                                language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")
     if not isinstance(v, list) or len(v) != 4:

@@ -4494,6 +4494,66 @@ def score_weekday_calc(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "off_one_day": float(off)}}
 
 
+# ---------------------------------------------------------------- unit_price (cheaper per unit, bulk bait)
+# Two offers of the same product in different units / pack sizes / deals. Half the time the bigger pack costs
+# more per unit, against the "bulk is cheaper" heuristic. Gold letter alternates.
+UP_GOODS = {"en": [("coffee", "g", "kg", 1000), ("juice", "ml", "l", 1000), ("rice", "g", "kg", 1000), ("shampoo", "ml", "l", 1000)],
+            "de": [("Kaffee", "g", "kg", 1000), ("Saft", "ml", "l", 1000), ("Reis", "g", "kg", 1000), ("Shampoo", "ml", "l", 1000)]}
+
+
+def load_unit_price(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("unit_price", i)
+        good, su, bu, mult = UP_GOODS[lang][i % 4]
+        bulk_worse = (i // 4) % 2 == 0
+        deal = (i // 8) % 3  # 0 plain, 1 multi-pack, 2 "3 for 2"
+        small_q = r.choice([250, 400, 500, 750])
+        p_unit = r.randint(8, 30) / 1000  # € per small unit
+        k = r.choice([1.5, 2, 2.5, 3])  # big pack = k units of the big unit
+        diff = r.choice([0.08, 0.12, 0.18])
+        small_cost = small_q * p_unit
+        if deal == 1:
+            cnt = r.choice([2, 4, 6])
+            small_txt = (f"{cnt} x {small_q} {su} for {small_cost * cnt:.2f} €" if lang == "en" else
+                         f"{cnt} x {small_q} {su} für {small_cost * cnt:.2f} €".replace(".", ","))
+            small_per = small_cost * cnt / (cnt * small_q)
+        elif deal == 2:
+            small_txt = (f"{small_q} {su} for {small_cost:.2f} €, offer: buy 3, pay for 2" if lang == "en" else
+                         f"{small_q} {su} für {small_cost:.2f} €, Aktion: 3 kaufen, 2 bezahlen".replace(".", ",", 1))
+            small_per = small_cost * 2 / (3 * small_q)
+        else:
+            small_txt = (f"{small_q} {su} for {small_cost:.2f} €" if lang == "en" else
+                         f"{small_q} {su} für {small_cost:.2f} €".replace(".", ","))
+            small_per = small_cost / small_q
+        big_per = small_per * (1 + diff if bulk_worse else 1 - diff)
+        big_cost = round(big_per * k * mult, 2)
+        big_per = big_cost / (k * mult)
+        ks = f"{k:g}" if lang == "en" else f"{k:g}".replace(".", ",")
+        bc = f"{big_cost:.2f}" if lang == "en" else f"{big_cost:.2f}".replace(".", ",")
+        big_txt = f"{ks} {bu} for {bc} €" if lang == "en" else f"{ks} {bu} für {bc} €"
+        big_first = i % 2 == 0
+        a, b = (big_txt, small_txt) if big_first else (small_txt, big_txt)
+        big_letter = "A" if big_first else "B"
+        gold = (("B" if big_first else "A") if big_per > small_per else big_letter)
+        q = (f"Two offers for {good} of the same quality:\nA: {a}\nB: {b}\nWhich offer is cheaper per {su}? "
+             "Answer A or B. (If you buy the deal, you take exactly 3.)" if lang == "en" else
+             f"Zwei Angebote für {good} in gleicher Qualität:\nA: {a}\nB: {b}\nWelches Angebot ist pro {su} günstiger? "
+             "Antworte mit A oder B. (Bei der Aktion nimmst du genau 3.)")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bulk_worse": bulk_worse,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_unit_price(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    m = re.findall(r"\b([AB])\b", fa)
+    v = m[0] if len(set(m)) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_bulk_worse" if item["bulk_worse"] else "ok_bulk_better": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6066,6 +6126,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "unit_price": task(load_unit_price, score_unit_price, 24, 120),
     "count_mentions": task(load_count_mentions, score_count_mentions, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},

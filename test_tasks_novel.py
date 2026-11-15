@@ -1319,8 +1319,18 @@ def test_weekday_calc():
     assert not tn.score_weekday_calc(xs[0], {"content": "Antwort: Montag oder " + xs[0]["gold"]})["correct"]
 
 
+
+def test_unit_price():
+    import tasks_novel as tn
+    xs = tn.load_unit_price("en", 120, 0)
+    assert 0.4 < sum(x["gold"] == "A" for x in xs) / len(xs) < 0.6
+    for x in xs:
+        assert not tn.score_unit_price(x, {"content": "Answer: A or B"})["correct"]
+
+
 if __name__ == "__main__":
     test_weekday_calc()
+    test_unit_price()
     test_count_mentions()
     test_interval_math()
     test_dedup_records()

@@ -4390,6 +4390,8 @@ def score_interval_math(item, reply):
     line = final_answer(reply["content"]) or ""
     parts = re.split(r"\s+/\s+|\s+(?:to|bis|und|and)\s+|\s*[–—]\s*|;", line)  # "min / max", "3 bis 8"
     vals = [v for p in parts for v in im_values(p)[:1]]
+    if len(vals) < 2:  # "min 22, max 50": no separator, take the numbers in order
+        vals = im_values(line)
     lo, hi = F(item["lo"]), F(item["hi"])
     close = lambda v, g: abs(v - g) <= max(F(1, 100), abs(g) / 500)  # noqa: E731 - decimals to ~3 places
     ok = len(vals) >= 2 and close(min(vals[:2]), lo) and close(max(vals[:2]), hi)

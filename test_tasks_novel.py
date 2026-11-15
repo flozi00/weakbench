@@ -1283,6 +1283,8 @@ def test_interval_math():
     import tasks_novel as tn
     for x in tn.load_interval_math("de", 9, 0):
         assert tn.score_interval_math(x, {"content": f"Antwort: {x['lo']} / {x['hi']}"})["correct"], x["gold"]
+        if x["kind"] != "quot":
+            assert tn.score_interval_math(x, {"content": f"Antwort: min {x['lo']}, max {x['hi']}"})["correct"]
         if x["kind"] == "quot":
             lo, hi = F(x["lo"]), F(x["hi"])
             assert tn.score_interval_math(x, {"content": f"Antwort: {float(lo):.3f} bis {float(hi):.3f}".replace(".", ",")})["correct"]

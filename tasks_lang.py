@@ -2964,6 +2964,39 @@ def score_de_ersatzinfinitiv(item, reply):
                        "wrong_order": float(wrong_order)}}
 
 
+# ---------------------------------------------------------------- en_irregular (less common irregular verbs)
+EI_VERBS = [("swim", "swam", "swum"), ("forbid", "forbade", "forbidden"), ("wring", "wrung", "wrung"), ("seek", "sought", "sought"),
+            ("stride", "strode", "stridden"), ("forsake", "forsook", "forsaken"), ("tread", "trod", "trodden"),
+            ("undergo", "underwent", "undergone"), ("foresee", "foresaw", "foreseen"), ("shrink", "shrank", "shrunk"),
+            ("spring", "sprang", "sprung"), ("weave", "wove", "woven"), ("arise", "arose", "arisen"), ("cling", "clung", "clung"),
+            ("withdraw", "withdrew", "withdrawn"), ("overtake", "overtook", "overtaken"), ("sink", "sank", "sunk"),
+            ("bear", "bore", "borne"), ("mislead", "misled", "misled"), ("sting", "stung", "stung")]
+EI_FRAMES = [("Yesterday she ___ ({v}) without hesitation.", 1), ("By then they had already ___ ({v}).", 2)]
+
+
+def load_en_irregular(lang, n, seed):
+    items = []
+    for i in range(min(n or 40, 40)):
+        base, past, part = EI_VERBS[i % 20]
+        frame, form = EI_FRAMES[i // 20]
+        gold = (past, part)[form - 1]
+        other = (past, part)[2 - form]
+        items.append({"id": str(i), "lang": "en", "gold": gold, "other": other, "regular": base.rstrip("e") + "ed", "form": form,
+                      "messages": [{"role": "user", "content": "Fill the gap with the correct form of the verb in brackets "
+                                    "(standard written English). Answer with that word only.\n\n" + frame.format(v=base)}]})
+    return items
+
+
+def score_en_irregular(item, reply):
+    w = re.findall(r"[a-z]+", (reply["content"] or "").lower())
+    w = [x for x in w if x not in ("had", "have", "the", "answer", "already", "she", "they", "is")]
+    v = w[0] if len(set(w)) == 1 else (w[-1] if w and len(w) <= 2 else None)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_past" if item["form"] == 1 else "ok_participle": float(ok), "took_regular": float(v == item["regular"]),
+                       "swapped_forms": float(v == item["other"] and item["other"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3286,6 +3319,7 @@ TASKS = {
     "de_prefix_meaning": task(("de",), load_de_prefix_meaning, score_de_prefix_meaning, 16, 16, lang_check=False),
     "en_hyphens": task(("en",), load_en_hyphens, score_en_hyphens, 16, 20, lang_check=False),
     "de_ersatzinfinitiv": task(("de",), load_de_ersatzinfinitiv, score_de_ersatzinfinitiv, 96, 20, lang_check=False),
+    "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 40, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

@@ -1716,3 +1716,17 @@ def test_workday_deadline():
 
 if __name__ == "__main__":
     test_workday_deadline()
+
+
+def test_fare_group():
+    import tasks_novel as tn
+    xs = tn.load_fare_group("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    g = f"{x['gold']:.2f}".replace(".", ",")
+    for c in (f"Antwort: {g} €", f"Antwort: 3 x 2,50 + 1,25 = {g} €", f"Antwort: {g} Euro (mit Gruppenrabatt)"):
+        assert tn.score_fare_group(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_fare_group()

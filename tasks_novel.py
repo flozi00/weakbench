@@ -8353,6 +8353,60 @@ def score_workday_deadline(item, reply):
             "detail": {"calendar_days": float(v == tuple(item["naive"])), "forgot_holiday": float(v == tuple(item["no_hol"]))}}
 
 
+# ---------------------------------------------------------------- fare_group (a fare table with conditions)
+def load_fare_group(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("fare_group", i, att)
+        while True:
+            zones = {z: F(r.randrange(180, 701, 10), 100) for z in (1, 2, 3)}
+            zones[2] = max(zones[2], zones[1] + F(1, 2)); zones[3] = max(zones[3], zones[2] + F(1, 2))  # noqa: E702
+            z = r.choice([1, 2, 3])
+            adults, kids, seniors, small = r.randint(1, 3), r.randint(0, 3), r.randint(0, 2), r.randint(0, 2)
+            peak = r.random() < 0.5
+            group = r.choice([4, 5])
+            unit = zones[z] + (F(1, 2) if peak else 0)
+            total = adults * unit + kids * unit / 2 + seniors * unit * F(3, 4)  # small children under 6 ride free
+            if adults + kids + seniors + small >= group + 1:  # group ticket: 20 % off everyone who pays
+                total *= F(4, 5)
+            naive = (adults + kids + seniors + small) * unit  # everyone full price
+            if (total * 100).denominator == 1:  # whole cents: no rounding question
+                break
+        gold = round(float(total), 2)
+        eur = lambda x: f"{float(x):.2f}" if lang == "en" else f"{float(x):.2f}".replace(".", ",")  # noqa: E731
+        when = ("at 8:15 on a weekday (peak time)" if peak else "at 11:30 on a weekday") if lang == "en" else \
+            ("um 8:15 Uhr an einem Werktag (Hauptverkehrszeit)" if peak else "um 11:30 Uhr an einem Werktag")
+        rules_en = (f"Single tickets: zone 1 {eur(zones[1])} €, zones 1-2 {eur(zones[2])} €, zones 1-3 {eur(zones[3])} €. "
+                    f"Peak time (6:00-9:00 on weekdays): +0.50 € per full ticket. Children 6-14 pay half of the full ticket (incl. any "
+                    f"peak surcharge), seniors (65+) three quarters of it, children under 6 travel free. Groups of more than {group} people (counting everyone) get "
+                    f"20 % off the total.")
+        rules_de = (f"Einzelfahrscheine: Zone 1 {eur(zones[1])} €, Zonen 1-2 {eur(zones[2])} €, Zonen 1-3 {eur(zones[3])} €. "
+                    f"Hauptverkehrszeit (werktags 6:00-9:00 Uhr): +0,50 € pro vollem Fahrschein. Kinder von 6 bis 14 zahlen die "
+                    f"Hälfte des vollen Fahrscheins (samt Zuschlag), Senioren (ab 65) drei Viertel davon, Kinder unter 6 fahren kostenlos. Gruppen von "
+                    f"mehr als {group} Personen (alle mitgezählt) bekommen 20 % auf den Gesamtpreis.")
+        zr = ["zone 1", "zones 1-2", "zones 1-3"][z - 1] if lang == "en" else ["Zone 1", "Zonen 1-2", "Zonen 1-3"][z - 1]
+        parts = ([(adults, "adult", "adults"), (kids, "child aged 6-14", "children aged 6-14"), (seniors, "senior", "seniors"),
+                  (small, "child under 6", "children under 6")] if lang == "en" else
+                 [(adults, "einem Erwachsenen", "Erwachsenen"), (kids, "einem Kind von 6 bis 14", "Kindern von 6 bis 14"),
+                  (seniors, "einer Seniorin", "Senioren"), (small, "einem Kind unter 6", "Kindern unter 6")])
+        ps = [(sg if c == 1 else f"{c} {pl}") if lang == "de" else f"{c} {sg if c == 1 else pl}" for c, sg, pl in parts if c]
+        who = ", ".join(ps[:-1]) + (" and " if lang == "en" else " und ") + ps[-1] if len(ps) > 1 else ps[0]
+        q = (f"{rules_en}\nA group of {who} travels in {zr} {when}. What do their tickets cost in total, in euros?" if lang == "en" else
+             f"{rules_de}\nEine Gruppe aus {who} fährt in {zr} {when}. Was kosten ihre Fahrscheine insgesamt in Euro?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": round(float(naive), 2),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_fare_group(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "").rsplit("=", 1)[-1]
+    v = answer_value(fa, item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.006
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"all_full_price": float(v is not None and abs(v - item["bait"]) < 0.006 and item["bait"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9949,6 +10003,7 @@ TASKS = {
     "bus_meet": task(load_bus_meet, score_bus_meet, 24, 120),
     "allergen_check": task(load_allergen_check, score_allergen_check, 24, 120),
     "workday_deadline": task(load_workday_deadline, score_workday_deadline, 24, 120),
+    "fare_group": task(load_fare_group, score_fare_group, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

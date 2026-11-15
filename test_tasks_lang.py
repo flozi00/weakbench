@@ -963,3 +963,16 @@ def test_de_eszett():
 
 if __name__ == "__main__":
     test_de_eszett()
+
+
+def test_de_imperative():
+    import tasks_lang as tl
+    for x in tl.load_de_imperative("de", None, 0):
+        sent = x["messages"][0]["content"].splitlines()[-1]
+        for c in (x["gold"][0], x["gold"][0].capitalize() + "!", sent.replace("___", x["gold"][0].capitalize()), f"„{x['gold'][-1]}“"):
+            assert tl.score_de_imperative(x, {"content": c})["correct"], c
+        assert tl.score_de_imperative(x, {"content": x["bait"]})["detail"]["typical_error"] == 1
+
+
+if __name__ == "__main__":
+    test_de_imperative()

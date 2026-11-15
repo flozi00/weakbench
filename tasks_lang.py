@@ -3933,6 +3933,35 @@ def score_en_confusables(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- de_imperative (du-imperative)
+# e->i verbs change in the imperative (lies, nimm, gib) but never take -e; a->ä verbs do NOT umlaut (fahr, not fähr);
+# stems in -t/-d/-chn/-ffn need -e (arbeite, warte, öffne, rechne). Accepted forms per Duden, the typical errors as bait.
+IMP_ITEMS = [("lesen", "das Buch bis morgen", ["lies"], "lese"), ("nehmen", "dir noch ein Stück Kuchen", ["nimm"], "nehme"),
+             ("geben", "mir bitte das Salz", ["gib"], "gebe"), ("sprechen", "bitte etwas lauter", ["sprich"], "spreche"),
+             ("helfen", "mir mal beim Tragen", ["hilf"], "helfe"), ("essen", "dein Gemüse auf", ["iss"], "esse"),
+             ("vergessen", "den Schlüssel nicht", ["vergiss"], "vergesse"), ("sehen", "dir das mal an", ["sieh"], "sehe"),
+             ("fahren", "vorsichtig", ["fahr", "fahre"], "fähr"), ("laufen", "nicht so schnell", ["lauf", "laufe"], "läuf"),
+             ("schlafen", "gut", ["schlaf", "schlafe"], "schläf"), ("arbeiten", "nicht zu lange", ["arbeite"], "arbeit"),
+             ("warten", "kurz auf mich", ["warte"], "wart"), ("öffnen", "bitte das Fenster", ["öffne"], "öffn"),
+             ("sein", "bitte pünktlich", ["sei"], "bist"), ("werfen", "den Ball zu mir", ["wirf"], "werfe")]
+
+
+def load_de_imperative(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "bait": b, "verb": v,
+             "messages": [{"role": "user", "content": f"Setze den Imperativ (du-Form) von „{v}“ ein. Antworte nur mit der Verbform.\n\n"
+                           f"___ {rest}!"}]}
+            for i, (v, rest, g, b) in enumerate(IMP_ITEMS[:min(n or 16, 16)])]
+
+
+def score_de_imperative(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", reply["content"] or "").strip().lower()
+    t = re.sub(r"^(?:antwort|answer)\s*:\s*", "", t)
+    w = re.findall(r"[a-zäöüß]+", t)
+    v = w[0] if w else None
+    ok = v in item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"][0], "detail": {"typical_error": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4477,6 +4506,7 @@ TASKS = {
     "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
+    "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

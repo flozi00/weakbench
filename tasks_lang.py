@@ -2813,22 +2813,22 @@ CO_ITEMS = {"de": [("Wir müssen bis Freitag eine Entscheidung ___.", ("treffen"
                    ("Bitte ___ Rücksicht auf die Nachbarn.", ("nimm", "gib", "mach"), "nimm", "gib"),
                    ("Die Opposition ___ scharfe Kritik an dem Plan.", ("übte", "machte", "gab"), "übte", "machte"),
                    ("Darf ich Ihnen eine Frage ___?", ("stellen", "fragen", "machen"), "stellen", "fragen"),
-                   ("Er hat im Test viele Fehler ___.", ("gemacht", "getan", "begangen"), "gemacht", "getan"),
+                   ("Er hat im Test viele Fehler ___.", ("gemacht", "getan", "gegeben"), "gemacht", "getan"),
                    ("Sie ___ großen Wert auf Pünktlichkeit.", ("legt", "gibt", "macht"), "legt", "gibt"),
-                   ("Wir müssen das Risiko in Kauf ___.", ("nehmen", "geben", "machen"), "nehmen", "machen"),
-                   ("Kannst du mir einen Gefallen ___?", ("tun", "machen", "geben"), "tun", "geben"),
+                   ("Wir müssen das Risiko in Kauf ___.", ("nehmen", "geben", "machen"), "nehmen", "-"),
+                   ("Kannst du mir einen Gefallen ___?", ("tun", "machen", "geben"), "tun", "machen"),
                    ("Der Minister hat eine Rede ___.", ("gehalten", "gegeben", "gemacht"), "gehalten", "gegeben"),
                    ("Er ___ sich große Mühe mit dem Geschenk.", ("gab", "machte", "nahm"), "gab", "machte"),
-                   ("Die Polizei ___ den Verdächtigen fest.", ("nahm", "machte", "hielt"), "nahm", "machte"),
+                   ("Die Polizei ___ den Verdächtigen fest.", ("nahm", "machte", "stellte"), "nahm", "machte"),
                    ("Wir sollten eine Pause ___.", ("machen", "nehmen", "halten"), "machen", "nehmen"),
                    ("Sie hat die Prüfung ___ – sie war erfolgreich.", ("bestanden", "genommen", "gemacht"), "bestanden", "genommen"),
                    ("Bitte ___ mir Bescheid, wenn du ankommst.", ("gib", "mach", "nimm"), "gib", "mach"),
                    ("Er ___ einen Antrag auf Elterngeld.", ("stellte", "machte", "gab"), "stellte", "machte"),
-                   ("Sie musste eine schwere Krankheit ___.", ("durchmachen", "nehmen", "machen"), "durchmachen", "nehmen")],
-            "en": [("We have to ___ a decision by Friday.", ("make", "take", "do"), "make", "take"),
+                   ("Sie musste eine schwere Krankheit ___.", ("durchmachen", "nehmen", "machen"), "durchmachen", "-")],
+            "en": [("We have to ___ a decision by Friday.", ("make", "meet", "do"), "make", "meet"),
                    ("Did you ___ your homework?", ("do", "make", "take"), "do", "make"),
                    ("Please ___ attention to the safety rules.", ("pay", "give", "make"), "pay", "give"),
-                   ("She ___ a speech at the conference.", ("gave", "held", "made"), "gave", "held"),
+                   ("We ___ a meeting every Monday.", ("hold", "make", "do"), "hold", "make"),
                    ("He ___ a lot of mistakes in the test.", ("made", "did", "took"), "made", "did"),
                    ("Can you ___ me a favour?", ("do", "make", "give"), "do", "make"),
                    ("They ___ a break after two hours.", ("took", "made", "did"), "took", "made"),
@@ -2836,7 +2836,7 @@ CO_ITEMS = {"de": [("Wir müssen bis Freitag eine Entscheidung ___.", ("treffen"
                    ("The police ___ the suspect into custody.", ("took", "made", "did"), "took", "made"),
                    ("She ___ a promise to help us.", ("made", "gave", "did"), "made", "gave"),
                    ("We need to ___ the risk.", ("take", "make", "do"), "take", "make"),
-                   ("I'd like to ___ a question.", ("ask", "make", "do"), "ask", "make"),
+                   ("I'd like to ___ a question.", ("ask", "make", "do"), "ask", "-"),
                    ("She ___ a lot of effort into the gift.", ("put", "gave", "made"), "put", "gave"),
                    ("Please ___ me know when you arrive.", ("let", "give", "make"), "let", "give"),
                    ("The opposition ___ sharp criticism of the plan.", ("voiced", "practised", "did"), "voiced", "practised"),
@@ -2861,7 +2861,7 @@ def score_collocations(item, reply):
     hit = [o for o in item["opts"] if f" {o.lower()} " in t]
     v = hit[0] if len(hit) == 1 else None
     ok = v == item["gold"]
-    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])}}
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])} if item["calque"] != "-" else {}}  # "-": no calque
 
 
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)

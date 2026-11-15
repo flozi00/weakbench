@@ -5475,11 +5475,16 @@ def load_json_repair(lang, n, seed):
 def score_json_repair(item, reply):
     import json
     text = reply["content"] or ""
-    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S) or re.search(r"\{.*\}", text, re.S)
-    try:
-        got = json.loads(m[1] if m and m.re.groups else m[0]) if m else None
-    except ValueError:
-        got = None
+    dec, got, pos = json.JSONDecoder(), None, 0
+    while (pos := text.find("{", pos)) != -1:  # the last JSON object that parses (a quoted broken input or {x} in prose do not)
+        try:
+            obj, end = dec.raw_decode(text, pos)
+        except ValueError:
+            pos += 1
+            continue
+        if isinstance(obj, dict) and len(obj) > 1:
+            got = obj
+        pos = end
     want = json.loads(item["gold"])
     ok = got == want
     return {"correct": ok, "score": float(ok), "pred": json.dumps(got, ensure_ascii=False, sort_keys=True)[:200] if got else None,

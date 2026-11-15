@@ -3561,6 +3561,43 @@ def score_de_nominal_adj(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"capitalised": float(ok and cap)}}
 
 
+# ---------------------------------------------------------------- en_zero_article ("the" or no article)
+# German uses the definite article with abstract nouns, generic plurals, meals, institutions and days ("Ich liebe die
+# Musik", "nach dem Frühstück", "im Bett"); English mostly does not, except for specific reference.
+ZA_ITEMS = [("I love ___ music, especially jazz.", "none"), ("___ music at the party last night was far too loud.", "the"),
+            ("___ life in a big city can be stressful.", "none"), ("He told me about ___ life of his grandfather.", "the"),
+            ("We usually have ___ breakfast at seven.", "none"), ("___ breakfast at that hotel was excellent.", "the"),
+            ("She goes to ___ church every Sunday.", "none"), ("___ church in our village is 800 years old.", "the"),
+            ("___ dogs are loyal animals.", "none"), ("___ dogs next door barked all night.", "the"),
+            ("He was ill and stayed in ___ bed all day.", "none"), ("The cat is sleeping on ___ bed in my room.", "the"),
+            ("I will see you on ___ Monday.", "none"), ("___ nature has always fascinated me.", "none"),
+            ("Can you pass me ___ salt, please?", "the"), ("___ salt is bad for you in large amounts.", "none"),
+            ("My son is still at ___ school; he finishes at four.", "none"), ("They met at ___ school next to the station.", "the"),
+            ("___ history was my favourite subject.", "none"), ("We visited ___ history museum in Berlin.", "the")]
+
+
+def load_en_zero_article(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "sent": sent,
+             "messages": [{"role": "user", "content": "Does the gap need \"the\" or no article? Answer with \"the\" or \"no article\" only."
+                           "\n\n" + sent}]}
+            for i, (sent, g) in enumerate(ZA_ITEMS[:min(n or 20, 20)])]
+
+
+def score_en_zero_article(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", (reply["content"] or "")).replace("’", "'").strip().lower()
+    norm = lambda x: re.sub(r"[^a-z' ]", " ", x.lower()).split()  # noqa: E731
+    filled = {"the": norm(item["sent"].replace("___", "the")), "none": norm(item["sent"].replace("___ ", "").replace("___", ""))}
+    v = next((k for k, f in filled.items() if norm(t) == f), None)  # a repeated full sentence
+    if v is None:
+        head = re.sub(r"^\W*(?:answer:\s*)?", "", t)
+        if re.fullmatch(r"\W*(?:answer:\s*)?[-–—∅]\W*", t) or re.match(r"(?:no article|none|zero article|nothing|no\b|x\b)", head):
+            v = "none"
+        elif re.match(r"\W*the\b", head):
+            v = "the"
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4095,6 +4132,7 @@ TASKS = {
     "en_adj_adv": task(("en",), load_en_adj_adv, score_en_adj_adv, 20, 20, lang_check=False),
     "de_paronyms": task(("de",), load_de_paronyms, score_de_paronyms, 16, 16, lang_check=False),
     "de_nominal_adj": task(("de",), load_de_nominal_adj, score_de_nominal_adj, 16, 16, lang_check=False),
+    "en_zero_article": task(("en",), load_en_zero_article, score_en_zero_article, 20, 20, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

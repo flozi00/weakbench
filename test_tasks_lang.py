@@ -858,3 +858,18 @@ def test_en_perfect_past():
 
 if __name__ == "__main__":
     test_en_perfect_past()
+
+
+def test_en_zero_article():
+    import tasks_lang as tl
+    for x in tl.load_en_zero_article("en", None, 0):
+        g = x["gold"]
+        full = x["sent"].replace("___", "The" if x["sent"].startswith("___") else "the") if g == "the" else x["sent"].replace("___ ", "")
+        full = full[0].upper() + full[1:]
+        for c in (("the", "**the**", "The (specific music)") if g == "the" else ("no article", "No article.", "none", "-")) + (full,):
+            assert tl.score_en_zero_article(x, {"content": c})["correct"], (c, x["sent"])
+        assert not tl.score_en_zero_article(x, {"content": "the" if g == "none" else "no article"})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_zero_article()

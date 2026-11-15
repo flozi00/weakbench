@@ -2944,6 +2944,38 @@ def score_de_umlaut_input(item, reply):
             "detail": {"copied_translit": float(bool(copied)), "has_umlauts": float(has >= 1)}}
 
 
+# ---------------------------------------------------------------- en_question_tags (auxiliary, polarity, special cases)
+QT_ITEMS = [("plain", "She can swim", ["can't she", "cannot she"]), ("plain", "He has finished the report", ["hasn't he"]),
+            ("plain", "They won't be late", ["will they"]), ("plain", "You didn't call him", ["did you"]),
+            ("plain", "We should leave now", ["shouldn't we"]), ("plain", "It was raining", ["wasn't it"]),
+            ("special", "I am late again", ["aren't i", "am i not"]), ("special", "Let's take a break", ["shall we"]),
+            ("special", "Open the window", ["will you", "would you", "can you", "could you", "won't you"]),
+            ("special", "There is a problem with the printer", ["isn't there"]),
+            ("special", "They used to live in Leeds", ["didn't they"]), ("special", "This is your bag", ["isn't it"]),
+            ("negative_word", "Nobody called this morning", ["did they"]), ("negative_word", "You never lie", ["do you"]),
+            ("negative_word", "Nothing happened", ["did it"]), ("negative_word", "She hardly ever complains", ["does she"]),
+            ("subject", "Everyone is here", ["aren't they"]), ("subject", "Somebody left the door open", ["didn't they"]),
+            ("subject", "Neither of them knew the answer", ["did they"]), ("subject", "Everything is ready", ["isn't it"])]
+
+
+def load_en_question_tags(lang, n, seed):
+    rows = QT_ITEMS[:min(n or len(QT_ITEMS), len(QT_ITEMS))]
+    return [{"id": str(i), "lang": "en", "gold": tags[0], "tags": tags, "kind": k,
+             "messages": [{"role": "user", "content": "Add the correct question tag. Answer with the tag only (for example: "
+                           "\"isn't it\").\n\n" + sent + ", ___?"}]}
+            for i, (k, sent, tags) in enumerate(rows)]
+
+
+def score_en_question_tags(item, reply):
+    def norm(t):
+        t = t.lower().replace("’", "'")
+        return " ".join(re.findall(r"[a-z']+", t))
+    t = norm(reply["content"] or "")
+    t = t.split("?")[0] if "?" in t else t
+    ok = any(re.search(r"(?:^|\s)" + re.escape(norm(g)) + r"(?:\s|$)", t) for g in item["tags"]) and len(t.split()) <= 6
+    return {"correct": ok, "score": float(ok), "pred": t[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3261,6 +3293,7 @@ TASKS = {
     "collocations": task(("de", "en"), load_collocations, score_collocations, 16, 16, lang_check=False),
     "de_umlaut_input": task(("de",), load_de_umlaut_input, score_de_umlaut_input, 512, 16),
     "en_grammar_fix": task(("en",), load_en_grammar_fix, score_en_grammar_fix, 64, 16, lang_check=False),
+    "en_question_tags": task(("en",), load_en_question_tags, score_en_question_tags, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

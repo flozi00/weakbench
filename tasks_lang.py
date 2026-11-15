@@ -3421,7 +3421,8 @@ PV_ITEMS = [("motion", "Ich ___ das Buch auf den Tisch.", ("lege", "liege")), ("
             ("motion", "Er hat den Schlüssel unter die Matte ___.", ("gelegt", "gelegen")), ("position", "Der Schlüssel hat unter der Matte ___.", ("gelegen", "gelegt")),
             ("motion", "Die Kinder ___ sich vor den Fernseher.", ("setzen", "sitzen")), ("position", "Die Kinder ___ vor dem Fernseher.", ("sitzen", "setzen")),
             ("motion", "Ich habe das Fahrrad in den Keller ___.", ("gestellt", "gestanden")), ("position", "Das Fahrrad hat im Keller ___.", ("gestanden", "gestellt")),
-            ("motion", "Sie ___ den Mantel an den Haken.", ("hängt", "hängen")), ("position", "Der Mantel ___ am Haken.", ("hängt", "hängen")),
+            ("motion", "Sie hat den Mantel an den Haken ___.", ("gehängt", "gehangen")),
+            ("position", "Der Mantel hat den ganzen Tag am Haken ___.", ("gehangen", "gehängt")),
             ("motion", "Leg die Zeitung bitte neben ___ Laptop.", ("den", "dem")), ("position", "Die Zeitung liegt neben ___ Laptop.", ("dem", "den"))]
 
 

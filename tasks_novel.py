@@ -7347,6 +7347,70 @@ def score_ledger_balance(item, reply):
             "detail": {"took_pending": float(near(item["bait"])), "took_cancelled": float(near(item["bait2"]))}}
 
 
+# ---------------------------------------------------------------- dark_patterns (name the manipulation, or none)
+DP_KINDS = ["urgency", "confirmshaming", "hidden_costs", "preticked", "continuity", "none"]
+DP_LABELS = {"en": ["false urgency", "confirmshaming", "hidden costs", "pre-ticked consent", "forced continuity", "none of these (fair)"],
+             "de": ["falsche Dringlichkeit", "Beschämung beim Ablehnen (Confirmshaming)", "versteckte Kosten",
+                    "vorangekreuzte Einwilligung", "erzwungene Verlängerung", "keines davon (fair)"]}
+DP_TEXT = {"en": {"urgency": ["Only {k} left! Offer ends in 00:{m}:59 — {p} at this price will never come back.",
+                              "{k} people are looking at {p} right now. Buy within {m} minutes or lose your discount!"],
+                  "confirmshaming": ["Get 10 % off {p}! [Yes please] [No thanks, I prefer paying full price like a fool]",
+                                     "Join our newsletter for {p} tips? [Sign me up] [No, I don't care about saving money]"],
+                  "hidden_costs": ["{p}: {k}9.99 €. (At the last checkout step: service fee 4.90 €, 'handling' 2.50 €.)",
+                                   "Ticket for {p}: {k}5 €. Final page adds a booking fee of 7 € and a 'mandatory' insurance of 3 €."],
+                  "preticked": ["Checkout for {p}: [x] Yes, share my data with partners for offers  [x] Add travel insurance (3.99 €)",
+                                "Order {p}. Box already ticked: [x] I agree to receive marketing calls."],
+                  "continuity": ["Free {m}-day trial of {p}! After the trial you are charged {k}9.99 € per month unless you cancel by phone.",
+                                 "{p} trial for 0 €. Card required; renews automatically at {k}4.99 € monthly, cancellation only by letter."],
+                  "none": ["{p}: {k}9.99 € including VAT and shipping. Free returns within 30 days. [Buy] [Not now]",
+                           "Try {p} for {m} days. We will remind you 3 days before the trial ends; cancel with one click."]},
+           "de": {"urgency": ["Nur noch {k} Stück! Angebot endet in 00:{m}:59 – {p} gibt es nie wieder zu diesem Preis.",
+                              "{k} Personen sehen sich {p} gerade an. Kauf innerhalb von {m} Minuten, sonst ist dein Rabatt weg!"],
+                  "confirmshaming": ["10 % Rabatt auf {p}! [Ja, gern] [Nein danke, ich zahle lieber den vollen Preis wie ein Dummkopf]",
+                                     "Newsletter mit Tipps zu {p}? [Anmelden] [Nein, Sparen ist mir egal]"],
+                  "hidden_costs": ["{p}: {k}9,99 €. (Im letzten Bestellschritt: Servicegebühr 4,90 €, „Bearbeitung“ 2,50 €.)",
+                                   "Ticket für {p}: {k}5 €. Die letzte Seite addiert 7 € Buchungsgebühr und eine „Pflicht“-Versicherung von 3 €."],
+                  "preticked": ["Kasse für {p}: [x] Ja, meine Daten für Angebote an Partner weitergeben  [x] Reiseversicherung hinzufügen (3,99 €)",
+                                "Bestellung {p}. Schon angekreuzt: [x] Ich willige in Werbeanrufe ein."],
+                  "continuity": ["{m} Tage {p} gratis testen! Danach kostet es {k}9,99 € pro Monat, außer du kündigst telefonisch.",
+                                 "{p}-Test für 0 €. Kreditkarte nötig; verlängert sich automatisch für {k}4,99 € monatlich, Kündigung nur per Brief."],
+                  "none": ["{p}: {k}9,99 € inklusive MwSt. und Versand. Kostenlose Rückgabe innerhalb von 30 Tagen. [Kaufen] [Jetzt nicht]",
+                           "Teste {p} {m} Tage lang. Wir erinnern dich 3 Tage vor Ende des Tests; Kündigung mit einem Klick."]}}
+DP_PRODUCTS = {"en": ["the noise-cancelling headphones", "the yoga app", "the coffee subscription", "the language course",
+                      "the cloud storage", "the e-reader", "the meal kit", "the fitness tracker", "the photo editor", "the travel pillow",
+                      "the password manager", "the plant food"],
+               "de": ["die Kopfhörer", "die Yoga-App", "das Kaffee-Abo", "den Sprachkurs", "den Cloud-Speicher", "den E-Reader",
+                      "die Kochbox", "den Fitness-Tracker", "die Fotobearbeitung", "das Reisekissen", "den Passwort-Manager",
+                      "den Pflanzendünger"]}
+
+
+def load_dark_patterns(lang, n, seed):
+    items = []
+    letters = "ABCDEF"
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("dark_patterns", i, att)
+        kind = DP_KINDS[i % 6]
+        text = r.choice(DP_TEXT[lang][kind]).format(p=r.choice(DP_PRODUCTS[lang]), k=r.randint(1, 9), m=r.randint(10, 30))
+        opts = "\n".join(f"{letters[j]}: {lab}" for j, lab in enumerate(DP_LABELS[lang]))
+        q = (f"Shop text:\n\"{text}\"\nWhich manipulative design pattern does this text use?\n{opts}\nAnswer with one letter."
+             if lang == "en" else
+             f"Shop-Text:\n„{text}“\nWelches manipulative Designmuster nutzt dieser Text?\n{opts}\nAntworte mit einem Buchstaben.")
+        items.append({"id": str(i), "lang": lang, "gold": letters[DP_KINDS.index(kind)], "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_dark_patterns(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    m = re.findall(r"\b([A-F])\b", fa)
+    v = m[0] if len(set(m)) == 1 else None
+    ok = v == item["gold"]
+    d = {f"ok_{item['kind']}": float(ok)}
+    if item["kind"] == "none":
+        d["false_alarm"] = float(v is not None and v != "F")
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8927,6 +8991,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "dark_patterns": task(load_dark_patterns, score_dark_patterns, 24, 120),
     "ledger_balance": task(load_ledger_balance, score_ledger_balance, 24, 120),
     "critical_path": task(load_critical_path, score_critical_path, 24, 120),
     "counterexample": task(load_counterexample, score_counterexample, 24, 60),

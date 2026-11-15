@@ -3256,6 +3256,13 @@ def score_de_das_was(item, reply):
             "detail": {f"ok_{item['gold']}": float(ok), **({"took_das": float(v == "das")} if item["gold"] == "was" else {})}}
 
 
+def two_opts(i, gold, opts):
+    """The two offered forms in prompt order: the gold first in half the items (pairs of ids), whatever the list order,
+    so "always the first/second shown" scores 50 %."""
+    other = next(x for x in opts if x != gold)
+    return (gold, other) if (i // 2) % 2 == 0 else (other, gold)
+
+
 def gap_pick(item, reply, opts):
     """The option a gap-fill reply chose. A reply that repeats the sentence is read at the gap (the words before "___" in
     the prompt, then an option); otherwise the reply must name exactly one option. Brackets are notes."""
@@ -3447,7 +3454,7 @@ CN_ITEMS = [("How ___ information do you need?", "much", ("much", "many")),
 
 def load_en_countable(lang, n, seed):
     return [{"id": str(i), "lang": "en", "gold": g, "opts": o,
-             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with the word only.\n\n{sent}"}]}
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{two_opts(i, g, o)[0]}\" or \"{two_opts(i, g, o)[1]}\". Answer with the word only.\n\n{sent}"}]}
             for i, (sent, g, o) in enumerate(CN_ITEMS[:min(n or 20, 20)])]
 
 
@@ -3481,7 +3488,7 @@ AA_ITEMS = [("She sings very ___.", "well", ("good", "well")), ("This soup taste
 
 def load_en_adj_adv(lang, n, seed):
     return [{"id": str(i), "lang": "en", "gold": g, "opts": o, "adverb": g == o[1] and g != "fast",
-             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with the word only.\n\n{sent}"}]}
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{two_opts(i, g, o)[0]}\" or \"{two_opts(i, g, o)[1]}\". Answer with the word only.\n\n{sent}"}]}
             for i, (sent, g, o) in enumerate(AA_ITEMS[:min(n or 20, 20)])]
 
 
@@ -3513,7 +3520,7 @@ PA_ITEMS = [("Er ist ___ krank: Er hustet und hat Fieber, der Arzt hat ihn krank
 
 def load_de_paronyms(lang, n, seed):
     return [{"id": str(i), "lang": "de", "gold": g, "opts": o,
-             "messages": [{"role": "user", "content": f"Setze „{o[i % 2]}“ oder „{o[1 - i % 2]}“ ein. Antworte nur mit dem Wort.\n\n{sent}"}]}
+             "messages": [{"role": "user", "content": f"Setze „{two_opts(i, g, o)[0]}“ oder „{two_opts(i, g, o)[1]}“ ein. Antworte nur mit dem Wort.\n\n{sent}"}]}
             for i, (sent, g, o) in enumerate(PA_ITEMS[:min(n or 16, 16)])]
 
 
@@ -3659,7 +3666,7 @@ ENC_ITEMS = [("This box is ___ than that one. (heavy)", "heavier", ("heavier", "
 
 def load_en_comparison(lang, n, seed):
     return [{"id": str(i), "lang": "en", "gold": g, "opts": o,
-             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with that form only.\n\n{sent}"}]}
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{two_opts(i, g, o)[0]}\" or \"{two_opts(i, g, o)[1]}\". Answer with that form only.\n\n{sent}"}]}
             for i, (sent, g, o) in enumerate(ENC_ITEMS[:min(n or 16, 16)])]
 
 

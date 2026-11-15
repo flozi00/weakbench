@@ -3570,7 +3570,7 @@ ZA_ITEMS = [("I love ___ music, especially jazz.", "none"), ("___ music at the p
             ("She goes to ___ church every Sunday.", "none"), ("___ church in our village is 800 years old.", "the"),
             ("___ dogs are loyal animals.", "none"), ("___ dogs next door barked all night.", "the"),
             ("He was ill and stayed in ___ bed all day.", "none"), ("The cat is sleeping on ___ bed in my room.", "the"),
-            ("I will see you on ___ Monday.", "none"), ("___ nature has always fascinated me.", "none"),
+            ("I will see you on ___ Monday.", "none"), ("We arrived on ___ Monday after the storm.", "the"),
             ("Can you pass me ___ salt, please?", "the"), ("___ salt is bad for you in large amounts.", "none"),
             ("My son is still at ___ school; he finishes at four.", "none"), ("They met at ___ school next to the station.", "the"),
             ("___ history was my favourite subject.", "none"), ("We visited ___ history museum in Berlin.", "the")]

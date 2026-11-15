@@ -5933,6 +5933,63 @@ def score_overlap_count(item, reply):
             "detail": {"ok_three" if item["three"] else "ok_two": float(ok), "took_sum": float(v == item["naive"])}}
 
 
+# ---------------------------------------------------------------- sheet_eval (dependency order)
+def load_sheet_eval(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("sheet_eval", i)
+        while True:
+            names = [f"{c}1" for c in "ABCDEFGH"[:r.randint(6, 8)]]
+            order = names[:]  # cells listed A1.. but each formula only uses cells LATER in the list (bottom-up dependencies)
+            forms = {}
+            for j, nm in enumerate(order):
+                later = order[j + 1:]
+                if len(later) < 2 or r.random() < 0.25:
+                    forms[nm] = ("const", r.randint(1, 20))
+                else:
+                    kind = r.choice(["add", "mul", "sum", "max", "if"])
+                    a, b = r.sample(later, 2)
+                    forms[nm] = (kind, a, b, r.randint(1, 9))
+
+            def ev(nm, vals):
+                f = forms[nm]
+                g = lambda x: vals.get(x, 0)  # noqa: E731
+                if f[0] == "const":
+                    return f[1]
+                k, a, b, c = f
+                return {"add": g(a) + c, "mul": g(a) * c, "sum": g(a) + g(b), "max": max(g(a), g(b)),
+                        "if": g(a) if g(a) > g(b) else g(b) + c}[k]
+            true = {}
+            for nm in reversed(order):
+                true[nm] = ev(nm, true)
+            top = {}
+            for nm in order:
+                top[nm] = ev(nm, top)
+            target = order[0]
+            if true[target] != top[target] and abs(true[target]) < 10000:
+                break
+
+        def txt(nm):
+            f = forms[nm]
+            if f[0] == "const":
+                return str(f[1])
+            k, a, b, c = f
+            return {"add": f"={a}+{c}", "mul": f"={a}*{c}", "sum": f"=SUM({a},{b})", "max": f"=MAX({a},{b})",
+                    "if": f"=IF({a}>{b}, {a}, {b}+{c})"}[k]
+        sheet = "\n".join(f"{nm}: {txt(nm)}" for nm in order)
+        q = (f"A spreadsheet has these cells:\n{sheet}\nWhat value does {target} show?" if lang == "en" else
+             f"Eine Tabellenkalkulation hat diese Zellen:\n{sheet}\nWelchen Wert zeigt {target} an?")
+        items.append({"id": str(i), "lang": lang, "gold": true[target], "topdown": top[target],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_sheet_eval(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_topdown": float(v == item["topdown"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7509,6 +7566,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "sheet_eval": task(load_sheet_eval, score_sheet_eval, 24, 120),
     "overlap_count": task(load_overlap_count, score_overlap_count, 24, 120),
     "tax_brackets": task(load_tax_brackets, score_tax_brackets, 24, 120),
     "weighted_mean": task(load_weighted_mean, score_weighted_mean, 24, 120),

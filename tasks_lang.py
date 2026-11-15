@@ -3050,10 +3050,10 @@ DP_ITEMS2 = [("She is very interested ___ modern art.", "in", "for", "on"), ("It
              ("He is proud ___ his daughter.", "of", "on", "for"), ("The team consists ___ five engineers.", "of", "from", "in"),
              ("She insisted ___ paying the bill.", "on", "for", "at"), ("Who is responsible ___ this project?", "for", "of", "to"),
              ("My brother is good ___ chess.", "at", "in", "on"), ("She is married ___ a doctor.", "to", "with", "by"),
-             ("I am afraid ___ spiders.", "of", "from", "for"), ("We arrived ___ the airport at noon.", "at", "on", "to"),
-             ("He apologised ___ the delay.", "for", "about", "of"), ("This book is different ___ the film.", "from", "of", "as"),
-             ("They are waiting ___ the bus.", "for", "on", "of"), ("I am looking forward ___ the holidays.", "to", "on", "for"),
-             ("She congratulated him ___ his new job.", "on", "to", "for"), ("He suffers ___ hay fever.", "from", "under", "of"),
+             ("I am afraid ___ spiders.", "of", "from", "at"), ("We arrived ___ the airport at noon.", "at", "on", "to"),
+             ("He apologised ___ the delay.", "for", "to", "of"), ("This book is different ___ the film.", "from", "of", "as"),
+             ("They are waiting ___ the bus.", "for", "at", "of"), ("I am looking forward ___ the holidays.", "to", "on", "for"),
+             ("She congratulated him ___ his new job.", "on", "to", "at"), ("He suffers ___ hay fever.", "from", "under", "of"),
              ("We are aware ___ the risks.", "of", "about", "over"), ("Her new car is very similar ___ mine.", "to", "with", "as"),
              ("She specialises ___ tax law.", "in", "on", "at"), ("Don't laugh ___ him.", "at", "about", "over")]
 

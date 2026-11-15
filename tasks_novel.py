@@ -6983,8 +6983,15 @@ def load_pace_speed(lang, n, seed):
             q = ((f"A runner runs at {vs} km/h. What is the pace in minutes and seconds per km (format m:ss)?" if lang == "en" else
                   f"Ein Läufer läuft mit {vs} km/h. Wie ist die Pace in Minuten und Sekunden pro km (Format m:ss)?"))
         else:
+            from fractions import Fraction as F
             dist = r.choice([5, 10, 21.1, 42.2])
-            tot = round(pace * dist * 60)
+            exact = (m * 60 + s_) * F(str(dist))  # seconds, exact
+            if exact.denominator != 1:  # a half second would make "rounded to the second" ambiguous: whole seconds only
+                s_ = s_ - s_ % 10
+                pace = m + s_ / 60
+                pstr = f"{m}:{s_:02d}"
+                exact = (m * 60 + s_) * F(str(dist))
+            tot = int(exact)
             gold = f"{tot // 3600}:{tot // 60 % 60:02d}:{tot % 60:02d}"
             tb = round((m + s_ / 100) * dist * 60)
             bait = f"{tb // 3600}:{tb // 60 % 60:02d}:{tb % 60:02d}"
@@ -7001,7 +7008,8 @@ def load_pace_speed(lang, n, seed):
 def score_pace_speed(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
     if item["kind"] == "to_speed":
-        v = answer_value(fa, item["lang"])
+        kmh = re.search(r"(\d+(?:[.,]\d+)?)\s*km\s*/\s*h", fa)  # "Pace 5:00 min/km entspricht 8,0 km/h"
+        v = float(kmh[1].replace(",", ".")) if kmh else answer_value(fa, item["lang"])
         ok = v is not None and abs(v - item["gold"]) <= 0.05
         bait = v is not None and abs(v - item["bait"]) <= 0.05 and item["bait"] != item["gold"]
     else:

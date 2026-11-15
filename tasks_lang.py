@@ -2544,6 +2544,52 @@ def score_de_konj2(item, reply):
             "detail": {f"ok_{item['verb']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- i18n_strings (translate UI strings, keep the placeholders)
+# Software strings with placeholders ({name}, {count}, %d, %s), HTML tags and a key name in <kbd>. Translated into the
+# other language; every placeholder, tag and key must survive exactly (same count), none may be invented, and the text
+# must be in the target language.
+I18N = [("Welcome back, {name}! You have {count} new messages.", "Willkommen zurück, {name}! Du hast {count} neue Nachrichten."),
+        ("Press <kbd>Enter</kbd> to save your changes.", "Drücke <kbd>Enter</kbd>, um deine Änderungen zu speichern."),
+        ("Deleted %d files from <b>%s</b>.", "%d Dateien aus <b>%s</b> gelöscht."),
+        ("Your trial ends in {days} days. <a href=\"{url}\">Upgrade now</a>.",
+         "Deine Testphase endet in {days} Tagen. <a href=\"{url}\">Jetzt upgraden</a>."),
+        ("{user} shared {count} photos with you.", "{user} hat {count} Fotos mit dir geteilt."),
+        ("Could not connect to %s. Retrying in %d seconds.", "Keine Verbindung zu %s. Neuer Versuch in %d Sekunden."),
+        ("<b>Warning:</b> {file} is larger than {limit} MB.", "<b>Warnung:</b> {file} ist größer als {limit} MB."),
+        ("Last login: {date} from {ip}.", "Letzte Anmeldung: {date} von {ip}.")]
+I18N_TOKEN = re.compile(r"\{\w+\}|%[ds]|</?\w+(?:\s+[^>]*)?>")
+
+
+def load_i18n_strings(lang, n, seed):
+    """lang = the target language."""
+    items = []
+    for i in range(n or 60):
+        r = random.Random(f"i18n_strings:{i}")
+        picks = r.sample(I18N, 3)
+        src = [p[1] if lang == "en" else p[0] for p in picks]
+        ask = ("Translate these user-interface strings into English, one per line, in the same order. Keep every "
+               "placeholder, HTML tag and key name exactly as it is.\n\n" if lang == "en" else
+               "Übersetze diese Oberflächentexte ins Deutsche, einen pro Zeile, in derselben Reihenfolge. Behalte jeden "
+               "Platzhalter, jedes HTML-Tag und jeden Tastennamen genau bei.\n\n")
+        items.append({"id": str(i), "lang": lang, "src": src, "gold": None,
+                      "messages": [{"role": "user", "content": ask + "\n".join(src)}]})
+    return items
+
+
+def score_i18n_strings(item, reply):
+    import collections as _c
+    text = re.sub(r"^```\w*\s*|```\s*$", "", (reply["content"] or "").strip(), flags=re.M)
+    lines = [re.sub(r"^\s*(?:\d+[.)]|[-*])\s*", "", x).strip() for x in text.splitlines() if x.strip()]
+    tok_ok = len(lines) >= len(item["src"]) and all(
+        _c.Counter(I18N_TOKEN.findall(out)) == _c.Counter(I18N_TOKEN.findall(src)) for out, src in zip(lines, item["src"]))
+    kbd_ok = all(("Enter" in out) == ("Enter" in src) for out, src in zip(lines, item["src"]))
+    plain = I18N_TOKEN.sub(" ", " ".join(lines))
+    lang_ok = common.lang_ok(plain, item["lang"], min_words=8) is not False
+    ok = tok_ok and kbd_ok and lang_ok
+    return {"correct": ok, "score": float(ok), "pred": " | ".join(lines)[:80], "gold": None,
+            "detail": {"placeholders_ok": float(tok_ok and kbd_ok), "lang_ok": float(lang_ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2600,6 +2646,7 @@ TASKS = {
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),
     "code_comments_lang": task(("de", "en"), load_code_comments_lang, score_code_comments_lang, 1024, 20, lang_check=False),
     "de_konj2": task(("de",), load_de_konj2, score_de_konj2, 32, 24, lang_check=False),
+    "i18n_strings": task(("de", "en"), load_i18n_strings, score_i18n_strings, 512, 24, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

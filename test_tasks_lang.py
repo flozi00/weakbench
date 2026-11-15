@@ -709,7 +709,18 @@ def test_de_konj2():
     assert tl.score_de_konj2(s2, {"content": "wärest / würdest"})["correct"]
 
 
+def test_i18n_strings():
+    import tasks_lang as tl
+    x = tl.load_i18n_strings("de", 1, 0)[0]
+    gold = {p[0]: p[1] for p in tl.I18N}
+    good = "\n".join(gold[s] for s in x["src"])
+    assert tl.score_i18n_strings(x, {"content": good})["correct"]
+    broken = tl.I18N_TOKEN.sub("", good, count=1)  # one placeholder or tag lost
+    assert not tl.score_i18n_strings(x, {"content": broken})["correct"]
+
+
 if __name__ == "__main__":
+    test_i18n_strings()
     test_de_konj2()
     test_code_comments_lang()
     test_de_plural_adj()

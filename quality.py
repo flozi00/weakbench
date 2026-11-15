@@ -1270,7 +1270,7 @@ GROUPS = {
                    "de_plural_adj", "de_konj2"],
     "language": ["lang_switch", "polyglot_switch", "mixed_input", "bilingual_notice", "glossary_mt", "de_address",
                  "de_variety", "en_variety", "de_no_anglicisms", "form_writing", "irony", "revise_on_feedback",
-                 "code_comments_lang"],
+                 "code_comments_lang", "i18n_strings"],
     "judge": ["open_checklist", "tutor_feedback", "persona_guard", "human_persona", "self_model", "memory_dialog",
               "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor", "neutral_summary", "triage_advice", "howto_steps", "tactful_message"],
 }

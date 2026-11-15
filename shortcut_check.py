@@ -1,10 +1,12 @@
 """Shortcut detector: the best accuracy a constant reply ("yes", "A", "die", "cannot be determined", ..., and the task's
-own three most common gold answers) reaches per generated task, scored offline. >= 0.6 is flagged; 0.5 on a trap/control-twin task is the expected ceiling of always
+own three most common gold answers, and picking the first/second quoted option or the longest/shortest lettered
+option) reaches per generated task, scored offline. >= 0.6 is flagged; 0.5 on a trap/control-twin task is the expected ceiling of always
 abstaining (the ok_trap / ok_control split shows it).
 
     uv run shortcut_check.py [task,task,...]
 """
 import collections
+import re
 import importlib
 import sys
 
@@ -12,6 +14,22 @@ sys.path.insert(0, ".")
 REPLIES = ["Answer: yes", "Answer: no", "Antwort: ja", "Antwort: nein", "Answer: A", "Answer: B", "Answer: C", "Answer: D",
            "Answer: 0", "Answer: 1", "Answer: cannot be determined", "Antwort: nicht bestimmbar", "Answer: ambiguous",
            "Antwort: mehrdeutig", "die", "das", "der", "is", "are", "ist", "sind", "dass", "das", "seit", "seid", "ironic", "sincere", "ironisch", "ernst"]
+
+
+def positional_reply(item, rule):
+    """A reply that picks by position or length, never by content: the first or second quoted option of the prompt, or
+    the longest / shortest of the lettered options ("A. ...")."""
+    text = item["messages"][-1]["content"]
+    if rule in ("<first shown>", "<second shown>"):
+        q = re.findall(r'["„“]([^"„“\n]{1,60})["“”]', text)
+        return ("Answer: " + q[0 if rule == "<first shown>" else 1]) if len(q) >= 2 else ""
+    opts = re.findall(r"^([A-D])[.)]\s+(.+)$", text, re.M)
+    if not opts:
+        return ""
+    pick = (max if rule == "<longest option>" else min)(opts, key=lambda o: len(o[1]))
+    return "Answer: " + pick[0]
+
+
 tasks = sys.argv[1].split(",") if len(sys.argv) > 1 else [n for m in ("tasks_novel", "tasks_lang") for n in importlib.import_module(m).TASKS]
 mods = [importlib.import_module(m) for m in ("tasks_novel", "tasks_lang")]
 for name in tasks:
@@ -24,8 +42,10 @@ for name in tasks:
         items = t["load"](lang, t["counts"]["full"][lang] or None, 0)
         common = [g for g, _ in collections.Counter(str(it.get("gold")) for it in items).most_common(3) if g != "None"]
         own = [f"{p}{g}" for g in common for p in ("Answer: ", "Antwort: ", "")]  # e.g. always "4", always "Bella"
-        for rep in REPLIES + own:
-            sc = [t["score"](it, {"content": rep, "reasoning": "", "tool_calls": [], "finish_reason": "stop"})["correct"] for it in items]
+        positional = ["<first shown>", "<second shown>", "<longest option>", "<shortest option>"]
+        for rep in REPLIES + own + positional:
+            sc = [t["score"](it, {"content": positional_reply(it, rep) if rep in positional else rep, "reasoning": "",
+                                  "tool_calls": [], "finish_reason": "stop"})["correct"] for it in items]
             acc = sum(bool(x) for x in sc) / len(sc)
             if acc > best[0]:
                 best = (acc, f"{lang}:{rep}")

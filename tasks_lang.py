@@ -4305,10 +4305,14 @@ def load_de_tense_identify(lang, n, seed):
 
 
 def score_de_tense_identify(item, reply):
-    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower().replace("imperfekt", "präteritum")
+    t = strip_lead(reply["content"]).lower()
+    for a, b in (("vollendete gegenwart", "perfekt"), ("vollendete vergangenheit", "plusquamperfekt"), ("vollendete zukunft", "futur ii"),
+                 ("praesens", "präsens"), ("praeteritum", "präteritum"), ("imperfekt", "präteritum")):
+        t = t.replace(a, b)  # textbook synonyms and ASCII spellings
+    t = re.sub(r"\([^()]*\)", " ", t)
     t = re.sub(r"\b(?:nicht|not|kein\w*)\s+[\wä ]+?(?=[,.;)]|\s+(?:sondern|but)\b|$)", " ", t)
     t = re.sub(r"futur\s*(?:1|eins)\b", "futur i", t)
-    t = re.sub(r"futur\s*(?:2|zwei)\b|futur\s*exakt", "futur ii", t)
+    t = re.sub(r"futur\s*(?:2|zwei)\b|futur(?:um)?\s*ex[akc]+t(?:um)?", "futur ii", t)
     found = set()
     for k in ("präsens", "präteritum", "plusquamperfekt", "perfekt", "futur ii", "futur i"):
         if re.search(rf"\b{k}\b", t):

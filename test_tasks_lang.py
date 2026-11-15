@@ -1072,6 +1072,9 @@ def test_de_tense_identify():
     f2 = next(x for x in xs if x["gold"] == "Futur II")
     assert tl.score_de_tense_identify(f2, {"content": "Futur 2 (vollendete Zukunft)"})["correct"]
     assert not tl.score_de_tense_identify(f2, {"content": "Futur I"})["correct"]
+    assert tl.score_de_tense_identify(f2, {"content": "Futurum exactum"})["correct"]
+    pf = next(x for x in xs if x["gold"] == "Perfekt")
+    assert tl.score_de_tense_identify(pf, {"content": "vollendete Gegenwart"})["correct"]
 
 
 if __name__ == "__main__":

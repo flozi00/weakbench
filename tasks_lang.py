@@ -2965,11 +2965,11 @@ def score_de_ersatzinfinitiv(item, reply):
 
 
 # ---------------------------------------------------------------- en_irregular (less common irregular verbs)
-EI_VERBS = [("swim", "swam", "swum", "across the lake"), ("forbid", "forbade", "forbidden", "the trip"),
+EI_VERBS = [("swim", "swam", "swum", "across the lake"), ("drive", "drove", "driven", "the old van"),
             ("wring", "wrung", "wrung", "the wet towel"), ("seek", "sought", "sought", "advice"),
             ("forsake", "forsook", "forsaken", "her old plans"), ("freeze", "froze", "frozen", "the vegetables"),
             ("undergo", "underwent", "undergone", "the operation"), ("foresee", "foresaw", "foreseen", "the problem"),
-            ("weave", "wove", "woven", "a basket"), ("bite", "bit", "bitten", "into the apple"), ("cling", "clung", "clung", "to the rope"),
+            ("hide", "hid", "hidden", "the key"), ("bite", "bit", "bitten", "into the apple"), ("cling", "clung", "clung", "to the rope"),
             ("withdraw", "withdrew", "withdrawn", "her application"), ("overtake", "overtook", "overtaken", "the truck"),
             ("bear", "bore", "borne", "the pain"), ("mislead", "misled", "misled", "the jury"), ("forgive", "forgave", "forgiven", "her brother")]
 EI_FRAMES = [("Yesterday she ___ ({v}) {t}.", 1), ("By then she had already ___ ({v}) {t}.", 2)]
@@ -2982,16 +2982,20 @@ def load_en_irregular(lang, n, seed):
         frame, form = EI_FRAMES[i // 16]
         gold = (past, part)[form - 1]
         other = (past, part)[2 - form]
-        items.append({"id": str(i), "lang": "en", "gold": gold, "other": other, "regular": base.rstrip("e") + "ed", "form": form,
+        reg = base + base[-1] + "ed" if re.search(r"[^aeiou][aeiou][bdgmnpt]$", base) else base.rstrip("e") + "ed"  # swimmed
+        items.append({"id": str(i), "lang": "en", "gold": gold, "other": other, "regular": reg, "form": form, "frame": frame.format(v=base, t=tail),
                       "messages": [{"role": "user", "content": "Fill the gap with the correct form of the verb in brackets "
                                     "(standard written English). Answer with that word only.\n\n" + frame.format(v=base, t=tail)}]})
     return items
 
 
 def score_en_irregular(item, reply):
-    w = re.findall(r"[a-z]+", (reply["content"] or "").lower())
-    w = [x for x in w if x not in ("had", "have", "the", "answer", "already", "she", "they", "is")]
-    v = w[0] if len(set(w)) == 1 else (w[-1] if w and len(w) <= 2 else None)
+    text = re.sub(r"\([^()]*\)", " ", (reply["content"] or "").lower().replace("’", "'"))
+    pre, post = (x.strip(" .").lower() for x in item["frame"].split("___"))
+    post = re.sub(r"\s*\([a-z ]+\)\s*", " ", post).strip()
+    m = re.search(re.escape(pre.split()[-1]) + r"\s+([a-z]+)\s+" + re.escape(post.split()[0]), text) if pre and post else None
+    w = [x for x in re.findall(r"[a-z]+", text) if x not in ("had", "have", "the", "answer", "already", "she", "they", "is")]
+    v = m[1] if m else (w[0] if len(set(w)) == 1 else (w[-1] if w and len(w) <= 2 else None))  # a full sentence: the gap word
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ok_past" if item["form"] == 1 else "ok_participle": float(ok), "took_regular": float(v == item["regular"]),

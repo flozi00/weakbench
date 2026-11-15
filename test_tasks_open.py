@@ -471,6 +471,21 @@ def test_en_learner_feedback():
         tasks_judge.configure(None, None, None)
 
 
+def test_risk_explain():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_risk_explain("de", None, 0)
+        x = it[0]
+        good = f"Von 1000 Menschen haben mit dem Medikament etwa {x['arr_1000']:g} weniger einen Herzinfarkt."
+        assert to.score_risk_explain(x, {"content": good})["correct"]
+        r = to.score_risk_explain(x, {"content": f"Das Risiko sinkt um {x['rrr']:.0f} Prozent, nehmen Sie es."})
+        assert not r["correct"] and r["detail"]["absolute_number"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -592,6 +607,7 @@ if __name__ == "__main__":
     test_de_creative()
     test_de_learner_feedback()
     test_en_learner_feedback()
+    test_risk_explain()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

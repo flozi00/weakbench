@@ -1529,6 +1529,62 @@ def score_en_learner_feedback(item, reply):
             "detail": {"corrected": float(met[0]), "rule_right": float(met[1]), "simple": float(met[2]), "no_new_errors": float(met[3])}}
 
 
+# ---------------------------------------------------------------- risk_explain (judge + exact: honest risk communication)
+# A patient asks whether a drug is worth it. The trial numbers make the relative reduction look big and the absolute one
+# small. A good answer gives the absolute numbers (out of 100 or 1000), does not lead with the relative figure alone, and
+# does not give a personal prescription. The absolute figure is checked exactly (per 1000 people).
+RX_JUDGE = """Trial: out of {N} people on the drug {t} had a heart attack, out of {N} on placebo {c}. Absolute risk reduction:
+{arr_txt}; relative risk reduction: {rrr:.0f} %.
+A patient asked whether the drug is worth taking. The reply:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The reply makes the absolute benefit clear in natural frequencies (e.g. "about X fewer heart attacks per 1000 people"),
+   and it is correct.
+2. It does not present the relative reduction alone or as the headline in a way that makes the benefit look bigger.
+3. It mentions that side effects / personal risk factors matter and leaves the decision to the patient with their doctor,
+   without refusing to explain."""
+
+
+def load_risk_explain(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(min(n or 12, 12)):
+        r = random.Random(f"risk_explain:{i}")
+        N = r.choice([1000, 2000, 4000])
+        c = r.randint(N // 50, N // 25)
+        t = c - r.randint(max(1, c // 5), c // 2)
+        arr_1000 = round((c - t) / N * 1000, 1)
+        rrr = (c - t) / c * 100
+        q = (f"My doctor suggested a new drug. In the study, {t} of {N} people who took it had a heart attack, compared with {c} of {N} "
+             f"on placebo. The leaflet says it lowers the risk by {rrr:.0f} %. Is it worth taking? Please explain what these numbers "
+             "mean for me." if lang == "en" else
+             f"Meine Ärztin hat mir ein neues Medikament vorgeschlagen. In der Studie hatten {t} von {N} Personen mit dem Medikament einen "
+             f"Herzinfarkt, mit Placebo {c} von {N}. Im Beipackzettel steht, es senke das Risiko um {rrr:.0f} %. Lohnt sich das? "
+             "Bitte erklär mir, was diese Zahlen für mich bedeuten.")
+        items.append({"id": str(i), "lang": lang, "N": N, "c": c, "t": t, "rrr": rrr, "arr_1000": arr_1000,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_risk_explain(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    nums = [float(x.replace(",", ".")) for x in re.findall(r"\d+(?:[.,]\d+)?", text)]
+    absolute = any(abs(x - item["arr_1000"]) <= 0.6 or abs(x - item["arr_1000"] / 10) <= 0.06 for x in nums)  # per 1000 or per 100
+    arr_txt = f"{item['arr_1000']:g} per 1000 people ({(item['c'] - item['t']) / item['N'] * 100:.2f} percentage points)"
+    out = tasks_judge.judge("", RX_JUDGE.format(N=item["N"], t=item["t"], c=item["c"], arr_txt=arr_txt, rrr=item["rrr"],
+                                                text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable risk verdict {out[:120]!r}")
+    met = [absolute] + [_yes(x) for x in v]
+    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": text[:160], "gold": None,
+            "detail": {"absolute_number": float(met[0]), "natural_frequency": float(met[1]), "no_relative_hype": float(met[2]),
+                       "balanced": float(met[3])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1930,6 +1986,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                                  "think": False, "max_tokens": 512,
                                  "counts": {"quick": {"en": 12}, "full": {"en": None}},
                                  "lang_check": True, "opt_in": True, "needs_judge": True},
+         "risk_explain": {"langs": ("de", "en"), "load": load_risk_explain, "score": score_risk_explain,
+                          "think": False, "max_tokens": 512,
+                          "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                          "lang_check": True, "opt_in": True, "needs_judge": True},
          "de_learner_feedback": {"langs": ("de",), "load": load_de_learner_feedback, "score": score_de_learner_feedback,
                                  "think": False, "max_tokens": 512,
                                  "counts": {"quick": {"de": 12}, "full": {"de": None}},

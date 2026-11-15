@@ -2048,8 +2048,8 @@ def score_vegan_adapt(item, reply):
 # that guesses the output by pattern-matching without understanding shows up as output_ok without rule_ok.
 RX2_DESC = {"reverse": "reverse the word", "shift": "shift every letter {k} place(s) forward in the alphabet (z wraps to a)",
             "rotate": "move the first {k} letter(s) to the end", "double_vowels": "double every vowel (a, e, i, o, u)",
-            "swap_pairs": "swap the letters in pairs (1st with 2nd, 3rd with 4th, ...)", "sort": "sort the letters alphabetically",
-            "upper_every": "capitalise every {k1}th letter, starting with the first"}
+            "swap_pairs": "swap the letters in pairs (1st with 2nd, 3rd with 4th, ...; an odd last letter stays)", "sort": "sort the letters alphabetically",
+            "upper_every": "capitalise the 1st letter and then every {k1}. letter after it (positions 1, 1+{k1}, 1+2*{k1}, ...)"}
 RX2_JUDGE = """A hidden rule turns words into new words. The TRUE rule, applied step by step in this order, is:
 {truth}
 
@@ -2067,7 +2067,7 @@ def load_rule_explain(lang, n, seed):
     items = []
     for i in range(n or 24):
         r = random.Random(f"rule_explain:{i}")
-        depth = 1 + i % 2
+        depth = 1 + i % 3  # depth 3 adds the case step (upper_every)
         while True:
             rule = tasks_novel.make_rule(r, depth)
             words = [tasks_novel.word(r) for _ in range(7)]
@@ -2091,8 +2091,8 @@ def score_rule_explain(item, reply):
     tasks_judge.check_judge()
     text = reply["content"] or ""
     ans = tasks_novel.final_answer(text) or ""
-    out_ok = re.sub(r"[^\w]", "", ans) == item["gold"]  # case matters (upper_every)
-    m = re.search(r"(?:Rule|Regel)\s*:\s*(.+?)(?:\n\s*\n|(?:Answer|Antwort)\s*:|$)", text, re.S | re.I)
+    out_ok = (re.findall(r"\w+", ans) or [""])[-1] == item["gold"]  # the last word ("ftcclxlr -> ugddymsm"); case matters
+    m = re.search(r"(?:Rule|Regel)\W{0,4}?:\s*(.+?)(?:(?:\*\*)?(?:Answer|Antwort)\W{0,4}?:|$)", text, re.S | re.I)  # "**Rule**:"
     stated = (m[1] if m else text)[:800].strip()
     out = tasks_judge.judge("", RX2_JUDGE.format(truth=item["truth"], text=stated or "(none)"), max_tokens=64)
     mm = re.search(r"\{.*\}", out, re.S)

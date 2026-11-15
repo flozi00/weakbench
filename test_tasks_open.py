@@ -810,6 +810,8 @@ def test_rule_explain():
         r = to.score_rule_explain(x, {"content": f"Rule: reverse the word.\n\nAnswer: {x['gold']}"})
         assert r["correct"], r
         assert to.score_rule_explain(x, {"content": "Rule: something.\nAnswer: zzzz"})["detail"]["output_ok"] == 0
+        assert to.score_rule_explain(x, {"content": f"**Rule**: reverse it.\n\nAnswer: abc -> {x['gold']}"})["detail"]["output_ok"] == 1
+        assert any("capitalise" in y["truth"] for y in xs)  # depth 3 includes the case step
     finally:
         stop()
         tasks_judge.configure(None, None, None)

@@ -5247,6 +5247,68 @@ def score_new_concept(item, reply):
             "detail": {f"ok_c{item['nc']}": float(ok), "jaccard": round(jac, 4)}}
 
 
+# ---------------------------------------------------------------- split_bill (settle shared expenses)
+SB_PEOPLE = ["Lea", "Max", "Nora", "Omar"]
+SB_ITEMS = {"en": ["the holiday flat", "fuel", "groceries", "the boat tour", "museum tickets", "the dinner"],
+            "de": ["die Ferienwohnung", "Benzin", "Lebensmittel", "die Bootstour", "Museumstickets", "das Abendessen"]}
+
+
+def load_split_bill(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i in range(n or 120):
+        r = rng_of("split_bill", i)
+        people = SB_PEOPLE[:r.choice([3, 4])]
+        partial = i % 2 == 0
+        while True:
+            exps = [(r.choice(people), r.randrange(30, 400, 6), list(people)) for _ in range(3)]
+            if partial:
+                k = r.randrange(3)
+                outs = r.sample(people, 1)
+                exps[k] = (exps[k][0], exps[k][1], [p for p in people if p not in outs])
+            who = r.choice(people)
+            bal = {p: F(0) for p in people}
+            plain = {p: F(0) for p in people}
+            for payer, amt, among in exps:
+                bal[payer] += amt
+                plain[payer] += amt
+                for p in among:
+                    bal[p] -= F(amt, len(among))
+                for p in people:
+                    plain[p] -= F(amt, len(people))
+            g = bal[who]
+            if g * 100 == int(g * 100) and g != 0 and (not partial or plain[who] != g) and len({e[1] for e in exps}) == 3:
+                break
+        names = SB_ITEMS[lang]
+        lines = []
+        for j, (payer, amt, among) in enumerate(exps):
+            nm = names[(i + j) % len(names)]
+            share = "" if len(among) == len(people) else (
+                f" (shared only by {', '.join(among)})" if lang == "en" else f" (nur geteilt von {', '.join(among)})")
+            lines.append(f"- {payer} paid {amt} € for {nm}{share}" if lang == "en" else f"- {payer} hat {amt} € für {nm} bezahlt{share}")
+        q = (f"{', '.join(people)} went on a trip. Every expense is split equally among the people who share it.\n"
+             + "\n".join(lines) + f"\nAfter settling up, how much money does {who} get back in total? If {who} has to pay, "
+             "answer with a negative number." if lang == "en" else
+             f"{', '.join(people)} waren zusammen verreist. Jede Ausgabe wird gleichmäßig auf die Personen verteilt, die sie teilen.\n"
+             + "\n".join(lines) + f"\nWie viel Geld bekommt {who} nach der Abrechnung insgesamt zurück? Wenn {who} zahlen muss, "
+             "antworte mit einer negativen Zahl.")
+        items.append({"id": str(i), "lang": lang, "gold": float(g), "partial": partial, "plain": float(plain[who]),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_split_bill(item, reply):
+    fa = (final_answer(reply["content"]) or "").replace("−", "-")
+    v = answer_value(fa, item["lang"])
+    if v is not None and v > 0 and re.search(r"\b(pays?|owes?|zahlt|schuldet|muss .*zahlen)\b", fa, re.I) and item["gold"] < 0:
+        v = -v  # "Max pays 42.50 €" stated in words
+    ok = v is not None and abs(v - item["gold"]) < 0.006
+    d = {"ok_partial" if item["partial"] else "ok_all_share": float(ok)}
+    if item["partial"]:
+        d["took_all_share"] = float(v is not None and abs(v - item["plain"]) < 0.006)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6822,6 +6884,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "split_bill": task(load_split_bill, score_split_bill, 24, 120),
     "new_concept": task(load_new_concept, score_new_concept, 24, 120),
     "ranked_vote": task(load_ranked_vote, score_ranked_vote, 24, 120),
     "parallel_work": task(load_parallel_work, score_parallel_work, 24, 120),

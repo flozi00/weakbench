@@ -798,3 +798,22 @@ def test_vegan_adapt():
 
 if __name__ == "__main__":
     test_vegan_adapt()
+
+
+def test_rule_explain():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        xs = to.load_rule_explain("en", None, 0)
+        assert len({x["messages"][0]["content"] for x in xs}) == 24 and all(x["truth"] for x in xs)
+        x = xs[0]
+        r = to.score_rule_explain(x, {"content": f"Rule: reverse the word.\n\nAnswer: {x['gold']}"})
+        assert r["correct"], r
+        assert to.score_rule_explain(x, {"content": "Rule: something.\nAnswer: zzzz"})["detail"]["output_ok"] == 0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_rule_explain()

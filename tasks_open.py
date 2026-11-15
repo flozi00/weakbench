@@ -44,6 +44,7 @@ import re
 
 import common
 import tasks_judge
+import tasks_novel
 import tasks_lang
 import tasks_text
 
@@ -2041,6 +2042,70 @@ def score_vegan_adapt(item, reply):
                        "grammar": float(grammar)}}
 
 
+# ---------------------------------------------------------------- rule_explain (judge + exact: induce AND articulate a rule)
+# rule_induction's hidden string rules (1-2 steps), but the model must also state the rule in words. The applied output
+# is checked exactly; the judge compares the stated rule with the true one (any equivalent description counts). A model
+# that guesses the output by pattern-matching without understanding shows up as output_ok without rule_ok.
+RX2_DESC = {"reverse": "reverse the word", "shift": "shift every letter {k} place(s) forward in the alphabet (z wraps to a)",
+            "rotate": "move the first {k} letter(s) to the end", "double_vowels": "double every vowel (a, e, i, o, u)",
+            "swap_pairs": "swap the letters in pairs (1st with 2nd, 3rd with 4th, ...)", "sort": "sort the letters alphabetically",
+            "upper_every": "capitalise every {k1}th letter, starting with the first"}
+RX2_JUDGE = """A hidden rule turns words into new words. The TRUE rule, applied step by step in this order, is:
+{truth}
+
+The model described the rule as:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The described rule is equivalent to the true rule: applied to any word it gives the same result (a different but
+   equivalent wording or order of independent steps is fine; a rule that only fits the examples by coincidence is not).
+2. The description is clear and precise enough that a person could apply it without seeing the examples."""
+
+
+def load_rule_explain(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 24):
+        r = random.Random(f"rule_explain:{i}")
+        depth = 1 + i % 2
+        while True:
+            rule = tasks_novel.make_rule(r, depth)
+            words = [tasks_novel.word(r) for _ in range(7)]
+            outs = [tasks_novel.apply_rule(rule, w) for w in words]
+            if all(o != w for o, w in zip(outs, words)) and len(set(outs)) == 7 and tasks_novel.unique_answer(words, outs):
+                break
+        ex = "\n".join(f"{w} -> {o}" for w, o in zip(words[:6], outs[:6]))
+        truth = "\n".join(f"{k + 1}. " + RX2_DESC[nm].format(k=kk, k1=kk + 1) for k, (nm, kk) in enumerate(rule))
+        q = (f"Each input word is turned into an output word by the same hidden rule:\n{ex}\n\nFirst explain the rule in one "
+             f"or two sentences, starting with \"Rule:\". Then apply it to \"{words[6]}\" and finish with a line \"Answer: <word>\"."
+             if lang == "en" else
+             f"Jedes Eingabewort wird nach derselben verborgenen Regel in ein Ausgabewort umgewandelt:\n{ex}\n\nErkläre zuerst die "
+             f"Regel in ein oder zwei Sätzen, beginnend mit „Regel:“. Wende sie dann auf „{words[6]}“ an und schließe mit einer Zeile "
+             f"„Antwort: <Wort>“ ab.")
+        items.append({"id": str(i), "lang": lang, "gold": outs[6], "truth": truth, "depth": depth,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_rule_explain(item, reply):
+    tasks_judge.check_judge()
+    text = reply["content"] or ""
+    ans = tasks_novel.final_answer(text) or ""
+    out_ok = re.sub(r"[^\w]", "", ans) == item["gold"]  # case matters (upper_every)
+    m = re.search(r"(?:Rule|Regel)\s*:\s*(.+?)(?:\n\s*\n|(?:Answer|Antwort)\s*:|$)", text, re.S | re.I)
+    stated = (m[1] if m else text)[:800].strip()
+    out = tasks_judge.judge("", RX2_JUDGE.format(truth=item["truth"], text=stated or "(none)"), max_tokens=64)
+    mm = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(mm[0]) if mm else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 2:
+        raise ValueError(f"unusable rule_explain verdict {out[:120]!r}")
+    rule_ok, clear = (_yes(x) for x in v)
+    met = [out_ok, rule_ok, clear]
+    return {"correct": all(met), "score": round(sum(met) / 3, 4), "pred": ans[:40], "gold": item["gold"],
+            "detail": {"output_ok": float(out_ok), "rule_ok": float(rule_ok), "clear": float(clear),
+                       "output_without_rule": float(out_ok and not rule_ok), f"ok_d{item['depth']}": float(all(met))}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2618,6 +2683,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                          "think": False, "max_tokens": 512,
                          "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
                          "lang_check": True, "opt_in": True, "needs_judge": True},
+         "rule_explain": {"langs": ("de", "en"), "load": load_rule_explain, "score": score_rule_explain,
+                          "think": False, "max_tokens": 1024,
+                          "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                          "lang_check": False, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

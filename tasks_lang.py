@@ -2384,6 +2384,55 @@ def score_de_case_article(item, reply):
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- false_friends (translation traps)
+# Each sentence turns on a false friend. de items translate EN->DE, en items DE->EN. Correct = the right sense
+# appears and the look-alike word does not.
+FF = {"de": [("Eventually, she found the keys.", r"schließlich|letztendlich|endlich|am ende|zuletzt|irgendwann", r"eventuell"),
+             ("Actually, the meeting was cancelled.", r"eigentlich|tatsächlich|in wirklichkeit", r"aktuell"),
+             ("That is a sensible decision.", r"vernünftig|sinnvoll|klug", r"sensib"),
+             ("He brought her a small gift.", r"geschenk|präsent|mitbringsel", r"\bgift\b"),
+             ("The chef cooked a great dinner.", r"koch|köchin|küchenchef", r"\bchef\b|\bchefin\b"),
+             ("The firefighter was very brave.", r"mutig|tapfer", r"\bbrav"),
+             ("I want to become a doctor.", r"\bwerden\b", r"bekomm"),
+             ("This tool is really handy.", r"praktisch|nützlich|handlich", r"\bhandy\b"),
+             ("We spend every summer at the lake.", r"verbring", r"spend"),
+             ("The fabric of this shirt is soft.", r"stoff|gewebe", r"fabrik"),
+             ("Our rent went up again.", r"miete", r"\brente"),
+             ("The city has two billion euros of debt.", r"milliarde", r"\bbillion"),
+             ("She was very sympathetic when I told her about my loss.", r"mitfühlend|verständnisvoll|mitgefühl|anteilnahme|verständnis", r"sympathisch"),
+             ("The undertaker arrived at noon.", r"bestatter", r"unternehmer"),
+             ("The students met in the gymnasium.", r"turnhalle|sporthalle", r"gymnasium"),
+             ("I have a map of the city.", r"karte|stadtplan", r"mappe")],
+      "en": [("Er ist sehr sensibel.", r"sensitive", r"sensible"),
+             ("Ich bekomme morgen ein Paket.", r"\bget|\bgetting|receiv|be delivered|arriv", r"becom"),
+             ("Das ist eventuell möglich.", r"possibl|perhaps|maybe|might", r"eventual"),
+             ("Die aktuelle Lage ist ruhig.", r"current|present", r"actual"),
+             ("Mein Chef ist im Urlaub.", r"boss|manager|supervisor", r"\bchef"),
+             ("Das Kind war den ganzen Tag brav.", r"well[- ]behaved|good|behaved", r"brave"),
+             ("Ich habe ein neues Handy.", r"phone|mobile", r"handy"),
+             ("Sie ist sehr sympathisch.", r"likeable|likable|nice|pleasant|friendly|lovely|personable", r"sympathetic"),
+             ("Er arbeitet in einer Fabrik.", r"factory|plant|mill", r"fabric"),
+             ("Meine Oma bekommt eine kleine Rente.", r"pension", r"\brent\b"),
+             ("Dieser Pilz ist Gift.", r"poison|toxic", r"\bgift"),
+             ("Er hat eine Milliarde Euro.", r"\bbillion", r"milliard|trillion")]}
+
+
+def load_false_friends(lang, n, seed):
+    rows = FF[lang]
+    ask = ("Translate into German. Reply with the translation only.\n\n" if lang == "de" else
+           "Übersetze ins Englische. Antworte nur mit der Übersetzung.\n\n")
+    return [{"id": str(i), "lang": lang, "gold": good, "bait": bait,
+             "messages": [{"role": "user", "content": ask + src}]}
+            for i, (src, good, bait) in enumerate(rows[:min(n or len(rows), len(rows))])]
+
+
+def score_false_friends(item, reply):
+    t = (reply["content"] or "").lower()
+    bait = bool(re.search(item["bait"], t))
+    ok = bool(re.search(item["gold"], t)) and not bait
+    return {"correct": ok, "score": float(ok), "pred": t[:80], "gold": item["gold"], "detail": {"took_bait": float(bait)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2688,6 +2737,7 @@ TASKS = {
     "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
     "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 24, lang_check=False),
+    "false_friends": task(("de", "en"), load_false_friends, score_false_friends, 128, 12),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

@@ -9328,11 +9328,12 @@ def load_free_shipping(lang, n, seed):
             cart = round(limit - r.uniform(1, 9), 2)
             names = r.sample(range(8), 4)
             prices = [round(r.uniform(0.8, 9), 2) for _ in names]
-            best_add = min((sum(c) for k in range(1, 5) for c in itertools.combinations(prices, k) if cart + sum(c) >= limit), default=None)
+            reach = lambda c: round((cart + sum(c)) * 100) >= limit * 100  # noqa: E731  in cents: no 49.9999 below 50
+            best_add = min((sum(c) for k in range(1, 5) for c in itertools.combinations(prices, k) if reach(c)), default=None)
             pay_fee = round(cart + fee, 2)
             add = round(cart + best_add, 2) if best_add is not None else None
             gold = min(pay_fee, add) if add is not None else pay_fee
-            naive_add = round(cart + min((p for p in prices if cart + p >= limit), default=999), 2)  # one item that reaches it
+            naive_add = round(cart + min((p for p in prices if reach((p,))), default=999), 2)  # one item that reaches it
             adding_wins = i % 2 == 0  # half the items adding is cheaper (often as a pair), half paying the fee
             if add is not None and abs(pay_fee - add) >= 0.2 and (gold == add) == adding_wins and (not adding_wins or gold != naive_add):
                 break

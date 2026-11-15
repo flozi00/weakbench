@@ -5116,6 +5116,68 @@ def score_parallel_work(item, reply):
                            float(v is not None and abs(v - item["bait"]) < 0.51)}}
 
 
+# ---------------------------------------------------------------- ranked_vote (instant-runoff count)
+RV_CANDS = ["Arno", "Bella", "Cora", "Dario"]
+
+
+def _rv_irv(groups):
+    """groups: [(count, ranking tuple)]. Returns the winner, or None on any tie in elimination or at the end."""
+    alive = set(RV_CANDS)
+    while True:
+        tally = {c: 0 for c in alive}
+        for cnt, rank in groups:
+            top = next(c for c in rank if c in alive)
+            tally[top] += cnt
+        total = sum(tally.values())
+        best = max(tally.values())
+        if best * 2 > total:
+            return max(tally, key=tally.get)
+        low = min(tally.values())
+        losers = [c for c in tally if tally[c] == low]
+        if len(losers) > 1:
+            return None
+        alive.discard(losers[0])
+
+
+def load_ranked_vote(lang, n, seed):
+    import itertools
+    perms = list(itertools.permutations(RV_CANDS))
+    items = []
+    for i in range(n or 120):
+        r = rng_of("ranked_vote", i)
+        while True:
+            groups = [(r.randint(3, 30), r.choice(perms)) for _ in range(r.randint(4, 6))]
+            w = _rv_irv(groups)
+            first = {}
+            for cnt, rank in groups:
+                first[rank[0]] = first.get(rank[0], 0) + cnt
+            top = sorted(first.values(), reverse=True)
+            plur = max(first, key=first.get)
+            if w and w != plur and (len(top) < 2 or top[0] != top[1]):
+                break
+        lines = "\n".join((f"- {cnt} voters: " if lang == "en" else f"- {cnt} Stimmen: ") + " > ".join(rank) for cnt, rank in groups)
+        q = ("An election uses instant-runoff voting. Each voter ranks all four candidates. In each round, every ballot counts "
+             "for its highest-ranked candidate still in the race. If someone has more than half of the ballots, they win; "
+             "otherwise the candidate with the fewest ballots is eliminated and the next round starts.\nBallots:\n"
+             f"{lines}\nWho wins?" if lang == "en" else
+             "Eine Wahl nutzt Integrierte Stichwahl. Jede Person ordnet alle vier Kandidierenden. In jeder Runde zählt jeder "
+             "Stimmzettel für die höchstplatzierte Person, die noch im Rennen ist. Hat jemand mehr als die Hälfte der Stimmzettel, "
+             "gewinnt diese Person; sonst scheidet die Person mit den wenigsten Stimmzetteln aus und die nächste Runde beginnt.\n"
+             f"Stimmzettel:\n{lines}\nWer gewinnt?")
+        items.append({"id": str(i), "lang": lang, "gold": w, "plurality": plur,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_ranked_vote(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    named = [c for c in RV_CANDS if re.search(r"\b" + c + r"\b", fa)]
+    v = named[0] if len(named) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_plurality": float(v == item["plurality"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6691,6 +6753,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "ranked_vote": task(load_ranked_vote, score_ranked_vote, 24, 120),
     "parallel_work": task(load_parallel_work, score_parallel_work, 24, 120),
     "card_score": task(load_card_score, score_card_score, 24, 120),
     "queue_sim": task(load_queue_sim, score_queue_sim, 24, 120),

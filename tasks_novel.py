@@ -6962,6 +6962,57 @@ def score_savings_plan(item, reply):
             "detail": {"took_simple_interest": float(v is not None and abs(v - item["simple"]) <= 0.011)}}
 
 
+# ---------------------------------------------------------------- pace_speed (min:s per km vs km/h)
+def load_pace_speed(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("pace_speed", i, att)
+        kind = ("to_speed", "to_pace", "finish")[i % 3]
+        m, s_ = r.randint(3, 8), r.choice([0, 10, 15, 20, 30, 40, 45, 50])
+        pace = m + s_ / 60
+        pstr = f"{m}:{s_:02d}"
+        if kind == "to_speed":
+            gold, bait = round(60 / pace, 2), round(60 / (m + s_ / 100), 2)
+            q = (f"A runner's pace is {pstr} min per km. What is the speed in km/h? Round to two decimals." if lang == "en" else
+                 f"Eine Läuferin läuft eine Pace von {pstr} min pro km. Wie schnell ist sie in km/h? Runde auf zwei Nachkommastellen.")
+        elif kind == "to_pace":
+            v = r.randint(70, 180) / 10
+            sec = round(3600 / v)
+            gold, bait = f"{sec // 60}:{sec % 60:02d}", f"{int(60 / v)}:{round((60 / v % 1) * 100):02d}"
+            vs = f"{v:g}" if lang == "en" else f"{v:g}".replace(".", ",")
+            q = ((f"A runner runs at {vs} km/h. What is the pace in minutes and seconds per km (format m:ss)?" if lang == "en" else
+                  f"Ein Läufer läuft mit {vs} km/h. Wie ist die Pace in Minuten und Sekunden pro km (Format m:ss)?"))
+        else:
+            dist = r.choice([5, 10, 21.1, 42.2])
+            tot = round(pace * dist * 60)
+            gold = f"{tot // 3600}:{tot // 60 % 60:02d}:{tot % 60:02d}"
+            tb = round((m + s_ / 100) * dist * 60)
+            bait = f"{tb // 3600}:{tb // 60 % 60:02d}:{tb % 60:02d}"
+            ds = f"{dist:g}" if lang == "en" else f"{dist:g}".replace(".", ",")
+            q = (f"At a steady pace of {pstr} min per km, how long does a {ds} km run take? Answer as h:mm:ss, rounded to the second."
+                 if lang == "en" else
+                 f"Bei einer gleichmäßigen Pace von {pstr} min pro km: Wie lange dauert ein Lauf über {ds} km? Antworte als h:mm:ss, "
+                 "auf die Sekunde gerundet.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_pace_speed(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    if item["kind"] == "to_speed":
+        v = answer_value(fa, item["lang"])
+        ok = v is not None and abs(v - item["gold"]) <= 0.05
+        bait = v is not None and abs(v - item["bait"]) <= 0.05
+    else:
+        pat = r"\b(\d{1,2}):(\d{2})\b" if item["kind"] == "to_pace" else r"\b(\d{1,2}):(\d{2}):(\d{2})\b"
+        m = re.findall(pat, fa)
+        v = ":".join([str(int(m[0][0]))] + list(m[0][1:])) if len(set(m)) == 1 else None
+        ok, bait = v == item["gold"], v == item["bait"] and item["bait"] != item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "took_decimal_minutes": float(bait)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8542,6 +8593,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "pace_speed": task(load_pace_speed, score_pace_speed, 24, 120),
     "savings_plan": task(load_savings_plan, score_savings_plan, 24, 120),
     "resistors": task(load_resistors, score_resistors, 24, 120),
     "iso_week": task(load_iso_week, score_iso_week, 24, 120),

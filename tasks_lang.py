@@ -2353,8 +2353,8 @@ def score_time_prep(item, reply):
 # prepositions where motion takes the accusative and location the dative (springt auf den Tisch / schläft auf dem Tisch).
 CA_ART = {"akk": {"m": "den", "n": "das", "f": "die"}, "dat": {"m": "dem", "n": "dem", "f": "der"},
           "gen": {"m": "des", "n": "des", "f": "der"}}
-CA_FRAMES = [("gen", "Das Spiel fällt wegen ___ {n} aus.", [("Regens", "m"), ("Sturms", "m"), ("Gewitters", "n"), ("Hitze", "f")]),
-             ("gen", "Während ___ {n} war es im Saal still.", [("Konzerts", "n"), ("Vortrags", "m"), ("Prüfung", "f"), ("Pause", "f")]),
+CA_FRAMES = [("gen", "Das Spiel fällt wegen ___ {n} aus.", [("Hitze", "f"), ("Sturms", "m"), ("Glätte", "f"), ("Kälte", "f")]),
+             ("gen", "Während ___ {n} war es im Saal still.", [("Prüfung", "f"), ("Konzerts", "n"), ("Pause", "f"), ("Sitzung", "f")]),
              ("dat", "Sie fährt mit ___ {n} zur Arbeit.", [("Bus", "m"), ("Fahrrad", "n"), ("Bahn", "f"), ("Zug", "m")]),
              ("akk", "Er kauft ein Geschenk für ___ {n}.", [("Lehrer", "m"), ("Kind", "n"), ("Nachbarin", "f"), ("Chef", "m")]),
              ("akk", "Die Katze springt auf ___ {n}.", [("Tisch", "m"), ("Sofa", "n"), ("Mauer", "f"), ("Schrank", "m")]),

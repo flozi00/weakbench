@@ -1304,6 +1304,8 @@ def test_count_mentions():
         body = x["messages"][0]["content"].split("\n\n")[0]
         assert sum(bool(_re.search(r"\b" + target + r"\b", ln)) for ln in body.splitlines()) == x["gold"]
         assert tn.score_count_mentions(x, {"content": f"Answer: {x['gold']}"})["correct"]
+        assert tn.score_count_mentions(x, {"content": f"Answer: entries 3, 5 and 9, so {x['gold']}"})["correct"]
+        assert not tn.score_count_mentions(x, {"content": f"Answer: {x['gold']} or {x['gold'] + 1}"})["correct"]
 
 
 

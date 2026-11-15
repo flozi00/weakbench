@@ -4449,7 +4449,8 @@ def load_count_mentions(lang, n, seed):
 
 
 def score_count_mentions(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    v = None if re.search(r"\b(or|oder)\b", fa) else last_int(fa)  # "1 or 2" hedges
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_len{item['len']}": float(ok), "off_by_one": float(v is not None and abs(v - item["gold"]) == 1)}}

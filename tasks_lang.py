@@ -3208,8 +3208,11 @@ def load_en_phrasal_sense(lang, n, seed):
         verb, senses, ctxs = PS_ITEMS[i // 2]
         sent, k = ctxs[i % 2]
         letters = "ABC"
-        opts = "\n".join(f"{letters[j]}: {s_}" for j, s_ in enumerate(senses))
-        items.append({"id": str(i), "lang": "en", "gold": letters[k],
+        target = i % 3  # the right sense at A, B, C in turn; the other two keep their order
+        rest = [x for j, x in enumerate(senses) if j != k]
+        order = rest[:target] + [senses[k]] + rest[target:]
+        opts = "\n".join(f"{letters[j]}: {s_}" for j, s_ in enumerate(order))
+        items.append({"id": str(i), "lang": "en", "gold": letters[target],
                       "messages": [{"role": "user", "content": f"What does \"{verb}\" mean in this sentence?\n\n{sent}\n\n{opts}\n\n"
                                     "Answer with A, B or C only."}]})
     return items

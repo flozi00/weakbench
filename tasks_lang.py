@@ -4081,6 +4081,29 @@ def score_en_adj_order(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_adj_order": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_linking (Fugenelement in compounds)
+# Whether a compound takes a linking -s-/-e-/-n-/-es- is lexical, not a rule a model can compute: "Arbeitsplatz" but
+# "Bahnhof". Only compounds with one standard form in Germany; the form without a linking element is gold in half.
+DLK_ITEMS = [("Arbeitsplatz", "Arbeitplatz"), ("Bahnhof", "Bahnshof"), ("Liebesbrief", "Liebebrief"), ("Handtuch", "Handstuch"),
+             ("Wirtschaftskrise", "Wirtschaftkrise"), ("Schwimmbad", "Schwimmsbad"), ("Hundeleine", "Hundleine"),
+             ("Lehrerzimmer", "Lehrerszimmer"), ("Zeitungsartikel", "Zeitungartikel"), ("Rathaus", "Ratshaus"),
+             ("Freundeskreis", "Freundkreis"), ("Tischdecke", "Tischsdecke"), ("Weihnachtsbaum", "Weihnachtbaum"),
+             ("Autobahn", "Autosbahn"), ("Schiffsreise", "Schiffreise"), ("Kopfkissen", "Kopfskissen")]
+
+
+def load_de_linking(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Schreibweise des zusammengesetzten Wortes ist richtig: "
+                           f"„{two_opts(i, g, (g, w))[0]}“ oder „{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort."}]}
+            for i, (g, w) in enumerate(DLK_ITEMS[:n or len(DLK_ITEMS)])]
+
+
+def score_de_linking(item, reply):
+    r = score_de_eszett(item, {"content": strip_lead(reply["content"] or "")})  # one offered word, word-bounded
+    r["detail"] = {"ok_linked" if len(item["gold"]) > len(item["opts"][1]) else "ok_plain": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5383,6 +5406,7 @@ TASKS = {
     "de_adj_endings": task(("de",), load_de_adj_endings, score_de_adj_endings, 16, None, lang_check=False),
     "en_modal_perfect": task(("en",), load_en_modal_perfect, score_en_modal_perfect, 16, None, lang_check=False),
     "en_adj_order": task(("en",), load_en_adj_order, score_en_adj_order, 16, None, lang_check=False),
+    "de_linking": task(("de",), load_de_linking, score_de_linking, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

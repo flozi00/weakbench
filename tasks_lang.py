@@ -4256,7 +4256,7 @@ def load_en_tense_identify(lang, n, seed):
 
 def score_en_tense_identify(item, reply):
     t = re.sub(r"[-_]", " ", re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower())
-    t = re.sub(r"\b(?:not|nicht)\s+(?:the\s+)?[a-z ]+?(?=[,.;)]|$)", " ", t)
+    t = re.sub(r"\b(?:not|nicht)\s+(?:the\s+)?[a-z ]+?(?=[,.;)]|\s+(?:but|sondern|it is|it's)\b|$)", " ", t)  # "not X but Y"
     found = {k for k, al in ETI_ALIAS.items() for a in al if re.search(rf"\b{re.escape(a.replace('-', ' '))}\b", t)}
     # "present perfect continuous" also contains "present perfect": keep the longest match only
     found = {k for k in found if not any(k != o and k in o for o in found)}

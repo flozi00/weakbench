@@ -1054,6 +1054,7 @@ def test_en_tense_identify():
     pp = next(x for x in xs if x["gold"] == "present perfect")
     assert not tl.score_en_tense_identify(pp, {"content": "present perfect continuous"})["correct"]
     assert tl.score_en_tense_identify(pp, {"content": "Present perfect (not simple past)"})["correct"]
+    assert tl.score_en_tense_identify(pp, {"content": "Not simple past but present perfect"})["correct"]
 
 
 if __name__ == "__main__":

@@ -1306,6 +1306,50 @@ def score_conflict_summary(item, reply):
                        "faithful": float(faithful)}}
 
 
+# ---------------------------------------------------------------- concept_contrast (judge: two easily confused concepts)
+CC_PAIRS = {"en": [("weather", "climate"), ("correlation", "causation"), ("accuracy", "precision (of measurements)"),
+                   ("a virus", "a bacterium"), ("speed", "acceleration"), ("revenue", "profit"), ("mass", "weight"),
+                   ("an epidemic", "a pandemic"), ("inflation", "deflation"), ("a median", "a mean")],
+            "de": [("Wetter", "Klima"), ("Korrelation", "Kausalität"), ("Richtigkeit", "Präzision (von Messungen)"),
+                   ("ein Virus", "ein Bakterium"), ("Geschwindigkeit", "Beschleunigung"), ("Umsatz", "Gewinn"),
+                   ("Masse", "Gewichtskraft"), ("Epidemie", "Pandemie"), ("Inflation", "Deflation"), ("Median", "Mittelwert")]}
+CC_JUDGE = """The user asked for the difference between "{a}" and "{b}", with one everyday example for each, in at most 120 words.
+
+ANSWER:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Both concepts are defined correctly.
+2. Each example really illustrates its own concept (not the other one, not both).
+3. The key difference is stated explicitly, not only implied by the two definitions."""
+
+
+def load_concept_contrast(lang, n, seed):
+    tasks_judge.check_judge()
+    rows = CC_PAIRS[lang][:min(n or 10, 10)]
+    return [{"id": str(i), "lang": lang, "a": a, "b": b,
+             "messages": [{"role": "user", "content": (f"What is the difference between {a} and {b}? Give one everyday example for "
+                                                       "each. At most 120 words." if lang == "en" else
+                                                       f"Was ist der Unterschied zwischen {a} und {b}? Nenne für beides je ein "
+                                                       "Alltagsbeispiel. Höchstens 120 Wörter.")}]}
+            for i, (a, b) in enumerate(rows)]
+
+
+def score_concept_contrast(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len([w for w in text.split() if re.search(r"\w", w)])
+    out = tasks_judge.judge("", CC_JUDGE.format(a=item["a"], b=item["b"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable contrast verdict {out[:120]!r}")
+    met = [_yes(x) for x in v] + [words <= 120]
+    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": text[:160], "gold": None,
+            "detail": {"definitions_ok": float(met[0]), "examples_fit": float(met[1]), "contrast_explicit": float(met[2]),
+                       "within_limit": float(met[3])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1703,6 +1747,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "concept_contrast": {"langs": ("de", "en"), "load": load_concept_contrast, "score": score_concept_contrast,
+                              "think": False, "max_tokens": 384,
+                              "counts": {"quick": {"de": 10, "en": 10}, "full": {"de": None, "en": None}},
+                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "conflict_summary": {"langs": ("de", "en"), "load": load_conflict_summary, "score": score_conflict_summary,
                               "think": False, "max_tokens": 256,
                               "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},

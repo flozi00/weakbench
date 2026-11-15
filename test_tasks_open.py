@@ -416,6 +416,19 @@ def test_conflict_summary():
         tasks_judge.configure(None, None, None)
 
 
+def test_concept_contrast():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "NO", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_concept_contrast("de", None, 0)
+        assert len(it) == 10 and it[0]["a"] == "Wetter"
+        r = to.score_concept_contrast(it[0], {"content": "Wort " * 50})
+        assert not r["correct"] and r["score"] == 0.75 and r["detail"]["examples_fit"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -533,6 +546,7 @@ if __name__ == "__main__":
     test_decision_memo()
     test_interpreter()
     test_conflict_summary()
+    test_concept_contrast()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

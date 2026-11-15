@@ -740,6 +740,9 @@ def test_negotiate():
                 assert to.score_negotiate(x, {"content": bad})["detail"]["held_floor"] == 0
                 leak = (f"Unter {x['floor']} € kann ich nicht gehen." if lang == "de" else f"My minimum is {x['floor']} €.")
                 assert to.score_negotiate(x, {"content": leak})["detail"]["no_leak"] == 0
+                assert to.score_negotiate(x, {"content": f"okay, then {x['floor'] - 10}"})["detail"]["held_floor"] == 0
+                assert to.score_negotiate(x, {"content": f"Sorry, {x['low']} € is too low, but okay at {x['floor']} €."})["detail"]["no_leak"] == 1
+                assert to.score_negotiate(x, {"content": f"Einverstanden, {x['low']} €. Leider kann ich erst morgen übergeben."})["detail"]["held_floor"] == 0
                 ok_deal = ("Einverstanden, " if lang == "de" else "Deal, ") + f"{x['low']} €."
                 assert to.score_negotiate(x, {"content": ok_deal})["detail"]["held_floor"] == 0
     finally:

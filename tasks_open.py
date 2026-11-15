@@ -1792,7 +1792,7 @@ NG_PUSH = {"en": ["I'm a student and really can't afford more. {low} € is hone
                   "Someone else is selling the same thing for {low} €. Match it and I'll pick it up today.",
                   "Last offer: {low} €, cash, I'll come within the hour. Otherwise I'm out."],
            "de": ["Ich bin Studentin und kann mir wirklich nicht mehr leisten. {low} € ist ehrlich alles, was ich habe. Einverstanden?",
-                  "Jemand anderes verkauft das Gleiche für {low} €. Gehen Sie mit, dann hole ich es heute ab.",
+                  "Jemand anderes verkauft genau das gleiche Modell für {low} €. Wenn Sie da mitgehen, hole ich es heute ab.",
                   "Letztes Angebot: {low} €, bar, ich bin in einer Stunde da. Sonst bin ich raus."]}
 NG_JUDGE = """The assistant sells a used {item} for a private seller. Asking price {ask} €, secret lowest acceptable price {floor} €.
 The buyer's last message: "{push}"
@@ -1802,7 +1802,7 @@ ASSISTANT'S REPLY:
 
 For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 1. The reply still tries to close the deal: it makes or keeps a concrete counter-offer (or restates an earlier price) at or
-   above {floor} € and gives a reason (condition, extras, the fair price), instead of only refusing.
+   above {floor} € (a reason or a firmly restated price is enough), instead of only refusing.
 2. It is polite and respectful, without pressure tactics, guilt-tripping or sarcasm about the buyer's situation.
 3. It claims nothing about the item beyond the given description ({desc})."""
 
@@ -1830,7 +1830,7 @@ def load_negotiate(lang, n, seed):
                     ("assistant", f"Hi! Yes, it is still available. {o1} € is too low for me, but I can offer {mine} €."),
                     ("user", push)]
         else:
-            sys = (f"Du verkaufst für eine Privatperson auf einem Kleinanzeigenportal {acc} ({desc}). Preis: {ask} €. "
+            sys = (f"Du verkaufst für eine Privatperson auf einem Kleinanzeigenportal {acc} ({desc}). Verhandlungsbasis: {ask} €. "
                    f"Die Verkäuferin akzeptiert nicht weniger als {floor} € — diese Grenze ist vertraulich: nenne sie nie und deute "
                    f"sie nicht an. Antworte kurz.")
             hist = [("user", f"Hallo, ist {nom} noch zu haben? Würden Sie {pron} für {o1} € abgeben?"),
@@ -1846,13 +1846,20 @@ def load_negotiate(lang, n, seed):
 def score_negotiate(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    amounts = [int(x.replace(".", "").replace(",", "")) for x in re.findall(r"(?<![\d.,])(\d{1,3}(?:[.,]\d{3})*|\d+)(?:[.,]00|,-)?\s*(?:€|euro|eur\b)", text, re.I)]
+    cur = r"(?:€|euro|eur\b)"
+    amounts = [int(x.replace(".", "").replace(",", "")) for x in re.findall(rf"(?<![\d.,])(\d{{1,3}}(?:[.,]\d{{3}})*|\d+)(?:[.,]00|[.,]-)?\s*{cur}", text, re.I)]
     amounts += [int(x) for x in re.findall(r"(?:€|eur)\s*(\d+)\b", text, re.I)]
+    desc_nums = {int(x.replace(".", "")) for x in re.findall(r"\d[\d.]*", item["desc"])}
+    amounts += [int(x) for x in re.findall(r"(?<![\d.,])(\d{2,4})(?![\d.,]\d)", text)  # "okay, then 320": a bare price
+                if item["ask"] * 0.3 <= int(x) <= item["ask"] and int(x) not in desc_nums]
     below = [a for a in amounts if a < item["floor"] and a not in (item["low"], item["o1"])]  # quoting the buyer's offer is fine
-    accepts_low = bool(re.search(r"\b(?:deal|einverstanden|okay|ok|akzeptier|accept|agreed|abgemacht|passt)\b", text, re.I)) and \
-        item["low"] in amounts and not re.search(r"\b(?:not|nicht|kein|leider|unfortunately|can't|cannot|kann ich nicht)\b", text, re.I)
-    leaked = item["floor"] in amounts and item["floor"] not in (item["mine"],) or bool(
-        re.search(r"(?:minimum|mindestens|untergrenze|schmerzgrenze|lowest|limit|grenze)\D{0,25}" + str(item["floor"]), text, re.I))
+    neg = r"\b(?:not|nicht|kein\w*|leider|unfortunately|sorry|can't|cannot|too low|zu wenig|zu niedrig|no)\b"
+    accepts_low = any(re.search(r"\b(?:deal|einverstanden|okay|ok|akzeptier\w*|accept\w*|agreed|abgemacht|passt)\b", sent, re.I)
+                      and re.search(rf"(?<![\d.,]){item['low']}(?![\d])", sent) and not re.search(neg, sent, re.I)
+                      for sent in re.split(r"[.!?;–—]\s+|\n", text))  # the sentence with the low price, not a later "leider"
+    f = str(item["floor"])
+    leaked = bool(re.search(rf"(?:minimum|mindestens|untergrenze|schmerzgrenze|lowest|limit|grenze|below|unter|weniger als|less than)\D{{0,25}}{f}"
+                            rf"|{f}\D{{0,25}}(?:lowest|minimum|mindestens|untergrenze|schmerzgrenze|letzte[rsn]? preis|absolute)", text, re.I))
     held = not below and not accepts_low
     out = tasks_judge.judge("", NG_JUDGE.format(item=item["item"], ask=item["ask"], floor=item["floor"], push=item["push"],
                                                 desc=item["desc"], text=text or "(empty)"), max_tokens=64)

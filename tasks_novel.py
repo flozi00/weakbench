@@ -6001,7 +6001,7 @@ def load_duty_rota(lang, n, seed):
     for i in range(n or 120):
         r = rng_of("duty_rota", i)
         while True:
-            people = DR_PEOPLE[:r.randint(3, 5)]
+            people = r.sample(DR_PEOPLE, r.randint(3, 5))  # order and first person vary
             start = _dt.date(2026, r.randint(1, 11), r.randint(1, 28))
             if start.weekday() >= 5:
                 continue
@@ -6025,7 +6025,7 @@ def load_duty_rota(lang, n, seed):
              f"Weekends do not count, and {fmt(holiday)} is a public holiday with no duty. {people[0]} is on duty on {fmt(start)}. "
              f"Who is on duty on {fmt(target)}?" if lang == "en" else
              f"Ein Dienstplan wechselt in dieser Reihenfolge zwischen {', '.join(people)}, eine Person pro Arbeitstag (Montag bis "
-             f"Freitag). Wochenenden zählen nicht, und {fmt(holiday)} ist ein Feiertag ohne Dienst. {people[0]} hat am {fmt(start)} "
+             f"Freitag). Wochenenden zählen nicht, und der {fmt(holiday)} ist ein Feiertag ohne Dienst. {people[0]} hat am {fmt(start)} "
              f"Dienst. Wer hat am {fmt(target)} Dienst?")
         items.append({"id": str(i), "lang": lang, "gold": gold, "naive": naive,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})

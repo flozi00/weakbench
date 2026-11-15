@@ -2674,6 +2674,48 @@ def score_de_passive(item, reply):
                        "kept_accusative": float(item["obj"].lower() in t)}}
 
 
+# ---------------------------------------------------------------- en_usage (classic English usage traps, closed choice)
+EU_ITEMS = [("fewer_less", "There were ___ people at the meeting than last year.", ("fewer", "less"), "fewer"),
+            ("fewer_less", "We need ___ sugar in this recipe.", ("fewer", "less"), "less"),
+            ("fewer_less", "This checkout is for customers with ten items or ___ than ten items.", ("fewer", "less"), "fewer"),
+            ("fewer_less", "She earns ___ money than her brother.", ("fewer", "less"), "less"),
+            ("who_whom", "To ___ should I send the invoice?", ("who", "whom"), "whom"),
+            ("who_whom", "The woman ___ called yesterday is my aunt.", ("who", "whom"), "who"),
+            ("who_whom", "The man ___ we met at the station was a doctor.", ("who", "whom"), "whom"),
+            ("who_whom", "___ do you think will win?", ("Who", "Whom"), "Who"),
+            ("lie_lay", "I am tired; I will ___ down for an hour.", ("lie", "lay"), "lie"),
+            ("lie_lay", "Please ___ the book on the table.", ("lie", "lay"), "lay"),
+            ("lie_lay", "Yesterday the dog ___ in the sun all afternoon.", ("lay", "laid"), "lay"),
+            ("lie_lay", "Yesterday she ___ the baby in the cot.", ("lay", "laid"), "laid"),
+            ("i_me", "Between you and ___, the plan will fail.", ("I", "me"), "me"),
+            ("i_me", "My sister and ___ went to the cinema.", ("I", "me"), "I"),
+            ("i_me", "The manager invited Tom and ___ to lunch.", ("I", "me"), "me"),
+            ("i_me", "She is taller than ___ am.", ("I", "me"), "I"),
+            ("agreement", "Each of the students ___ a laptop.", ("has", "have"), "has"),
+            ("agreement", "Neither of the answers ___ correct.", ("is", "are"), "is"),
+            ("agreement", "The list of items ___ on the desk.", ("is", "are"), "is"),
+            ("agreement", "The number of complaints ___ increased.", ("has", "have"), "has"),
+            ("agreement", "A number of complaints ___ been made.", ("has", "have"), "have"),
+            ("agreement", "Everyone in the two teams ___ ready.", ("is", "are"), "is"),
+            ("fewer_less", "There are ___ cars on the road on Sundays.", ("fewer", "less"), "fewer"),
+            ("who_whom", "She is the colleague ___ I trust most.", ("who", "whom"), "whom")]
+
+
+def load_en_usage(lang, n, seed):
+    rows = EU_ITEMS[:min(n or len(EU_ITEMS), len(EU_ITEMS))]
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": opts, "kind": k,
+             "messages": [{"role": "user", "content": f"Fill the gap with {opts[0]} or {opts[1]} (formal written English). "
+                           f"Answer with that word only.\n\n{sent}"}]}
+            for i, (k, sent, opts, g) in enumerate(rows)]
+
+
+def score_en_usage(item, reply):
+    low = [o.lower() for o in item["opts"]]
+    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in low]
+    ok = len(set(w)) == 1 and w[0] == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2985,6 +3027,7 @@ TASKS = {
     "de_capitals": task(("de",), load_de_capitals, score_de_capitals, 96, 20, lang_check=False),
     "en_conditionals": task(("en",), load_en_conditionals, score_en_conditionals, 32, 24, lang_check=False),
     "de_passive": task(("de",), load_de_passive, score_de_passive, 64, 24, lang_check=False),
+    "en_usage": task(("en",), load_en_usage, score_en_usage, 16, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

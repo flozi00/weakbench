@@ -4647,6 +4647,8 @@ def load_coin_change(lang, n, seed):
             g, gr = _cc_dp(coins, amount), _cc_greedy(coins, amount)
             if (gr != g) == trap:
                 break
+        else:
+            raise RuntimeError(f"coin_change: no {'trap' if trap else 'control'} system for item {i}")
         cs = ", ".join(map(str, coins))
         q = (f"In a country the only coins are worth {cs} crowns (any number of each). What is the smallest number of coins "
              f"that add up to exactly {amount} crowns?" if lang == "en" else

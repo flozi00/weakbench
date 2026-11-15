@@ -2965,25 +2965,26 @@ def score_de_ersatzinfinitiv(item, reply):
 
 
 # ---------------------------------------------------------------- en_irregular (less common irregular verbs)
-EI_VERBS = [("swim", "swam", "swum"), ("forbid", "forbade", "forbidden"), ("wring", "wrung", "wrung"), ("seek", "sought", "sought"),
-            ("stride", "strode", "stridden"), ("forsake", "forsook", "forsaken"), ("tread", "trod", "trodden"),
-            ("undergo", "underwent", "undergone"), ("foresee", "foresaw", "foreseen"), ("shrink", "shrank", "shrunk"),
-            ("spring", "sprang", "sprung"), ("weave", "wove", "woven"), ("arise", "arose", "arisen"), ("cling", "clung", "clung"),
-            ("withdraw", "withdrew", "withdrawn"), ("overtake", "overtook", "overtaken"), ("sink", "sank", "sunk"),
-            ("bear", "bore", "borne"), ("mislead", "misled", "misled"), ("sting", "stung", "stung")]
-EI_FRAMES = [("Yesterday she ___ ({v}) without hesitation.", 1), ("By then they had already ___ ({v}).", 2)]
+EI_VERBS = [("swim", "swam", "swum", "across the lake"), ("forbid", "forbade", "forbidden", "the trip"),
+            ("wring", "wrung", "wrung", "the wet towel"), ("seek", "sought", "sought", "advice"),
+            ("forsake", "forsook", "forsaken", "her old plans"), ("tread", "trod", "trodden", "on the fresh paint"),
+            ("undergo", "underwent", "undergone", "the operation"), ("foresee", "foresaw", "foreseen", "the problem"),
+            ("weave", "wove", "woven", "a basket"), ("bite", "bit", "bitten", "into the apple"), ("cling", "clung", "clung", "to the rope"),
+            ("withdraw", "withdrew", "withdrawn", "her application"), ("overtake", "overtook", "overtaken", "the truck"),
+            ("bear", "bore", "borne", "the pain"), ("mislead", "misled", "misled", "the jury"), ("forgive", "forgave", "forgiven", "her brother")]
+EI_FRAMES = [("Yesterday she ___ ({v}) {t}.", 1), ("By then she had already ___ ({v}) {t}.", 2)]
 
 
 def load_en_irregular(lang, n, seed):
     items = []
-    for i in range(min(n or 40, 40)):
-        base, past, part = EI_VERBS[i % 20]
-        frame, form = EI_FRAMES[i // 20]
+    for i in range(min(n or 32, 32)):
+        base, past, part, tail = EI_VERBS[i % 16]
+        frame, form = EI_FRAMES[i // 16]
         gold = (past, part)[form - 1]
         other = (past, part)[2 - form]
         items.append({"id": str(i), "lang": "en", "gold": gold, "other": other, "regular": base.rstrip("e") + "ed", "form": form,
                       "messages": [{"role": "user", "content": "Fill the gap with the correct form of the verb in brackets "
-                                    "(standard written English). Answer with that word only.\n\n" + frame.format(v=base)}]})
+                                    "(standard written English). Answer with that word only.\n\n" + frame.format(v=base, t=tail)}]})
     return items
 
 
@@ -3319,7 +3320,7 @@ TASKS = {
     "de_prefix_meaning": task(("de",), load_de_prefix_meaning, score_de_prefix_meaning, 16, 16, lang_check=False),
     "en_hyphens": task(("en",), load_en_hyphens, score_en_hyphens, 16, 20, lang_check=False),
     "de_ersatzinfinitiv": task(("de",), load_de_ersatzinfinitiv, score_de_ersatzinfinitiv, 96, 20, lang_check=False),
-    "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 40, lang_check=False),
+    "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 32, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

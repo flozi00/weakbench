@@ -2518,10 +2518,8 @@ def load_de_konj2(lang, n, seed):
         r = random.Random(f"de_konj2:{i}")
         pers, verb = persons[i % 6], verbs[(i // 6) % 5]
         main = r.choice(K2_MAIN)
-        subj = {"er": "er", "sie": "sie"}.get(pers, pers)
+        subj = "die beiden" if pers == "sie" else pers  # bare "sie" could be singular: hätte/würde would fit too
         obj, inf = main.rsplit(" ", 1)
-        if pers in ("ich",) and "dich" not in main and "dir" not in main:
-            pass
         if pers == "du":
             obj = obj.replace("dich", "mich").replace("dir", "mir")
         sent = f"Wenn {subj} {K2_COND[verb]}, ___ {subj} {obj} {inf}."

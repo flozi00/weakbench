@@ -7944,12 +7944,12 @@ def load_seat_pairs(lang, n, seed):
         first = r.randint(1, 30)
         lines = "\n".join(f"{first + k:>2}  {' '.join('X' if t else '.' for t in row[:3])}   {' '.join('X' if t else '.' for t in row[3:])}"
                            for k, row in enumerate(grid))
-        q = (f"Seat map of a small plane (X = taken, . = free). Each row has seats A B C | aisle | D E F:\n     A B C   D E F\n{lines}\n"
+        q = (f"Seat map of a small plane (X = taken, . = free). Each row has seats A B C | aisle | D E F:\n    A B C   D E F\n{lines}\n"
              f"Two people want to sit directly next to each other in the same row; seats across the aisle (C and D) are NOT next "
              f"to each other. How many different pairs of free side-by-side seats are there? (In a row with A, B and C free, A-B "
              f"and B-C are two pairs.)" if lang == "en" else
              f"Sitzplan eines kleinen Flugzeugs (X = belegt, . = frei). Jede Reihe hat die Plätze A B C | Gang | D E F:\n"
-             f"     A B C   D E F\n{lines}\nZwei Personen wollen direkt nebeneinander in derselben Reihe sitzen; Plätze über "
+             f"    A B C   D E F\n{lines}\nZwei Personen wollen direkt nebeneinander in derselben Reihe sitzen; Plätze über "
              f"den Gang hinweg (C und D) gelten NICHT als nebeneinander. Wie viele verschiedene Paare freier, nebeneinander "
              f"liegender Plätze gibt es? (Sind in einer Reihe A, B und C frei, sind A-B und B-C zwei Paare.)")
         items.append({"id": str(i), "lang": lang, "gold": pairs, "bait": pairs + aisle,

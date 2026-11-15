@@ -3343,15 +3343,25 @@ def score_en_gerund_inf(item, reply):
 
 # ---------------------------------------------------------------- mirror_language (reply in the customer's language)
 ML_MSGS = {"fr": ["Bonjour, ma commande n'est pas encore arrivée. Pouvez-vous me dire où elle se trouve ? Merci.",
-                  "Bonjour, je voudrais changer l'adresse de livraison de ma commande. Est-ce que c'est encore possible ?"],
+                  "Bonjour, je voudrais changer l'adresse de livraison de ma commande. Est-ce que c'est encore possible ?",
+                  "Bonjour, la lampe que j'ai reçue est cassée. Que dois-je faire ?",
+                  "Bonjour, j'ai renvoyé un article il y a deux semaines. Quand vais-je être remboursé ?"],
            "es": ["Hola, mi pedido todavía no ha llegado. ¿Me pueden decir dónde está? Gracias.",
-                  "Hola, quiero cambiar la dirección de envío de mi pedido. ¿Todavía es posible?"],
+                  "Hola, quiero cambiar la dirección de envío de mi pedido. ¿Todavía es posible?",
+                  "Hola, la lámpara que recibí está rota. ¿Qué tengo que hacer?",
+                  "Hola, devolví un artículo hace dos semanas. ¿Cuándo me devuelven el dinero?"],
            "it": ["Buongiorno, il mio ordine non è ancora arrivato. Potete dirmi dove si trova? Grazie.",
-                  "Buongiorno, vorrei cambiare l'indirizzo di consegna del mio ordine. È ancora possibile?"],
+                  "Buongiorno, vorrei cambiare l'indirizzo di consegna del mio ordine. È ancora possibile?",
+                  "Buongiorno, la lampada che ho ricevuto è rotta. Cosa devo fare?",
+                  "Buongiorno, ho restituito un articolo due settimane fa. Quando riceverò il rimborso?"],
            "nl": ["Hallo, mijn bestelling is nog niet aangekomen. Kunt u mij zeggen waar die is? Dank u.",
-                  "Hallo, ik wil het afleveradres van mijn bestelling wijzigen. Is dat nog mogelijk?"],
+                  "Hallo, ik wil het afleveradres van mijn bestelling wijzigen. Is dat nog mogelijk?",
+                  "Hallo, de lamp die ik heb ontvangen is kapot. Wat moet ik doen?",
+                  "Hallo, ik heb twee weken geleden een artikel teruggestuurd. Wanneer krijg ik mijn geld terug?"],
            "pl": ["Dzień dobry, moje zamówienie jeszcze nie dotarło. Czy mogą Państwo powiedzieć, gdzie jest? Dziękuję.",
-                  "Dzień dobry, chciałbym zmienić adres dostawy mojego zamówienia. Czy to jeszcze możliwe?"]}
+                  "Dzień dobry, chciałbym zmienić adres dostawy mojego zamówienia. Czy to jeszcze możliwe?",
+                  "Dzień dobry, lampa, którą otrzymałem, jest zepsuta. Co mam zrobić?",
+                  "Dzień dobry, dwa tygodnie temu odesłałem produkt. Kiedy otrzymam zwrot pieniędzy?"]}
 ML_WORDS = {"fr": {"le", "la", "les", "de", "des", "du", "votre", "vous", "nous", "est", "et", "pour", "une", "un", "que", "commande",
                    "bonjour", "merci", "livraison", "adresse", "jours", "pouvez", "sera", "avec", "cordialement", "possible", "encore"},
             "es": {"el", "la", "los", "las", "su", "de", "que", "y", "es", "para", "pedido", "usted", "hola", "una", "por", "le", "gracias",
@@ -3381,13 +3391,15 @@ def _ml_lang(text):
 def load_mirror_language(lang, n, seed):
     sys_ = ("Du bist der Kundenservice von „Lumora“, einem Onlineshop für Lampen. Antworte immer in der Sprache, in der der Kunde "
             "schreibt. Bestellungen werden innerhalb von 3–5 Werktagen geliefert; Adressänderungen sind möglich, solange die "
-            "Bestellung noch nicht versandt ist." if lang == "de" else
+            "Bestellung noch nicht versandt ist. Defekte Artikel werden kostenlos ersetzt; Erstattungen kommen innerhalb von 5 "
+            "Werktagen nach Eingang der Rücksendung." if lang == "de" else
             "You are customer support for 'Lumora', an online shop for lamps. Always reply in the language the customer writes in. "
-            "Orders are delivered within 3-5 working days; address changes are possible as long as the order has not shipped yet.")
+            "Orders are delivered within 3-5 working days; address changes are possible as long as the order has not shipped yet. "
+            "Broken items are replaced free of charge; refunds arrive within 5 working days after the return is received.")
     items = []
-    for i in range(min(n or 10, 10)):
+    for i in range(min(n or 20, 20)):
         target = list(ML_MSGS)[i % 5]
-        msg = ML_MSGS[target][(i // 5) % 2]
+        msg = ML_MSGS[target][i // 5]
         items.append({"id": str(i), "lang": lang, "target": target,
                       "messages": [{"role": "system", "content": sys_}, {"role": "user", "content": msg}]})
     return items
@@ -3731,7 +3743,7 @@ TASKS = {
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
-    "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 10, lang_check=False),
+    "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

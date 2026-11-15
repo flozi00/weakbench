@@ -9249,6 +9249,31 @@ def score_country_currency(item, reply):
     return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- leap_days (count leap years in a range: the century rule)
+def load_leap_days(lang, n, seed):
+    items = []
+    leap = lambda y: y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)  # noqa: E731
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("leap_days", i, att)
+        while True:
+            a = r.randrange(1601, 2400)
+            b = a + r.randint(40, 450)
+            gold = sum(leap(y) for y in range(a, b + 1))
+            naive = sum(y % 4 == 0 for y in range(a, b + 1))  # every 4th year, the century rule forgotten
+            if gold != naive:
+                break
+        q = (f"In the Gregorian calendar, how many leap years are there from the year {a} to the year {b}, both included?" if lang == "en"
+             else f"Wie viele Schaltjahre gibt es im gregorianischen Kalender vom Jahr {a} bis zum Jahr {b}, beide eingeschlossen?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": naive, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_leap_days(item, reply):
+    v = stated_int(reply, r"(?:leap|schalt)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"forgot_century_rule": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10862,6 +10887,7 @@ TASKS = {
     "country_facts": task(load_country_facts, score_country_facts, 24, 120),
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
+    "leap_days": task(load_leap_days, score_leap_days, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

@@ -2061,3 +2061,16 @@ def test_country_currency():
 
 if __name__ == "__main__":
     test_country_currency()
+
+
+def test_leap_days():
+    import tasks_novel as tn
+    xs = tn.load_leap_days("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120 and all(x["gold"] != x["bait"] for x in xs)
+    x = xs[0]
+    for c in (f"Antwort: {x['gold']} Schaltjahre", f"Antwort: {x['gold']}", f"Antwort: {x['bait']} - 1 = {x['gold']}"):
+        assert tn.score_leap_days(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_leap_days()

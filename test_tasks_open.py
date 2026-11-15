@@ -831,6 +831,9 @@ def test_transcript_clean():
         bad = good.replace(f"um {x['right']} Uhr", f"um {x['wrong']} Uhr")
         assert to.score_transcript_clean(x, {"content": bad})["detail"]["facts_corrected"] == 0
         assert to.score_transcript_clean(x, {"content": good + " Ähm, danke."})["detail"]["no_fillers"] == 0
+        for tm in (f"{int(x['right']):02d}.00 Uhr", f"{int(x['right']):02d}:00"):
+            alt = good.replace(f"um {x['right']} Uhr", "um " + tm)
+            assert to.score_transcript_clean(x, {"content": alt})["detail"]["facts_corrected"] == 1, alt
         e = to.load_transcript_clean("en", None, 0)[0]
         h = int(e["right"])
         ok = f"{e['surname']} says the meeting on {e['day']} is at {h} {'am' if 'am' in e['src'].split('wait, at')[1][:8] else 'pm'} in room {e['room']}; please bring the contracts."

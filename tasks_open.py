@@ -2110,7 +2110,7 @@ def score_rule_explain(item, reply):
 # A generated voicemail transcript with fillers (ähm, also, halt, sozusagen / um, like, you know), a false start, a
 # repetition and a self-correction ("um drei, nein, um vier"). The clean written version must drop the fillers and keep
 # only the corrected fact (code), and read as natural written language (judge).
-TCL_NAMES = ["Frau Becker", "Herr Yıldız", "Frau Nowak", "Herr Lindqvist", "Frau Haddad", "Herr Okafor"]
+TCL_NAMES = ["Frau Becker", "Herr Demir", "Frau Nowak", "Herr Lindqvist", "Frau Haddad", "Herr Okafor"]
 TCL_FILL = {"de": ["ähm", "äh", "also", "halt", "sozusagen", "quasi"], "en": ["um", "uh", "like", "you know", "basically", "sort of"]}
 TCL_JUDGE = """VOICEMAIL TRANSCRIPT (spoken, messy):
 {src}
@@ -2130,7 +2130,7 @@ def load_transcript_clean(lang, n, seed):
     items = []
     for i in range(n or 16):
         r = random.Random(f"transcript_clean:{i}")
-        name = TCL_NAMES[i % 6]
+        name = TCL_NAMES[i % 6] if lang == "de" else TCL_NAMES[i % 6].replace("Frau", "Ms").replace("Herr", "Mr")
         wrong_h, right_h = r.sample([9, 10, 11, 14, 15, 16], 2)
         room, day = r.choice(["2.14", "3.05", "1.20", "4.11"]), r.choice(["Dienstag", "Mittwoch", "Donnerstag"] if lang == "de" else ["Tuesday", "Wednesday", "Thursday"])
         f = TCL_FILL[lang]
@@ -2157,8 +2157,9 @@ def score_transcript_clean(item, reply):
     text = (reply["content"] or "").strip()
     low = text.lower()
     fills = [w for w in TCL_FILL[item["lang"]] if w not in ("also", "like") and re.search(rf"(?<!\w){re.escape(w)}(?!\w)", low)]
-    hrs = re.findall(r"(?<![\d.])(\d{1,2})(?::\d{2})?\s*(?:uhr|am|pm|a\.m\.|p\.m\.|o'clock)", low)
-    facts = (item["right"] in hrs and item["wrong"] not in hrs and item["room"] in text and item["day"].lower() in low
+    hrs = {int(h) for h in re.findall(r"(?<![\d.])(\d{1,2})(?:[:.]\d{2})?\s*(?:uhr|am|pm|a\.m\.|p\.m\.|o'clock)", low)}
+    hrs |= {int(h) for h in re.findall(r"(?<![\d.])(\d{1,2}):\d{2}\b", low)}  # "um 16:00." without a unit; rooms use dots
+    facts = (int(item["right"]) in hrs and int(item["wrong"]) not in hrs and item["room"] in text and item["day"].lower() in low
              and item["surname"].lower() in low)
     out = tasks_judge.judge("", TCL_JUDGE.format(src=item["src"], text=text or "(empty)",
                                                  language="German" if item["lang"] == "de" else "English"), max_tokens=64)

@@ -4601,7 +4601,7 @@ PK_ITEMS = [("Die Tür [wird] jeden Morgen um acht [geöffnet].", "Vorgangspassi
             ("Der Brief [wurde] von ihr [unterschrieben].", "Vorgangspassiv"),
             ("Die Tür [ist] schon [geöffnet].", "Zustandspassiv"), ("Der Tisch [ist] für vier Personen [gedeckt].", "Zustandspassiv"),
             ("Das Geschäft [ist] sonntags [geschlossen].", "Zustandspassiv"), ("Die Rechnung [ist] bereits [bezahlt].", "Zustandspassiv"),
-            ("Das Fenster [war] den ganzen Tag [gekippt].", "Zustandspassiv"),
+            ("Die Tür [war] den ganzen Tag [abgeschlossen].", "Zustandspassiv"),
             ("Der Zug [ist] pünktlich [abgefahren].", "Perfekt Aktiv"), ("Sie [ist] nach Berlin [gezogen].", "Perfekt Aktiv"),
             ("Das Kind [ist] eingeschlafen.".replace("eingeschlafen", "[eingeschlafen]"), "Perfekt Aktiv"),
             ("Wir [sind] gestern lange [gewandert].", "Perfekt Aktiv"), ("Der Schnee [ist] über Nacht [geschmolzen].", "Perfekt Aktiv")]
@@ -4618,13 +4618,15 @@ def load_de_passive_kind(lang, n, seed):
 
 def score_de_passive_kind(item, reply):
     t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
-    t = re.sub(r"\b(?:nicht|kein\w*)\s+(?:(?:das|der|ein)\s+)?[\w-]+", " ", t)
+    t = re.sub(r"partizip\s+(?:ii|2|perfekt)|perfektpartizip|plusquamperfekt", " # ", t)  # "sein + Partizip Perfekt" names no label
+    # a negated label and labels coordinated with it ("nicht Vorgangspassiv oder Perfekt Aktiv")
+    t = re.sub(r"\b(?:nicht|kein\w*)\s+(?:(?:das|der|ein)\s+)?[\w-]+(?:\s+aktiv)?(?:\s+(?:oder|und)\s+[\w-]+(?:\s+aktiv)?)*", " ", t)
     found = set()
     for k in ("Vorgangspassiv", "Zustandspassiv", "Perfekt Aktiv"):
         for a in PK_LABELS[k]:
-            if a in t:
+            if re.search(rf"(?<![a-zäöü]){re.escape(a)}(?![a-zäöü])", t):
                 found.add(k)
-                t = t.replace(a, " ")
+                t = re.sub(rf"(?<![a-zäöü]){re.escape(a)}(?![a-zäöü])", " ", t)
     ok = found == {item["gold"]}
     return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {f"ok_{item['gold'].split()[0].lower()}": float(ok)}}
 

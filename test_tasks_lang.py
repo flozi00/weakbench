@@ -1188,6 +1188,10 @@ def test_de_passive_kind():
     z = next(x for x in xs if x["gold"] == "Zustandspassiv")
     assert tl.score_de_passive_kind(z, {"content": "Zustandspassiv, nicht Vorgangspassiv"})["correct"]
     assert not tl.score_de_passive_kind(z, {"content": "Perfekt Aktiv"})["correct"]
+    assert tl.score_de_passive_kind(z, {"content": "Zustandspassiv: sein + Partizip Perfekt"})["correct"]
+    assert tl.score_de_passive_kind(z, {"content": "Zustandspassiv, nicht Vorgangspassiv oder Perfekt Aktiv"})["correct"]
+    p = next(x for x in xs if x["gold"] == "Perfekt Aktiv")
+    assert not tl.score_de_passive_kind(p, {"content": "Plusquamperfekt"})["correct"]
 
 
 if __name__ == "__main__":

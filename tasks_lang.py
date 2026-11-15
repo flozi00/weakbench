@@ -3352,20 +3352,30 @@ ML_MSGS = {"fr": ["Bonjour, ma commande n'est pas encore arrivée. Pouvez-vous m
                   "Hallo, ik wil het afleveradres van mijn bestelling wijzigen. Is dat nog mogelijk?"],
            "pl": ["Dzień dobry, moje zamówienie jeszcze nie dotarło. Czy mogą Państwo powiedzieć, gdzie jest? Dziękuję.",
                   "Dzień dobry, chciałbym zmienić adres dostawy mojego zamówienia. Czy to jeszcze możliwe?"]}
-ML_WORDS = {"fr": {"le", "la", "les", "de", "des", "votre", "vous", "nous", "est", "et", "pour", "une", "un", "que", "commande", "bonjour"},
-            "es": {"el", "la", "los", "su", "de", "que", "y", "es", "para", "pedido", "usted", "hola", "una", "por", "le"},
-            "it": {"il", "la", "di", "che", "e", "è", "per", "suo", "ordine", "un", "una", "buongiorno", "le", "della", "non"},
-            "nl": {"de", "het", "een", "uw", "u", "is", "en", "van", "dat", "bestelling", "wij", "niet", "met", "voor", "hallo"},
-            "pl": {"i", "w", "na", "nie", "się", "jest", "że", "to", "zamówienie", "państwa", "pan", "pani", "dzień", "dobry", "z"},
-            "de": {"der", "die", "das", "und", "ist", "nicht", "sie", "ihre", "wir", "bestellung", "mit", "für", "ein", "eine"},
-            "en": {"the", "and", "is", "your", "you", "we", "order", "to", "of", "for", "not", "a", "with", "it"}}
+ML_WORDS = {"fr": {"le", "la", "les", "de", "des", "du", "votre", "vous", "nous", "est", "et", "pour", "une", "un", "que", "commande",
+                   "bonjour", "merci", "livraison", "adresse", "jours", "pouvez", "sera", "avec", "cordialement", "possible", "encore"},
+            "es": {"el", "la", "los", "las", "su", "de", "que", "y", "es", "para", "pedido", "usted", "hola", "una", "por", "le", "gracias",
+                   "envío", "dirección", "días", "puede", "todavía", "saludos", "llegará", "con", "posible"},
+            "it": {"il", "la", "di", "che", "e", "è", "per", "suo", "ordine", "un", "una", "buongiorno", "le", "della", "non", "gentile",
+                   "cliente", "consegna", "giorni", "possiamo", "si", "può", "ci", "cordiali", "saluti", "indirizzo", "grazie", "salve",
+                   "certo", "sì", "ancora", "lavorativi", "entro"},
+            "nl": {"de", "het", "een", "uw", "u", "is", "en", "van", "dat", "bestelling", "wij", "niet", "met", "voor", "hallo", "beste",
+                   "klant", "pakket", "komt", "binnen", "vriendelijke", "groet", "werkdagen", "kunnen", "nog", "adres", "aan", "dank"},
+            "pl": {"i", "w", "na", "nie", "się", "sie", "jest", "że", "ze", "to", "zamówienie", "zamowienie", "państwa", "panstwa", "pan",
+                   "pana", "pani", "dzień", "dzien", "dobry", "z", "za", "dziękujemy", "dziekujemy", "przesyłka", "przesylka", "dni",
+                   "roboczych", "pozdrawiamy", "ciągu", "ciagu", "dotrze", "zostanie", "adres", "kontakt", "wiadomość", "wiadomosc"},
+            "ca": {"gràcies", "pel", "seva", "comanda", "arribarà", "dies", "els", "amb", "adreça", "missatge", "bon", "dia"},
+            "pt": {"obrigado", "obrigada", "sua", "encomenda", "pedido", "dias", "úteis", "não", "você", "olá", "endereço", "chegará"},
+            "de": {"der", "die", "das", "und", "ist", "nicht", "sie", "ihre", "wir", "bestellung", "mit", "für", "ein", "eine", "werktagen"},
+            "en": {"the", "and", "is", "your", "you", "we", "order", "to", "of", "for", "not", "a", "with", "it", "days", "thank"}}
 
 
 def _ml_lang(text):
     words = re.findall(r"[a-zàâäçèéêëîïôöûüùñóíúąćęłńśźżß']+", text.lower())
     score = {k: sum(w in v for w in words) for k, v in ML_WORDS.items()}
-    best = max(score, key=score.get)
-    return best if score[best] >= 3 else None
+    ranked = sorted(score, key=score.get, reverse=True)
+    best, second = ranked[0], ranked[1]
+    return best if score[best] >= 3 and score[best] > score[second] else None  # ca / pt are listed so they do not count as es
 
 
 def load_mirror_language(lang, n, seed):

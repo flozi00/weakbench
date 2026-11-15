@@ -7490,15 +7490,15 @@ def load_dilution(lang, n, seed):
         ps, qs = (f"{p}", f"{q}")
         vs = f"{v}"
         if water:
-            q_ = (f"You have {vs} litres of a juice concentrate with {ps} % fruit content. How many litres of water must you add to get "
-                  f"a drink with {qs} % fruit content?" if lang == "en" else
-                  f"Du hast {vs} Liter Saftkonzentrat mit {ps} % Fruchtanteil. Wie viele Liter Wasser musst du hinzufügen, damit ein "
-                  f"Getränk mit {qs} % Fruchtanteil entsteht?")
+            q_ = (f"You have {vs} litres of a fruit drink with {ps} % juice content. How many litres of water must you add to get "
+                  f"a drink with {qs} % juice content?" if lang == "en" else
+                  f"Du hast {vs} Liter Fruchtsaftgetränk mit {ps} % Saftanteil. Wie viele Liter Wasser musst du hinzufügen, damit ein "
+                  f"Getränk mit {qs} % Saftanteil entsteht?")
         else:
-            q_ = (f"You have {vs} litres of a cleaning solution with {ps} % vinegar. How many litres of pure vinegar must you add to get "
-                  f"{qs} % vinegar?" if lang == "en" else
-                  f"Du hast {vs} Liter Reinigungslösung mit {ps} % Essig. Wie viele Liter reinen Essig musst du hinzufügen, damit "
-                  f"die Lösung {qs} % Essig enthält?")
+            q_ = (f"You have {vs} litres of a cleaning solution with {ps} % alcohol (by volume). How many litres of pure alcohol must "
+                  f"you add to get {qs} % alcohol?" if lang == "en" else
+                  f"Du hast {vs} Liter Reinigungslösung mit {ps} Vol.-% Alkohol. Wie viele Liter reinen Alkohol musst du hinzufügen, "
+                  f"damit die Lösung {qs} Vol.-% Alkohol enthält?")
         items.append({"id": str(i), "lang": lang, "gold": float(gold), "bait": float(total), "water": water,
                       "messages": [{"role": "user", "content": q_ + "\n" + ASK[lang]}]})
     return items
@@ -7506,7 +7506,10 @@ def load_dilution(lang, n, seed):
 
 def score_dilution(item, reply):
     fa = result_side(final_answer(reply["content"]) or "")
-    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:l|litres?|liters?|liter)\b", fa, re.I)
+    fa = re.sub(r"\([^()]*\)", " ", fa)
+    unit = r"(\d+(?:[.,]\d+)?)\s*(?:l|litres?|liters?|liter)\b"
+    added = re.search(unit + r"\s*(?:of\s+)?(?:reinen?\s+|pure\s+)?(?:wasser|water|alkohol|alcohol)", fa, re.I)  # the amount added
+    m = added or re.search(unit, fa, re.I)
     v = float(m[1].replace(",", ".")) if m else answer_value(fa, item["lang"])
     near = lambda x: v is not None and abs(v - x) <= 0.01  # noqa: E731
     return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],

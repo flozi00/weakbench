@@ -2323,22 +2323,28 @@ TP_MON_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "Augu
 TP_EN = [("at", lambda r: f"{r.randint(1, 12)} pm"), ("on", lambda r: r.choice(TP_DAYS_EN)),
          ("in", lambda r: r.choice(TP_MON_EN)), ("in", lambda r: str(r.randint(1990, 2023))),
          ("on", lambda r: f"{r.randint(2, 28)} {r.choice(TP_MON_EN)}"), ("at", lambda r: f"{r.randint(1, 12)}:30"),
-         ("in", lambda r: r.choice(["the morning", "the afternoon", "the evening"])),
+         ("in", lambda r: f"the {r.choice(['first', 'second', 'last'])} week of {r.choice(TP_MON_EN)}"),
          ("on", lambda r: f"{r.choice(TP_DAYS_EN)} {r.choice(['morning', 'afternoon', 'evening'])}")]
 TP_DE = [("um", lambda r: f"{r.randint(1, 12)} Uhr"), ("am", lambda r: r.choice(TP_DAYS_DE)),
          ("im", lambda r: r.choice(TP_MON_DE)), ("im", lambda r: f"Jahr {r.randint(1990, 2023)}"),
          ("am", lambda r: f"{r.randint(2, 28)}. {r.choice(TP_MON_DE)}"), ("in", lambda r: f"der Nacht zum {r.choice(TP_DAYS_DE)}"),
-         ("am", lambda r: r.choice(["Morgen", "Vormittag", "Nachmittag", "Abend"])), ("um", lambda r: f"halb {r.randint(2, 12)}")]
+         ("am", lambda r: r.choice(TP_DAYS_DE) + r.choice(["morgen", "vormittag", "nachmittag", "abend"])),
+         ("um", lambda r: f"halb {r.randint(2, 12)}")]
 TP_FRAME = {"en": "The meeting with Clara takes place ___ {t}.", "de": "Das Treffen mit Clara findet ___ {t} statt."}
 
 
 def load_time_prep(lang, n, seed):
     items = []
     table = TP_EN if lang == "en" else TP_DE
-    for i in range(n or 80):
+    seen = set()
+    for i in range(min(n or 56, 56)):  # 8 kinds x 7 distinct fillers, dealt round-robin: every gold equally often per kind
         r = random.Random(f"time_prep:{i}")
         gold, gen = table[i % len(table)]
-        sent = TP_FRAME[lang].format(t=gen(r))
+        t = gen(r)
+        while t in seen:
+            t = gen(r)
+        seen.add(t)
+        sent = TP_FRAME[lang].format(t=t)
         ask = ("Fill the gap with at, on or in. Answer with that word only.\n\n" if lang == "en" else
                "Setze um, am, im oder in in die Lücke ein. Antworte nur mit dem Wort.\n\n")  # closed choice: one answer
         items.append({"id": str(i), "lang": lang, "gold": gold, "kind": i % len(table),
@@ -3202,7 +3208,7 @@ TASKS = {
 _FEW = {'percent_traps', 'en_produce', 'polyglot_switch', 'sys_adherence', 'form_writing', 'de_no_anglicisms',
         'agreement_attractor', 'prop_logic', 'counterfactual_world'}
 _QUICK_CAP = {'en_produce': 40}
-for _name in ['en_produce', 'de_produce', 'polyglot_switch', 'sys_adherence', 'wordplay', 'de_verbs', 'agreement_attractor', 'form_writing', 'de_no_anglicisms', 'de_grammar_fix', 'time_prep']:
+for _name in ['en_produce', 'de_produce', 'polyglot_switch', 'sys_adherence', 'wordplay', 'de_verbs', 'agreement_attractor', 'form_writing', 'de_no_anglicisms', 'de_grammar_fix']:
     _t = TASKS[_name]
     _full = {k: v if v and _name not in _FEW else None for k, v in _t["counts"]["full"].items()}  # all distinct if fewer
     _quick = {k: min(v, _QUICK_CAP.get(_name, v)) if v else v for k, v in _t["counts"]["quick"].items()}

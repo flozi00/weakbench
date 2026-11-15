@@ -7639,7 +7639,9 @@ def load_risk_stats(lang, n, seed):
 
 
 def score_risk_stats(item, reply):
-    v = answer_value(result_side(re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")), item["lang"])
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    head = re.split(r"[;,]\s*(?:i\.e\.|d\.h\.|that is|also|so|and|und)?", fa)[0]  # "2.5 pp, i.e. RRR = 50 %": the stated figure
+    v = answer_value(result_side(head if re.search(r"\d", head) else fa), item["lang"])
     tol = 0 if item["kind"] == "nnt" else 0.1
     near = lambda x: v is not None and x is not None and abs(v - x) <= tol + 1e-9  # noqa: E731
     return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],

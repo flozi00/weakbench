@@ -1570,9 +1570,21 @@ def load_risk_explain(lang, n, seed):
 def score_risk_explain(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    nums = [float(x.replace(",", ".")) for x in re.findall(r"\d+(?:[.,]\d+)?", text)]
-    absolute = any(abs(x - item["arr_1000"]) <= 0.6 or abs(x - item["arr_1000"] / 10) <= 0.06 for x in nums)  # per 1000 or per 100
-    arr_txt = f"{item['arr_1000']:g} per 1000 people ({(item['c'] - item['t']) / item['N'] * 100:.2f} percentage points)"
+    # the absolute benefit stated as such: a number next to "fewer/weniger" and a per-100/1000 base, or "percentage points"
+    low = text.lower().replace("1.000", "1000").replace("1,000", "1000")
+    absolute = False
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)", low):
+        x = float(m[1].replace(",", "."))
+        ctx = low[max(0, m.start() - 60):m.end() + 60]
+        fewer = re.search(r"weniger|fewer|less|vermied|prevent|verhinder|reduction|reduktion", ctx)
+        if re.search(r"prozentpunkt|percentage point", low[m.end():m.end() + 25]) and abs(x - item["arr_1000"] / 10) <= 0.06:
+            absolute = True
+        elif fewer and re.search(r"(?:von|per|of|pro|out of|in|unter|je)\s+(?:je\s+)?1000\b", ctx) and abs(x - item["arr_1000"]) <= 0.6:
+            absolute = True
+        elif fewer and re.search(r"(?:von|per|of|pro|out of|in|unter|je)\s+100\b", ctx) and abs(x - item["arr_1000"] / 10) <= 0.06:
+            absolute = True
+    arr_exact = (item["c"] - item["t"]) / item["N"]
+    arr_txt = f"{arr_exact * 1000:g} per 1000 people ({arr_exact * 100:g} percentage points)"
     out = tasks_judge.judge("", RX_JUDGE.format(N=item["N"], t=item["t"], c=item["c"], arr_txt=arr_txt, rrr=item["rrr"],
                                                 text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)

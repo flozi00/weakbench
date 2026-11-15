@@ -778,14 +778,19 @@ def test_vegan_adapt():
     url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
     try:
         tasks_judge.configure(url, "mock", 32768)
-        x = to.load_vegan_adapt("de", None, 0)[0]  # Pfannkuchen
-        lines = "\n".join(f"- {a:g} {u} {nm}".replace(",", ",") for nm, a, u in x["scaled"])
-        good = lines.replace(".", ",") + "\n- 450 ml Hafermilch\n- 3 EL Apfelmus statt Eiern\n- 30 g vegane Butter\n1. Verrühren. 2. Ausbacken."
-        r = to.score_vegan_adapt(x, {"content": good})
-        assert r["detail"]["scaled_ok"] == 1 and r["detail"]["vegan"] == 1, r  # "statt Eiern" is the thing replaced
-        good2 = good
-        assert to.score_vegan_adapt(x, {"content": good2})["correct"], to.score_vegan_adapt(x, {"content": good2})
-        assert to.score_vegan_adapt(x, {"content": good2 + "\n- 2 Eier"})["detail"]["vegan"] == 0
+        x = to.load_vegan_adapt("de", None, 0)[0]  # Pfannkuchen, 2 servings
+        assert "1 Eier" not in x["messages"][0]["content"]
+        (n1, a1, _), (n2, a2, _) = x["scaled"]
+        good = f"- {a1:g} g {n1}\n- {a2:g} g {n2}\n- 150 ml Hafermilch\n- 2 EL Apfelmus statt Eiern\n- 10 g vegane Butter\n1. Verrühren. 2. Backen."
+        assert to.score_vegan_adapt(x, {"content": good})["correct"], to.score_vegan_adapt(x, {"content": good})
+        for bad in ("- 1 Ei", "- 300 ml Kuhmilch", "- 2 Eigelb", "- 100 ml Schlagsahne"):
+            assert to.score_vegan_adapt(x, {"content": good + "\n" + bad})["detail"]["vegan"] == 0, bad
+        for fine in ("- Erdnussbutter", "- 100 g Cashewkäse", "- Sahne (vegan)", "- Tofu (Hähnchen-Ersatz)", "- Pflanzenmilch"):
+            assert to.score_vegan_adapt(x, {"content": good + "\n" + fine})["detail"]["vegan"] == 1, fine
+        assert to.score_vegan_adapt(x, {"content": "1 EL Mehlschwitze\n" + good})["detail"]["scaled_ok"] == 1
+        e = to.load_vegan_adapt("en", None, 0)[0]
+        assert to._va_left("en", "plant-based milk, 2 flax eggs, egg replacer, cashew cheese, dairy-free butter") == []
+        assert to._va_left("en", "buttermilk, 2 eggs, parmesan") != []
     finally:
         stop()
         tasks_judge.configure(None, None, None)

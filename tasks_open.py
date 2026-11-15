@@ -1952,20 +1952,25 @@ def score_honest_ad(item, reply):
 
 
 # ---------------------------------------------------------------- vegan_adapt (judge + exact: scale and substitute)
-# A recipe for p servings with 2-3 animal ingredients; scale it to q servings AND make it vegan. Plant ingredients must
-# carry the exactly scaled amounts (code); no animal ingredient may remain (code, word list); the judge checks the
+# A recipe for 4 servings with 2-3 animal ingredients; scale it to q servings AND make it vegan. The ingredients people
+# weigh (flour, sugar, pasta, ...) must carry the exactly scaled amounts (code); no animal ingredient may remain (code,
+# German compounds included, plant forms like Hafermilch / oat milk / Cashewkäse allowed); the judge checks the
 # substitutes are sensible in kind and amount and the method still works.
-VA_RECIPES = {"en": [("pancakes", [("flour", 200, "g"), ("sugar", 30, "g"), ("salt", 2, "g")], [("milk", 300, "ml"), ("eggs", 2, ""), ("butter", 20, "g")]),
-                     ("pasta bake", [("pasta", 400, "g"), ("tomatoes", 600, "g"), ("onion", 1, "")], [("cheese", 150, "g"), ("cream", 200, "ml")]),
-                     ("muffins", [("flour", 250, "g"), ("sugar", 100, "g"), ("baking powder", 10, "g")], [("butter", 80, "g"), ("eggs", 2, ""), ("yoghurt", 150, "g")]),
-                     ("curry", [("rice", 300, "g"), ("chickpeas", 400, "g"), ("curry paste", 40, "g")], [("chicken", 400, "g"), ("cream", 150, "ml")])],
-              "de": [("Pfannkuchen", [("Mehl", 200, "g"), ("Zucker", 30, "g"), ("Salz", 2, "g")], [("Milch", 300, "ml"), ("Eier", 2, ""), ("Butter", 20, "g")]),
-                     ("Nudelauflauf", [("Nudeln", 400, "g"), ("Tomaten", 600, "g"), ("Zwiebel", 1, "")], [("Käse", 150, "g"), ("Sahne", 200, "ml")]),
-                     ("Muffins", [("Mehl", 250, "g"), ("Zucker", 100, "g"), ("Backpulver", 10, "g")], [("Butter", 80, "g"), ("Eier", 2, ""), ("Joghurt", 150, "g")]),
-                     ("Curry", [("Reis", 300, "g"), ("Kichererbsen", 400, "g"), ("Currypaste", 40, "g")], [("Hähnchen", 400, "g"), ("Sahne", 150, "ml")])]}
-VA_ANIMAL = {"en": r"\b(?:milk|eggs?|butter|cheese|cream|yogh?urt|chicken|honey)\b", "de": r"\b(?:milch|eier?n?|butter|käse|sahne|joghurt|hähnchen|honig)\b"}
-VA_PLANT_OK = {"en": r"(?:oat|soy|almond|plant|vegan|coconut|nut)[\s-]*$", "de": r"(?:hafer|soja|mandel|pflanz\w*|vegan\w*|kokos|nuss)[\s-]*$"}
-VA_JUDGE = """ORIGINAL RECIPE ({p} servings):
+VA_RECIPES = {"en": [("pancakes", [("flour", 200, "g"), ("sugar", 40, "g")], ["300 ml milk", "2 eggs", "20 g butter"]),
+                     ("pasta bake", [("pasta", 400, "g"), ("tomatoes", 600, "g")], ["150 g cheese", "200 ml cream"]),
+                     ("muffins", [("flour", 240, "g"), ("sugar", 100, "g")], ["80 g butter", "2 eggs", "150 g yoghurt"]),
+                     ("curry", [("rice", 300, "g"), ("chickpeas", 400, "g")], ["400 g chicken", "150 ml cream"])],
+              "de": [("Pfannkuchen", [("Mehl", 200, "g"), ("Zucker", 40, "g")], ["300 ml Milch", "2 Eier", "20 g Butter"]),
+                     ("Nudelauflauf", [("Nudeln", 400, "g"), ("Tomaten", 600, "g")], ["150 g Käse", "200 ml Sahne"]),
+                     ("Muffins", [("Mehl", 240, "g"), ("Zucker", 100, "g")], ["80 g Butter", "2 Eier", "150 g Joghurt"]),
+                     ("Curry", [("Reis", 300, "g"), ("Kichererbsen", 400, "g")], ["400 g Hähnchen", "150 ml Sahne"])]}
+VA_ANIMAL = {"en": r"butter(?:milk)?|milk|cheese|cream|yogh?urt|chicken|honey|ghee|parmesan|whey|\beggs?\b|\begg yolks?\b",
+             "de": r"milch|butter(?:schmalz)?|käse|sahne|joghurt|hähnchen|honig|quark|schmand|parmesan|ghee|speck|eigelb|eiweiß|\beiern?\b|\bei\b"}
+VA_PLANT_BEFORE = {"en": r"(?:oat|soy|almond|plant[- ]based|plant|vegan|coconut|nut|peanut|cashew|flax|dairy[- ]free|rice|chickpea)[\s-]*$",
+                   "de": r"(?:hafer|soja|mandel|pflanz\w*|vegan\w*|kokos|nuss|erdnuss|cashew|reis|kichererbsen)[\s-]*$"}
+VA_PLANT_AFTER = r"^(?:[\s-]?(?:ersatz|replacer|substitute|alternative)|\s*\((?:vegan|soja|soy|pflanzlich|plant))"
+VA_GONE = r"(?:statt|anstelle von|anstatt|ohne|ersetzt|instead of|without|replaces?|in place of|no)\s+(?:der |die |das |the )?$"
+VA_JUDGE = """ORIGINAL RECIPE (4 servings):
 {orig}
 
 ADAPTED RECIPE (should be for {q} servings and vegan):
@@ -1982,39 +1987,48 @@ def load_vegan_adapt(lang, n, seed):
     tasks_judge.check_judge()
     items = []
     for i in range(n or 16):
-        r = random.Random(f"vegan_adapt:{i}")
         dish, plant, animal = VA_RECIPES[lang][i % 4]
-        p, q = [(2, 3), (2, 5), (4, 6), (4, 10), (3, 6), (6, 9)][(i // 4) % 6]  # distinct per dish for up to 24 items
-        fmt = lambda nm, a, u: f"- {a:g} {u} {nm}".replace("  ", " ") if u else f"- {a:g} {nm}"  # noqa: E731
-        base = [(nm, a * p / 4, u) for nm, a, u in plant + animal]
-        orig = "\n".join(fmt(nm, a, u) for nm, a, u in base)
-        req = (f"Here is a recipe for {dish} for {p} servings:\n{orig}\nAdapt it for {q} servings and make it vegan. List all "
+        q = [2, 6, 8, 10, 3, 5][(i // 4) % 6]
+        orig = "\n".join([f"- {a} {u} {nm}" for nm, a, u in plant] + [f"- {x}" for x in animal])
+        req = (f"Here is a recipe for {dish} for 4 servings:\n{orig}\nAdapt it for {q} servings and make it vegan. List all "
                f"ingredients with amounts, then 2-4 short steps." if lang == "en" else
-               f"Hier ist ein Rezept für {dish} für {p} Portionen:\n{orig}\nPasse es für {q} Portionen an und mach es vegan. Nenne "
+               f"Hier ist ein Rezept für {dish} für 4 Portionen:\n{orig}\nPasse es für {q} Portionen an und mach es vegan. Nenne "
                f"alle Zutaten mit Mengen, dann 2-4 kurze Schritte.")
-        scaled = [(nm, a * q / p, u) for nm, a, u in base[:len(plant)]]
-        items.append({"id": str(i), "lang": lang, "orig": orig, "p": p, "q": q, "scaled": scaled,
+        items.append({"id": str(i), "lang": lang, "orig": orig, "q": q, "scaled": [(nm, a * q / 4, u) for nm, a, u in plant],
                       "messages": [{"role": "user", "content": req}]})
     return items
+
+
+def _va_left(lang, low):
+    """Animal ingredients still in the recipe: not plant-qualified ("Hafermilch", "plant-based butter", "Sahne (vegan)")
+    and not named as the thing replaced ("statt Eiern")."""
+    out = []
+    for m in re.finditer(VA_ANIMAL[lang], low):
+        before, after = low[:m.start()], low[m.end():]
+        if re.search(VA_PLANT_BEFORE[lang], before) or re.search(VA_PLANT_AFTER, after) or re.search(VA_GONE, low[max(0, m.start() - 20):m.start()]):
+            continue
+        out.append(m[0])
+    return out
 
 
 def score_vegan_adapt(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     low = text.lower()
-    # an animal word counts unless a plant prefix stands right before it ("Hafermilch", "oat milk", "vegane Butter")
-    # ... and unless it is the thing replaced ("statt Eiern", "instead of butter", "ohne Sahne")
-    gone = r"(?:statt|anstelle von|anstatt|ohne|ersetzt|instead of|without|replaces?|in place of|no)\s+(?:der |die |das |the )?$"
-    left = [m[0] for m in re.finditer(VA_ANIMAL[item["lang"]], low) if not re.search(VA_PLANT_OK[item["lang"]], low[:m.start()])
-            and not re.search(gone, low[max(0, m.start() - 20):m.start()])]
-    num = lambda x: x.replace(",", ".")  # noqa: E731
+    left = _va_left(item["lang"], low)
     missing = []
-    for nm, a, u in item["scaled"]:
-        line = next((ln for ln in low.splitlines() if nm.lower() in ln), "")
-        vals = [float(num(v)) for v in re.findall(r"\d+(?:[.,]\d+)?", line)]
-        if not any(abs(v - a) <= max(0.06 * a, 0.5) for v in vals):
+    for nm, a, u in item["scaled"]:  # any line naming the ingredient (as a word end) with the scaled amount in g
+        ok = False
+        for ln in low.splitlines():
+            if not re.search(re.escape(nm.lower()) + r"(?![a-zäöüß])", ln):
+                continue
+            ln = re.sub(r"(?<=\d)\.(?=\d{3}\b)", "", ln)  # 1.000 g
+            for v, unit in re.findall(r"(\d+(?:[.,]\d+)?)\s*(kg|g)?\b", ln):
+                g = float(v.replace(",", ".")) * (1000 if unit == "kg" else 1)
+                ok |= abs(g - a) <= max(0.05 * a, 1)
+        if not ok:
             missing.append(nm)
-    out = tasks_judge.judge("", VA_JUDGE.format(p=item["p"], q=item["q"], orig=item["orig"], text=text or "(empty)",
+    out = tasks_judge.judge("", VA_JUDGE.format(q=item["q"], orig=item["orig"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
     v = (json.loads(m[0]) if m else {}).get("verdicts")

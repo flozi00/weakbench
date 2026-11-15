@@ -8728,6 +8728,48 @@ def score_coupon_best(item, reply):
             "detail": {"letter_ok": float(ok_l), "price_ok": float(ok_p), "bigger_number": float(letter == item["bait"])}}
 
 
+# ---------------------------------------------------------------- trip_cost (fuel vs electric, l/100 km and kWh/100 km, round trip)
+def load_trip_cost(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("trip_cost", i, att)
+        while True:
+            km = r.randrange(80, 451, 10)
+            l100, fuel = F(r.randrange(48, 91), 10), F(r.randrange(165, 199), 100)
+            kwh100, power = r.randrange(15, 23), F(r.choice([29, 35, 39, 45, 59]), 100)
+            kind = ("petrol", "electric", "diff")[i % 3]
+            pet = 2 * km * l100 / 100 * fuel  # there and back
+            ele = 2 * km * F(kwh100, 100) * power
+            gold = {"petrol": pet, "electric": ele, "diff": pet - ele}[kind]
+            one_way = gold / 2
+            if (gold * 100).denominator == 1 and gold > 0:
+                break
+        eur = lambda x: f"{float(x):.2f}" if lang == "en" else f"{float(x):.2f}".replace(".", ",")  # noqa: E731
+        dec = lambda x: f"{float(x):g}" if lang == "en" else f"{float(x):g}".replace(".", ",")  # noqa: E731
+        ask = ({"petrol": "What does the fuel for the petrol car cost for the whole trip?",
+                "electric": "What does the electricity for the electric car cost for the whole trip?",
+                "diff": "How many euros cheaper is the electric car than the petrol car for the whole trip?"} if lang == "en" else
+               {"petrol": "Was kostet der Kraftstoff für den Benziner für die ganze Fahrt?",
+                "electric": "Was kostet der Strom für das Elektroauto für die ganze Fahrt?",
+                "diff": "Um wie viel Euro ist das Elektroauto auf der ganzen Fahrt günstiger als der Benziner?"})[kind]
+        q = (f"A trip goes {km} km to a city and back the same way. A petrol car uses {dec(l100)} l/100 km at {eur(fuel)} € per litre; "
+             f"an electric car uses {kwh100} kWh/100 km at {eur(power)} € per kWh. {ask} Round to cents." if lang == "en" else
+             f"Eine Fahrt geht {km} km in eine Stadt und auf demselben Weg zurück. Ein Benziner braucht {dec(l100)} l/100 km bei "
+             f"{eur(fuel)} € pro Liter; ein Elektroauto braucht {kwh100} kWh/100 km bei {eur(power)} € pro kWh. {ask} Runde auf Cent.")
+        items.append({"id": str(i), "lang": lang, "gold": round(float(gold), 2), "bait": round(float(one_way), 2), "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_trip_cost(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    v = answer_value(fa, item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.015
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "one_way_only": float(v is not None and abs(v - item["bait"]) < 0.015)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10332,6 +10374,7 @@ TASKS = {
     "elevator_route": task(load_elevator_route, score_elevator_route, 24, 120),
     "implausible_value": task(load_implausible_value, score_implausible_value, 24, 120),
     "coupon_best": task(load_coupon_best, score_coupon_best, 24, 120),
+    "trip_cost": task(load_trip_cost, score_trip_cost, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

@@ -1871,3 +1871,18 @@ def test_coupon_best():
 
 if __name__ == "__main__":
     test_coupon_best()
+
+
+def test_trip_cost():
+    import tasks_novel as tn
+    xs = tn.load_trip_cost("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    g = f"{x['gold']:.2f}".replace(".", ",")
+    for c in (f"Antwort: {g} €", f"Antwort: 2 x 120 km x 6,5 l/100 km x 1,80 € = {g} €"):
+        assert tn.score_trip_cost(x, {"content": c})["correct"], c
+    assert tn.score_trip_cost(x, {"content": f"Antwort: {x['bait']:.2f} €".replace(".", ",")})["detail"]["one_way_only"] == 1
+
+
+if __name__ == "__main__":
+    test_trip_cost()

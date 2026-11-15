@@ -3064,6 +3064,41 @@ def score_md_translate(item, reply):
                        "translated": float(translated)}}
 
 
+# ---------------------------------------------------------------- de_prefix_meaning (separable or not: the form decides)
+# (sentence, meaning of the separable verb, meaning of the inseparable one, which applies)
+PM_ITEMS = [("Der Fahrer hat das Verkehrsschild umgefahren.", "es umgestoßen, sodass es umfiel", "einen Bogen darum gemacht", "A"),
+            ("Der Fahrer hat das Verkehrsschild umfahren.", "es umgestoßen, sodass es umfiel", "einen Bogen darum gemacht", "B"),
+            ("Der Fährmann hat die Wanderer übergesetzt.", "sie ans andere Ufer gebracht", "ihre Worte in eine andere Sprache übertragen", "A"),
+            ("Die Dolmetscherin hat die Rede übersetzt.", "sie ans andere Ufer gebracht", "sie in eine andere Sprache übertragen", "B"),
+            ("Er hat den Brief umgeschrieben.", "ihn neu und anders geschrieben", "den Inhalt mit anderen Worten angedeutet, ohne ihn direkt zu nennen", "A"),
+            ("Sie hat das Problem nur umschrieben.", "es neu und anders aufgeschrieben", "es mit anderen Worten angedeutet, ohne es direkt zu nennen", "B"),
+            ("Ich habe kurz durch das Fernglas durchgeschaut.", "hindurchgesehen", "jemandes wahre Absicht erkannt", "A"),
+            ("Ich habe seinen Plan sofort durchschaut.", "hindurchgesehen", "die wahre Absicht erkannt", "B"),
+            ("Nach dem Streit ist sie zur Tagesordnung übergegangen.", "zu etwas anderem gewechselt", "jemanden absichtlich nicht beachtet", "A"),
+            ("Bei der Beförderung wurde er übergangen.", "zu etwas anderem gewechselt", "absichtlich nicht berücksichtigt", "B"),
+            ("Der Hund hat den Ball wiedergeholt.", "ihn zurückgebracht", "es noch einmal gesagt oder getan", "A"),
+            ("Die Lehrerin hat die Frage wiederholt.", "sie zurückgebracht", "sie noch einmal gestellt", "B"),
+            ("Er hat die Hand untergehalten, damit nichts herunterfällt.", "sie darunter gehalten", "sich mit jemandem unterhalten", "A"),
+            ("Wir haben uns lange unterhalten.", "etwas darunter gehalten", "miteinander gesprochen", "B"),
+            ("Sie hat die Uhr auf Winterzeit umgestellt.", "anders eingestellt", "von allen Seiten eingekreist", "A"),
+            ("Die Polizei hat das Haus umstellt.", "anders eingestellt", "von allen Seiten eingekreist", "B")]
+
+
+def load_de_prefix_meaning(lang, n, seed):
+    rows = PM_ITEMS[:min(n or 16, 16)]
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": f"Was bedeutet das Verb in diesem Satz?\n\n{sent}\n\nA: {a}\nB: {b}\n\n"
+                           "Antworte nur mit A oder B."}]}
+            for i, (sent, a, b, g) in enumerate(rows)]
+
+
+def score_de_prefix_meaning(item, reply):
+    m = re.findall(r"\b([AB])\b", reply["content"] or "")
+    v = m[0] if len(set(m)) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3383,6 +3418,7 @@ TASKS = {
     "en_grammar_fix": task(("en",), load_en_grammar_fix, score_en_grammar_fix, 64, 16, lang_check=False),
     "en_question_tags": task(("en",), load_en_question_tags, score_en_question_tags, 16, 20, lang_check=False),
     "md_translate": task(("de", "en"), load_md_translate, score_md_translate, 1024, 6, lang_check=False),
+    "de_prefix_meaning": task(("de",), load_de_prefix_meaning, score_de_prefix_meaning, 16, 16, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

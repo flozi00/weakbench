@@ -5186,6 +5186,63 @@ def score_ranked_vote(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- new_concept (apply a fresh definition)
+NC_WORDS = ["florp", "zindel", "quast", "morvik", "telb", "gruna"]
+
+
+def _nc_conds(r):
+    """Conditions as (en text, de text, predicate)."""
+    k = r.choice([3, 4, 7])
+    lo = r.randint(10, 40)
+    hi = lo + r.randint(30, 50)
+    primes = {2, 3, 5, 7, 11, 13, 17, 19, 23}
+    return [("it is even", "sie ist gerade", lambda x: x % 2 == 0),
+            ("its digit sum is a prime number", "ihre Quersumme ist eine Primzahl", lambda x: sum(map(int, str(x))) in primes),
+            (f"it is divisible by {k}", f"sie ist durch {k} teilbar", lambda x, k=k: x % k == 0),
+            (f"it lies between {lo} and {hi} (both included)", f"sie liegt zwischen {lo} und {hi} (beide eingeschlossen)",
+             lambda x, lo=lo, hi=hi: lo <= x <= hi),
+            ("its last digit is larger than its first digit", "ihre letzte Ziffer ist größer als ihre erste Ziffer",
+             lambda x: int(str(x)[-1]) > int(str(x)[0]))]
+
+
+def load_new_concept(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("new_concept", i)
+        word = NC_WORDS[i % len(NC_WORDS)]
+        nc = (2, 3)[i % 2]
+        while True:
+            conds = r.sample(_nc_conds(r), nc)
+            pos, exc = conds[:2], conds[2] if nc == 3 else None  # with 3: the third is an "unless" exception
+            nums = r.sample(range(10, 100), 8)
+            member = [all(c[2](x) for c in pos) and not (exc and exc[2](x)) for x in nums]
+            if 2 <= sum(member) <= 5 and (not exc or any(all(c[2](x) for c in pos) and exc[2](x) for x in nums)):
+                break
+        li = 0 if lang == "en" else 1
+        d = (f"A number is a {word} if {pos[0][li]} and {pos[1][li]}" if lang == "en" else
+             f"Eine Zahl ist ein {word.capitalize()}, wenn {pos[0][li]} und {pos[1][li]}")
+        if exc:
+            d += f", unless {exc[li]}" if lang == "en" else f", außer {exc[li]}"
+        q = (f"{d}.\nWhich of these numbers are {word}s? {', '.join(map(str, nums))}\nList all of them, separated by commas "
+             "(or write none)." if lang == "en" else
+             f"{d}.\nWelche dieser Zahlen sind {word.capitalize()}s? {', '.join(map(str, nums))}\nNenne alle, durch Kommas getrennt "
+             "(oder schreib keine).")
+        gold = sorted(x for x, m in zip(nums, member) if m)
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(map(str, gold)), "set": gold, "nc": nc,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_new_concept(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    got = {int(x) for x in re.findall(r"\b\d+\b", fa)}
+    want = set(item["set"])
+    ok = got == want
+    jac = len(got & want) / len(got | want) if got | want else 1.0
+    return {"correct": ok, "score": float(ok), "pred": sorted(got), "gold": item["gold"],
+            "detail": {f"ok_c{item['nc']}": float(ok), "jaccard": round(jac, 4)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6761,6 +6818,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "new_concept": task(load_new_concept, score_new_concept, 24, 120),
     "ranked_vote": task(load_ranked_vote, score_ranked_vote, 24, 120),
     "parallel_work": task(load_parallel_work, score_parallel_work, 24, 120),
     "card_score": task(load_card_score, score_card_score, 24, 120),

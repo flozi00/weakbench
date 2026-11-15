@@ -1041,3 +1041,20 @@ def test_de_case_identify():
 
 if __name__ == "__main__":
     test_de_case_identify()
+
+
+def test_en_tense_identify():
+    import tasks_lang as tl
+    xs = tl.load_en_tense_identify("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 48
+    for x in xs[:8]:
+        assert tl.score_en_tense_identify(x, {"content": x["gold"].capitalize() + "."})["correct"], x["gold"]
+    ppc = next(x for x in xs if x["gold"] == "present perfect continuous")
+    assert not tl.score_en_tense_identify(ppc, {"content": "present perfect"})["correct"]
+    pp = next(x for x in xs if x["gold"] == "present perfect")
+    assert not tl.score_en_tense_identify(pp, {"content": "present perfect continuous"})["correct"]
+    assert tl.score_en_tense_identify(pp, {"content": "Present perfect (not simple past)"})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_tense_identify()

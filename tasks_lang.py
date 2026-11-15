@@ -4222,6 +4222,50 @@ def score_de_case_identify(item, reply):
             "detail": {"ok_" + item["gold"][:3].lower(): float(ok), "ok_fem" if item["fem"] else "ok_masc_neut": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_tense_identify (name the tense of a verb phrase)
+ETI_VERBS = [("work", "works", "worked", "working", "worked"), ("play", "plays", "played", "playing", "played"),
+             ("write", "writes", "wrote", "writing", "written"), ("read", "reads", "read", "reading", "read"),
+             ("cook", "cooks", "cooked", "cooking", "cooked"), ("drive", "drives", "drove", "driving", "driven"),
+             ("study", "studies", "studied", "studying", "studied"), ("sing", "sings", "sang", "singing", "sung")]
+ETI_SUBJ = [("She", 3), ("They", 0), ("My brother", 3), ("We", 0)]
+ETI_TENSES = {"simple present": (lambda v, p: v[1] if p == 3 else v[0]),
+              "present continuous": (lambda v, p: ("is " if p == 3 else "are ") + v[3]),
+              "present perfect": (lambda v, p: ("has " if p == 3 else "have ") + v[4]),
+              "present perfect continuous": (lambda v, p: ("has been " if p == 3 else "have been ") + v[3]),
+              "simple past": (lambda v, p: v[2]), "past continuous": (lambda v, p: ("was " if p == 3 else "were ") + v[3]),
+              "past perfect": (lambda v, p: "had " + v[4]), "will future": (lambda v, p: "will " + v[0])}
+ETI_ALIAS = {"simple present": ["simple present", "present simple"], "present continuous": ["present continuous", "present progressive"],
+             "present perfect": ["present perfect"], "present perfect continuous": ["present perfect continuous", "present perfect progressive"],
+             "simple past": ["simple past", "past simple", "preterite"], "past continuous": ["past continuous", "past progressive"],
+             "past perfect": ["past perfect", "pluperfect"], "will future": ["will future", "simple future", "future simple", "will-future", "future"]}
+
+
+def load_en_tense_identify(lang, n, seed):
+    items = []
+    names = list(ETI_TENSES)
+    for i, att in common.redraws(n or 48, items):
+        r = random.Random(f"en_tense_identify:{i}" + (f"~{att}" if att else ""))
+        tense = names[i % len(names)]
+        v, (subj, p) = r.choice(ETI_VERBS), r.choice(ETI_SUBJ)
+        vp = ETI_TENSES[tense](v, p)
+        q = (f"Which tense is the verb in brackets? Choose from: simple present, present continuous, present perfect, present perfect "
+             f"continuous, simple past, past continuous, past perfect, will future. Answer with the tense only.\n\n{subj} [{vp}].")
+        items.append({"id": str(i), "lang": "en", "gold": tense, "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_en_tense_identify(item, reply):
+    t = re.sub(r"[-_]", " ", re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower())
+    t = re.sub(r"\b(?:not|nicht)\s+(?:the\s+)?[a-z ]+?(?=[,.;)]|$)", " ", t)
+    found = {k for k, al in ETI_ALIAS.items() for a in al if re.search(rf"\b{re.escape(a.replace('-', ' '))}\b", t)}
+    # "present perfect continuous" also contains "present perfect": keep the longest match only
+    found = {k for k in found if not any(k != o and k in o for o in found)}
+    if "will future" in found and len(found) > 1:
+        found.discard("will future")  # "future" is a bare alias; a named tense wins
+    ok = found == {item["gold"]}
+    return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {f"ok_{item['gold'].replace(' ', '_')}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4773,6 +4817,7 @@ TASKS = {
     "en_since_for": task(("en",), load_en_since_for, score_en_since_for, 18, 18, lang_check=False),
     "denglisch_spot": task(("de",), load_denglisch_spot, score_denglisch_spot, 20, 40, lang_check=False),
     "de_case_identify": task(("de",), load_de_case_identify, score_de_case_identify, 24, 48, lang_check=False),
+    "en_tense_identify": task(("en",), load_en_tense_identify, score_en_tense_identify, 24, 48, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

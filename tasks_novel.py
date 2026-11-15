@@ -5315,6 +5315,55 @@ def score_split_bill(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- edit_rule (a rewrite rule with an exception)
+# A generated short report holds amounts and years. Rule: double every amount, but leave years unchanged. Models
+# either miss the exception (double the year) or miss amounts. All numbers of the reply are compared in order.
+ER_LINES = {"en": ["In {y} the club had {a} members.", "The library bought {a} new books in {y}.", "Since {y}, {a} trees were planted.",
+                   "The bakery sold {a} loaves on the day it opened in {y}.", "In {y}, {a} people visited the fair."],
+            "de": ["Im Jahr {y} hatte der Verein {a} Mitglieder.", "Die Bibliothek kaufte {y} {a} neue Bücher.",
+                   "Seit {y} wurden {a} Bäume gepflanzt.", "Die Bäckerei verkaufte bei ihrer Eröffnung {y} {a} Brote.",
+                   "Im Jahr {y} besuchten {a} Menschen die Messe."]}
+ER_RULE = {"double": ("Double every number in this text, but leave years unchanged.", "Verdopple jede Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a * 2),
+           "plus": ("Add 15 to every number in this text, but leave years unchanged.", "Addiere 15 zu jeder Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a + 15),
+           "half": ("Halve every number in this text, but leave years unchanged.", "Halbiere jede Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a // 2)}
+
+
+def load_edit_rule(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("edit_rule", i)
+        rule = ("double", "plus", "half")[i % 3]
+        k = r.choice([3, 4, 5])
+        tpls = r.sample(ER_LINES[lang], k)
+        nums, src = [], []
+        for t in tpls:
+            y, a = r.randint(1960, 2024), r.randrange(12, 900, 2)  # even: halving stays whole
+            src.append(t.format(y=y, a=a))
+            pos_y, pos_a = t.index("{y}"), t.index("{a}")
+            pair = [(pos_y, ("y", y)), (pos_a, ("a", a))]
+            nums += [v for _, v in sorted(pair)]
+        f = ER_RULE[rule][2]
+        gold = [v if kind == "y" else f(v) for kind, v in nums]
+        years = [v for kind, v in nums if kind == "y"]
+        ask = ER_RULE[rule][0 if lang == "en" else 1] + (" Reply with the rewritten text only." if lang == "en" else
+                                                          " Antworte nur mit dem umgeschriebenen Text.")
+        items.append({"id": str(i), "lang": lang, "gold": " ".join(map(str, gold)), "nums": gold, "years": years, "rule": rule,
+                      "messages": [{"role": "user", "content": ask + "\n\n" + " ".join(src) + "\n\n" + ASK[lang]}]})
+    return items
+
+
+def score_edit_rule(item, reply):
+    text = reply["content"] or ""
+    fa = final_answer(text)
+    body = text if not fa or len(re.findall(r"\d+", fa)) < len(item["nums"]) else fa
+    got = [int(x) for x in re.findall(r"\d+", body.replace(".", "").replace(",", ""))]
+    got = got[-len(item["nums"]):] if len(got) >= len(item["nums"]) else got
+    ok = got == item["nums"]
+    broke = any(y not in got for y in item["years"])
+    return {"correct": ok, "score": float(ok), "pred": " ".join(map(str, got)), "gold": item["gold"],
+            "detail": {f"ok_rule_{item['rule']}": float(ok), "broke_exception": float(broke)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6890,6 +6939,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "edit_rule": task(load_edit_rule, score_edit_rule, 24, 120),
     "split_bill": task(load_split_bill, score_split_bill, 24, 120),
     "new_concept": task(load_new_concept, score_new_concept, 24, 120),
     "ranked_vote": task(load_ranked_vote, score_ranked_vote, 24, 120),

@@ -2718,6 +2718,62 @@ def score_en_usage(item, reply):
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- sentence_order (coherence from discourse cues)
+SO_TEXTS = {"en": [["A small bakery opened in our street last spring.", "Its owner, a former engineer, bakes everything himself.",
+                    "However, he refuses to sell white bread.", "Customers who ask for it get a rye loaf and a lecture instead.",
+                    "Surprisingly, most of them come back the next day."],
+                   ["Our town wanted a new bridge for years.", "The council finally approved one in March.",
+                    "The cheapest offer came from a company nobody knew.", "That company, it later turned out, had never built a bridge.",
+                    "The council therefore cancelled the contract and started again."],
+                   ["Mira found an old camera in her grandfather's attic.", "Inside it was a film that had never been developed.",
+                    "She took the film to the last photo shop in the city.", "The pictures showed her grandmother as a young woman.",
+                    "Mira had never seen her smile like that."],
+                   ["A storm hit the coast on Tuesday night.", "It knocked out power in three villages.",
+                    "Repair crews could not reach them because the road was flooded.", "They finally arrived by boat on Wednesday.",
+                    "By evening, the lights were on again."]],
+            "de": [["Im Frühjahr hat in unserer Straße eine kleine Bäckerei eröffnet.", "Ihr Besitzer, ein früherer Ingenieur, backt alles selbst.",
+                    "Weißbrot verkauft er allerdings nicht.", "Wer danach fragt, bekommt stattdessen ein Roggenbrot und einen Vortrag.",
+                    "Erstaunlicherweise kommen die meisten trotzdem am nächsten Tag wieder."],
+                   ["Unsere Stadt wollte seit Jahren eine neue Brücke.", "Im März genehmigte der Rat endlich eine.",
+                    "Das günstigste Angebot kam von einer Firma, die niemand kannte.", "Diese Firma hatte, wie sich später zeigte, noch nie eine Brücke gebaut.",
+                    "Der Rat kündigte deshalb den Vertrag und begann von vorn."],
+                   ["Mira fand auf dem Dachboden ihres Großvaters eine alte Kamera.", "Darin steckte ein Film, der nie entwickelt worden war.",
+                    "Sie brachte den Film in das letzte Fotogeschäft der Stadt.", "Die Bilder zeigten ihre Großmutter als junge Frau.",
+                    "So lächeln hatte Mira sie noch nie gesehen."],
+                   ["In der Nacht zum Mittwoch traf ein Sturm die Küste.", "Er legte in drei Dörfern den Strom lahm.",
+                    "Die Reparaturtrupps kamen nicht hin, weil die Straße überflutet war.", "Am Mittwoch erreichten sie die Dörfer schließlich mit einem Boot.",
+                    "Am Abend brannte das Licht wieder."]]}
+SO_LET = "ABCDE"
+
+
+def load_sentence_order(lang, n, seed):
+    items = []
+    for i in range(min(n or 12, 12)):
+        sents = SO_TEXTS[lang][i % 4]
+        r = random.Random(f"sentence_order:{i}")
+        while True:
+            perm = r.sample(range(5), 5)
+            if all(perm[j] + 1 != perm[j + 1] for j in range(4)) and perm[0] != 0:  # no original pair stays adjacent
+                break
+        shown = "\n".join(f"{SO_LET[j]}. {sents[p]}" for j, p in enumerate(perm))
+        gold = "".join(SO_LET[perm.index(k)] for k in range(5))
+        ask = ("These five sentences of a short text are shuffled. Put them in the right order. Answer with the five letters "
+               "in order, e.g. CAEBD.\n\n" if lang == "en" else
+               "Diese fünf Sätze eines kurzen Textes sind vertauscht. Bring sie in die richtige Reihenfolge. Antworte mit den fünf "
+               "Buchstaben in der richtigen Reihenfolge, z. B. CAEBD.\n\n")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "messages": [{"role": "user", "content": ask + shown}]})
+    return items
+
+
+def score_sentence_order(item, reply):
+    t = (reply["content"] or "").upper()
+    m = re.findall(r"\b([A-E])\b", t) if not re.search(r"\b[A-E]{5}\b", t) else list(re.findall(r"\b([A-E]{5})\b", t)[-1])
+    got = "".join(m[-5:]) if len(m) >= 5 else ""
+    ok = got == item["gold"]
+    pairs = sum(item["gold"][j:j + 2] in got for j in range(4)) / 4
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {"pairs_right": pairs}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3030,6 +3086,7 @@ TASKS = {
     "en_conditionals": task(("en",), load_en_conditionals, score_en_conditionals, 32, 24, lang_check=False),
     "de_passive": task(("de",), load_de_passive, score_de_passive, 64, 24, lang_check=False),
     "en_usage": task(("en",), load_en_usage, score_en_usage, 16, 24, lang_check=False),
+    "sentence_order": task(("de", "en"), load_sentence_order, score_sentence_order, 512, 12, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

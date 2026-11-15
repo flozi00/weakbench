@@ -5153,7 +5153,12 @@ def load_ranked_vote(lang, n, seed):
                 first[rank[0]] = first.get(rank[0], 0) + cnt
             top = sorted(first.values(), reverse=True)
             plur = max(first, key=first.get)
-            if w and w != plur and (len(top) < 2 or top[0] != top[1]):
+            runoff = top[0] * 2 <= sum(top)  # no first-round majority: the count is needed
+            want_upset = i % 3 != 0  # a third of the items: the leader also wins after the runoff (control)
+            order = sorted(RV_CANDS, key=lambda c: -first.get(c, 0))
+            place = order.index(w) if w else -1
+            distinct = len(set(first.get(c, 0) for c in RV_CANDS)) == 4  # first-round places are unambiguous
+            if w and runoff and distinct and (place == i % 3 if i % 3 < 2 else place >= 2):  # leader / runner-up / further back
                 break
         lines = "\n".join((f"- {cnt} voters: " if lang == "en" else f"- {cnt} Stimmen: ") + " > ".join(rank) for cnt, rank in groups)
         q = ("An election uses instant-runoff voting. Each voter ranks all four candidates. In each round, every ballot counts "
@@ -5164,18 +5169,21 @@ def load_ranked_vote(lang, n, seed):
              "Stimmzettel für die höchstplatzierte Person, die noch im Rennen ist. Hat jemand mehr als die Hälfte der Stimmzettel, "
              "gewinnt diese Person; sonst scheidet die Person mit den wenigsten Stimmzetteln aus und die nächste Runde beginnt.\n"
              f"Stimmzettel:\n{lines}\nWer gewinnt?")
-        items.append({"id": str(i), "lang": lang, "gold": w, "plurality": plur,
+        items.append({"id": str(i), "lang": lang, "gold": w, "plurality": plur, "upset": want_upset,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_ranked_vote(item, reply):
     fa = final_answer(reply["content"]) or ""
+    m = re.search(r"\b(" + "|".join(RV_CANDS) + r")\b\W*(?:wins|gewinnt|is the winner|ist (?:die )?gewinner)", fa, re.I)
     named = [c for c in RV_CANDS if re.search(r"\b" + c + r"\b", fa)]
-    v = named[0] if len(named) == 1 else None
+    v = m[1].capitalize() if m else named[0] if len(named) == 1 else None  # "Dario wins after Cora is eliminated"
     ok = v == item["gold"]
-    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
-            "detail": {"took_plurality": float(v == item["plurality"])}}
+    d = {"ok_upset" if item["upset"] else "ok_control": float(ok)}
+    if item["upset"]:
+        d["took_plurality"] = float(v == item["plurality"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
 # ---------------------------------------------------------------- table_qa

@@ -2766,9 +2766,9 @@ def load_sentence_order(lang, n, seed):
 
 
 def score_sentence_order(item, reply):
-    t = (reply["content"] or "").upper()
-    m = re.findall(r"\b([A-E])\b", t) if not re.search(r"\b[A-E]{5}\b", t) else list(re.findall(r"\b([A-E]{5})\b", t)[-1])
-    got = "".join(m[-5:]) if len(m) >= 5 else ""
+    # the last run of five letters ("CAEBD", "C, A, E, B, D", "C-A-E-B-D"); a stray "A" in an explanation is no run
+    runs = re.findall(r"(?<![A-Za-z])[A-Ea-e](?:[\s,\-–>.]*[A-Ea-e]){4}(?![A-Za-z])", reply["content"] or "")
+    got = re.sub(r"[^A-Ea-e]", "", runs[-1]).upper() if runs else ""
     ok = got == item["gold"]
     pairs = sum(item["gold"][j:j + 2] in got for j in range(4)) / 4
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"], "detail": {"pairs_right": pairs}}

@@ -4803,6 +4803,67 @@ def score_work_rates(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- spot_change (diff two texts by reading)
+SPC_CLAUSE = {"en": ["The tenant {name} pays {num} euros on the first of each month.", "The deposit is {num} euros and is {neg}refundable.",
+                    "Pets are {neg}allowed in the flat.", "The notice period is {num} {unit}.", "Repairs above {num} euros are paid by {name}.",
+                    "The heating is {neg}included in the rent.", "Keys are handed over by {name} on day {num}.",
+                    "The garden may be used for {num} {unit} per week."],
+            "de": ["Der Mieter {name} zahlt am Ersten jedes Monats {num} Euro.", "Die Kaution beträgt {num} Euro und wird {neg}erstattet.",
+                   "Haustiere sind in der Wohnung {neg}erlaubt.", "Die Kündigungsfrist beträgt {num} {unit}.",
+                   "Reparaturen über {num} Euro bezahlt {name}.", "Die Heizung ist {neg}in der Miete enthalten.",
+                   "Die Schlüssel übergibt {name} am Tag {num}.", "Der Garten darf {num} {unit} pro Woche genutzt werden."]}
+SPC_NAMES = ["Keller", "Brandt", "Vogel", "Lorenz", "Hahn", "Krüger"]
+SPC_UNITS = {"en": ["weeks", "months", "hours", "days"], "de": ["Wochen", "Monate", "Stunden", "Tage"]}
+SPC_NEG = {"en": "not ", "de": "nicht "}
+
+
+def load_spot_change(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("spot_change", i)
+        target = (40, 120, 300)[(i // 4) % 3]
+        slots = []
+        while sum(len(x[0].split()) for x in slots) < target:
+            slots.append((r.choice(SPC_CLAUSE[lang]), {"name": r.choice(SPC_NAMES), "num": str(r.randint(2, 900)),
+                                                       "unit": r.choice(SPC_UNITS[lang]), "neg": r.choice(["", SPC_NEG[lang]])}))
+        kinds = ("num", "name", "unit", "neg")
+        kind = kinds[i % 4]
+        cands = [k for k, (c, _) in enumerate(slots) if "{" + kind + "}" in c and k > 0]
+        if not cands:
+            cands = [k for k, (c, _) in enumerate(slots) if "{num}" in c]
+            kind = "num"
+        k = r.choice(cands)
+        tpl, vals = slots[k]
+        new = dict(vals)
+        if kind == "num":
+            new["num"] = str(int(vals["num"]) + r.choice([1, 10, 100, -1]) if int(vals["num"]) > 100 else int(vals["num"]) + r.choice([1, 10]))
+        elif kind == "name":
+            new["name"] = r.choice([x for x in SPC_NAMES if x != vals["name"]])
+        elif kind == "unit":
+            new["unit"] = r.choice([x for x in SPC_UNITS[lang] if x != vals["unit"]])
+        else:
+            new["neg"] = "" if vals["neg"] else SPC_NEG[lang]
+        old_t = " ".join(c.format(**v) for c, v in slots)
+        new_t = " ".join((tpl.format(**new) if j == k else c.format(**v)) for j, (c, v) in enumerate(slots))
+        ow, nw = (vals[kind].strip() or "-", new[kind].strip() or "-")
+        q = ("Version A and version B of a contract differ in exactly one place. Which word was changed? Give the word in A and "
+             "the word in B as: A: <word> / B: <word> (write - if a word was only added or removed).\n\n" if lang == "en" else
+             "Version A und Version B eines Vertrags unterscheiden sich an genau einer Stelle. Welches Wort wurde geändert? Gib das "
+             "Wort in A und das Wort in B so an: A: <Wort> / B: <Wort> (schreib -, wenn ein Wort nur ergänzt oder entfernt wurde).\n\n")
+        items.append({"id": str(i), "lang": lang, "gold": f"A: {ow} / B: {nw}", "old": ow, "new": nw, "len": target, "kind": kind,
+                      "messages": [{"role": "user", "content": q + f"A: {old_t}\n\nB: {new_t}\n\n" + ASK[lang]}]})
+    return items
+
+
+def score_spot_change(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    m = re.search(r"A\s*:\s*\**\s*([^\s/*]+)\s*\**\s*/\s*B\s*:\s*\**\s*([^\s/*]+)", fa)
+    got = (m[1].strip(".,\"'“”„").lower(), m[2].strip(".,\"'“”„").lower()) if m else None
+    ok = got == (item["old"].lower(), item["new"].lower())
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],
+            "detail": {f"ok_len{item['len']}": float(ok), f"ok_kind_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6375,6 +6436,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "spot_change": task(load_spot_change, score_spot_change, 24, 120),
     "work_rates": task(load_work_rates, score_work_rates, 24, 120),
     "median_traps": task(load_median_traps, score_median_traps, 24, 120),
     "alien_calendar": task(load_alien_calendar, score_alien_calendar, 24, 120),

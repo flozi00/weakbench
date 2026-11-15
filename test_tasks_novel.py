@@ -1498,6 +1498,14 @@ def test_night_shift():
     x = xs[0]
     assert tn.score_night_shift(x, {"content": f"Answer: {x['gold']} minutes"})["correct"]
     assert tn.score_night_shift(x, {"content": f"Answer: {x['bait']}"})["detail"]["no_midnight_wrap"] == 1
+    g = x["gold"]
+    for c in (f"Answer: {g} minutes ({g // 60} h {g % 60} min)", f"Answer: {g} minutes, i.e. {g / 60:.2f} hours",
+              f"Answer: {g // 60} h {g % 60} min = {g} minutes", f"Antwort: {g:,} Minuten".replace(",", ".")):
+        assert tn.score_night_shift(x, {"content": c})["correct"], c
+    y = tn.load_break_even("de", None, 0)[0]
+    assert tn.score_break_even(y, {"content": f"Antwort: {y['gold']} Lampen (bei {y['gold'] - 1} noch Verlust)"})["correct"]
+    assert tn.score_break_even(y, {"content": f"Antwort: mindestens {y['gold']} Lampen pro Monat, Gewinn dann 5 €"})["correct"]
+    assert not tn.score_break_even(y, {"content": f"Antwort: {y['gold'] - 1}–{y['gold']}"})["correct"]
 
 
 if __name__ == "__main__":

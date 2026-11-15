@@ -7659,21 +7659,33 @@ def load_break_even(lang, n, seed):
             price = r.randint(8, 120)
             var = r.randint(2, price - 3)
             gold, bait = math.ceil(fixed / (price - var)), math.ceil(fixed / price)
-            if fixed % (price - var) and gold != bait:  # a remainder, so rounding up matters
+            if fixed % (price - var) and bait not in (gold, gold - 1):  # a remainder, so rounding up matters
                 break
         q = (f"A small workshop sells handmade lamps. Rent, insurance and wages cost {fixed} € per month regardless of sales. "
              f"Each lamp sells for {price} €; material and shipping cost {var} € per lamp. How many lamps must it sell in a month "
              f"so that it does not make a loss?" if lang == "en" else
              f"Eine kleine Werkstatt verkauft handgemachte Lampen. Miete, Versicherung und Löhne kosten unabhängig vom Absatz "
-             f"{fixed} € im Monat. Jede Lampe kostet {price} €; Material und Versand kosten {var} € pro Lampe. Wie viele Lampen "
+             f"{fixed} € im Monat. Jede Lampe wird für {price} € verkauft; Material und Versand kosten {var} € pro Lampe. Wie viele Lampen "
              f"muss sie im Monat verkaufen, damit sie keinen Verlust macht?")
         items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "floor": gold - 1,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
+def stated_int(reply, unit):
+    """The integer an answer states before `unit` ("3212 Lampen (bei 3211 Verlust)", "25 h 15 min = 1515 minutes,
+    i.e. 25.25 h"); a range ("3211-3212", "3211 oder 3212") is None."""
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = re.split(r"[;,]\s+|\bi\.e\.|\bd\.h\.", fa)[0]
+    fa = fa.split("=")[-1]
+    if re.search(r"\d\s*(?:[–-]|bis|to|oder|or)\s*\d", fa):
+        return None
+    m = re.search(r"([\d.,  ]*\d)\s*" + unit, fa, re.I)
+    return last_int(m[1] if m else fa)
+
+
 def score_break_even(item, reply):
-    v = last_int(final_answer(reply["content"]) or "")
+    v = stated_int(reply, r"(?:lampen|lamps)")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ignored_variable_cost": float(v == item["bait"]), "rounded_down": float(v == item["floor"])}}
@@ -7713,7 +7725,7 @@ def load_night_shift(lang, n, seed):
 
 
 def score_night_shift(item, reply):
-    v = last_int(final_answer(reply["content"]) or "")
+    v = stated_int(reply, r"(?:min|minuten|minutes)\b")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"no_midnight_wrap": float(v == item["bait"]),

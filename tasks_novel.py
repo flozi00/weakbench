@@ -9938,6 +9938,55 @@ def score_probability(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- genetics_cross
+# Two pea plants, 2-3 independent genes with full dominance; the chance that one offspring shows a given set of traits.
+# Gold = exact Fraction by enumerating all gamete pairs. Bait: the chance of the homozygous genotype instead of the
+# trait (a dominant trait is AA or Aa). No gold value in more than ~1/6 of the items. `ok_g<genes>`, `genotype_bait`.
+GC_GENES = {"en": [("P", "purple", "white", "flowers"), ("T", "tall", "short", "stems"), ("R", "round", "wrinkled", "seeds")],
+            "de": [("P", "violette", "weiße", "Blüten"), ("T", "hohe", "niedrige", "Stängel"), ("R", "runde", "runzlige", "Samen")]}
+GC_INTRO = {"en": "In pea plants, purple flowers (P) are dominant over white (p), tall stems (T) over short (t), and round "
+                  "seeds (R) over wrinkled (r). The genes are inherited independently.",
+            "de": "Bei Erbsen ist violette Blütenfarbe (P) dominant über weiß (p), hoher Wuchs (T) über niedrigen (t) und runde "
+                  "Samen (R) über runzlige (r). Die Gene werden unabhängig vererbt."}
+
+
+def load_genetics_cross(lang, n, seed):
+    import itertools
+    items = []
+    for i, att in common.redraws(n or 72, items):
+        r = rng_of("genetics_cross", i, att)
+        while True:
+            k = r.choice([2, 3])
+            genes = sorted(r.sample(range(3), k))
+            par = [[r.choice([c * 2, c + c.lower(), c.lower() * 2]) for c in (GC_GENES["en"][g][0] for g in genes)] for _ in range(2)]
+            want = [r.random() < 0.5 for _ in genes]  # True = the dominant trait
+            gold, bait, w = Fraction(0), Fraction(0), Fraction(1, 2 ** (2 * k))
+            for g1, g2 in itertools.product(itertools.product(*par[0]), itertools.product(*par[1])):  # gametes
+                kids = ["".join(sorted(g1[j] + g2[j])) for j in range(k)]  # "Pp": the upper case sorts first
+                gold += w * all(kids[j][0].isupper() == want[j] for j in range(k))
+                bait += w * all(kids[j] == (kids[j][0].upper() if want[j] else kids[j][0].lower()) * 2 for j in range(k))
+            if 0 < gold < 1 and gold != bait and sum(it["gold"] == str(gold) for it in items) < max(2, (n or 72) // 6):
+                break  # "always 1/2" must not pay
+        G = [GC_GENES[lang][g] for g in genes]
+        geno = lambda pp: " ".join("".join(x) for x in pp)  # noqa: E731
+        traits = [f"{G[j][1] if want[j] else G[j][2]} {G[j][3]}" for j in range(k)]
+        tl = ", ".join(traits[:-1]) + (" and " if lang == "en" else " und ") + traits[-1]
+        q = (f"{GC_INTRO[lang]} A plant with genotype {geno(par[0])} is crossed with a plant with genotype {geno(par[1])}. "
+             f"What is the probability that one offspring has {tl}? Give a fraction." if lang == "en" else
+             f"{GC_INTRO[lang]} Eine Pflanze mit dem Genotyp {geno(par[0])} wird mit einer Pflanze mit dem Genotyp {geno(par[1])} "
+             f"gekreuzt. Mit welcher Wahrscheinlichkeit hat ein Nachkomme {tl}? Gib einen Bruch an.")
+        items.append({"id": str(i), "lang": lang, "gold": str(gold), "bait": str(bait), "genes": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_genetics_cross(item, reply):
+    v = prob_value(final_answer(reply["content"]) or "", item["lang"])
+    near = lambda f: v is not None and abs(v - float(Fraction(f))) <= 0.005  # noqa: E731
+    return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_g{item['genes']}": float(near(item["gold"])), "genotype_bait": float(near(item["bait"]))}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11046,6 +11095,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "genetics_cross": task(load_genetics_cross, score_genetics_cross, 24, 72),
     "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),
     "free_shipping": task(load_free_shipping, score_free_shipping, 24, 120),
     "seven_segment": task(load_seven_segment, score_seven_segment, 24, 120),

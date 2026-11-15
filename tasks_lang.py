@@ -4360,6 +4360,42 @@ def score_de_das_function(item, reply):
     return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {f"ok_{item['gold'].lower()}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_that_function (word class of "that")
+# The English twin of de_das_function: determiner ("that book"), demonstrative pronoun ("That is true."), relative
+# pronoun ("the book that I read") and conjunction ("I think that ..."), 4 each.
+TF_ITEMS = [("[That] car belongs to my aunt.", "determiner"), ("Could you pass me [that] cup?", "determiner"),
+            ("I remember [that] summer very well.", "determiner"), ("Who is [that] man at the door?", "determiner"),
+            ("[That] is not what I meant.", "demonstrative pronoun"), ("I already told you [that].", "demonstrative pronoun"),
+            ("Is [that] your final answer?", "demonstrative pronoun"), ("[That] was a long day.", "demonstrative pronoun"),
+            ("The book [that] I borrowed is overdue.", "relative pronoun"), ("Here is the key [that] opens the shed.", "relative pronoun"),
+            ("It was the best film [that] I have seen.", "relative pronoun"), ("The man [that] called you is waiting.", "relative pronoun"),
+            ("I think [that] she is right.", "conjunction"), ("He said [that] the shop was closed.", "conjunction"),
+            ("It is clear [that] we need help.", "conjunction"), ("She was so tired [that] she fell asleep.", "conjunction")]
+TF_LABELS = {"determiner": ["determiner", "demonstrative determiner", "demonstrative adjective"],
+             "demonstrative pronoun": ["demonstrative pronoun"], "relative pronoun": ["relative pronoun"],
+             "conjunction": ["conjunction", "subordinating conjunction", "complementizer", "complementiser"]}
+
+
+def load_en_that_function(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g,
+             "messages": [{"role": "user", "content": "What is the word class of the word in brackets? Choose from: determiner, demonstrative "
+                           "pronoun, relative pronoun, conjunction. Answer with the word class only.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(TF_ITEMS[:min(n or 16, 16)])]
+
+
+def score_en_that_function(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower().replace("-", " ")
+    t = re.sub(r"\b(?:not|no)\s+(?:(?:a|an|the)\s+)?(?:demonstrative\s+|relative\s+|subordinating\s+)?\w+", " ", t)
+    found = set()
+    for k in ("demonstrative pronoun", "relative pronoun", "determiner", "conjunction"):
+        for a in sorted(TF_LABELS[k], key=len, reverse=True):
+            if re.search(rf"\b{a}\b", t):
+                found.add(k)
+                t = re.sub(rf"\b{a}\b", " ", t)
+    ok = found == {item["gold"]}
+    return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4914,6 +4950,7 @@ TASKS = {
     "en_tense_identify": task(("en",), load_en_tense_identify, score_en_tense_identify, 24, 48, lang_check=False),
     "de_tense_identify": task(("de",), load_de_tense_identify, score_de_tense_identify, 24, 48, lang_check=False),
     "de_das_function": task(("de",), load_de_das_function, score_de_das_function, 16, 16, lang_check=False),
+    "en_that_function": task(("en",), load_en_that_function, score_en_that_function, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

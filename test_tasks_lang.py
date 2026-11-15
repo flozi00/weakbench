@@ -1096,3 +1096,19 @@ def test_de_das_function():
 
 if __name__ == "__main__":
     test_de_das_function()
+
+
+def test_en_that_function():
+    import tasks_lang as tl
+    xs = tl.load_en_that_function("en", None, 0)
+    for x in xs:
+        assert tl.score_en_that_function(x, {"content": x["gold"].capitalize() + "."})["correct"], x["gold"]
+    d = xs[0]
+    assert tl.score_en_that_function(d, {"content": "Demonstrative determiner"})["correct"]
+    c = next(x for x in xs if x["gold"] == "conjunction")
+    assert tl.score_en_that_function(c, {"content": "Subordinating conjunction, not a relative pronoun"})["correct"]
+    assert not tl.score_en_that_function(c, {"content": "pronoun"})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_that_function()

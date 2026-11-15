@@ -1638,3 +1638,17 @@ def test_auction_price():
 
 if __name__ == "__main__":
     test_auction_price()
+
+
+def test_parcel_price():
+    import tasks_novel as tn
+    xs = tn.load_parcel_price("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert all(x["gold"] != x["bait"] for x in xs if x["bulky"])
+    x = xs[0]
+    assert tn.score_parcel_price(x, {"content": f"Antwort: {x['gold']} €"})["correct"]
+    assert tn.score_parcel_price(x, {"content": f"Antwort: {x['bait']} €"})["detail"]["ignored_volume"] == 1
+
+
+if __name__ == "__main__":
+    test_parcel_price()

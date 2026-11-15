@@ -8103,6 +8103,47 @@ def score_auction_price(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "paid_own_bid": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- parcel_price (billable weight = max(actual, volumetric))
+def load_parcel_price(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("parcel_price", i, att)
+        bulky = i % 2 == 0  # half the parcels are light but large: the volumetric weight decides
+        while True:
+            l, w, h = r.randrange(20, 81, 5), r.randrange(15, 61, 5), r.randrange(10, 51, 5)
+            vol = l * w * h / 5000
+            actual = round(r.uniform(0.5, vol * 0.8), 1) if bulky else round(r.uniform(vol * 1.2, vol * 1.2 + 15), 1)
+            if actual <= 0.4 or actual > 30 or vol > 30:
+                continue
+            tiers = [(2, 5), (5, 8), (10, 12), (20, 18), (31.5, 25)]
+            price = lambda kg: next(p for lim, p in tiers if kg <= lim)  # noqa: E731
+            bill = max(actual, vol)
+            gold, bait = price(bill), price(actual)
+            want = [8, 12, 18, 25][(i // 2) % 4] if bulky else [5, 8, 12, 18, 25][(i // 2) % 5]  # prices balanced
+            if (gold != bait or not bulky) and gold == want:
+                break
+        tab = ", ".join((f"up to {lim:g} kg: {p} €" if lang == "en" else f"bis {str(lim).replace('.', ',').removesuffix(',0')} kg: {p} €")
+                        for lim, p in tiers)
+        a_txt = f"{actual:g}" if lang == "en" else f"{actual:g}".replace(".", ",")
+        q = (f"A parcel weighs {a_txt} kg and measures {l} x {w} x {h} cm. The carrier charges by the billable weight: the higher "
+             f"of the actual weight and the volumetric weight (length x width x height in cm / 5000). Prices: {tab}. "
+             f"How many euros does the parcel cost?" if lang == "en" else
+             f"Ein Paket wiegt {a_txt} kg und misst {l} x {w} x {h} cm. Der Paketdienst rechnet nach dem abrechenbaren Gewicht ab: "
+             f"dem höheren Wert aus tatsächlichem Gewicht und Volumengewicht (Länge x Breite x Höhe in cm / 5000). Preise: {tab}. "
+             f"Wie viele Euro kostet das Paket?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "bulky": bulky,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_parcel_price(item, reply):
+    v = stated_int(reply, r"(?:€|euro|eur\b)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_bulky" if item["bulky"] else "ok_heavy": float(ok),
+                       "ignored_volume": float(v == item["bait"] and item["bait"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9694,6 +9735,7 @@ TASKS = {
     "version_pick": task(load_version_pick, score_version_pick, 24, 120),
     "check_digit": task(load_check_digit, score_check_digit, 24, 120),
     "auction_price": task(load_auction_price, score_auction_price, 24, 120),
+    "parcel_price": task(load_parcel_price, score_parcel_price, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

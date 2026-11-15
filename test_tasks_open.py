@@ -682,6 +682,8 @@ def test_double_meaning():
         assert to.score_double_meaning(de[0], {"content": "Warum sitzt der Banker im Park? Er wollte sein Geld auf die Bank bringen."})["correct"]
         assert to.score_double_meaning(de[1], {"content": "Der König hat zwei Schlösser: eins am Rhein und eins an der Tür."})["correct"]
         assert not to.score_double_meaning(de[0], {"content": "Ein Witz ohne das Wort."})["correct"]
+        assert to.score_double_meaning(de[5], {"content": "Warum ist die Glühbirne Obst? Weil sie hell ist."})["detail"]["word_used"]
+        assert to.score_double_meaning(de[4], {"content": "Der Strauss brachte einen Blumenstrauss."})["detail"]["word_used"]
         en = to.load_double_meaning("en", None, 0)
         assert not to.score_double_meaning(en[1], {"content": "He took a bath."})["detail"]["word_used"]
     finally:

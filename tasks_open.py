@@ -1621,7 +1621,7 @@ DBL_WORDS = {"de": [("Bank", "Sitzbank", "Geldinstitut"), ("Schloss", "Türschlo
                    ("Zug", "Bahn", "Schachzug")],
             "en": [("bank", "river bank", "money bank"), ("bat", "animal", "baseball bat"), ("bark", "tree bark", "dog's bark"),
                    ("match", "game", "matchstick"), ("spring", "season", "coil"), ("seal", "animal", "stamp/closure"),
-                   ("crane", "bird", "machine"), ("bow", "ribbon/weapon", "bending forward"), ("mouse", "animal", "computer mouse"),
+                   ("crane", "bird", "machine"), ("bolt", "lightning bolt", "door bolt"), ("mouse", "animal", "computer mouse"),
                    ("pitch", "football field", "sound frequency")]}
 DBL_JUDGE = """A short joke (two or three sentences) was requested in {language} whose punchline plays on BOTH meanings of the word
 "{word}" ({m1} / {m2}).
@@ -1651,12 +1651,13 @@ def score_double_meaning(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
     w = item["word"]
-    if item["lang"] == "de":  # inflected and umlaut plurals count: Bänke, Schlösser, Kiefern, Züge
+    if item["lang"] == "de":  # inflected, umlaut plurals and compounds count: Bänke, Schlösser, Glühbirne, Parkbank; ß = ss
+        text_m, w = text.replace("ß", "ss"), w.replace("ß", "ss")
         uml = re.sub(r"[aou]", lambda m: {"a": "ä", "o": "ö", "u": "ü"}[m[0]], w, count=1)
-        pat = rf"\b(?:{re.escape(w)}|{re.escape(uml)})\w{{0,4}}\b"
+        pat = rf"(?:{re.escape(w)}|{re.escape(uml)})\w{{0,4}}\b"
     else:
-        pat = rf"\b{re.escape(w)}(?:s|es)?\b"
-    has_word = bool(re.search(pat, text, re.I))
+        text_m, pat = text, rf"\b{re.escape(w)}(?:s|es|ed|ing)?\b"
+    has_word = bool(re.search(pat, text_m, re.I))
     words = len(re.findall(r"\w+", text))
     out = tasks_judge.judge("", DBL_JUDGE.format(language="German" if item["lang"] == "de" else "English", word=item["word"],
                                                 m1=item["m1"], m2=item["m2"], text=text or "(empty)"), max_tokens=64)

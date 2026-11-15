@@ -7205,7 +7205,8 @@ def load_counterexample(lang, n, seed):
         while True:
             text, pred, kind, par = _ce_claims(r, lang)
             true = all(pred(m) for m in range(1, 201))
-            if true == want_true:
+            coprime = math.gcd(par["a"], par["b"]) == 1
+            if true == want_true and (kind != "div" or not true or coprime == (i % 4 == 1)):  # true div claims: half non-coprime
                 break
         q = (f"Claim: {text}\nIf the claim is false, give one counterexample (a single number). If it is true, answer \"true\"."
              if lang == "en" else

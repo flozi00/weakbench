@@ -6163,6 +6163,43 @@ def score_dose_calc(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- growth_rel (relative vs absolute change)
+GR_TOWNS = ["Altdorf", "Bergheim", "Chamstadt", "Dornfeld", "Eschwege", "Falkenau", "Grünwald"]
+
+
+def load_growth_rel(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("growth_rel", i)
+        shrink = i % 2 == 1
+        while True:
+            towns = r.sample(GR_TOWNS, 5)
+            a = [r.randrange(2000, 90000, 100) for _ in towns]
+            b = [x + (-1 if shrink else 1) * r.randrange(100, x // 4, 100) for x in a]
+            rel = [(y - x) / x for x, y in zip(a, b)]
+            ab = [y - x for x, y in zip(a, b)]
+            pick = (min if shrink else max)
+            gi, ai = rel.index(pick(rel)), ab.index(pick(ab))
+            srt = sorted(rel, reverse=not shrink)
+            if gi != ai and abs(srt[0] - srt[1]) > 0.01:
+                break
+        rows = "\n".join(f"| {t} | {x} | {y} |" for t, x, y in zip(towns, a, b))
+        head = "| Town | 2020 | 2025 |\n|---|---|---|" if lang == "en" else "| Ort | 2020 | 2025 |\n|---|---|---|"
+        q = (f"Population:\n{head}\n{rows}\nWhich town " + ("shrank" if shrink else "grew") + " the most in percent?" if lang == "en" else
+             f"Einwohnerzahl:\n{head}\n{rows}\nWelcher Ort ist prozentual am stärksten " + ("geschrumpft" if shrink else "gewachsen") + "?")
+        items.append({"id": str(i), "lang": lang, "gold": towns[gi], "abs": towns[ai], "towns": towns,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_growth_rel(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    named = [t for t in item["towns"] if re.search(r"\b" + t + r"\b", fa)]
+    v = named[0] if len(named) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_absolute": float(v == item["abs"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7739,6 +7776,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "growth_rel": task(load_growth_rel, score_growth_rel, 24, 120),
     "dose_calc": task(load_dose_calc, score_dose_calc, 24, 120),
     "bin_pack": task(load_bin_pack, score_bin_pack, 24, 120),
     "duty_rota": task(load_duty_rota, score_duty_rota, 24, 120),

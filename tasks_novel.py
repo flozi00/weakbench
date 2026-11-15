@@ -5558,13 +5558,15 @@ def load_cell_rule(lang, n, seed):
         steps = (1, 2, 3)[i % 3]
         while True:
             table = {p: r.choice("#.") for p in pats}
-            if 3 <= sum(v == "#" for v in table.values()) <= 5:
+            if not 3 <= sum(v == "#" for v in table.values()) <= 5:
+                continue
+            width = r.randint(8, 12)
+            row = "".join(r.choice("#.") for _ in range(width))
+            cur = row
+            for _ in range(steps):
+                cur = "".join(table[cur[k - 1] + cur[k] + cur[(k + 1) % width]] for k in range(width))
+            if "#" in cur and "." in cur and cur != row:  # no uniform or unchanged row: those are guessable
                 break
-        width = r.randint(8, 12)
-        row = "".join(r.choice("#.") for _ in range(width))
-        cur = row
-        for _ in range(steps):
-            cur = "".join(table[cur[k - 1] + cur[k] + cur[(k + 1) % width]] for k in range(width))
         rules = "\n".join(f"{p} -> {table[p]}" for p in pats)
         q = (f"A row of cells, each # or ., changes in steps. In each step every cell looks at itself and its left and right "
              f"neighbour (the row wraps around: the first cell's left neighbour is the last cell, and the other way round) and "

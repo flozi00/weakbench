@@ -2969,12 +2969,24 @@ def load_en_question_tags(lang, n, seed):
 def score_en_question_tags(item, reply):
     def norm(t):
         t = t.lower().replace("’", "'")
-        return " ".join(re.findall(r"[a-z']+", t))
-    raw = reply["content"] or ""
-    if re.search(r"/|\bor\b", raw, re.I):
+        t = re.sub(r"\bcan't\b", "can not", t).replace("won't", "will not")
+        t = re.sub(r"\b(\w+)n't\b", r"\1 not", t).replace("cannot", "can not")
+        return " ".join(re.findall(r"[a-z]+", t))
+    raw = (reply["content"] or "").split("?")[0]  # the answer part; an explanation after the "?" is ignored
+    tagish = r"\s*[\w’']+\s+(?:i|you|he|she|it|we|they|there)(?:\s+not)?\s*"
+    if sum(bool(re.fullmatch(tagish, seg, re.I)) for seg in raw.split(",")) > 1:  # "can she, can't she": a hedge
         return {"correct": False, "score": 0.0, "pred": raw[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": 0.0}}
-    t = norm(raw.split("?")[0] if "?" in raw else raw)
-    ok = any(re.search(r"(?:^|\s)" + re.escape(norm(g)) + r"(?:\s|$)", t) for g in item["tags"]) and len(t.split()) <= 6
+    raw = raw.split(",")[-1]  # a full sentence "She can swim, can't she" -> the tag after the last comma
+    t = norm(raw)
+    golds = set()
+    for g in item["tags"]:
+        g = norm(g)
+        golds.add(g)
+        m = re.fullmatch(r"(\w+) not (\w+)", g)  # "has not he" (from hasn't he) <-> formal "has he not"
+        if m:
+            golds.add(f"{m[1]} {m[2]} not")
+    hedge = bool(re.search(r"/|\bor\b", raw, re.I))
+    ok = not hedge and any(re.search(r"(?:^|\s)" + re.escape(g) + r"$", t) for g in golds) and len(t.split()) <= 6
     return {"correct": ok, "score": float(ok), "pred": t[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 

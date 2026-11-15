@@ -6021,10 +6021,11 @@ def load_duty_rota(lang, n, seed):
             if gold != naive:
                 break
         fmt = lambda d: f"{WDn[d.weekday()]}, {d.isoformat()}"  # noqa: E731
-        q = (f"A duty rota rotates through {', '.join(people)} in this order, one person per working day (Monday to Friday). "
+        grp = ", ".join(people[:-1]) + (" and " if lang == "en" else " und ") + people[-1]
+        q = (f"A duty rota rotates through {grp} in this order, one person per working day (Monday to Friday). "
              f"Weekends do not count, and {fmt(holiday)} is a public holiday with no duty. {people[0]} is on duty on {fmt(start)}. "
              f"Who is on duty on {fmt(target)}?" if lang == "en" else
-             f"Ein Dienstplan wechselt in dieser Reihenfolge zwischen {', '.join(people)}, eine Person pro Arbeitstag (Montag bis "
+             f"Ein Dienstplan wechselt zwischen {grp} (in dieser Reihenfolge), eine Person pro Arbeitstag (Montag bis "
              f"Freitag). Wochenenden zählen nicht, und der {fmt(holiday)} ist ein Feiertag ohne Dienst. {people[0]} hat am {fmt(start)} "
              f"Dienst. Wer hat am {fmt(target)} Dienst?")
         items.append({"id": str(i), "lang": lang, "gold": gold, "naive": naive,
@@ -6033,7 +6034,8 @@ def load_duty_rota(lang, n, seed):
 
 
 def score_duty_rota(item, reply):
-    fa = final_answer(reply["content"]) or ""
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")  # "Bruno (not Aylin)"
+    fa = re.split(r"->|→|=", fa)[-1]  # "Aylin, Bruno, Carla -> Bruno"
     named = [p for p in DR_PEOPLE if re.search(r"\b" + p + r"\b", fa)]
     v = named[0] if len(named) == 1 else None
     ok = v == item["gold"]

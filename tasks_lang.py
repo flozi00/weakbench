@@ -2516,10 +2516,11 @@ def load_de_weil_denn(lang, n, seed):
     for i in range(min(n or 30, 30)):
         conj = ("weil", "denn", "da")[i % 3]
         subj, verb, rest = WD_CLAUSE[(i // 3) % 5]
-        main = WD_MAIN[(i // 3 + i // 15) % 3]
+        main = WD_MAIN[(i // 3 + 2 * (i // 15)) % 3]
         second = f"{subj[0].upper()}{subj[1:]} {verb} {rest}."
         gold = f"{conj} {subj} {verb} {rest}" if conj == "denn" else f"{conj} {subj} {rest} {verb}"
         items.append({"id": str(i), "lang": "de", "gold": gold, "conj": conj, "bait": f"{conj} {subj} {verb} {rest}",
+                      "words": sorted(f"{subj} {verb} {rest}".lower().split()), "verb": verb,
                       "messages": [{"role": "user", "content": f"Verbinde die beiden Sätze mit „{conj}“ zu einem Satz "
                                     f"(Standardschriftdeutsch, der erste Satz bleibt vorne). Antworte nur mit dem Satz.\n\n{main} {second}"}]})
     return items
@@ -2527,8 +2528,14 @@ def load_de_weil_denn(lang, n, seed):
 
 def score_de_weil_denn(item, reply):
     t = re.sub(r"\s+", " ", (reply["content"] or "").lower())
-    ok = item["gold"].lower() in t
     vl = item["conj"] != "denn"
+    ok = False
+    for seg in re.findall(r"\b" + item["conj"] + r"\b([^.,;!?\n]*)", t):  # the clause after the conjunction
+        toks = seg.split()
+        if sorted(toks) == item["words"] and (toks[-1] == item["verb"]) == vl and (vl or toks[1:2] == [item["verb"]] or
+                                                                                   toks.index(item["verb"]) > 0):
+            ok = True
+    ok = ok and not (vl and item["bait"].lower() in t)  # a hedge that also writes "weil er hat ..." fails
     d = {"ok_vl" if vl else "ok_v2": float(ok)}
     if vl:
         d["took_v2"] = float(item["bait"].lower() in t)

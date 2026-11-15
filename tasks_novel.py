@@ -5000,7 +5000,8 @@ def score_queue_sim(item, reply):
 CS_COL = {"en": ["red", "blue", "green", "yellow"], "de": ["rot", "blau", "grün", "gelb"]}
 CS_RULES = {  # (en, de); applied in this order
     "neg": ("Every {c0} card counts negative (its value is subtracted).", "Jede {c0}e Karte zählt negativ (ihr Wert wird abgezogen)."),
-    "pair": ("If two cards have the same value, both count double.", "Haben zwei Karten denselben Wert, zählen beide doppelt."),
+    "pair": ("If two or more cards have the same face value, each of them counts double.",
+             "Haben zwei oder mehr Karten denselben Kartenwert, zählt jede von ihnen doppelt."),
     "cancel": ("If the hand holds at least one {c1} card, the card with the highest face value among the other colours counts 0 "
                "(once per hand; on a tie, the first such card in the hand).",
                "Enthält die Hand mindestens eine {c1}e Karte, zählt die Karte mit dem höchsten Kartenwert unter den anderen Farben 0 "
@@ -5045,7 +5046,8 @@ def load_card_score(lang, n, seed):
             hand_c = [(cols[c], v) for c, v in hand]
             gold = _cs_score(hand_c, rules, cols[c0], cols[c1])
             naive = sum(v for _, v in hand)
-            if gold != naive:
+            capped = "cap" in rules and _cs_score(hand_c, [x for x in rules if x != "cap"], cols[c0], cols[c1]) > 30
+            if gold != naive and (not capped or i % 6 == 0):  # the cap would make "30" a constant shortcut
                 break
         texts = [CS_RULES[x][0 if lang == "en" else 1].format(c0=cols[c0], c1=cols[c1]) for x in rules]
         cards = ", ".join(f"{c} {v}" for c, v in hand_c)

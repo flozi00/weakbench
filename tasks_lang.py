@@ -2661,11 +2661,12 @@ def load_de_passive(lang, n, seed):
 
 
 def score_de_passive(item, reply):
-    t = re.sub(r"\s+", " ", (reply["content"] or "").strip().splitlines()[0] if (reply["content"] or "").strip() else "").lower()
     p = item["part"]
-    pat = {"praesens": rf"\bwird\b.*\b{p}\b(?! werden| worden)", "praeteritum": rf"\bwurde\b.*\b{p}\b(?! worden)",
+    lines = [x.strip() for x in (reply["content"] or "").splitlines() if x.strip()]
+    t = re.sub(r"\s+", " ", next((x for x in lines if p in x.lower()), lines[0] if lines else "")).lower()  # skip an intro line
+    pat = {"praesens": rf"\bwird\b.*\b{p}\b(?! werden| worden)", "praeteritum": rf"\bwurde\b.*\b{p}\b(?! worden| werden)",
            "perfekt": rf"\bist\b.*\b{p} worden\b", "futur": rf"\bwird\b.*\b{p} werden\b"}[item["tense"]]
-    tense_ok = bool(re.search(pat, t))
+    tense_ok = bool(re.search(pat, t)) and "?" not in t and not re.search(r"/|\boder\b", t)  # no question, no hedge
     case_ok = item["nom"].lower() in t and item["obj"].lower() not in t
     ok = tense_ok and case_ok
     return {"correct": ok, "score": float(ok), "pred": t[:100], "gold": item["gold"],

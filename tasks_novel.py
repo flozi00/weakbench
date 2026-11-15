@@ -4982,7 +4982,7 @@ def load_queue_sim(lang, n, seed):
                 if lang == "en" else
                 f"Eine Sachbearbeiterin bedient eine Warteschlange in Runden von höchstens {q} Minuten. Wer nach einer Runde nicht "
                 "fertig ist, stellt sich hinten an. Wer während einer Runde oder genau an ihrem Ende ankommt, reiht sich vor der "
-                "Person ein, deren Runde gerade endete. Sie beginnt in Minute 0 und wartet nie, wenn jemand ansteht.")
+                "Person ein, deren Runde gerade endete. Die Sachbearbeiterin beginnt in Minute 0 und wartet nie, wenn jemand ansteht.")
         ask = (f"In which minute is {who} finished?" if lang == "en" else f"In welcher Minute ist {who} fertig?")
         items.append({"id": str(i), "lang": lang, "gold": done[who], "fifo": fifo[who], "k": k,
                       "messages": [{"role": "user", "content": f"{rule}\n{lines}\n{ask}\n" + ASK[lang]}]})
@@ -5016,6 +5016,9 @@ def answer_value(line, lang):
     """The number a final answer line states: after the last "=" when the line restates arithmetic
     ("3 x 49 + 2 x 15 = 177"), else its first number ("6000 m (6 km)")."""
     line = line or ""
+    bare = re.sub(r"\([^()]*\)", " ", line)  # a working note in brackets: "64 m² (= 8 x 6 - 4)"
+    if re.search(r"\d", bare):
+        line = bare
     return parse_number(line.rsplit("=", 1)[1] if "=" in line else line, lang, first=True)
 
 

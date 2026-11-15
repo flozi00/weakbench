@@ -9359,6 +9359,34 @@ def score_free_shipping(item, reply):
             "detail": {"paid_fee": float(near(item["pay_fee"]) and not ok), "one_item_only": float(near(item["naive_add"]) and not ok)}}
 
 
+# ---------------------------------------------------------------- seven_segment (read a number drawn as 7-segment ASCII art)
+SEG = {"0": (" _ ", "| |", "|_|"), "1": ("   ", "  |", "  |"), "2": (" _ ", " _|", "|_ "), "3": (" _ ", " _|", " _|"),
+       "4": ("   ", "|_|", "  |"), "5": (" _ ", "|_ ", " _|"), "6": (" _ ", "|_ ", "|_|"), "7": (" _ ", "  |", "  |"),
+       "8": (" _ ", "|_|", "|_|"), "9": (" _ ", "|_|", " _|")}
+
+
+def load_seven_segment(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("seven_segment", i, att)
+        num = str(r.randint(10 ** (2 + i % 3), 10 ** (3 + i % 3) - 1))  # 3 to 5 digits
+        art = "\n".join(" ".join(SEG[d][row] for d in num) for row in range(3))
+        q = (f"This number is drawn like a digital clock display (each digit is 3 characters wide, separated by a space). Which number "
+             f"is it?\n```\n{art}\n```" if lang == "en" else
+             f"Diese Zahl ist wie auf einer Digitalanzeige gezeichnet (jede Ziffer ist 3 Zeichen breit, getrennt durch ein Leerzeichen). "
+             f"Welche Zahl ist es?\n```\n{art}\n```")
+        items.append({"id": str(i), "lang": lang, "gold": num, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_seven_segment(item, reply):
+    fa = re.sub(r"[\s.,']", "", final_answer(reply["content"]) or "")
+    m = re.findall(r"\d+", fa)
+    v = m[-1] if m else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_d{len(item['gold'])}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10975,6 +11003,7 @@ TASKS = {
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
     "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),
     "free_shipping": task(load_free_shipping, score_free_shipping, 24, 120),
+    "seven_segment": task(load_seven_segment, score_seven_segment, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

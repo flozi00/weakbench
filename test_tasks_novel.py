@@ -2116,3 +2116,17 @@ def test_free_shipping():
 
 if __name__ == "__main__":
     test_free_shipping()
+
+
+def test_seven_segment():
+    import tasks_novel as tn
+    xs = tn.load_seven_segment("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert len({tuple(v) for v in tn.SEG.values()}) == 10  # every digit drawn differently
+    x = xs[0]
+    for c in (f"Answer: {x['gold']}", f"Answer: {int(x['gold']):,}", f"Answer: **{x['gold']}**"):
+        assert tn.score_seven_segment(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_seven_segment()

@@ -1407,6 +1407,32 @@ def score_de_creative(item, reply):
                        "vivid": float(met[3]), "coherent_arc": float(met[4]), "length_ok": float(met[5]), "words": words}}
 
 
+LF_ALTS = {"Gestern bin ich ins Kino gegangen.": ["Ich bin gestern ins Kino gegangen."],
+           "Wegen des Regens bleiben wir zu Hause.": ["Wegen Regens bleiben wir zu Hause."],
+           "Ich gehe nach Hause.": ["Ich gehe nachhause."],
+           "She can sing very well.": ["She sings very well.", "She can sing really well."],
+           "If I had time, I would help you.": ["If I had the time, I would help you."],
+           "She told me that she was tired.": ["She told me she was tired.", "She said to me that she was tired."],
+           "I want you to come to my party.": ["I would like you to come to my party."],
+           "I have been living in Berlin since 2020.": ["I have lived in Berlin since 2020."],
+           "He has been working here for three years.": ["He has worked here for three years."]}
+
+
+def _lf_corrected(text, golds):
+    """Whether one of the accepted corrections appears in the reply: quotes, bold, commas and final punctuation do not
+    matter, English contractions are expanded."""
+    def norm(t):
+        t = t.replace("’", "'").lower()
+        t = re.sub(r"\b(i|you|we|they)'ve\b", r"\1 have", t)
+        t = re.sub(r"\b(i|you|we|they|he|she)'d\b", r"\1 would", t)
+        t = re.sub(r"\b(he|she|it)'s been\b", r"\1 has been", t)
+        t = re.sub(r"\b(he|she|it)'s (worked|lived|been)\b", r"\1 has \2", t)
+        t = re.sub(r"[„“”\"*_`,.!?:;»«‚‘]", " ", t)
+        return " " + re.sub(r"\s+", " ", t).strip() + " "
+    reply = norm(text)
+    return any(norm(g) in reply for g in golds)
+
+
 # ---------------------------------------------------------------- de_learner_feedback (judge + exact: correct and explain)
 # A German learner's sentence with one error. The model corrects it (checked exactly) and explains the rule in simple
 # German for a B1 learner (judged: rule correct, explanation simple, no new errors, encouraging but not padded).
@@ -1444,8 +1470,7 @@ def load_de_learner_feedback(lang, n, seed):
 def score_de_learner_feedback(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    norm = lambda t: re.sub(r"\s+", " ", re.sub(r"[„“\"*]", "", t)).strip().lower()  # noqa: E731
-    corrected = norm(item["good"]) in norm(text)
+    corrected = _lf_corrected(text, [item["good"], *LF_ALTS.get(item["good"], [])])
     out = tasks_judge.judge("", LF_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
                             max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
@@ -1492,10 +1517,7 @@ def load_en_learner_feedback(lang, n, seed):
 def score_en_learner_feedback(item, reply):
     tasks_judge.check_judge()
     text = (reply["content"] or "").strip()
-    norm = lambda t: re.sub(r"\s+", " ", re.sub(r"[“”\"*]", "", t.replace("’", "'"))).strip().lower()  # noqa: E731
-    alts = {"I have been living in Berlin since 2020.": ["I have lived in Berlin since 2020."],
-            "He has been working here for three years.": ["He has worked here for three years."]}.get(item["good"], [])
-    corrected = any(norm(g) in norm(text) for g in [item["good"], *alts])
+    corrected = _lf_corrected(text, [item["good"], *LF_ALTS.get(item["good"], [])])
     out = tasks_judge.judge("", LFE_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
                             max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)

@@ -1488,3 +1488,17 @@ def test_break_even():
 
 if __name__ == "__main__":
     test_break_even()
+
+
+def test_night_shift():
+    import tasks_novel as tn
+    xs = tn.load_night_shift("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert all(x["gold"] != x["bait"] for x in xs)
+    x = xs[0]
+    assert tn.score_night_shift(x, {"content": f"Answer: {x['gold']} minutes"})["correct"]
+    assert tn.score_night_shift(x, {"content": f"Answer: {x['bait']}"})["detail"]["no_midnight_wrap"] == 1
+
+
+if __name__ == "__main__":
+    test_night_shift()

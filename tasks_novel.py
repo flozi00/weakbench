@@ -7679,6 +7679,47 @@ def score_break_even(item, reply):
             "detail": {"ignored_variable_cost": float(v == item["bait"]), "rounded_down": float(v == item["floor"])}}
 
 
+# ---------------------------------------------------------------- night_shift (hours across midnight, minus breaks)
+NS_NAMES = ["Mara", "Jonas", "Elif", "Tomasz", "Ines", "Karl", "Sven", "Lea"]
+
+
+def load_night_shift(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("night_shift", i, att)
+        shifts, total, naive = [], 0, 0
+        while not shifts or total == naive:  # 18:00-06:00 is 12 h both ways: redraw so the bait differs
+            shifts, total, naive = [], 0, 0
+            for _ in range(r.randint(2, 4)):
+                a = r.randrange(18 * 60, 23 * 60 + 46, 15)
+                b = r.randrange(4 * 60, 8 * 60 + 1, 15)
+                brk = r.choice([0, 15, 30, 45])
+                shifts.append((a, b, brk))
+                total += b + 1440 - a - brk
+                naive += abs(b - a) - brk  # subtracting the clock times without crossing midnight
+        hm = lambda m: f"{m // 60:02d}:{m % 60:02d}"  # noqa: E731
+        name = r.choice(NS_NAMES)
+        lines = "\n".join(
+            (f"- {hm(a)} to {hm(b)} the next morning, " + (f"{brk} min break" if brk else "no break") if lang == "en" else
+             f"- {hm(a)} bis {hm(b)} Uhr am nächsten Morgen, " + (f"{brk} Min. Pause" if brk else "keine Pause"))
+            for a, b, brk in shifts)
+        q = (f"{name} worked these night shifts:\n{lines}\nHow many minutes did {name} work in total, without the breaks?"
+             if lang == "en" else
+             f"{name} hat diese Nachtschichten gearbeitet:\n{lines}\nWie viele Minuten hat {name} insgesamt gearbeitet, ohne die Pausen?")
+        items.append({"id": str(i), "lang": lang, "gold": total, "bait": naive,
+                      "with_breaks": total + sum(x[2] for x in shifts),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_night_shift(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"no_midnight_wrap": float(v == item["bait"]),
+                       "kept_breaks": float(v == item["with_breaks"] and item["with_breaks"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9261,6 +9302,7 @@ TASKS = {
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
     "risk_stats": task(load_risk_stats, score_risk_stats, 24, 120),
     "break_even": task(load_break_even, score_break_even, 24, 120),
+    "night_shift": task(load_night_shift, score_night_shift, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

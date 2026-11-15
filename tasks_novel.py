@@ -182,8 +182,9 @@ ASK = {"en": "Think it through, then finish with one line \"Answer: <your answer
 ANSWER = re.compile(r"(?im)^\W*(?:final\s+)?(?:answer|antwort)\W{0,4}?[:：]\s*(.+?)\s*$")  # "**Answer**: x" too
 
 
-LEAD_IN = re.compile(r"^(?:the (?:correct |final |right )?(?:answer|solution|result) is|"
-                     r"die (?:richtige |korrekte )?(?:antwort|lösung) (?:lautet|ist)|das ergebnis (?:lautet|ist)|richtig ist)\s*:?\s*", re.I)
+LEAD_IN = re.compile(r"^(?:the (?:correct |final |right |missing )?(?:answer|solution|result|article|word|form) is|"
+                     r"(?:die|der|das) (?:richtige |korrekte |passende |gesuchte |fehlende )?(?:antwort|lösung|artikel|wort|form|ergebnis)"
+                     r"\s*(?:lautet|ist|:)|richtig ist)\s*:?\s*", re.I)
 
 
 def final_answer(text):

@@ -4038,14 +4038,14 @@ def score_dual_output(item, reply):
 # Nouns whose gender changes the meaning: der See / die See, das Band / der Band, die Leiter / der Leiter, die Steuer /
 # das Steuer, das Tor / der Tor, der Kiefer / die Kiefer, das Gehalt / der Gehalt, das Erbe / der Erbe. Nominative gaps.
 GM_ITEMS = [("Im Sommer schwimmen wir im Bodensee; ___ See ist dort sehr klar.", "der", ("der", "die")),
-            ("Bei Sturm ist ___ See rau, und die Fischer bleiben im Hafen.", "die", ("der", "die")),
+            ("Bei Sturm ist ___ See rau, und die Kutter bleiben in den Nordseehäfen.", "die", ("der", "die")),
             ("___ Band mit den Fotos steht im obersten Regal.", "der", ("der", "das")),
             ("___ Band hält das Paket zusammen.", "das", ("der", "das")),
             ("___ Leiter der Abteilung hat die Besprechung abgesagt.", "der", ("der", "die")),
             ("___ Leiter steht im Keller, falls du an die Lampe willst.", "die", ("der", "die")),
             ("___ Steuer muss bis Ende Mai bezahlt werden.", "die", ("die", "das")),
             ("Bei Glatteis muss man ___ Steuer gut festhalten.", "das", ("die", "das")),
-            ("___ Tor fiel in der letzten Minute.", "das", ("der", "das")),
+            ("___ Tor zum 2:1 fiel in der letzten Minute.", "das", ("der", "das")),
             ("___ Tor glaubte jedes Wort, das man ihm erzählte.", "der", ("der", "das")),
             ("___ Kiefer im Garten ist über zwanzig Meter hoch.", "die", ("der", "die")),
             ("Nach dem Unfall war ___ Kiefer gebrochen; er konnte kaum sprechen.", "der", ("der", "die")),

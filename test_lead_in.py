@@ -29,5 +29,13 @@ def test_lead_in():
     assert not bad, bad[:10]
 
 
+def test_article_frames():
+    import tasks_lang as tl
+    x = next(y for y in tl.load_de_genus_meaning("de", None, 0) if y["gold"] == "die")
+    for c in ("Der richtige Artikel ist „die“.", "Der passende Artikel ist die.", "Der gesuchte Artikel: die", "Die korrekte Antwort: die"):
+        assert tl.score_de_genus_meaning(x, {"content": c})["correct"], c
+
+
 if __name__ == "__main__":
     test_lead_in()
+    test_article_frames()

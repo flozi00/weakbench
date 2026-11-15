@@ -3066,22 +3066,23 @@ def score_md_translate(item, reply):
 
 # ---------------------------------------------------------------- de_prefix_meaning (separable or not: the form decides)
 # (sentence, meaning of the separable verb, meaning of the inseparable one, which applies)
-PM_ITEMS = [("Der Fahrer hat das Verkehrsschild umgefahren.", "es umgestoßen, sodass es umfiel", "einen Bogen darum gemacht", "A"),
-            ("Der Fahrer hat das Verkehrsschild umfahren.", "es umgestoßen, sodass es umfiel", "einen Bogen darum gemacht", "B"),
-            ("Der Fährmann hat die Wanderer übergesetzt.", "sie ans andere Ufer gebracht", "ihre Worte in eine andere Sprache übertragen", "A"),
-            ("Die Dolmetscherin hat die Rede übersetzt.", "sie ans andere Ufer gebracht", "sie in eine andere Sprache übertragen", "B"),
-            ("Er hat den Brief umgeschrieben.", "ihn neu und anders geschrieben", "den Inhalt mit anderen Worten angedeutet, ohne ihn direkt zu nennen", "A"),
-            ("Sie hat das Problem nur umschrieben.", "es neu und anders aufgeschrieben", "es mit anderen Worten angedeutet, ohne es direkt zu nennen", "B"),
-            ("Ich habe kurz durch das Fernglas durchgeschaut.", "hindurchgesehen", "jemandes wahre Absicht erkannt", "A"),
-            ("Ich habe seinen Plan sofort durchschaut.", "hindurchgesehen", "die wahre Absicht erkannt", "B"),
-            ("Nach dem Streit ist sie zur Tagesordnung übergegangen.", "zu etwas anderem gewechselt", "jemanden absichtlich nicht beachtet", "A"),
-            ("Bei der Beförderung wurde er übergangen.", "zu etwas anderem gewechselt", "absichtlich nicht berücksichtigt", "B"),
-            ("Der Hund hat den Ball wiedergeholt.", "ihn zurückgebracht", "es noch einmal gesagt oder getan", "A"),
-            ("Die Lehrerin hat die Frage wiederholt.", "sie zurückgebracht", "sie noch einmal gestellt", "B"),
-            ("Er hat die Hand untergehalten, damit nichts herunterfällt.", "sie darunter gehalten", "sich mit jemandem unterhalten", "A"),
-            ("Wir haben uns lange unterhalten.", "etwas darunter gehalten", "miteinander gesprochen", "B"),
-            ("Sie hat die Uhr auf Winterzeit umgestellt.", "anders eingestellt", "von allen Seiten eingekreist", "A"),
-            ("Die Polizei hat das Haus umstellt.", "anders eingestellt", "von allen Seiten eingekreist", "B")]
+PM_PAIRS = [("Der Lkw hat die Absperrung umgefahren.", "Der Lkw hat die Absperrung umfahren.",
+             "er hat sie umgestoßen, sodass sie umfiel", "er ist um sie herumgefahren"),
+            ("Sie hat die Reisegruppe übergesetzt.", "Sie hat für die Reisegruppe übersetzt.",
+             "sie hat sie ans andere Ufer gebracht", "sie hat Gesagtes in eine andere Sprache übertragen"),
+            ("Er hat den Satz umgeschrieben.", "Er hat den Satz umschrieben.",
+             "er hat ihn neu formuliert und aufgeschrieben", "er hat den Inhalt angedeutet, ohne den Satz direkt zu nennen"),
+            ("In der Sitzung ist sie zum nächsten Punkt übergegangen.", "In der Sitzung hat sie den nächsten Punkt übergangen.",
+             "sie hat mit dem nächsten Punkt weitergemacht", "sie hat den nächsten Punkt ausgelassen"),
+            ("Die Soldaten haben die Zelte umgestellt.", "Die Soldaten haben die Zelte umstellt.",
+             "sie haben sie an einen anderen Platz gestellt", "sie haben sie von allen Seiten eingekreist"),
+            ("Sie ist geschickt mit dem Problem umgegangen.", "Sie hat das Problem geschickt umgangen.",
+             "sie hat es behandelt und bewältigt", "sie hat es vermieden, sich damit zu befassen"),
+            ("Die Absperrung ist durchgebrochen.", "Die Fans haben die Absperrung durchbrochen.",
+             "sie ist von selbst in zwei Teile zerbrochen", "jemand hat sich gewaltsam einen Weg hindurch gebahnt"),
+            ("Der Turm ist im Sturm umgeflogen.", "Der Hubschrauber hat den Turm umflogen.",
+             "er ist umgefallen", "er wurde im Bogen umrundet")]
+PM_ITEMS = [x for a, b, ma, mb in PM_PAIRS for x in ((a, ma, mb, "A"), (b, ma, mb, "B"))]  # same options within a pair
 
 
 def load_de_prefix_meaning(lang, n, seed):

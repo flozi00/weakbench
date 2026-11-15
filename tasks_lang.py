@@ -3231,6 +3231,34 @@ def score_en_phrasal_sense(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- de_das_was (Relativpronomen das / was)
+DW_ITEMS = [("Das Buch, ___ ich gerade lese, ist spannend.", "das"), ("Das ist alles, ___ ich weiß.", "was"),
+            ("Das Haus, ___ wir kaufen wollen, ist alt.", "das"), ("Es gibt nichts, ___ ihn aufhalten kann.", "was"),
+            ("Das Kind, ___ dort spielt, ist mein Neffe.", "das"), ("Das ist das Beste, ___ mir passiert ist.", "was"),
+            ("Das Auto, ___ vor der Tür steht, gehört ihr.", "das"), ("Er kam zu spät, ___ mich sehr ärgerte.", "was"),
+            ("Das Fenster, ___ kaputt ist, wird morgen repariert.", "das"), ("Gibt es etwas, ___ ich für dich tun kann?", "was"),
+            ("Das Lied, ___ im Radio lief, kenne ich.", "das"), ("Das Einzige, ___ zählt, ist das Ergebnis.", "was"),
+            ("Das Problem, ___ wir besprochen haben, ist gelöst.", "das"), ("Sie lacht viel, ___ ich an ihr mag.", "was"),
+            ("Das Geschenk, ___ du mir gegeben hast, ist schön.", "das"), ("Vieles, ___ er sagt, stimmt nicht.", "was"),
+            ("Das Restaurant, ___ neu eröffnet hat, ist voll.", "das"), ("Das Erste, ___ ich sah, war das Meer.", "was"),
+            ("Das Zimmer, ___ wir gebucht haben, ist klein.", "das"), ("Manches, ___ früher galt, gilt heute nicht mehr.", "was")]
+
+
+def load_de_das_was(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": "Setze „das“ oder „was“ ein (Standardschriftdeutsch). Antworte nur mit dem Wort.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(DW_ITEMS[:min(n or 20, 20)])]
+
+
+def score_de_das_was(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", (reply["content"] or "").lower())
+    w = [x for x in re.findall(r"[a-zäöüß]+", t) if x in ("das", "was")]
+    v = w[0] if len(set(w)) == 1 else (w[-1] if w and t.strip().startswith(("antwort", "answer")) and len(set(w)) == 1 else None)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['gold']}": float(ok), **({"took_das": float(v == "das")} if item["gold"] == "was" else {})}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3559,6 +3587,7 @@ TASKS = {
     "de_weak_nouns": task(("de",), load_de_weak_nouns, score_de_weak_nouns, 16, 40, lang_check=False),
     "en_relative_commas": task(("en",), load_en_relative_commas, score_en_relative_commas, 16, 16, lang_check=False),
     "en_phrasal_sense": task(("en",), load_en_phrasal_sense, score_en_phrasal_sense, 16, 20, lang_check=False),
+    "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

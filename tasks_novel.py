@@ -6336,7 +6336,7 @@ def load_meet_time(lang, n, seed):
             if meet.denominator == 1 and naive.denominator == 1 and meet != naive and meet < 22 * 60:
                 break
         a, b = ("Anna", "Ben")
-        q = (f"{a} leaves town A at {fmt(t1)} and walks/drives towards town B at {v1} km/h. {b} leaves town B at {fmt(t1 + lag)} and "
+        q = (f"{a} leaves town A at {fmt(t1)} and travels towards town B at {v1} km/h. {b} leaves town B at {fmt(t1 + lag)} and "
              f"travels towards town A on the same road at {v2} km/h. The road between A and B is {d} km long. At what time do they meet?"
              if lang == "en" else
              f"{a} fährt um {fmt(t1)} in Ort A los, mit {v1} km/h in Richtung Ort B. {b} fährt um {fmt(t1 + lag)} in Ort B los, auf "

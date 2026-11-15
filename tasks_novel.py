@@ -8225,6 +8225,63 @@ def score_bus_meet(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"start_plus_lcm": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- allergen_check (allergens through nested components)
+# component names carry no allergen of their own in everyday knowledge (no "praline cream" without nuts): the sheet decides
+AL_BASES = {"en": ["base sauce", "herb paste", "tomato glaze", "mustard marinade", "bread crust", "vegetable stock", "lemon cream", "herb salt"],
+            "de": ["Grundsoße", "Kräuterpaste", "Tomatenglasur", "Senfmarinade", "Brotkruste", "Gemüsebrühe", "Zitronencreme", "Kräutersalz"]}
+AL_DISHES = {"en": ["pasta", "salad", "chicken skewer", "apple cake", "fish fillet", "vegetable bowl", "ice cream", "flatbread"],
+             "de": ["Pasta", "Salat", "Hähnchenspieß", "Apfelkuchen", "Fischfilet", "Gemüsebowl", "Eisbecher", "Fladenbrot"]}
+AL_ALLERG = {"en": ["nuts", "milk", "sesame"], "de": ["Nüsse", "Milch", "Sesam"]}
+
+
+def load_allergen_check(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("allergen_check", i, att)
+        while True:
+            bases = r.sample(range(8), 6)
+            # level 1: components contain allergens directly; level 2: some components contain other components
+            contains = {b: set(r.sample(range(3), r.choice([0, 0, 1]))) for b in bases}
+            uses = {b: set() for b in bases}
+            for b in bases[3:]:
+                uses[b] = set(r.sample(bases[:3], r.choice([0, 1])))
+            def allergens(b, seen=()):
+                out = set(contains[b])
+                for u in uses[b]:
+                    out |= allergens(u)
+                return out
+            dishes = r.sample(range(8), 5)
+            dish_uses = {d: set(r.sample(bases, r.randint(1, 2))) for d in dishes}
+            target = r.randrange(3)
+            safe = sorted(d for d in dishes if not any(target in allergens(b) for b in dish_uses[d]))
+            naive = sorted(d for d in dishes if not any(target in contains[b] for b in dish_uses[d]))  # nested components ignored
+            if 1 <= len(safe) <= 3 and naive != safe:
+                break
+        B, D, A = AL_BASES[lang], AL_DISHES[lang], AL_ALLERG[lang]
+        comp = "\n".join(f"- {B[b]}: " + (", ".join([A[a] for a in sorted(contains[b])] + [B[u] for u in sorted(uses[b])]) or
+                                          ("no listed allergens" if lang == "en" else "keine der genannten Allergene"))
+                         for b in bases)
+        menu = "\n".join(f"- {D[d]}: " + ", ".join(B[b] for b in sorted(dish_uses[d])) for d in dishes)
+        q = (f"Kitchen sheet. Components and what they contain (a component can contain another component):\n{comp}\n"
+             f"Dishes and their components:\n{menu}\nWhich dishes are safe for a guest who must avoid {A[target]}? List all of them."
+             if lang == "en" else
+             f"Küchenblatt. Komponenten und was sie enthalten (eine Komponente kann eine andere Komponente enthalten):\n{comp}\n"
+             f"Gerichte und ihre Komponenten:\n{menu}\nWelche Gerichte sind sicher für einen Gast, der {A[target]} meiden muss? "
+             f"Nenne alle.")
+        items.append({"id": str(i), "lang": lang, "gold": [D[d] for d in safe], "bait": [D[d] for d in naive],
+                      "dishes": [D[d] for d in dishes], "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_allergen_check(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    got = sorted(d for d in item["dishes"] if re.search(rf"(?<![\w-]){re.escape(d)}(?![\w-])", fa, re.I))
+    ok = got == sorted(item["gold"])
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],
+            "detail": {"missed_nesting": float(got == sorted(item["bait"])),
+                       "unsafe_listed": float(bool(set(got) - set(item["gold"])))}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9819,6 +9876,7 @@ TASKS = {
     "parcel_price": task(load_parcel_price, score_parcel_price, 24, 120),
     "multikey_rank": task(load_multikey_rank, score_multikey_rank, 24, 120),
     "bus_meet": task(load_bus_meet, score_bus_meet, 24, 120),
+    "allergen_check": task(load_allergen_check, score_allergen_check, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

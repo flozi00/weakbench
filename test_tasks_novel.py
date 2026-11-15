@@ -1682,3 +1682,18 @@ def test_bus_meet():
 
 if __name__ == "__main__":
     test_bus_meet()
+
+
+def test_allergen_check():
+    import tasks_novel as tn
+    xs = tn.load_allergen_check("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert all(x["gold"] != x["bait"] for x in xs)
+    x = xs[0]
+    assert tn.score_allergen_check(x, {"content": "Answer: " + ", ".join(x["gold"])})["correct"]
+    r = tn.score_allergen_check(x, {"content": "Answer: " + ", ".join(x["bait"])})
+    assert not r["correct"] and r["detail"]["missed_nesting"] == 1
+
+
+if __name__ == "__main__":
+    test_allergen_check()

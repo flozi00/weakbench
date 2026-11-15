@@ -1652,3 +1652,18 @@ def test_parcel_price():
 
 if __name__ == "__main__":
     test_parcel_price()
+
+
+def test_multikey_rank():
+    import tasks_novel as tn
+    from collections import Counter
+    xs = tn.load_multikey_rank("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert max(Counter(x["gold"] for x in xs).values()) < 25
+    x = xs[0]
+    assert tn.score_multikey_rank(x, {"content": f"Answer: {x['gold']}"})["correct"]
+    assert tn.score_multikey_rank(x, {"content": f"Answer: {x['bait']}"})["detail"]["reversed_tiebreak"] == 1
+
+
+if __name__ == "__main__":
+    test_multikey_rank()

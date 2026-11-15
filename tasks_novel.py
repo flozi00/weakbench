@@ -8146,6 +8146,47 @@ def score_parcel_price(item, reply):
                        "ignored_volume": float(v == item["bait"] and item["bait"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- multikey_rank (sort by several keys, mixed directions)
+MK_NAMES = ["Abel", "Bruno", "Carla", "Dana", "Eddy", "Frida", "Gina", "Hugo", "Iris", "Jonas"]
+
+
+def load_multikey_rank(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("multikey_rank", i, att)
+        while True:
+            names = r.sample(MK_NAMES, r.randint(6, 8))
+            rows = [(nm, r.randint(1, 4) * 5, r.choice([3, 4, 5, 6])) for nm in names]  # points, games
+            key = lambda x: (-x[1], x[2], x[0])  # noqa: E731  points desc, fewer games first, then name A-Z
+            order = sorted(rows, key=key)
+            pos = r.randrange(1, len(rows))
+            naive = sorted(rows, key=lambda x: (-x[1], -x[2], x[0]))  # games in the wrong direction
+            tie = [x for x in rows if x[1] == order[pos][1]]
+            if len(tie) >= 2 and naive[pos][0] != order[pos][0]:
+                break
+        table = "\n".join(f"| {nm} | {p} | {g} |" for nm, p, g in rows)
+        place = ["", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"][pos] if lang == "en" else f"{pos + 1}."
+        q = (f"| Player | Points | Games played |\n|---|---|---|\n{table}\nRank the players by points (most first); with equal "
+             f"points, the player with FEWER games played ranks higher; if that is equal too, alphabetically by name. "
+             f"Who is in {place} place?" if lang == "en" else
+             f"| Spieler | Punkte | Gespielte Partien |\n|---|---|---|\n{table}\nOrdne die Spieler nach Punkten (die meisten zuerst); "
+             f"bei gleichen Punkten steht weiter vorn, wer WENIGER Partien gespielt hat; ist auch das gleich, alphabetisch "
+             f"nach Namen. Wer steht auf Platz {place.rstrip('.')}?")
+        items.append({"id": str(i), "lang": lang, "gold": order[pos][0], "names": names, "bait": naive[pos][0],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_multikey_rank(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    hits = sorted((m.start(), nm) for nm in item["names"] if (m := re.search(rf"\b{nm}\b", fa, re.I)))
+    hedge = re.search(r"\b(?:or|oder)\b|/", fa)
+    v = hits[0][1] if len(hits) == 1 or (len(hits) == 2 and not hedge) else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"reversed_tiebreak": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9738,6 +9779,7 @@ TASKS = {
     "check_digit": task(load_check_digit, score_check_digit, 24, 120),
     "auction_price": task(load_auction_price, score_auction_price, 24, 120),
     "parcel_price": task(load_parcel_price, score_parcel_price, 24, 120),
+    "multikey_rank": task(load_multikey_rank, score_multikey_rank, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

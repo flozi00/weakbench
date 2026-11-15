@@ -429,6 +429,20 @@ def test_concept_contrast():
         tasks_judge.configure(None, None, None)
 
 
+def test_de_creative():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES", "NO", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_de_creative("de", None, 0)
+        assert len(it) == 12 and "Präteritum" in it[0]["messages"][0]["content"]
+        r = to.score_de_creative(it[0], {"content": "# Titel\n" + "Wort " * 300, "finish_reason": "stop"})
+        assert not r["correct"] and r["detail"]["length_ok"] == 1.0 and r["detail"]["vivid"] == 0.0
+        assert to.score_de_creative(it[0], {"content": "Wort " * 100})["detail"]["length_ok"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -547,6 +561,7 @@ if __name__ == "__main__":
     test_interpreter()
     test_conflict_summary()
     test_concept_contrast()
+    test_de_creative()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

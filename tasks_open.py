@@ -1350,6 +1350,63 @@ def score_concept_contrast(item, reply):
                        "within_limit": float(met[3])}}
 
 
+# ---------------------------------------------------------------- de_creative (judge: German creative writing, own prompts)
+# The licence-free stand-in for a German EQ-Bench-style creative task (COVERAGE.md): our own prompts, each with hard
+# constraints (perspective, tense, a required motif, a length band) and a judge rubric for language quality. No
+# reference scores exist; the paired A/B is what it is for.
+DCW_PROMPTS = [("Ich-Perspektive", "Präteritum", "ein verlorener Schlüssel", "Eine Nachtschicht in einem Krankenhaus."),
+               ("Er-/Sie-Perspektive", "Präsens", "ein Gewitter", "Zwei Geschwister räumen die Wohnung ihrer verstorbenen Mutter aus."),
+               ("Ich-Perspektive", "Präsens", "ein alter Brief", "Der erste Schultag einer neuen Lehrerin."),
+               ("Er-/Sie-Perspektive", "Präteritum", "eine stehengebliebene Uhr", "Ein Fischer kehrt nach einem Sturm nicht zurück."),
+               ("Du-Perspektive", "Präsens", "ein Fahrradunfall", "Ein Bewerbungsgespräch, das anders läuft als geplant."),
+               ("Ich-Perspektive", "Präteritum", "Schnee im April", "Ein Umzug in eine Stadt, in der man niemanden kennt."),
+               ("Er-/Sie-Perspektive", "Präteritum", "ein Hund, der nicht bellt", "Ein Dorffest, bei dem etwas Seltsames passiert."),
+               ("Ich-Perspektive", "Präsens", "ein vergessener Geburtstag", "Eine Zugfahrt neben einer fremden Person."),
+               ("Er-/Sie-Perspektive", "Präsens", "eine kaputte Straßenlaterne", "Eine Nachbarschaft streitet über einen Baum."),
+               ("Ich-Perspektive", "Präteritum", "der Geruch von frischem Brot", "Die letzte Schicht in einer Bäckerei, die schließt."),
+               ("Du-Perspektive", "Präsens", "ein Anruf um drei Uhr nachts", "Jemand findet heraus, dass er adoptiert wurde."),
+               ("Er-/Sie-Perspektive", "Präteritum", "ein leeres Vogelnest", "Eine alte Frau lernt, ein Smartphone zu benutzen.")]
+DCW_JUDGE = """A German short story was requested with these constraints:
+- perspective: {persp}; tense: {tense}; the motif "{motif}" must appear and matter to the story; situation: {sit}
+- 250 to 400 words.
+
+STORY:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Perspective and tense are kept throughout (no slips into another tense or person, except in dialogue).
+2. The motif appears and plays a real role, and the story is about the given situation.
+3. The German is correct and idiomatic: no grammar, spelling or punctuation errors, no anglicisms or translationese.
+4. The language is vivid and specific (concrete details, varied sentences), not generic filler or cliché-strung.
+5. The story is coherent and has a recognisable arc (it goes somewhere; the ending is not just a summary or a moral)."""
+
+
+def load_de_creative(lang, n, seed):
+    tasks_judge.check_judge()
+    rows = DCW_PROMPTS[:min(n or 12, 12)]
+    return [{"id": str(i), "lang": "de", "persp": p_, "tense": t, "motif": m, "sit": sit,
+             "messages": [{"role": "user", "content": f"Schreib eine kurze Geschichte auf Deutsch (250 bis 400 Wörter). {sit} "
+                           f"Perspektive: {p_}. Zeitform: {t}. Das Motiv „{m}“ soll vorkommen und eine Rolle spielen. "
+                           "Antworte nur mit der Geschichte (ein Titel ist erlaubt)."}]}
+            for i, (p_, t, m, sit) in enumerate(rows)]
+
+
+def score_de_creative(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len([w for w in re.sub(r"^#.*$", "", text, flags=re.M).split() if re.search(r"\w", w)])
+    out = tasks_judge.judge("", DCW_JUDGE.format(persp=item["persp"], tense=item["tense"], motif=item["motif"], sit=item["sit"],
+                                                 text=text or "(empty)"), max_tokens=96)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 5:
+        raise ValueError(f"unusable story verdict {out[:120]!r}")
+    met = [_yes(x) for x in v] + [230 <= words <= 420 and reply.get("finish_reason") != "length"]
+    return {"correct": all(met), "score": round(sum(met) / 6, 4), "pred": text[:160], "gold": None,
+            "detail": {"constraints_kept": float(met[0]), "motif_and_situation": float(met[1]), "correct_german": float(met[2]),
+                       "vivid": float(met[3]), "coherent_arc": float(met[4]), "length_ok": float(met[5]), "words": words}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1747,6 +1804,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "de_creative": {"langs": ("de",), "load": load_de_creative, "score": score_de_creative,
+                         "think": False, "max_tokens": 1024,
+                         "counts": {"quick": {"de": 12}, "full": {"de": None}},
+                         "lang_check": True, "opt_in": True, "needs_judge": True},
          "concept_contrast": {"langs": ("de", "en"), "load": load_concept_contrast, "score": score_concept_contrast,
                               "think": False, "max_tokens": 384,
                               "counts": {"quick": {"de": 10, "en": 10}, "full": {"de": None, "en": None}},

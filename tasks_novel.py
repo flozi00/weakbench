@@ -8937,6 +8937,75 @@ def score_geo_coords(item, reply):
     return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- geo_locate (world knowledge: city -> coordinates, distances)
+# The reverse of geo_coords on the same GeoNames set: give a big city's coordinates (scored by the great-circle error:
+# full credit within 50 km, half within 200 km), or the distance between two big cities (within 10 %), or which of two
+# cities lies further north (exact). Measures a spatial world model, not lookup of a memorised quiz.
+def _km(a, b):
+    import math
+    la1, lo1, la2, lo2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6371 * math.asin(math.sqrt(h))
+
+
+def load_geo_locate(lang, n, seed):
+    g = GEO_PLACES.value
+    names = lambda cc: g["countries"][cc][lang == "de"][0]  # noqa: E731
+    by_cc = {}
+    for c in g["big_cities"]:
+        by_cc.setdefault(c[2], []).append(c)
+    ccs = sorted(by_cc)
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("geo_locate", i, att)
+        kind = ("coords", "distance", "north")[i % 3]
+        while True:  # distance pairs at least 300 km apart, north pairs at least 3° of latitude apart
+            a = r.choice(by_cc[r.choice(ccs)])
+            b = r.choice(by_cc[r.choice([c for c in ccs if c != a[2]])])
+            if (kind != "distance" or _km(a, b) >= 300) and (kind != "north" or abs(a[0] - b[0]) >= 3):
+                break
+        A, B = f"{a[4][0]} ({names(a[2])})", f"{b[4][0]} ({names(b[2])})"
+        if kind == "coords":
+            q = (f"Give the approximate coordinates of {A} as decimal latitude and longitude, e.g. \"48.1, 11.6\" (south and west "
+                 f"negative)." if lang == "en" else
+                 f"Gib die ungefähren Koordinaten von {A} als Dezimalzahlen an, Breite und Länge, z. B. „48.1, 11.6“ (Süden und "
+                 f"Westen negativ).")
+            gold = f"{a[0]:.2f}, {a[1]:.2f}"
+        elif kind == "distance":
+            q = (f"Roughly how many kilometres apart are {A} and {B} as the crow flies?" if lang == "en" else
+                 f"Wie viele Kilometer liegen {A} und {B} ungefähr Luftlinie auseinander?")
+            gold = round(_km(a, b))
+        else:
+            q = (f"Which city lies further north: {A} or {B}?" if lang == "en" else
+                 f"Welche Stadt liegt weiter nördlich: {A} oder {B}?")
+            gold = (a if a[0] > b[0] else b)[4][0]
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold, "a": list(a[:2]), "b": list(b[:2]),
+                      "na": a[4], "nb": b[4], "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_geo_locate(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    if item["kind"] == "coords":
+        vals = [(float(m.group(1).replace(",", ".").replace("−", "-")), m.group(2)) for m in
+                re.finditer(r"([-−]?\d+(?:[.,]\d+)?)\s*°?\s*([NSOWE])?\b", fa)][:2]
+        if len(vals) < 2:
+            return {"correct": False, "score": 0.0, "pred": fa[:40], "gold": item["gold"], "detail": {"ok_coords": 0.0, "km_off": None}}
+        (la, h1), (lo, h2) = vals
+        la, lo = (-abs(la) if h1 == "S" else la), (-abs(lo) if h2 == "W" else lo)
+        d = _km(item["a"], (la, lo))
+        sc = 1.0 if d <= 50 else 0.5 if d <= 200 else 0.0
+        return {"correct": sc == 1.0, "score": sc, "pred": f"{la}, {lo}", "gold": item["gold"], "detail": {"ok_coords": sc, "km_off": round(d)}}
+    if item["kind"] == "distance":
+        v = answer_value(re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", fa), item["lang"])
+        ok = v is not None and abs(v - item["gold"]) <= 0.1 * item["gold"]
+        return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_distance": float(ok)}}
+    has = lambda ns: any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in ns)  # noqa: E731
+    hits = [ns[0] for ns in (item["na"], item["nb"]) if has(ns)]
+    ok = hits == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": hits, "gold": item["gold"], "detail": {"ok_north": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10545,6 +10614,7 @@ TASKS = {
     "password_rules": task(load_password_rules, score_password_rules, 24, 120),
     "meet_city": task(load_meet_city, score_meet_city, 24, 120),
     "geo_coords": task(load_geo_coords, score_geo_coords, 24, 120),
+    "geo_locate": task(load_geo_locate, score_geo_locate, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

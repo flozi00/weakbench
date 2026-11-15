@@ -1947,3 +1947,22 @@ def test_geo_coords():
 
 if __name__ == "__main__":
     test_geo_coords()
+
+
+def test_geo_locate():
+    import tasks_novel as tn
+    xs = tn.load_geo_locate("en", None, 0)
+    assert len(xs) == 120 and len({x["messages"][0]["content"] for x in xs}) == 120
+    c = next(x for x in xs if x["kind"] == "coords")
+    la, lo = c["a"]
+    for rep, sc in ((f"Answer: {la:.1f}, {lo:.1f}", 1.0), (f"Answer: {abs(la):.1f}° {'N' if la >= 0 else 'S'}, {abs(lo):.1f}° {'E' if lo >= 0 else 'W'}", 1.0),
+                    (f"Answer: {la + 1.2:.1f}, {lo:.1f}", 0.5), (f"Answer: {lo:.1f}, {la:.1f}", 0.0)):
+        assert tn.score_geo_locate(c, {"content": rep})["score"] == sc or abs(la - lo) < 1, rep
+    d = next(x for x in xs if x["kind"] == "distance")
+    assert tn.score_geo_locate(d, {"content": f"Answer: about {round(d['gold'] * 1.05):,} km"})["correct"]
+    nth = next(x for x in xs if x["kind"] == "north")
+    assert tn.score_geo_locate(nth, {"content": f"Answer: {nth['gold']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_geo_locate()

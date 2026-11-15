@@ -10290,9 +10290,11 @@ def score_toy_machine(item, reply):
 
 
 # ---------------------------------------------------------------- sliding_puzzle
-# A 3x3 sliding puzzle (tiles 1-8 and a gap) and 6-14 moves, each naming the tile that slides into the gap; which tile
-# is at a named position at the end? Self-built 2-D state. The asked tile is balanced; it never sits there at the start.
+# A 3x3 sliding puzzle (tiles 1-8 and a gap) and 8-16 moves of the GAP (up / down / left / right: the tile there
+# slides in); which tile is at a named position at the end? Self-built 2-D state, the moved tiles are never named. The asked tile is balanced; it never sits there at the start.
 # `ok_m<moves bucket>`, `start_bait` (named the starting tile).
+SP_DIR = {"en": {"U": "up", "D": "down", "L": "left", "R": "right"},
+          "de": {"U": "hoch", "D": "runter", "L": "links", "R": "rechts"}}
 SP_POS = {"en": ["top left", "top middle", "top right", "middle left", "centre", "middle right", "bottom left",
                  "bottom middle", "bottom right"],
           "de": ["oben links", "oben Mitte", "oben rechts", "Mitte links", "Mitte", "Mitte rechts", "unten links",
@@ -10307,22 +10309,22 @@ def load_sliding_puzzle(lang, n, seed):
             board = list(range(1, 9)) + [0]
             r.shuffle(board)
             start, moves = list(board), []
-            k = r.randint(6, 14)
+            k = r.randint(8, 16)
             while len(moves) < k:
                 g = board.index(0)
                 nb = [p for p in range(9) if abs(p // 3 - g // 3) + abs(p % 3 - g % 3) == 1]
-                p = r.choice([q for q in nb if not moves or board[q] != moves[-1]] or nb)  # no instant undo
-                moves.append(board[p])
+                p = r.choice([q for q in nb if not moves or board[q] != moves[-1][0]] or nb)  # no instant undo
+                moves.append((board[p], {-3: "U", 3: "D", -1: "L", 1: "R"}[p - g]))
                 board[g], board[p] = board[p], 0
             pos = r.randrange(9)
             if board[pos] and board[pos] != start[pos] and board[pos] == i % 8 + 1:
                 break
         rows = "\n".join(" ".join(str(x) if x else "_" for x in start[j:j + 3]) for j in (0, 3, 6))
-        q = (f"A 3x3 sliding puzzle (\"_\" is the gap):\n{rows}\n\nThese tiles are slid into the gap, one after another (each "
-             f"is next to the gap when it moves): {', '.join(map(str, moves))}. Which tile is at the {SP_POS['en'][pos]} at the end?"
+        q = (f"A 3x3 sliding puzzle (\"_\" is the gap):\n{rows}\n\nThe gap moves, one step at a time (the tile it moves onto "
+             f"slides into the old gap): {', '.join(SP_DIR['en'][d] for _, d in moves)}. Which tile is at the {SP_POS['en'][pos]} at the end?"
              if lang == "en" else
-             f"Ein 3x3-Schiebepuzzle („_“ ist die Lücke):\n{rows}\n\nDiese Plättchen werden nacheinander in die Lücke geschoben "
-             f"(jedes liegt beim Schieben neben der Lücke): {', '.join(map(str, moves))}. Welches Plättchen liegt am Ende "
+             f"Ein 3x3-Schiebepuzzle („_“ ist die Lücke):\n{rows}\n\nDie Lücke bewegt sich Schritt für Schritt (das Plättchen, auf "
+             f"das sie wandert, rutscht an ihre alte Stelle): {', '.join(SP_DIR['de'][d] for _, d in moves)}. Welches Plättchen liegt am Ende "
              f"{SP_POS['de'][pos]}?")
         items.append({"id": str(i), "lang": lang, "gold": board[pos], "start_tile": start[pos], "moves": k,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
@@ -10333,7 +10335,7 @@ def score_sliding_puzzle(item, reply):
     v = last_int(final_answer(reply["content"]) or "")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
-            "detail": {f"ok_m{'6-9' if item['moves'] <= 9 else '10-14'}": float(ok), "start_bait": float(v == item["start_tile"])}}
+            "detail": {f"ok_m{'8-11' if item['moves'] <= 11 else '12-16'}": float(ok), "start_bait": float(v == item["start_tile"])}}
 
 
 # ---------------------------------------------------------------- event_order

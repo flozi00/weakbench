@@ -4538,9 +4538,9 @@ def load_unit_price(lang, n, seed):
         big_letter = "A" if big_first else "B"
         gold = (("B" if big_first else "A") if big_per > small_per else big_letter)
         q = (f"Two offers for {good} of the same quality:\nA: {a}\nB: {b}\nWhich offer is cheaper per {su}? "
-             "Answer A or B. (If you buy the deal, you take exactly 3.)" if lang == "en" else
+             "Answer A or B." + (" (For the offer you take exactly 3.)" if deal == 2 else "") if lang == "en" else
              f"Zwei Angebote für {good} in gleicher Qualität:\nA: {a}\nB: {b}\nWelches Angebot ist pro {su} günstiger? "
-             "Antworte mit A oder B. (Bei der Aktion nimmst du genau 3.)")
+             "Antworte mit A oder B." + (" (Bei der Aktion nimmst du genau 3.)" if deal == 2 else ""))
         items.append({"id": str(i), "lang": lang, "gold": gold, "bulk_worse": bulk_worse,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items

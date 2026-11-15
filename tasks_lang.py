@@ -3568,11 +3568,11 @@ ZA_ITEMS = [("I love ___ music, especially jazz.", "none"), ("___ music at the p
             ("___ life in a big city can be stressful.", "none"), ("He told me about ___ life of his grandfather.", "the"),
             ("We usually have ___ breakfast at seven.", "none"), ("___ breakfast at that hotel was excellent.", "the"),
             ("She goes to ___ church every Sunday.", "none"), ("___ church in our village is 800 years old.", "the"),
-            ("___ dogs are loyal animals.", "none"), ("___ dogs next door barked all night.", "the"),
+            ("___ dogs are loyal animals in general.", "none"), ("___ dogs next door barked all night.", "the"),
             ("He was ill and stayed in ___ bed all day.", "none"), ("The cat is sleeping on ___ bed in my room.", "the"),
-            ("I will see you on ___ Monday.", "none"), ("We arrived on ___ Monday after the storm.", "the"),
+            ("I will see you on ___ Monday.", "none"), ("I'll never forget ___ Monday when we first met.", "the"),
             ("Can you pass me ___ salt, please?", "the"), ("___ salt is bad for you in large amounts.", "none"),
-            ("My son is still at ___ school; he finishes at four.", "none"), ("They met at ___ school next to the station.", "the"),
+            ("My son is still at ___ school; he finishes at four.", "none"), ("They met in front of ___ school next to the station.", "the"),
             ("___ history was my favourite subject.", "none"), ("We visited ___ history museum in Berlin.", "the")]
 
 
@@ -3584,13 +3584,14 @@ def load_en_zero_article(lang, n, seed):
 
 
 def score_en_zero_article(item, reply):
-    t = re.sub(r"\([^()]*\)", " ", (reply["content"] or "")).replace("’", "'").strip().lower()
+    raw = (reply["content"] or "").replace("’", "'").strip().lower()
+    t = re.sub(r"\([^()]*\)", " ", raw).strip() or raw.strip("() ")  # "(no article)" alone is the answer
     norm = lambda x: re.sub(r"[^a-z' ]", " ", x.lower()).split()  # noqa: E731
     filled = {"the": norm(item["sent"].replace("___", "the")), "none": norm(item["sent"].replace("___ ", "").replace("___", ""))}
     v = next((k for k, f in filled.items() if norm(t) == f), None)  # a repeated full sentence
     if v is None:
-        head = re.sub(r"^\W*(?:answer:\s*)?", "", t)
-        if re.fullmatch(r"\W*(?:answer:\s*)?[-–—∅]\W*", t) or re.match(r"(?:no article|none|zero article|nothing|no\b|x\b)", head):
+        head = re.sub(r"^\W*(?:answer:\s*)?(?:the (?:correct )?answer(?: is)?:?\s*|the gap needs\s*|it needs\s*)?", "", t)
+        if re.fullmatch(r"\W*(?:answer:\s*)?[-–—∅øØ0]\W*", t) or re.match(r"(?:no article|none|zero\b|nothing|no\b|x\b)", head):
             v = "none"
         elif re.match(r"\W*the\b", head):
             v = "the"

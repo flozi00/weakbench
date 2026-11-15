@@ -1177,3 +1177,18 @@ def test_en_adverb_position():
 
 if __name__ == "__main__":
     test_en_adverb_position()
+
+
+def test_de_passive_kind():
+    import tasks_lang as tl
+    xs = tl.load_de_passive_kind("de", None, 0)
+    assert len(xs) == 15
+    for x in xs:
+        assert tl.score_de_passive_kind(x, {"content": x["gold"]})["correct"], x["gold"]
+    z = next(x for x in xs if x["gold"] == "Zustandspassiv")
+    assert tl.score_de_passive_kind(z, {"content": "Zustandspassiv, nicht Vorgangspassiv"})["correct"]
+    assert not tl.score_de_passive_kind(z, {"content": "Perfekt Aktiv"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_passive_kind()

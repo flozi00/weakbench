@@ -4593,6 +4593,42 @@ def score_en_adverb_position(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_passive_kind (Vorgangspassiv, Zustandspassiv or Perfekt Aktiv)
+# "ist geöffnet" (state) vs "wird geöffnet" (process) vs "ist abgefahren" (sein-Perfekt of an intransitive verb): the
+# same "ist + Partizip" surface is either Zustandspassiv or Perfekt Aktiv, which only the verb's valency decides.
+PK_ITEMS = [("Die Tür [wird] jeden Morgen um acht [geöffnet].", "Vorgangspassiv"), ("Das Paket [wurde] gestern [geliefert].", "Vorgangspassiv"),
+            ("Hier [wird] nicht [geraucht].", "Vorgangspassiv"), ("Die Straße [wird] gerade [repariert].", "Vorgangspassiv"),
+            ("Der Brief [wurde] von ihr [unterschrieben].", "Vorgangspassiv"),
+            ("Die Tür [ist] schon [geöffnet].", "Zustandspassiv"), ("Der Tisch [ist] für vier Personen [gedeckt].", "Zustandspassiv"),
+            ("Das Geschäft [ist] sonntags [geschlossen].", "Zustandspassiv"), ("Die Rechnung [ist] bereits [bezahlt].", "Zustandspassiv"),
+            ("Das Fenster [war] den ganzen Tag [gekippt].", "Zustandspassiv"),
+            ("Der Zug [ist] pünktlich [abgefahren].", "Perfekt Aktiv"), ("Sie [ist] nach Berlin [gezogen].", "Perfekt Aktiv"),
+            ("Das Kind [ist] eingeschlafen.".replace("eingeschlafen", "[eingeschlafen]"), "Perfekt Aktiv"),
+            ("Wir [sind] gestern lange [gewandert].", "Perfekt Aktiv"), ("Der Schnee [ist] über Nacht [geschmolzen].", "Perfekt Aktiv")]
+PK_LABELS = {"Vorgangspassiv": ["vorgangspassiv", "werden-passiv", "werdenpassiv"], "Zustandspassiv": ["zustandspassiv", "sein-passiv", "seinpassiv"],
+             "Perfekt Aktiv": ["perfekt aktiv", "perfekt (aktiv)", "aktiv perfekt", "perfekt"]}
+
+
+def load_de_passive_kind(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": "Ist die Verbform in eckigen Klammern Vorgangspassiv, Zustandspassiv oder Perfekt Aktiv? "
+                           "Antworte nur mit einem dieser Begriffe.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(PK_ITEMS[:min(n or 15, 15)])]
+
+
+def score_de_passive_kind(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
+    t = re.sub(r"\b(?:nicht|kein\w*)\s+(?:(?:das|der|ein)\s+)?[\w-]+", " ", t)
+    found = set()
+    for k in ("Vorgangspassiv", "Zustandspassiv", "Perfekt Aktiv"):
+        for a in PK_LABELS[k]:
+            if a in t:
+                found.add(k)
+                t = t.replace(a, " ")
+    ok = found == {item["gold"]}
+    return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {f"ok_{item['gold'].split()[0].lower()}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -5153,6 +5189,7 @@ TASKS = {
     "de_verb_case": task(("de",), load_de_verb_case, score_de_verb_case, 16, 16, lang_check=False),
     "en_reflexive": task(("en",), load_en_reflexive, score_en_reflexive, 16, 16, lang_check=False),
     "en_adverb_position": task(("en",), load_en_adverb_position, score_en_adverb_position, 20, 40, lang_check=False),
+    "de_passive_kind": task(("de",), load_de_passive_kind, score_de_passive_kind, 15, 15, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

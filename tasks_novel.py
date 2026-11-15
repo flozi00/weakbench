@@ -6621,8 +6621,8 @@ def load_temp_delta(lang, n, seed):
             q = (f"During the afternoon the temperature rose by {x} {u[pair[0]]}. By how many {u[pair[1]]} did it rise?" if lang == "en" else
                  f"Am Nachmittag stieg die Temperatur um {x} {u[pair[0]]}. Um wie viel {u[pair[1]]} ist sie gestiegen?")
         else:
-            q = (f"The thermometer shows {x} {u[pair[0]]}. What is that in {u[pair[1]]}?" if lang == "en" else
-                 f"Das Thermometer zeigt {x} {u[pair[0]]}. Wie viel ist das in {u[pair[1]]}?")
+            q = (f"The thermometer shows {x} {u[pair[0]]}. What is that in {u[pair[1]]}? Round to two decimals." if lang == "en" else
+                 f"Das Thermometer zeigt {x} {u[pair[0]]}. Wie viel ist das in {u[pair[1]]}? Runde auf zwei Nachkommastellen.")
         items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "diff": diff,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
@@ -6658,8 +6658,12 @@ def load_org_chart(lang, n, seed):
             ca, cb = chain(a), chain(b)
             lca = next(x for x in ca if x in cb)
             at_root = lca == people[0]
+            counts = {}
+            for q_ in boss.values():
+                counts[q_] = counts.get(q_, 0) + 1
+            hub = max(counts, key=lambda x: (counts[x], x))
             if (lca not in (a, b) and (boss[a] != lca or boss[b] != lca) and len(ca) + len(cb) >= 6
-                    and at_root == (i % 4 == 0)):  # the top boss is the answer in a quarter of the items only
+                    and at_root == (i % 4 == 0) and (lca == hub) == (i % 4 in (0, 1))):  # root / busiest boss: half at most
                 break
         bait = boss[a] if boss[a] != lca else boss[b]
         lines = [f"{p} reports to {q}." if lang == "en" else f"{p} berichtet an {q}." for p, q in boss.items()]
@@ -6675,8 +6679,10 @@ def load_org_chart(lang, n, seed):
 
 def score_org_chart(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    named = sorted((m.start(), x) for x in item["names"] for m in re.finditer(r"\b" + x + r"\b", fa))
-    v = named[0][1] if named else None
+    fa = re.split(r"→|->", fa)[-1]  # a chain "Jonte → Hamid → Fritz": its end
+    m = re.search(r"\b(?:report|reports|berichten|berichtet)\s+(?:to|an)\s+(\w+)", fa)  # "... both report to Fritz"
+    named = sorted((mm.start(), x) for x in item["names"] for mm in re.finditer(r"\b" + x + r"\b", fa))
+    v = m[1] if m and m[1] in item["names"] else (named[0][1] if named else None)
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_direct_manager": float(v == item["bait"])}}
 

@@ -2893,7 +2893,7 @@ def load_en_hyphens(lang, n, seed):
     rows = EH_ITEMS[:min(n or len(EH_ITEMS), len(EH_ITEMS))]
     out = []
     for i, (k, sent, good, bad) in enumerate(rows):
-        a, b = (good, bad) if i % 2 == 0 else (bad, good)
+        a, b = (good, bad) if (i // 2) % 2 == 0 else (bad, good)  # the gold letter varies within each kind
         out.append({"id": str(i), "lang": "en", "gold": "A" if a == good else "B", "kind": k,
                     "messages": [{"role": "user", "content": f"Which option is correct in standard written English?\n\n{sent}\n\n"
                                   f"A: {a}\nB: {b}\n\nAnswer with A or B only."}]})
@@ -2903,7 +2903,7 @@ def load_en_hyphens(lang, n, seed):
 def score_en_hyphens(item, reply):
     text = reply["content"] or ""
     line = re.findall(r"Answer\W*:?\W*\b([AB])\b", text, re.I)
-    m = line[-1:] or re.findall(r"\b([AB])\b", text)
+    m = line[-1:] or re.findall(r"\b([AB])\b(?!\s+[a-z])", text)  # the article "A hyphen ..." is no vote
     v = m[0].upper() if len({x.upper() for x in m}) == 1 else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}

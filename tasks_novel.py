@@ -6954,7 +6954,7 @@ def load_savings_plan(lang, n, seed):
 
 
 def score_savings_plan(item, reply):
-    fa = final_answer(reply["content"]) or ""
+    fa = result_side(final_answer(reply["content"]) or "")
     eur = re.search(r"(\d[\d.,  ]*\d)\s*(?:€|\beuros?\b|\beur\b)|€\s*(\d[\d.,  ]*\d)", fa, re.I)  # the first euro amount
     v = parse_number(eur[1] or eur[2], item["lang"]) if eur else answer_value(fa, item["lang"])
     ok = v is not None and abs(v - item["gold"]) <= 0.011
@@ -7241,6 +7241,17 @@ def score_counterexample(item, reply):
     return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"], "detail": d}
 
 
+def result_side(line):
+    """The part of an answer line that holds the result: with '=', the side without arithmetic ("3 + 5 = 8" -> "8",
+    "8 € = 7 € + 1 €" -> "8 €"); without '=', the line itself."""
+    if "=" not in line:
+        return line
+    parts = [p_.strip() for p_ in line.split("=")]
+    arith = lambda t: bool(re.search(r"\d[^\d=]*?[+−\-×x*/][^\d=]*?\d", t))  # noqa: E731
+    plain = [p_ for p_ in parts if re.search(r"\d", p_) and not arith(p_)]
+    return plain[-1] if plain else parts[-1]
+
+
 # ---------------------------------------------------------------- critical_path (longest path through dependencies)
 CP_NAMES = {"en": ["Planning", "Design", "Permits", "Foundation", "Walls", "Roof", "Wiring", "Plumbing", "Painting", "Inspection"],
             "de": ["Planung", "Entwurf", "Genehmigung", "Fundament", "Wände", "Dach", "Elektrik", "Sanitär", "Malerarbeiten", "Abnahme"]}
@@ -7278,7 +7289,7 @@ def load_critical_path(lang, n, seed):
 
 
 def score_critical_path(item, reply):
-    fa = final_answer(reply["content"]) or ""
+    fa = result_side(final_answer(reply["content"]) or "")
     m = re.search(r"(\d+)\s*(?:days?|Tage?n?)\b", fa, re.I)
     v = int(m[1]) if m else answer_value(fa, item["lang"])
     ok = v == item["gold"]
@@ -7328,7 +7339,7 @@ def load_ledger_balance(lang, n, seed):
 
 
 def score_ledger_balance(item, reply):
-    fa = final_answer(reply["content"]) or ""
+    fa = result_side(final_answer(reply["content"]) or "")
     eur = re.search(r"(-?−?\d[\d.,  ]*\d)\s*(?:€|\beuros?\b|\beur\b)", fa, re.I)
     v = parse_number(eur[1].replace("−", "-"), item["lang"]) if eur else answer_value(fa, item["lang"])
     near = lambda x: v is not None and abs(v - x) < 0.006  # noqa: E731

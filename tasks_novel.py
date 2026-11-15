@@ -7040,11 +7040,12 @@ def load_rooms_needed(lang, n, seed):
         r = rng_of("rooms_needed", i, att)
         while True:
             meets = []
+            want = (2, 3, 4, 5)[i % 4]  # the answer spread evenly
             for _ in range(r.randint(6, 9)):
-                a = r.randrange(8 * 60, 16 * 60, 30)
+                a = r.randrange(8 * 60, 16 * 60, 30) if want < 4 else r.randrange(9 * 60, 13 * 60, 30)
                 meets.append((a, a + r.choice([30, 60, 90, 120])))
             gold, touch = _rn_max(meets, False), _rn_max(meets, True)
-            if gold != touch or i % 3 == 0:  # two thirds of the items have back-to-back meetings that matter
+            if gold == want and (gold != touch or i % 3 == 0):  # mostly back-to-back meetings that matter
                 break
         names = ["Budget", "Hiring", "Design", "Sales", "Support", "Legal", "IT", "Training", "Board"] if lang == "en" else \
             ["Budget", "Personal", "Design", "Vertrieb", "Support", "Recht", "IT", "Schulung", "Vorstand"]

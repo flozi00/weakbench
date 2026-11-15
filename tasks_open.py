@@ -2240,6 +2240,55 @@ def score_subtitle_mt(item, reply):
                        "grammar": float(grammar)}}
 
 
+# ---------------------------------------------------------------- steelman (judge + exact: the best case for the side the user rejects)
+# The user states a view and asks for the strongest argument AGAINST it. Models drift back: they argue the user's own
+# side, build a strawman, or append a rebuttal ("however, your view is right"). At most 120 words (checked in code).
+STM_VIEWS = {"en": ["Cities should ban cars from their centres completely.", "Homework in primary school is a waste of time.",
+                   "Remote work is better for companies than office work.", "Nuclear power plants should be shut down.",
+                   "A four-day work week should be the legal standard.", "Social media should be banned for children under 16."],
+            "de": ["Innenstädte sollten komplett autofrei sein.", "Hausaufgaben in der Grundschule sind Zeitverschwendung.",
+                   "Homeoffice ist für Firmen besser als Büroarbeit.", "Atomkraftwerke sollten abgeschaltet werden.",
+                   "Die Vier-Tage-Woche sollte gesetzlicher Standard werden.", "Soziale Medien sollten für Kinder unter 16 verboten sein."]}
+STM_JUDGE = """THE USER'S VIEW: {view}
+The user asked for the strongest argument AGAINST this view, in {lang}.
+
+REPLY:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The reply argues against the user's view (not for it, and not "both sides").
+2. The argument is strong and charitable: real reasons a thoughtful opponent would give, no strawman, no mockery.
+3. The reply does not undercut itself with a rebuttal, a disclaimer, or a return to the user's view at the end.
+4. Grammar and spelling are correct and the reply is in {lang}."""
+
+
+def load_steelman(lang, n, seed):
+    tasks_judge.check_judge()
+    q = ("My view: {v}\nGive me the strongest argument against my view, as a convinced opponent would make it. "
+         "At most 120 words." if lang == "en" else
+         "Meine Meinung: {v}\nNenne mir das stärkste Argument gegen meine Meinung, so wie es ein überzeugter Gegner vorbringen "
+         "würde. Höchstens 120 Wörter.")
+    return [{"id": str(i), "lang": lang, "view": v, "messages": [{"role": "user", "content": q.format(v=v)}]}
+            for i, v in enumerate(STM_VIEWS[lang][:n or 6])]
+
+
+def score_steelman(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    short = 0 < len(text.split()) <= 120
+    name = {"de": "German", "en": "English"}[item["lang"]]
+    out = tasks_judge.judge("", STM_JUDGE.format(view=item["view"], lang=name, text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 4:
+        raise ValueError(f"unusable steelman verdict {out[:120]!r}")
+    against, strong, no_undercut, grammar = (_yes(x) for x in v)
+    met = [short, against, strong, no_undercut, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"within_120": float(short), "against": float(against), "charitable": float(strong),
+                       "no_undercut": float(no_undercut), "grammar": float(grammar)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2829,6 +2878,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                          "think": False, "max_tokens": 256,
                          "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},
                          "lang_check": True, "opt_in": True, "needs_judge": True},
+         "steelman": {"langs": ("de", "en"), "load": load_steelman, "score": score_steelman,
+                      "think": False, "max_tokens": 400,
+                      "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},
+                      "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

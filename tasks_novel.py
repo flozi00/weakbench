@@ -6202,6 +6202,65 @@ def score_growth_rel(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_absolute": float(v == item["abs"])}}
 
 
+# ---------------------------------------------------------------- pack_buy (cover an amount at the lowest cost)
+def _pb_best(packs, need):
+    best = None
+    lim = [need // q + 1 for q, _ in packs]
+    import itertools
+    for ks in itertools.product(*(range(m + 1) for m in lim)):
+        amt = sum(k * q for k, (q, _) in zip(ks, packs))
+        if amt >= need:
+            cost = sum(k * p for k, (_, p) in zip(ks, packs))
+            if best is None or cost < best:
+                best = cost
+    return best
+
+
+def _pb_greedy(packs, need):
+    cost, left = 0, need
+    for q, p in sorted(packs, key=lambda x: x[1] / x[0]):  # cheapest per unit first, as many as fit
+        k = left // q
+        cost += k * p
+        left -= k * q
+    if left > 0:  # then the cheapest single pack that covers the rest
+        cost += min(p for q, p in packs if q >= left) if any(q >= left for q, _ in packs) else \
+            min(p * (-(-left // q)) for q, p in packs)
+    return cost
+
+
+def load_pack_buy(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("pack_buy", i)
+        fails = i % 2 == 0
+        while True:
+            sizes = sorted(r.sample([2, 3, 5, 6, 8, 10, 12], r.choice([2, 3])))
+            packs = [(q, round(q * r.uniform(0.8, 1.3) * 2) / 2) for q in sizes]
+            need = r.randint(7, 30)
+            g, gr = _pb_best(packs, need), _pb_greedy(packs, need)
+            if (gr > g) == fails:
+                break
+        fmt = (lambda p: f"{p:.2f} €") if lang == "en" else (lambda p: f"{p:.2f} €".replace(".", ","))
+        offer = "; ".join((f"a pack of {q} rolls for {fmt(p)}" if lang == "en" else f"eine Packung mit {q} Rollen für {fmt(p)}")
+                          for q, p in packs)
+        q = (f"A shop sells paper towels only in packs: {offer}. You need at least {need} rolls. What is the lowest total price, "
+             "in euros?" if lang == "en" else
+             f"Ein Laden verkauft Küchenrollen nur in Packungen: {offer}. Du brauchst mindestens {need} Rollen. Wie hoch ist der "
+             "niedrigste Gesamtpreis in Euro?")
+        items.append({"id": str(i), "lang": lang, "gold": g, "greedy": gr, "fails": fails,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_pack_buy(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.006
+    d = {"ok_greedy_fails" if item["fails"] else "ok_greedy_works": float(ok)}
+    if item["fails"]:
+        d["took_greedy"] = float(v is not None and abs(v - item["greedy"]) < 0.006)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7778,6 +7837,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "pack_buy": task(load_pack_buy, score_pack_buy, 24, 120),
     "growth_rel": task(load_growth_rel, score_growth_rel, 24, 120),
     "dose_calc": task(load_dose_calc, score_dose_calc, 24, 120),
     "bin_pack": task(load_bin_pack, score_bin_pack, 24, 120),

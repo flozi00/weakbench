@@ -2204,7 +2204,7 @@ EG_ITEMS = [("agreement", "The list of names are on the desk.", "The list of nam
             ("tense", "I have seen him last week at the station.", "I saw him last week at the station.", []),
             ("tense", "By the time we arrived, the film already started.", "By the time we arrived, the film had already started.", []),
             ("article", "She is engineer at a large company.", "She is an engineer at a large company.", []),
-            ("article", "He played the piano for an hour and then went to the bed.", "He played the piano for an hour and then went to bed.", []),
+            ("article", "She gave me a good advice about the flat.", "She gave me good advice about the flat.", ["She gave me a good piece of advice about the flat."]),
             ("preposition", "We arrived to the hotel late at night.", "We arrived at the hotel late at night.", []),
             ("preposition", "She is married with a doctor from Leeds.", "She is married to a doctor from Leeds.", []),
             ("preposition", "It depends of the weather tomorrow.", "It depends on the weather tomorrow.", []),

@@ -2496,6 +2496,50 @@ def score_code_comments_lang(item, reply):
     return {"correct": ok, "score": float(ok), "pred": pooled[:80], "gold": None,
             "detail": {"parses": float(defined), "comments_ok": float(comments_ok), "docstring_ok": float(doc_ok)}}
 
+# ---------------------------------------------------------------- de_konj2 (Konjunktiv II in irreal conditionals)
+# "Wenn ich mehr Zeit ___ (haben), ___ ich öfter ins Kino ___ (gehen)." The wenn-clause takes the synthetic Konjunktiv II
+# (hätte, wäre, könnte, wüsste, müsste, käme); the main clause "würde + Infinitiv". Person and verb are generated.
+K2_FORMS = {"haben": {"ich": "hätte", "du": "hättest", "er": "hätte", "wir": "hätten", "ihr": "hättet", "sie": "hätten"},
+            "sein": {"ich": "wäre", "du": "wärst", "er": "wäre", "wir": "wären", "ihr": "wärt", "sie": "wären"},
+            "können": {"ich": "könnte", "du": "könntest", "er": "könnte", "wir": "könnten", "ihr": "könntet", "sie": "könnten"},
+            "wissen": {"ich": "wüsste", "du": "wüsstest", "er": "wüsste", "wir": "wüssten", "ihr": "wüsstet", "sie": "wüssten"},
+            "müssen": {"ich": "müsste", "du": "müsstest", "er": "müsste", "wir": "müssten", "ihr": "müsstet", "sie": "müssten"}}
+K2_WUERDE = {"ich": "würde", "du": "würdest", "er": "würde", "wir": "würden", "ihr": "würdet", "sie": "würden"}
+K2_COND = {"haben": "mehr Zeit ___ (haben)", "sein": "nicht so müde ___ (sein)", "können": "besser kochen ___ (können)",
+           "wissen": "die Antwort ___ (wissen)", "müssen": "nicht arbeiten ___ (müssen)"}
+K2_MAIN = ["öfter ins Kino gehen", "dich anrufen", "ein Fest geben", "dir helfen", "früher aufstehen"]
+
+
+def load_de_konj2(lang, n, seed):
+    items = []
+    persons = list(K2_WUERDE)
+    verbs = list(K2_FORMS)
+    for i in range(n or 96):
+        r = random.Random(f"de_konj2:{i}")
+        pers, verb = persons[i % 6], verbs[(i // 6) % 5]
+        main = r.choice(K2_MAIN)
+        subj = {"er": "er", "sie": "sie"}.get(pers, pers)
+        obj, inf = main.rsplit(" ", 1)
+        if pers in ("ich",) and "dich" not in main and "dir" not in main:
+            pass
+        if pers == "du":
+            obj = obj.replace("dich", "mich").replace("dir", "mir")
+        sent = f"Wenn {subj} {K2_COND[verb]}, ___ {subj} {obj} {inf}."
+        gold = (K2_FORMS[verb][pers], K2_WUERDE[pers])
+        items.append({"id": str(i), "lang": "de", "gold": " / ".join(gold), "forms": gold, "verb": verb,
+                      "messages": [{"role": "user", "content": "Setze die richtigen Verbformen im Konjunktiv II ein "
+                                    "(erste Lücke: das Verb in Klammern, zweite Lücke: würde). Antworte nur mit den zwei "
+                                    "Wörtern, durch Schrägstrich getrennt.\n\n" + sent}]})
+    return items
+
+
+def score_de_konj2(item, reply):
+    w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    ok = w[:2] == list(item["forms"])
+    return {"correct": ok, "score": float(ok), "pred": " ".join(w[:2]), "gold": item["gold"],
+            "detail": {f"ok_{item['verb']}": float(ok)}}
+
+
 def task(langs, load, score, max_tokens, quick, **kw):
     return {"langs": langs, "load": load, "score": score, "think": False, "max_tokens": max_tokens,
             "counts": {"quick": dict.fromkeys(langs, quick), "full": dict.fromkeys(langs, None)}, **kw}
@@ -2551,6 +2595,7 @@ TASKS = {
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),
     "code_comments_lang": task(("de", "en"), load_code_comments_lang, score_code_comments_lang, 1024, 20, lang_check=False),
+    "de_konj2": task(("de",), load_de_konj2, score_de_konj2, 32, 24, lang_check=False),
     "de_commas": task(("de",), load_de_commas, score_de_commas, 128, 60, lang_check=False),
     "register_shift": task(("de",), load_register, score_register, 512, None),
     "lang_quality": task(("de", "en"), load_quality, score_quality, 2048, None, lang_check=False, opt_in=True,

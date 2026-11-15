@@ -1267,7 +1267,7 @@ GROUPS = {
                        "alien_sort"],
     "de_grammar": ["de_case", "de_verbs", "de_commas", "de_homophones", "de_reported", "de_separable", "de_compound_gender",
                    "de_relative", "de_grammar_fix", "agreement_attractor", "wug", "time_prep", "tense_order",
-                   "de_plural_adj"],
+                   "de_plural_adj", "de_konj2"],
     "language": ["lang_switch", "polyglot_switch", "mixed_input", "bilingual_notice", "glossary_mt", "de_address",
                  "de_variety", "en_variety", "de_no_anglicisms", "form_writing", "irony", "revise_on_feedback",
                  "code_comments_lang"],

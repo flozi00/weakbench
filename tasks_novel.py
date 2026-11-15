@@ -4770,7 +4770,7 @@ def load_work_rates(lang, n, seed):
             a, b = r.randint(2, 9), r.randint(3, 12)
             c = r.randint(4, 15) if drain else None
             rate = F(1, a) + F(1, b) - (F(1, c) if drain else 0)
-            if rate > 0 and 1 / rate <= 24 and a != b:
+            if rate > 0 and 1 / rate <= 24 and a != b and c not in (a, b) and abs(60 / rate % 1 - 0.5) > 0.05:
                 break
         mins = 60 / rate
         no_drain = 60 / (F(1, a) + F(1, b))

@@ -5777,6 +5777,60 @@ def score_date_locale(item, reply):
             "detail": {"took_same_format": float(v in item["naive"])}}
 
 
+# ---------------------------------------------------------------- weighted_mean (when the plain mean is wrong)
+def load_weighted_mean(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("weighted_mean", i)
+        kind = ("speed", "mix", "grade")[i % 3]
+        if kind == "speed":
+            while True:
+                v1, v2 = r.sample([30, 40, 45, 60, 72, 80, 90, 120], 2)
+                gold = 2 * v1 * v2 / (v1 + v2)
+                if abs(gold - round(gold, 1)) < 1e-9:
+                    break
+            d = r.choice([30, 60, 90, 120])
+            plain = (v1 + v2) / 2
+            q = (f"A car drives {d} km from A to B at {v1} km/h and the same {d} km back at {v2} km/h. What is its average speed "
+                 "over the whole trip, in km/h?" if lang == "en" else
+                 f"Ein Auto fährt {d} km von A nach B mit {v1} km/h und dieselben {d} km zurück mit {v2} km/h. Wie hoch ist die "
+                 "Durchschnittsgeschwindigkeit über die ganze Fahrt, in km/h?")
+        elif kind == "mix":
+            l1, l2 = r.sample([1, 2, 3, 4, 5, 6], 2)
+            t1, t2 = r.randrange(10, 40, 5), r.randrange(50, 95, 5)
+            gold = (l1 * t1 + l2 * t2) / (l1 + l2)
+            plain = (t1 + t2) / 2
+            q = (f"You pour {l1} litres of water at {t1} °C and {l2} litres at {t2} °C into one bucket. Ignoring heat loss, what is "
+                 "the temperature of the mixture in °C?" if lang == "en" else
+                 f"Du gießt {l1} Liter Wasser mit {t1} °C und {l2} Liter mit {t2} °C in einen Eimer. Ohne Wärmeverlust: Welche "
+                 "Temperatur hat die Mischung in °C?")
+        else:
+            cps = r.sample([2, 3, 5, 6, 8, 10], 3)
+            grades = [r.choice([1.0, 1.3, 1.7, 2.0, 2.3, 2.7, 3.0, 3.3, 4.0]) for _ in range(3)]
+            gold = sum(c * g for c, g in zip(cps, grades)) / sum(cps)
+            plain = sum(grades) / 3
+            lines = ", ".join((f"{g:g} in a course worth {c} credits" if lang == "en" else
+                               f"{g:g}".replace(".", ",") + f" in einem Kurs mit {c} Leistungspunkten") for c, g in zip(cps, grades))
+            q = (f"A student got the grades {lines}. The overall grade weights each course by its credits. What is the overall "
+                 "grade? Round to two decimals." if lang == "en" else
+                 f"Eine Studentin hat die Noten {lines}. Die Gesamtnote gewichtet jeden Kurs mit seinen Leistungspunkten. "
+                 "Wie lautet die Gesamtnote? Runde auf zwei Nachkommastellen.")
+        if abs(gold - plain) < 0.2:
+            plain = None
+        items.append({"id": str(i), "lang": lang, "gold": round(gold, 2), "plain": plain, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_weighted_mean(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.05
+    d = {f"ok_{item['kind']}": float(ok)}
+    if item["plain"] is not None:
+        d["took_plain_mean"] = float(v is not None and abs(v - item["plain"]) <= 0.05)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7352,6 +7406,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "weighted_mean": task(load_weighted_mean, score_weighted_mean, 24, 120),
     "date_locale": task(load_date_locale, score_date_locale, 24, 120),
     "train_connect": task(load_train_connect, score_train_connect, 24, 120),
     "fifo_cost": task(load_fifo_cost, score_fifo_cost, 24, 120),

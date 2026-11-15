@@ -1673,6 +1673,86 @@ def score_double_meaning(item, reply):
                        "language": float(lang_ok)}}
 
 
+# ---------------------------------------------------------------- concise_rewrite (judge + exact: cut the padding, keep every fact)
+# A generated, padded announcement (filler phrases, repetitions, hedges) carrying 6 facts. The rewrite must fit a hard
+# word limit (about 40 % of the original) and keep every fact token (checked in code); the judge checks that nothing
+# changed meaning or was added, and that the result reads well.
+CR_EVENTS = {"en": ["first-aid course", "team workshop on data protection", "tour of the new warehouse", "evening talk on solar panels"],
+             "de": ["Erste-Hilfe-Kurs", "Team-Workshop zum Datenschutz", "Führung durch das neue Lager", "Abendvortrag über Solaranlagen"]}
+CR_HOSTS = ["Marta Kowalski", "Jonas Brandt", "Aylin Demir", "Pieter de Vries", "Lucía Romero", "Tobias Engel"]
+CR_ROOMS = ["B.204", "C.017", "A.311", "D.105"]
+CR_JUDGE = """ORIGINAL (padded):
+{src}
+
+REWRITE (should be much shorter):
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The rewrite changes no fact and adds nothing that is not in the original (no new conditions, times or promises).
+2. It reads well: complete, clear sentences or a clean short list, no telegram style that loses meaning.
+3. Grammar and spelling are correct {language}."""
+
+
+def load_concise_rewrite(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    months = {"en": ["March", "April", "May", "June"], "de": ["März", "April", "Mai", "Juni"]}[lang]
+    for i in range(n or 16):
+        r = random.Random(f"concise_rewrite:{i}")
+        ev, host, room = CR_EVENTS[lang][i % 4], CR_HOSTS[(i // 4) % 6], CR_ROOMS[i % 4]
+        day, month = r.randint(2, 27), months[(i // 2) % 4]
+        start, cost, seats, dl = r.choice(["9:30", "10:00", "14:00", "16:30"]), r.choice([0, 15, 25, 40]), r.randint(8, 24), r.randint(1, day - 1) if day > 2 else 1
+        date = f"{day}. {month}" if lang == "de" else f"{month} {day}"
+        dl_date = f"{dl}. {month}" if lang == "de" else f"{month} {dl}"
+        price = (("free of charge" if not cost else f"{cost} €") if lang == "en" else ("kostenlos" if not cost else f"{cost} €"))
+        if lang == "en":
+            src = (f"We would just like to take this opportunity to let you all know that, as some of you may perhaps already have heard, "
+                   f"we are planning to hold a {ev}. It is going to take place, as things currently stand, on {date}, and it will "
+                   f"begin at {start}, so please do make a note of the start time, which is {start}. The {ev} will be led by our "
+                   f"colleague {host}, who has kindly agreed to run it. In terms of the location, it will be held in room {room}. "
+                   f"With regard to the costs involved, we can tell you that participation is {price}. Please be aware that, "
+                   f"due to the size of the room, the number of places is unfortunately limited to a maximum of {seats} people. "
+                   f"If you are interested in taking part, we would ask you to please register by {dl_date} at the very latest. "
+                   f"Thank you very much in advance for your attention to this matter.")
+            req = "Rewrite this announcement concisely in at most {k} words. Keep every fact. Reply with the rewrite only.\n\n"
+        else:
+            src = (f"Wir möchten an dieser Stelle die Gelegenheit nutzen, Sie alle darüber zu informieren, dass, wie einige von Ihnen "
+                   f"vielleicht bereits gehört haben, ein {ev} geplant ist. Dieser findet nach aktuellem Stand am {date} statt und "
+                   f"beginnt um {start} Uhr, bitte merken Sie sich also die Anfangszeit, nämlich {start} Uhr. Geleitet wird der "
+                   f"Termin von unserer Kollegin bzw. unserem Kollegen {host}, die bzw. der sich freundlicherweise bereit erklärt "
+                   f"hat, ihn durchzuführen. Was den Ort betrifft, so findet er in Raum {room} statt. Hinsichtlich der Kosten können "
+                   f"wir Ihnen mitteilen, dass die Teilnahme {price} ist. Bitte beachten Sie, dass die Zahl der Plätze aufgrund der "
+                   f"Raumgröße leider auf höchstens {seats} Personen begrenzt ist. Wenn Sie Interesse an einer Teilnahme haben, "
+                   f"bitten wir Sie, sich spätestens bis zum {dl_date} anzumelden. Vielen Dank im Voraus für Ihre Aufmerksamkeit.")
+            req = "Formuliere diese Ankündigung knapp in höchstens {k} Wörtern um. Behalte jede Information. Antworte nur mit dem neuen Text.\n\n"
+        k = round(len(src.split()) * 0.4)
+        facts = [str(day), start, host.split()[-1], room, str(seats), str(dl)] + ([str(cost)] if cost else [])
+        items.append({"id": str(i), "lang": lang, "src": src, "limit": k, "facts": facts, "free": not cost,
+                      "messages": [{"role": "user", "content": req.format(k=k) + src}]})
+    return items
+
+
+def score_concise_rewrite(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len(re.findall(r"\S+", text))
+    within = 0 < words <= item["limit"]
+    missing = [f for f in item["facts"] if not re.search(rf"(?<![\d.:]){re.escape(f)}(?![\d]|:\d)", text)]
+    if item["free"] and not re.search(r"free|kostenlos|kostenfrei|gratis|no charge|keine kosten|0 €", text, re.I):
+        missing.append("free")
+    out = tasks_judge.judge("", CR_JUDGE.format(src=item["src"], text=text or "(empty)",
+                                                language="German" if item["lang"] == "de" else "English"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable concise_rewrite verdict {out[:120]!r}")
+    faithful, reads, grammar = (_yes(x) for x in v)
+    met = [within, not missing, faithful, reads, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"within_limit": float(within), "facts_kept": float(not missing), "faithful": float(faithful),
+                       "reads_well": float(reads), "grammar": float(grammar), "words": words}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2234,6 +2314,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                             "think": False, "max_tokens": 256,
                             "counts": {"quick": {"de": 10, "en": 10}, "full": {"de": None, "en": None}},
                             "lang_check": True, "opt_in": True, "needs_judge": True},
+         "concise_rewrite": {"langs": ("de", "en"), "load": load_concise_rewrite, "score": score_concise_rewrite,
+                             "think": False, "max_tokens": 384,
+                             "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
+                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

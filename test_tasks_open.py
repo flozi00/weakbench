@@ -693,3 +693,24 @@ def test_double_meaning():
 
 if __name__ == "__main__":
     test_double_meaning()
+
+
+def test_concise_rewrite():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        for lang in ("de", "en"):
+            for x in to.load_concise_rewrite(lang, None, 0):
+                f = x["facts"]
+                good = (f"{f[2]} leitet am {f[0]}. um {f[1]} Uhr in Raum {f[3]} den Termin. Max. {f[4]} Plätze, Anmeldung bis {f[5]}. "
+                        + ("Kostenlos." if x["free"] else f"Kosten: {f[6]} €."))
+                r = to.score_concise_rewrite(x, {"content": good})
+                assert r["detail"]["facts_kept"] == 1 and r["detail"]["within_limit"] == 1, (good, x["limit"])
+                assert to.score_concise_rewrite(x, {"content": x["src"]})["detail"]["within_limit"] == 0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_concise_rewrite()

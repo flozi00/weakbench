@@ -2819,7 +2819,7 @@ CO_ITEMS = {"de": [("Wir müssen bis Freitag eine Entscheidung ___.", ("treffen"
                    ("Kannst du mir einen Gefallen ___?", ("tun", "machen", "geben"), "tun", "machen"),
                    ("Der Minister hat eine Rede ___.", ("gehalten", "gegeben", "gemacht"), "gehalten", "gegeben"),
                    ("Er ___ sich große Mühe mit dem Geschenk.", ("gab", "machte", "nahm"), "gab", "machte"),
-                   ("Die Polizei ___ den Verdächtigen fest.", ("nahm", "machte", "stellte"), "nahm", "machte"),
+                   ("Die Polizei ___ den Verdächtigen fest.", ("nahm", "machte", "gab"), "nahm", "machte"),
                    ("Wir sollten eine Pause ___.", ("machen", "nehmen", "halten"), "machen", "nehmen"),
                    ("Sie hat die Prüfung ___ – sie war erfolgreich.", ("bestanden", "genommen", "gemacht"), "bestanden", "genommen"),
                    ("Bitte ___ mir Bescheid, wenn du ankommst.", ("gib", "mach", "nimm"), "gib", "mach"),

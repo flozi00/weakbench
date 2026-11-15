@@ -9313,6 +9313,51 @@ def score_grid_paths(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ignored_blocks": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- free_shipping (pay the fee or add items to reach the threshold)
+FS_ITEMS = {"en": ["socks", "a notebook", "batteries", "a phone case", "tea", "a USB cable", "a candle", "pens"],
+            "de": ["Socken", "ein Notizbuch", "Batterien", "eine Handyhülle", "Tee", "ein USB-Kabel", "eine Kerze", "Stifte"]}
+
+
+def load_free_shipping(lang, n, seed):
+    import itertools
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("free_shipping", i, att)
+        while True:
+            limit, fee = r.choice([29, 39, 49, 50, 60]), r.choice([3.95, 4.90, 5.95, 6.99])
+            cart = round(limit - r.uniform(1, 9), 2)
+            names = r.sample(range(8), 4)
+            prices = [round(r.uniform(0.8, 9), 2) for _ in names]
+            best_add = min((sum(c) for k in range(1, 5) for c in itertools.combinations(prices, k) if cart + sum(c) >= limit), default=None)
+            pay_fee = round(cart + fee, 2)
+            add = round(cart + best_add, 2) if best_add is not None else None
+            gold = min(pay_fee, add) if add is not None else pay_fee
+            naive_add = round(cart + min((p for p in prices if cart + p >= limit), default=999), 2)  # one item that reaches it
+            adding_wins = i % 2 == 0  # half the items adding is cheaper (often as a pair), half paying the fee
+            if add is not None and abs(pay_fee - add) >= 0.2 and (gold == add) == adding_wins and (not adding_wins or gold != naive_add):
+                break
+        eur = lambda x: f"{x:.2f}" if lang == "en" else f"{x:.2f}".replace(".", ",")  # noqa: E731
+        offer = "\n".join(f"- {FS_ITEMS[lang][k]}: {eur(p)} €" for k, p in zip(names, prices))
+        q = (f"Your cart is worth {eur(cart)} €. Shipping costs {eur(fee)} €, but is free from {limit} € order value. You would "
+             f"also use any of these items:\n{offer}\nWhat is the least you can pay in total (you may add any combination of the items, "
+             f"or none)?" if lang == "en" else
+             f"Dein Warenkorb hat einen Wert von {eur(cart)} €. Der Versand kostet {eur(fee)} €, ist aber ab {limit} € Bestellwert "
+             f"kostenlos. Du könntest auch jeden dieser Artikel gebrauchen:\n{offer}\nWas zahlst du insgesamt mindestens (du darfst "
+             f"beliebig viele der Artikel dazunehmen oder keinen)?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "pay_fee": pay_fee, "naive_add": naive_add,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_free_shipping(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "").rsplit("=", 1)[-1]
+    v = answer_value(fa, item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.006
+    near = lambda x: v is not None and abs(v - x) < 0.006  # noqa: E731
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"paid_fee": float(near(item["pay_fee"]) and not ok), "one_item_only": float(near(item["naive_add"]) and not ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10928,6 +10973,7 @@ TASKS = {
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
     "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),
+    "free_shipping": task(load_free_shipping, score_free_shipping, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

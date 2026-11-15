@@ -2100,3 +2100,19 @@ def test_grid_paths():
 
 if __name__ == "__main__":
     test_grid_paths()
+
+
+def test_free_shipping():
+    import tasks_novel as tn
+    xs = tn.load_free_shipping("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    g = f"{x['gold']:.2f}".replace(".", ",")
+    for c in (f"Antwort: {g} €", f"Antwort: 30,00 + 12,50 = {g} €"):
+        assert tn.score_free_shipping(x, {"content": c})["correct"], c
+    share = sum(x["gold"] == x["pay_fee"] for x in xs) / len(xs)
+    assert 0.2 < share < 0.8, share  # sometimes the fee is cheaper, sometimes adding items
+
+
+if __name__ == "__main__":
+    test_free_shipping()

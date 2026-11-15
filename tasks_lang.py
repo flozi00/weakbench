@@ -3844,6 +3844,34 @@ def score_en_apostrophe(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- de_eszett (ß after a long vowel or diphthong, ss after a short one)
+SZ_ITEMS = [("Wir wohnen in der ___ hinter dem Bahnhof.", "Straße", "Strasse"), ("Der ___ ist im Sommer fast ausgetrocknet.", "Fluss", "Fluß"),
+            ("Das Spiel hat allen viel ___ gemacht.", "Spaß", "Spass"), ("Ich ___ morgen früh aufstehen.", "muss", "muß"),
+            ("Ich ___ nicht, wo der Schlüssel ist.", "weiß", "weiss"), ("Die Kinder essen gern ___ mit Honig.", "Nüsse", "Nüße"),
+            ("Mein linker ___ tut weh.", "Fuß", "Fuss"), ("Er gab ihr zum Abschied einen ___.", "Kuss", "Kuß"),
+            ("Kannst du bitte das Fenster ___?", "schließen", "schliessen"), ("Wir haben den Bus knapp ___.", "verpasst", "verpaßt"),
+            ("Das Wasser ist zu ___ zum Baden.", "heiß", "heiss"), ("Ich warte ___ vor der Tür.", "draußen", "draussen"), ("Er ___ den Ball über den Zaun.", "schoss", "schoß"), ("Bitte ___ den Rasen am Wochenende.", "gieß", "giess"), ("Das Kleid ___ ihr wie angegossen.", "passt", "paßt"), ("Er ist ein ___ Fan des Vereins.", "großer", "grosser")]
+
+
+def load_de_eszett(lang, n, seed):
+    items = SZ_ITEMS
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Schreibweise ist richtig (Rechtschreibung in Deutschland): "
+                           f"„{two_opts(i, g, (g, w))[0]}“ oder „{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(items[:n or len(items)])]
+
+
+def score_de_eszett(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", reply["content"] or "")
+    found = [o for o in item["opts"] if re.search(rf"(?<![\wäöüß]){re.escape(o)}(?![\wäöüß])", t, re.I)]
+    if len(found) > 1:  # "Straße (nicht Strasse)" is already stripped; "Straße, nicht Strasse": take the lead
+        found = sorted(found, key=lambda o: re.search(re.escape(o), t, re.I).start())[:1] if not re.search(r"\b(?:oder|or)\b", t) else []
+    v = found[0] if found else None
+    ok = v is not None and v.lower() == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_eszett" if "ß" in item["gold"] else "ok_ss": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4385,6 +4413,7 @@ TASKS = {
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),
+    "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

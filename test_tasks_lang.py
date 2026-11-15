@@ -946,3 +946,20 @@ def test_en_apostrophe():
 
 if __name__ == "__main__":
     test_en_apostrophe()
+
+
+def test_de_eszett():
+    import tasks_lang as tl
+    xs = tl.load_de_eszett("de", None, 0)
+    assert len(xs) == 16 and all("ß" in x["opts"][0] + x["opts"][1] for x in xs)
+    for x in xs:
+        w = [o for o in x["opts"] if o != x["gold"]][0]
+        full = x["messages"][0]["content"].splitlines()[-1].replace("___", x["gold"])
+        for c in (x["gold"], f"„{x['gold']}“", full, f"{x['gold']} (nicht {w})", f"{x['gold']}, nicht {w}"):
+            assert tl.score_de_eszett(x, {"content": c})["correct"], c
+        assert not tl.score_de_eszett(x, {"content": w})["correct"]
+        assert not tl.score_de_eszett(x, {"content": f"{x['gold']} oder {w}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_eszett()

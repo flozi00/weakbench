@@ -6789,6 +6789,46 @@ def score_cond_table(item, reply):
                        "took_joint": float(v is not None and abs(v - item["joint"]) <= 0.5)}}
 
 
+# ---------------------------------------------------------------- map_scale (lengths linear, areas squared)
+def load_map_scale(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("map_scale", i, att)
+        scale = r.choice([5000, 10000, 20000, 25000, 50000, 100000])
+        area = i % 2 == 1
+        if not area:
+            cm = r.randint(3, 250) / 10
+            gold = cm * scale / 100000  # km
+            bait = cm * scale / 1000  # a unit slip: metres read as km
+            q = (f"On a map with scale 1:{scale:,} two villages are {cm:g} cm apart. How many kilometres apart are they in reality?"
+                 if lang == "en" else
+                 f"Auf einer Karte im Maßstab 1:{scale:,} liegen zwei Dörfer {f'{cm:g}'.replace('.', ',')} cm auseinander. "
+                 "Wie viele Kilometer sind sie in Wirklichkeit voneinander entfernt?")
+        else:
+            cm2 = r.randint(1, 40)
+            gold = cm2 * scale ** 2 / 10000 / 10000  # cm² -> m² -> ha
+            bait = cm2 * scale / 10000 / 10000
+            q = (f"On a map with scale 1:{scale:,} a field covers {cm2} cm². How many hectares is the field in reality? "
+                 "(1 ha = 10,000 m²)" if lang == "en" else
+                 f"Auf einer Karte im Maßstab 1:{scale:,} bedeckt ein Feld {cm2} cm². Wie viele Hektar ist das Feld in Wirklichkeit? "
+                 "(1 ha = 10.000 m²)")
+        if lang == "de":
+            q = q.replace(f"1:{scale:,}", "1:" + f"{scale:,}".replace(",", "."))
+        items.append({"id": str(i), "lang": lang, "gold": round(gold, 4), "bait": round(bait, 4), "area": area,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_map_scale(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    near = lambda x, y: x is not None and abs(x - y) <= 0.005 * abs(y) + 1e-9  # noqa: E731
+    ok = near(v, item["gold"])
+    d = {"ok_area" if item["area"] else "ok_length": float(ok)}
+    if item["area"]:
+        d["took_linear_area"] = float(near(v, item["bait"]))
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8369,6 +8409,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "map_scale": task(load_map_scale, score_map_scale, 24, 120),
     "cond_table": task(load_cond_table, score_cond_table, 24, 120),
     "refund_policy": task(load_refund_policy, score_refund_policy, 24, 120),
     "org_chart": task(load_org_chart, score_org_chart, 24, 120),

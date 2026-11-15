@@ -5301,7 +5301,12 @@ def load_split_bill(lang, n, seed):
 def score_split_bill(item, reply):
     fa = (final_answer(reply["content"]) or "").replace("−", "-")
     v = answer_value(fa, item["lang"])
-    if v is not None and v > 0 and re.search(r"\b" + item["who"] + r"\b\s+(?:pays|owes|has to pay|zahlt|schuldet|muss)\b", fa, re.I):
+    owes = re.search(r"\b" + item["who"] + r"\b\s+(?:pays|owes|has to pay|zahlt|schuldet|muss)\b(.*)", fa, re.I)
+    if owes and "=" not in fa:
+        parts = [parse_number(x, item["lang"]) for x in re.findall(r"\d[\d.,]*", owes[1])]
+        if len(parts) > 1 and all(p is not None for p in parts):
+            v = sum(parts)  # "Lea owes Max 100 € and Nora 136 €"
+    if v is not None and v > 0 and owes:
         v = -v  # "Lea pays 42.50 €": the sign from the reply's own words, about the person asked
     ok = v is not None and abs(v - item["gold"]) < 0.006
     d = {"ok_partial" if item["partial"] else "ok_all_share": float(ok)}

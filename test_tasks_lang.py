@@ -1059,3 +1059,20 @@ def test_en_tense_identify():
 
 if __name__ == "__main__":
     test_en_tense_identify()
+
+
+def test_de_tense_identify():
+    import tasks_lang as tl
+    xs = tl.load_de_tense_identify("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 48
+    for x in xs[:6]:
+        assert tl.score_de_tense_identify(x, {"content": x["gold"]})["correct"], x["gold"]
+    pq = next(x for x in xs if x["gold"] == "Plusquamperfekt")
+    assert not tl.score_de_tense_identify(pq, {"content": "Perfekt"})["correct"]
+    f2 = next(x for x in xs if x["gold"] == "Futur II")
+    assert tl.score_de_tense_identify(f2, {"content": "Futur 2 (vollendete Zukunft)"})["correct"]
+    assert not tl.score_de_tense_identify(f2, {"content": "Futur I"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_tense_identify()

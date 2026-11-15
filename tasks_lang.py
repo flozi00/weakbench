@@ -4266,6 +4266,58 @@ def score_en_tense_identify(item, reply):
     return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {f"ok_{item['gold'].replace(' ', '_')}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_tense_identify (Tempus bestimmen)
+# (subject, person key) and verbs with (Präsens 3sg, Präsens pl, Präteritum 3sg, Präteritum pl, Partizip II, Hilfsverb)
+DTI_SUBJ = [("Er", "3"), ("Sie", "3"), ("Wir", "p"), ("Die Kinder", "p")]
+DTI_VERBS = [("schreibt", "schreiben", "schrieb", "schrieben", "geschrieben", "h"), ("fährt", "fahren", "fuhr", "fuhren", "gefahren", "s"),
+             ("kocht", "kochen", "kochte", "kochten", "gekocht", "h"), ("schwimmt", "schwimmen", "schwamm", "schwammen", "geschwommen", "s"),
+             ("singt", "singen", "sang", "sangen", "gesungen", "h"), ("arbeitet", "arbeiten", "arbeitete", "arbeiteten", "gearbeitet", "h")]
+DTI_AUX = {("h", "3"): ("hat", "hatte", "wird", "haben"), ("h", "p"): ("haben", "hatten", "werden", "haben"),
+           ("s", "3"): ("ist", "war", "wird", "sein"), ("s", "p"): ("sind", "waren", "werden", "sein")}
+
+
+def _dti_form(tense, v, pk):
+    pres = v[0] if pk == "3" else v[1]
+    aux = DTI_AUX[(v[5], pk)]
+    return {"Präsens": pres, "Präteritum": v[2] if pk == "3" else v[3], "Perfekt": f"{aux[0]} ... {v[4]}",
+            "Plusquamperfekt": f"{aux[1]} ... {v[4]}", "Futur I": f"{aux[2]} ... {v[1]}", "Futur II": f"{aux[2]} ... {v[4]} {aux[3]}"}[tense]
+
+
+def load_de_tense_identify(lang, n, seed):
+    tenses = ["Präsens", "Präteritum", "Perfekt", "Plusquamperfekt", "Futur I", "Futur II"]
+    items = []
+    for i, att in common.redraws(n or 48, items):
+        r = random.Random(f"de_tense_identify:{i}" + (f"~{att}" if att else ""))
+        tense = tenses[i % 6]
+        (subj, pk), v = r.choice(DTI_SUBJ), r.choice(DTI_VERBS)
+        form = _dti_form(tense, v, pk)
+        adv = {"Präteritum": "gestern", "Perfekt": "gestern", "Plusquamperfekt": "gestern", "Futur I": "morgen",
+               "Futur II": "bis morgen"}.get(tense, "heute")  # Futur II: completed by a point in the future
+        if adv == "heute" or "..." not in form:
+            sent = f"{subj} [{form}] {adv}."
+        else:
+            a, b = form.split(" ... ")
+            sent = f"{subj} [{a}] {adv} [{b}]."
+        q = ("In welchem Tempus steht das Verb (die Teile in eckigen Klammern)? Wähle aus: Präsens, Präteritum, Perfekt, "
+             "Plusquamperfekt, Futur I, Futur II. Antworte nur mit dem Tempus.\n\n" + sent)
+        items.append({"id": str(i), "lang": "de", "gold": tense, "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_de_tense_identify(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower().replace("imperfekt", "präteritum")
+    t = re.sub(r"\b(?:nicht|not|kein\w*)\s+[\wä ]+?(?=[,.;)]|\s+(?:sondern|but)\b|$)", " ", t)
+    t = re.sub(r"futur\s*(?:1|eins)\b", "futur i", t)
+    t = re.sub(r"futur\s*(?:2|zwei)\b|futur\s*exakt", "futur ii", t)
+    found = set()
+    for k in ("präsens", "präteritum", "plusquamperfekt", "perfekt", "futur ii", "futur i"):
+        if re.search(rf"\b{k}\b", t):
+            found.add(k)
+            t = re.sub(rf"\b{k}\b", " ", t)  # longest first: Plusquamperfekt is not also Perfekt, Futur II not Futur I
+    ok = found == {item["gold"].lower()}
+    return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4818,6 +4870,7 @@ TASKS = {
     "denglisch_spot": task(("de",), load_denglisch_spot, score_denglisch_spot, 20, 40, lang_check=False),
     "de_case_identify": task(("de",), load_de_case_identify, score_de_case_identify, 24, 48, lang_check=False),
     "en_tense_identify": task(("en",), load_en_tense_identify, score_en_tense_identify, 24, 48, lang_check=False),
+    "de_tense_identify": task(("de",), load_de_tense_identify, score_de_tense_identify, 24, 48, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

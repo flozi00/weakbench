@@ -4686,6 +4686,7 @@ def load_alien_calendar(lang, n, seed):
         wrap = i % 2 == 0
         to_year_end = sum(lens[m0:]) - d0
         n_days = r.randint(to_year_end + 1, to_year_end + 40) if wrap else r.randint(5, max(6, to_year_end))
+        wrap = n_days > to_year_end  # a short in-year draw near the year end still wraps
         m, d = m0, d0 + n_days
         while d > lens[m]:
             d -= lens[m]
@@ -4708,11 +4709,11 @@ def load_alien_calendar(lang, n, seed):
 
 def score_alien_calendar(item, reply):
     fa = final_answer(reply["content"]) or ""
-    wds = [w for w in item["week"] if re.search(r"\b" + w + r"\b", fa)]
-    mos = [m for m in item["months"] if re.search(r"\b" + m + r"\b", fa)]
-    nums = re.findall(r"\d+", fa)
+    wds = [w for w in item["week"] if re.search(r"\b" + w + r"\b", fa, re.I)]
+    mos = [m for m in item["months"] if re.search(r"\b" + m + r"\b", fa, re.I)]
+    day = re.findall(r"(\d+)\D{0,20}?\b" + item["month"] + r"\b", fa, re.I)  # "10 of Brin", "10. Brin", "Tag 10 des Monats Brin"
     ok_w = wds == [item["wd"]]
-    ok_d = mos == [item["month"]] and nums == [str(item["day"])]
+    ok_d = mos == [item["month"]] and [int(x) for x in day] == [item["day"]]
     ok = ok_w and ok_d
     return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"],
             "detail": {"ok_date": float(ok_d), "ok_weekday": float(ok_w), "ok_year_wrap" if item["wrap"] else "ok_in_year": float(ok)}}

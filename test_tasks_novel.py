@@ -1361,10 +1361,24 @@ def test_work_rates():
         assert tn.score_work_rates(x, {"content": t})["correct"], t
 
 
+
+def test_spot_change():
+    import tasks_novel as tn
+    xs = tn.load_spot_change("de", 40, 0)
+    num = next(x for x in xs if x["kind"] == "num" and int(x["old"]) > 999)
+    neg = next(x for x in xs if x["kind"] == "neg" and x["new"] == "-")
+    ok = lambda x, t: tn.score_spot_change(x, {"content": "Antwort: " + t})["correct"]  # noqa: E731
+    o, n = num["old"], num["new"]
+    assert ok(num, f"A: {o} / B: {n}") and ok(num, f"**A:** {o} / **B:** {n}") and ok(num, f"A: {o} Euro / B: {n} Euro")
+    assert ok(num, f"A: {o[0]}.{o[1:]} / B: {n[0]}.{n[1:]}")
+    assert ok(neg, "A: nicht / B: —") and ok(neg, "A: „nicht“ / B: (entfällt)")
+
+
 if __name__ == "__main__":
     test_weekday_calc()
     test_median_traps()
     test_work_rates()
+    test_spot_change()
     test_recipe_scale()
     test_unit_price()
     test_count_mentions()

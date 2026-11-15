@@ -2580,8 +2580,8 @@ def score_de_capitals(item, reply):
 
 # ---------------------------------------------------------------- en_conditionals (verb form in conditionals)
 # (type, sentence with the gap, verb, accepted forms). Contractions are expanded before comparing.
-EC_ITEMS = [("first", "If it rains tomorrow, we ___ at home.", "stay", ["will stay"]),
-            ("first", "If you heat ice, it ___.", "melt", ["melts"]),
+EC_ITEMS = [("first", "If it rains tomorrow, we ___ at home.", "stay", ["will stay", "will be staying"]),
+            ("first", "If you heat ice, it ___.", "melt", ["melts", "will melt"]),
             ("first", "Unless you hurry, you ___ the bus.", "miss", ["will miss"]),
             ("first", "If she ___ early, she will catch the train.", "leave", ["leaves"]),
             ("first", "We will start as soon as everyone ___.", "arrive", ["arrives", "has arrived"]),
@@ -2590,7 +2590,7 @@ EC_ITEMS = [("first", "If it rains tomorrow, we ___ at home.", "stay", ["will st
             ("second", "If he ___ the answer, he would tell us.", "know", ["knew"]),
             ("second", "She would buy a house if she ___ enough money.", "have", ["had"]),
             ("second", "What would you do if you ___ the lottery?", "win", ["won"]),
-            ("third", "If she had studied, she ___ the exam.", "pass", ["would have passed"]),
+            ("third", "If she had studied, she ___ the exam.", "pass", ["would have passed", "could have passed", "might have passed"]),
             ("third", "If we ___ earlier, we would have caught the train.", "leave", ["had left"]),
             ("third", "They would have come if you ___ them.", "invite", ["had invited"]),
             ("third", "If it had not rained, the match ___ cancelled.", "not be", ["would not have been"]),
@@ -2604,14 +2604,14 @@ EC_ITEMS = [("first", "If it rains tomorrow, we ___ at home.", "stay", ["will st
             ("wish", "If only we ___ more time last week.", "have", ["had had"]),
             ("first", "If the alarm ___, leave the building.", "ring", ["rings"]),
             ("second", "It would be easier if the instructions ___ clearer.", "be", ["were"])]
-EC_EXPAND = [(r"won't", "will not"), (r"wouldn't", "would not"), (r"hadn't", "had not"), (r"'d have", " would have"),
-             (r"'ll", " will"), (r"'d", " would")]
+EC_EXPAND = [(r"won't", "will not"), (r"wouldn't", "would not"), (r"hadn't", "had not"), (r"couldn't", "could not"),
+             (r"didn't", "did not"), (r"'ve", " have"), (r"'d have", " would have"), (r"'ll", " will")]  # bare 'd: would or had
 
 
 def load_en_conditionals(lang, n, seed):
     rows = EC_ITEMS[:min(n or len(EC_ITEMS), len(EC_ITEMS))]
     return [{"id": str(i), "lang": "en", "gold": forms[0], "forms": forms, "kind": k,
-             "messages": [{"role": "user", "content": f"Fill the gap with the correct form of the verb in brackets ({verb}). "
+             "messages": [{"role": "user", "content": f"Fill the gap with the correct form of the verb in brackets ({verb}), in standard written English. "
                            f"Answer with the missing words only.\n\n{sent}"}]}
             for i, (k, sent, verb, forms) in enumerate(rows)]
 
@@ -2620,9 +2620,11 @@ def score_en_conditionals(item, reply):
     t = (reply["content"] or "").lower().replace("’", "'")
     for a, b in EC_EXPAND:
         t = t.replace(a, b)
-    t = " ".join(re.findall(r"[a-z]+", t))
-    got = [f for f in item["forms"] if re.search(r"(?:^| )" + f + r"(?: |$)", t)]
-    ok = bool(got) and len(t.split()) <= len(item["forms"][0].split()) + 3  # not the whole sentence with every option
+    hedge = bool(re.search(r"/|\bor\b", t))
+    ts = {" ".join(re.findall(r"[a-z]+", t.replace("'d", x))) for x in (" would", " had")}  # I'd known = I had known
+    got = [f for f in item["forms"] for u in ts if re.search(r"(?:^| )" + f + r"(?: |$)", u)]
+    t = min(ts, key=len)
+    ok = bool(got) and not hedge and len(t.split()) <= len(item["forms"][0].split()) + 3  # not the whole sentence
     return {"correct": ok, "score": float(ok), "pred": t[:60], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 

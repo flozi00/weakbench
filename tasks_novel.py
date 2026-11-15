@@ -4862,8 +4862,13 @@ def load_spot_change(lang, n, seed):
 
 def score_spot_change(item, reply):
     fa = final_answer(reply["content"]) or ""
-    m = re.search(r"A\s*:\s*\**\s*([^\s/*]+)\s*\**\s*/\s*B\s*:\s*\**\s*([^\s/*]+)", fa)
-    got = (m[1].strip(".,\"'“”„").lower(), m[2].strip(".,\"'“”„").lower()) if m else None
+    def word(part):  # "**A:** 1,369 euros" -> "1369", "—" / "(entfällt)" -> "-"
+        part = re.sub(r"^[\s*]*[AB]\s*[*:]+\s*\**", "", part).strip()
+        tok = (part.split() or [""])[0].strip(".,\"'“”„*()")
+        tok = re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", tok)
+        return "-" if tok in ("", "—", "–", "-", "entfällt", "none", "nothing", "nichts") else tok.lower()
+    parts = re.split(r"\s/\s|\s*/\s*(?=\**B)", fa, maxsplit=1)
+    got = (word(parts[0][parts[0].find("A"):]), word(parts[1])) if len(parts) == 2 and "A" in parts[0] else None
     ok = got == (item["old"].lower(), item["new"].lower())
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],
             "detail": {f"ok_len{item['len']}": float(ok), f"ok_kind_{item['kind']}": float(ok)}}

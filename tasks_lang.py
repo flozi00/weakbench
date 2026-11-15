@@ -3599,6 +3599,45 @@ def score_en_zero_article(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_austrian (Austrian standard German vocabulary)
+# Austrian German is a standard variety with its own everyday words; a model serving German speakers must understand
+# them. A sentence uses the Austrian word; the reply gives the word used in Germany (any listed synonym counts).
+AT_ITEMS = [("Kannst du beim Markt noch ein Kilo Paradeiser mitnehmen?", "Paradeiser", ["Tomaten", "Tomate"]),
+            ("Zum Schnitzel gibt es Erdäpfelsalat.", "Erdäpfel", ["Kartoffeln", "Kartoffel"]),
+            ("Die Marillenmarmelade meiner Oma ist die beste.", "Marille", ["Aprikose", "Aprikosen"]),
+            ("Im Jänner fahren wir Ski.", "Jänner", ["Januar"]),
+            ("Für den Kuchen brauche ich 500 Gramm Topfen.", "Topfen", ["Quark"]),
+            ("Brauchen Sie ein Sackerl?", "Sackerl", ["Tüte", "Plastiktüte", "Tragetasche", "Beutel"]),
+            ("Bitte noch einen Kaffee mit Schlagobers.", "Schlagobers", ["Schlagsahne", "Sahne"]),
+            ("Heute gibt es Karfiol mit Butterbröseln.", "Karfiol", ["Blumenkohl"]),
+            ("Die Fisolen müssen noch geputzt werden.", "Fisolen", ["grüne Bohnen", "Bohnen", "Brechbohnen", "Prinzessbohnen"]),
+            ("Zum Tafelspitz gehört frisch geriebener Kren.", "Kren", ["Meerrettich"]),
+            ("Der Kuchen ist mit roten Ribiseln belegt.", "Ribiseln", ["Johannisbeeren", "Johannisbeere"]),
+            ("Ich hole uns noch zwei Semmeln vom Bäcker.", "Semmel", ["Brötchen", "Schrippe", "Wecken"]),
+            ("Heuer war der Sommer besonders heiß.", "heuer", ["dieses Jahr", "in diesem Jahr"]),
+            ("Nach der Matura möchte sie Medizin studieren.", "Matura", ["Abitur", "Abi"]),
+            ("Er liegt seit Montag im Spital.", "Spital", ["Krankenhaus", "Klinik"]),
+            ("Die Zeitung kaufe ich immer in der Trafik.", "Trafik", ["Kiosk", "Tabakladen", "Tabakwarenladen", "Zeitungskiosk"]),
+            ("Die Melanzani schneidest du in dünne Scheiben.", "Melanzani", ["Auberginen", "Aubergine"]),
+            ("Leg das Polster aufs Sofa.", "Polster", ["Kissen", "Sofakissen"]),
+            ("Die Stiege in den Keller ist steil.", "Stiege", ["Treppe"]),
+            ("Wir treffen uns um halb drei beim Eingang vom Beisl.", "Beisl", ["Kneipe", "Gaststätte", "Wirtshaus", "Lokal", "Gasthaus"])]
+
+
+def load_de_austrian(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "word": w, "gold": g,
+             "messages": [{"role": "user", "content": f"Dieser Satz ist österreichisches Deutsch: „{sent}“\nWelches Wort sagt man in "
+                           f"Deutschland für „{w}“? Antworte nur mit dem Wort."}]}
+            for i, (sent, w, g) in enumerate(AT_ITEMS[:min(n or 20, 20)])]
+
+
+def score_de_austrian(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", reply["content"] or "").lower()
+    hit = any(re.search(rf"(?<![a-zäöüß]){re.escape(g.lower())}", t) for g in item["gold"])
+    ok = bool(hit)
+    return {"correct": ok, "score": float(ok), "pred": t.strip()[:40], "gold": item["gold"][0], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4134,6 +4173,7 @@ TASKS = {
     "de_paronyms": task(("de",), load_de_paronyms, score_de_paronyms, 16, 16, lang_check=False),
     "de_nominal_adj": task(("de",), load_de_nominal_adj, score_de_nominal_adj, 16, 16, lang_check=False),
     "en_zero_article": task(("en",), load_en_zero_article, score_en_zero_article, 20, 20, lang_check=False),
+    "de_austrian": task(("de",), load_de_austrian, score_de_austrian, 20, 20, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

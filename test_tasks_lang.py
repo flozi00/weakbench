@@ -873,3 +873,17 @@ def test_en_zero_article():
 
 if __name__ == "__main__":
     test_en_zero_article()
+
+
+def test_de_austrian():
+    import tasks_lang as tl
+    xs = tl.load_de_austrian("de", None, 0)
+    assert len(xs) == 20
+    for x in xs:
+        assert tl.score_de_austrian(x, {"content": x["gold"][0]})["correct"]
+        assert not tl.score_de_austrian(x, {"content": x["word"]})["correct"], x["word"]
+    assert tl.score_de_austrian(xs[0], {"content": "Tomaten (Paradeiser)"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_austrian()

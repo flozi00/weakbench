@@ -9058,7 +9058,9 @@ def load_country_facts(lang, n, seed):
     g = GEO_PLACES.value
     F, nm = g["facts"], (lambda cc: g["countries"][cc][lang == "de"][0])  # noqa: E731
     ccs = sorted(F)
-    pos = sorted({tuple(sorted((a, b))) for a in ccs for b in F[a]["neighbours"] if b in F})
+    # debatable pairs left out: ES-MA (Ceuta/Melilla) as yes; GB-ES (Gibraltar) and FR-NL (Saint Martin) as no
+    skip = {("ES", "MA"), ("ES", "GB"), ("FR", "NL")}
+    pos = sorted({tuple(sorted((a, b))) for a in ccs for b in F[a]["neighbours"] if b in F} - skip)
     items = []
     for i, att in common.redraws(n or 120, items):
         r = rng_of("country_facts", i, att)
@@ -9069,7 +9071,8 @@ def load_country_facts(lang, n, seed):
             else:
                 while True:
                     a, b = r.sample(ccs, 2)
-                    if F[a]["continent"] == F[b]["continent"] and b not in F[a]["neighbours"] and a not in F[b]["neighbours"]:
+                    if F[a]["continent"] == F[b]["continent"] and b not in F[a]["neighbours"] and a not in F[b]["neighbours"] \
+                            and tuple(sorted((a, b))) not in skip:
                         break
             if r.random() < 0.5:
                 a, b = b, a
@@ -9080,7 +9083,7 @@ def load_country_facts(lang, n, seed):
             items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
         elif kind == "area":
             while True:
-                a, b = r.sample(ccs, 2)
+                a, b = r.sample([c for c in ccs if c not in ("MA", "DK")], 2)  # Western Sahara, Greenland: area by definition
                 big, small = max(F[a]["area"], F[b]["area"]), min(F[a]["area"], F[b]["area"])
                 if small > 0 and big / small >= 1.3:
                     break
@@ -9090,7 +9093,7 @@ def load_country_facts(lang, n, seed):
             items.append({"id": str(i), "lang": lang, "kind": kind, "gold": nm(gold_cc), "cc": gold_cc, "pair": [a, b],
                           "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
         else:
-            cc = r.choice([c for c in ccs if c not in ("IL", "ZA")])
+            cc = r.choice([c for c in ccs if c not in ("IL", "ZA", "NL")])  # contested, three capitals, Amsterdam vs The Hague
             q = f"What is the capital of {nm(cc)}?" if lang == "en" else f"Wie heißt die Hauptstadt von {nm(cc)}?"
             items.append({"id": str(i), "lang": lang, "kind": kind, "gold": F[cc]["capital"][0], "names": F[cc]["capital"],
                           "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
@@ -9105,13 +9108,20 @@ def score_country_facts(item, reply):
         ok = v == item["gold"]
     elif item["kind"] == "area":
         g = GEO_PLACES.value
-        fa2 = re.sub(r"\b(?:than|als)\b.*$", " ", fa, flags=re.I)  # "Brazil is larger than Peru": the first one
-        named = [cc for cc in item["pair"] if any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa2, re.I) for x in sum(g["countries"][cc], []))]
-        ok = named == [item["cc"]]
-        v = named
+        first = {}
+        for cc in item["pair"]:
+            ms = [m.start() for x in sum(g["countries"][cc], []) for m in re.finditer(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I)]
+            if ms:
+                first[cc] = min(ms)
+        order = sorted(first, key=first.get)
+        v = order[0] if order else None
+        if len(order) == 2 and re.search(r"(?i)\b(?:smaller|kleiner)\b", fa[first[order[0]]:first[order[1]]]):
+            v = order[1]  # "Peru is smaller than Brazil"
+        ok = v == item["cc"]
     else:
-        v = fa[:40]
-        ok = any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in item["names"])
+        head = re.split(r"[,;]|\b(?:but|aber|sondern)\b", fa)[0]  # "Amsterdam, not The Hague" / "Not Amsterdam but The Hague"
+        v = head[:40]
+        ok = not re.match(r"\s*(?:not|nicht)\b", head, re.I) and any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", head, re.I) for x in item["names"])
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 

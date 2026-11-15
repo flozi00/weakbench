@@ -2010,6 +2010,10 @@ def test_country_facts():
     on = tn.GEO_PLACES.value["countries"][other][1][0]
     assert tn.score_country_facts(a, {"content": f"Antwort: {a['gold']} ist größer als {on}"})["correct"]
     assert not tn.score_country_facts(a, {"content": f"Antwort: {on}"})["correct"]
+    assert tn.score_country_facts(a, {"content": f"Antwort: {on} ist kleiner als {a['gold']}"})["correct"]
+    c = next(x for x in xs if x["kind"] == "capital")
+    assert not tn.score_country_facts(c, {"content": f"Antwort: Nicht {c['gold']}, sondern Xyz"})["correct"]
+    assert tn.score_country_facts(c, {"content": f"Antwort: {c['gold']}, nicht Xyz"})["correct"]
 
 
 if __name__ == "__main__":

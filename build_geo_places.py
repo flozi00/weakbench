@@ -107,7 +107,9 @@ for ln in open("geo_dl/countryInfo.txt", encoding="utf-8"):
 for ln in open("geo_dl/cities15000.txt", encoding="utf-8"):
     f = ln.rstrip("\n").split("\t")
     if f[7] == "PPLC" and f[8] in facts:
-        alts = [x for x in f[3].split(",") if re.fullmatch(r"[A-Za-zÀ-ÿ' .-]{3,}", x) and x.lower() not in COUNTRY_WORDS]
+        alts = [x for x in f[3].split(",") if re.fullmatch(r"[A-Za-zÀ-ÿ' .-]{4,}", x) and not x.isupper()
+                and x.lower() not in COUNTRY_WORDS | {"misr", "masr", "federal city", "federal capital", "phoenix city"}
+                and not x.lower().startswith("the city of")]  # no codes, no "Misr" (= Egypt), no epithets
         facts[f[8]]["capital"] = sorted({f[1], f[2], *facts[f[8]]["capital"], *alts}, key=lambda x: x != f[1])
 out = {"countries": C, "facts": facts, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city, "towns": unique_towns}
 s = repr(out)

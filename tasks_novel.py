@@ -7826,6 +7826,59 @@ def score_league_table(item, reply):
             "detail": {"ranked_by_goals": float(v == item["bait"]), "lost_tie_break": float(v in item["tied"])}}
 
 
+# ---------------------------------------------------------------- access_rules (precedence, not order)
+AR_ROLES = ["staff", "finance", "hr", "contractor", "admin"]
+AR_DIRS = ["/shared", "/shared/finance", "/shared/finance/payroll", "/shared/hr", "/shared/hr/reviews", "/shared/projects",
+           "/shared/projects/alpha"]
+
+
+def load_access_rules(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("access_rules", i, att)
+        want_yes = i % 2 == 0
+        while True:
+            rules = [(r.choice(["allow", "deny"]), r.choice(AR_ROLES), r.choice(AR_DIRS)) for _ in range(r.randint(4, 6))]
+            if len(set(rules)) < len(rules):
+                continue
+            roles = r.sample(AR_ROLES[:4], r.randint(1, 2))
+            path = r.choice([d for d in AR_DIRS if d.count("/") >= 2]) + "/" + r.choice(["q3.xlsx", "notes.txt", "plan.pdf"])
+            match = [(e, ro, d) for e, ro, d in rules if ro in roles and path.startswith(d + "/")]
+            if not match:
+                continue
+            top = max(len(d) for _, _, d in match)
+            gold = "deny" not in [e for e, _, d in match if len(d) == top]
+            first, last = match[0][0] == "allow", match[-1][0] == "allow"
+            if gold == want_yes and (first != gold or last != gold) and len(match) >= 2:
+                break
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        verb = {"allow": ("ALLOW", "ERLAUBEN"), "deny": ("DENY", "VERBIETEN")}
+        lines = "\n".join(f"{k + 1}. {verb[e][lang == 'de']} {ro} {d}" for k, (e, ro, d) in enumerate(rules))
+        user = f"Kim ({', '.join(roles)})"
+        q = (f"File server rules (role, folder; a rule applies to the folder and everything below it):\n{lines}\n"
+             f"Precedence: the rule with the most specific (longest) matching folder wins, regardless of its position in the list. "
+             f"If equally specific rules disagree, DENY wins. No matching rule means no access.\n"
+             f"{user} wants to open {path}. Is it allowed? Answer yes or no." if lang == "en" else
+             f"Regeln des Dateiservers (Rolle, Ordner; eine Regel gilt für den Ordner und alles darunter):\n{lines}\n"
+             f"Vorrang: Es gewinnt die Regel mit dem spezifischsten (längsten) passenden Ordner, egal an welcher Stelle sie steht. "
+             f"Widersprechen sich gleich spezifische Regeln, gewinnt VERBIETEN. Passt keine Regel, gibt es keinen Zugriff.\n"
+             f"{user} will {path} öffnen. Ist das erlaubt? Antworte mit ja oder nein.")
+        items.append({"id": str(i), "lang": lang, "gold": yes if gold else no,
+                      "first_match": yes if first else no, "last_match": yes if last else no,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_access_rules(item, reply):
+    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
+    v = yn[0] if yn else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{'allowed' if item['gold'] in ('yes', 'ja') else 'denied'}": float(ok),
+                       "took_first_match": float(v == item["first_match"] != item["gold"]),
+                       "took_last_match": float(v == item["last_match"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9411,6 +9464,7 @@ TASKS = {
     "night_shift": task(load_night_shift, score_night_shift, 24, 120),
     "reorder_day": task(load_reorder_day, score_reorder_day, 24, 120),
     "league_table": task(load_league_table, score_league_table, 24, 120),
+    "access_rules": task(load_access_rules, score_access_rules, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

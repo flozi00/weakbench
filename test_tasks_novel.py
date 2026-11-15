@@ -1546,3 +1546,18 @@ def test_league_table():
 
 if __name__ == "__main__":
     test_league_table()
+
+
+def test_access_rules():
+    import tasks_novel as tn
+    xs = tn.load_access_rules("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert sum(x["gold"] == "yes" for x in xs) == 60
+    for x in xs:
+        assert x["first_match"] != x["gold"] or x["last_match"] != x["gold"]
+    x = xs[0]
+    assert tn.score_access_rules(x, {"content": f"Answer: {x['gold'].capitalize()}, rule 3 is more specific."})["correct"]
+
+
+if __name__ == "__main__":
+    test_access_rules()

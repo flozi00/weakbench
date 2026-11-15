@@ -6820,7 +6820,10 @@ def load_map_scale(lang, n, seed):
 
 
 def score_map_scale(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    v = answer_value(fa, item["lang"])
+    if v is not None and not item["area"] and re.search(r"\d\s*m\b(?![²2])", fa) and not re.search(r"\bkm\b", fa):
+        v = v / 1000  # answered in metres
     near = lambda x, y: x is not None and abs(x - y) <= max(0.0051, 0.005 * abs(y))  # noqa: E731
     ok = near(v, item["gold"])
     d = {"ok_area" if item["area"] else "ok_length": float(ok)}

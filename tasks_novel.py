@@ -5837,6 +5837,55 @@ def score_weighted_mean(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- tax_brackets (marginal rates)
+def load_tax_brackets(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("tax_brackets", i)
+        k = r.choice([3, 4])
+        bounds = sorted(r.sample(range(5, 80, 5), k - 1))
+        bounds = [b * 1000 for b in bounds]
+        rates = sorted(r.sample([0, 5, 10, 15, 20, 25, 30, 35, 40, 45], k))
+        income = r.randrange(bounds[-1] + 1000, bounds[-1] + 60000, 500) if i % 2 == 0 else \
+            r.randrange(bounds[0] + 1000, bounds[-1], 500) if len(bounds) > 1 else r.randrange(bounds[0] + 1000, bounds[0] + 40000, 500)
+        tax, lo = 0, 0
+        top = 0
+        for b, rate in zip(bounds + [None], rates):
+            hi = income if b is None else min(income, b)
+            if hi > lo:
+                tax += (hi - lo) * rate / 100
+                top = rate
+            lo = b if b is not None else lo
+            if b is not None and income <= b:
+                break
+        flat = income * top / 100
+        lines = []
+        prev = 0
+        for j, rate in enumerate(rates):
+            if j < len(bounds):
+                lines.append(f"- {rate} % on income from {prev:,} € to {bounds[j]:,} €" if lang == "en" else
+                             f"- {rate} % auf das Einkommen von {prev:,} € bis {bounds[j]:,} €".replace(",", "."))
+                prev = bounds[j]
+            else:
+                lines.append(f"- {rate} % on income above {prev:,} €" if lang == "en" else
+                             f"- {rate} % auf das Einkommen über {prev:,} €".replace(",", "."))
+        inc = f"{income:,}" if lang == "en" else f"{income:,}".replace(",", ".")
+        q = ("In a country the income tax works like this; each rate applies only to the part of the income inside its band:\n"
+             + "\n".join(lines) + f"\nHow much tax does someone with an income of {inc} € pay, in euros?" if lang == "en" else
+             "In einem Land funktioniert die Einkommensteuer so; jeder Satz gilt nur für den Teil des Einkommens in seiner Stufe:\n"
+             + "\n".join(lines) + f"\nWie viel Steuer zahlt jemand mit einem Einkommen von {inc} €, in Euro?")
+        items.append({"id": str(i), "lang": lang, "gold": round(tax, 2), "flat": round(flat, 2),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_tax_brackets(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.51
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_flat_top_rate": float(v is not None and abs(v - item["flat"]) < 0.51 and not ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7412,6 +7461,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "tax_brackets": task(load_tax_brackets, score_tax_brackets, 24, 120),
     "weighted_mean": task(load_weighted_mean, score_weighted_mean, 24, 120),
     "date_locale": task(load_date_locale, score_date_locale, 24, 120),
     "train_connect": task(load_train_connect, score_train_connect, 24, 120),

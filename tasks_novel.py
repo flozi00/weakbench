@@ -6415,8 +6415,8 @@ NF_RULES = [  # (en, de, predicate on (cheap, stock), the misreading)
      lambda c, s: (not c) and (not s), lambda c, s: not (c and s)),
     ("in stock but not cheap", "vorrätig, aber nicht günstig",
      lambda c, s: s and not c, lambda c, s: not (s and c)),
-    ("not cheap, or cheap but not in stock", "nicht günstig, oder günstig, aber nicht vorrätig",
-     lambda c, s: (not c) or (c and not s), lambda c, s: (not c) and (not s))]
+    ("either cheap or in stock, but not both", "entweder günstig oder vorrätig, aber nicht beides",
+     lambda c, s: c != s, lambda c, s: c or s)]
 
 
 def load_negated_filter(lang, n, seed):
@@ -6444,7 +6444,9 @@ def load_negated_filter(lang, n, seed):
 
 
 def score_negated_filter(item, reply):
-    fa = final_answer(reply["content"]) or ""
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")  # "Fan (unlike the Kettle)"
+    names = "|".join(item["prods"])
+    fa = re.sub(r"\b(?:not|unlike|except|nicht|außer|anders als)\s+(?:the |der |die |das |den )?(?:" + names + r")\b", " ", fa, flags=re.I)
     got = sorted(p for p in item["prods"] if re.search(r"\b" + p + r"\b", fa, re.I))
     want = set(item["set"])
     jac = len(set(got) & want) / len(set(got) | want) if set(got) | want else 1.0

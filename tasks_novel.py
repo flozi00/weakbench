@@ -8627,7 +8627,10 @@ def load_elevator_route(lang, n, seed):
 
 
 def score_elevator_route(item, reply):
-    v = stated_int(reply, r"(?:floors?|stockwerke?|etagen?)")
+    unit = r"(?:floors?|stockwerke?|etagen?)\b"
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    hits = re.findall(r"(\d+)\s*" + unit, fa, re.I)  # "route 7 → 9 → 12 → 3, 19 floors": the number with the unit
+    v = int(hits[-1]) if hits else stated_int(reply, unit)
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"press_order": float(v == item["bait"])}}
 

@@ -1819,6 +1819,8 @@ def test_elevator_route():
         assert dist == x["gold"] != x["bait"]
     x = xs[0]
     assert tn.score_elevator_route(x, {"content": f"Answer: {x['gold']} floors"})["correct"]
+    for c in (f"Answer: route 7 → 9 → 12 → 3, {x['gold']} floors", f"Answer: route 7-9-12-3, total {x['gold']} floors", f"Answer: {x['gold']}"):
+        assert tn.score_elevator_route(x, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

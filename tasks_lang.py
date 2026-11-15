@@ -3973,6 +3973,55 @@ def score_de_imperative(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"][0], "detail": {"typical_error": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- dual_output (two languages in one reply, each in its place)
+# The instruction is in the cell language; the reply has a message in one language and, after a "---" line, a one-sentence
+# note in the other (or the same) language. Language per part by function words; the moved time and the name must
+# survive in both parts. Measures switching inside one reply, the case where models drift into a single language.
+DO_NAMES = ["Nora Novak", "Sami Haddad", "Elin Lindqvist", "Chidi Okafor", "Claire Moreau", "Piotr Kowalczyk"]
+DO_DAYS = {"en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "de": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"]}
+
+
+def _de_en(text):
+    words = re.findall(r"[a-zäöüß']+", text.lower())
+    de, en = sum(w in ML_WORDS["de"] for w in words), sum(w in ML_WORDS["en"] for w in words)
+    return "de" if de >= 2 and de > en else "en" if en >= 2 and en > de else None
+
+
+def load_dual_output(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 16, items):
+        r = random.Random(f"dual_output:{lang}:{i}" + (f"~{att}" if att else ""))
+        msg_lang, note_lang = [("en", "de"), ("de", "en"), ("en", "en"), ("de", "de")][i % 4] if i % 4 < 2 else \
+            [("en", "de"), ("de", "en")][i % 2]  # mostly mixed; the instruction language never decides
+        name, d_old, d_new = r.choice(DO_NAMES), *r.sample(range(5), 2)
+        hh = r.choice(["9:30", "10:00", "11:15", "14:00", "15:30"])
+        L = {"en": "English", "de": "German"} if lang == "en" else {"en": "Englisch", "de": "Deutsch"}
+        q = (f"Our project meeting with {name} moves from {DO_DAYS['en'][d_old]} to {DO_DAYS['en'][d_new]}, same time ({hh}). "
+             f"Write a short message (2-3 sentences) to {name} in {L[msg_lang]} telling them. Then a line with only ---, and "
+             f"below it one sentence in {L[note_lang]} for my own notes that summarises the change." if lang == "en" else
+             f"Unser Projekttermin mit {name} wird von {DO_DAYS['de'][d_old]} auf {DO_DAYS['de'][d_new]} verschoben, gleiche Uhrzeit "
+             f"({hh}). Schreib eine kurze Nachricht (2-3 Sätze) an {name} auf {L[msg_lang]}, die das mitteilt. Dann eine Zeile nur "
+             f"mit ---, und darunter einen Satz auf {L[note_lang]} für meine eigenen Notizen, der die Änderung zusammenfasst.")
+        items.append({"id": str(i), "lang": lang, "msg_lang": msg_lang, "note_lang": note_lang, "name": name.split()[-1], "time": hh,
+                      "day": (DO_DAYS["en"][d_new], DO_DAYS["de"][d_new]), "gold": f"{msg_lang}/{note_lang}",
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_dual_output(item, reply):
+    parts = [p.strip() for p in re.split(r"^\s*-{3,}\s*$", reply["content"] or "", flags=re.M) if p.strip()]
+    two = len(parts) == 2
+    m_lang = _de_en(parts[0]) if two else None
+    n_lang = _de_en(parts[1]) if two else None
+    day = item["day"][0] if item["msg_lang"] == "en" else item["day"][1]
+    facts = two and item["time"] in parts[0] and item["name"] in parts[0] and day.lower() in parts[0].lower()
+    one = two and len(re.findall(r"[.!?](?:\s|$)", parts[1])) <= 1
+    met = [two, m_lang == item["msg_lang"], n_lang == item["note_lang"], bool(facts), bool(one)]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": f"{m_lang}/{n_lang}", "gold": item["gold"],
+            "detail": {"split_ok": float(two), "msg_lang_ok": float(met[1]), "note_lang_ok": float(met[2]), "facts_kept": float(met[3]),
+                       "note_one_sentence": float(met[4]), "switched": float(met[1] and met[2] and item["msg_lang"] != item["note_lang"])}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4518,6 +4567,7 @@ TASKS = {
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),
+    "dual_output": task(("de", "en"), load_dual_output, score_dual_output, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

@@ -976,3 +976,24 @@ def test_de_imperative():
 
 if __name__ == "__main__":
     test_de_imperative()
+
+
+def test_dual_output():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        xs = tl.load_dual_output(lang, None, 0)
+        assert len({x["messages"][0]["content"] for x in xs}) == 16
+        for x in xs:
+            dn = x["day"][0] if x["msg_lang"] == "en" else x["day"][1]
+            msg = (f"Dear {x['name']}, our project meeting moves to {dn} at {x['time']}. The time stays the same. Thank you for your understanding."
+                   if x["msg_lang"] == "en" else
+                   f"Liebe Frau {x['name']}, unser Projekttermin wird auf {dn} um {x['time']} verschoben. Die Uhrzeit bleibt die gleiche und wir freuen uns.")
+            note = ("Der Termin mit ihr ist jetzt am neuen Tag und die Uhrzeit bleibt." if x["note_lang"] == "de" else
+                    "The meeting is now on the new day and the time is the same.")
+            r = tl.score_dual_output(x, {"content": f"{msg}\n---\n{note}"})
+            assert r["correct"], (x["gold"], r)
+            assert not tl.score_dual_output(x, {"content": msg})["correct"]
+
+
+if __name__ == "__main__":
+    test_dual_output()

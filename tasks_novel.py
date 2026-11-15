@@ -7133,6 +7133,46 @@ def score_roman_arith(item, reply):
                        "ok_value_only": float(not ok and bool(digits) and int(digits[-1]) == item["value"])}}
 
 
+# ---------------------------------------------------------------- cidr_check (network membership, gold from ipaddress)
+def load_cidr_check(lang, n, seed):
+    import ipaddress
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("cidr_check", i, att)
+        while True:
+            plen = r.choice([20, 21, 22, 23, 25, 26, 27, 28, 29])
+            base = ipaddress.IPv4Address(r.choice([10 << 24, (172 << 24) | (16 << 16), (192 << 24) | (168 << 16)]) + r.randrange(0, 1 << 16))
+            net = ipaddress.IPv4Network(f"{base}/{plen}", strict=False)
+            octet = ipaddress.IPv4Network(f"{base}/{plen // 8 * 8}", strict=False)  # the misreading: prefix rounded down to an octet
+            lo, hi = int(net.network_address), int(net.broadcast_address)
+            cands = {lo + r.randrange(0, hi - lo + 1), lo, hi, lo - 1, hi + 1, lo + r.randrange(-300, 300), hi + r.randrange(1, 40)}
+            cands = [ipaddress.IPv4Address(c) for c in cands if 0 < c < (1 << 32)]
+            r.shuffle(cands)
+            cands = cands[:6]
+            gold = [k + 1 for k, c in enumerate(cands) if c in net]
+            bait = [k + 1 for k, c in enumerate(cands) if c in octet]
+            if len(cands) == 6 and 1 <= len(gold) <= 4 and gold != bait:
+                break
+        lst = "\n".join(f"{k + 1}. {c}" for k, c in enumerate(cands))
+        q = (f"Network: {net}\nWhich of these addresses lie inside this network (network and broadcast address included)?\n{lst}\n"
+             "Answer with the numbers, separated by commas." if lang == "en" else
+             f"Netz: {net}\nWelche dieser Adressen liegen in diesem Netz (Netz- und Broadcast-Adresse eingeschlossen)?\n{lst}\n"
+             "Antworte mit den Nummern, durch Kommas getrennt.")
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(map(str, gold)), "set": gold, "bait": bait,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cidr_check(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    fa = re.sub(r"\d+\.\d+\.\d+\.\d+(?:/\d+)?", " ", fa)  # an address quoted back is no item number
+    got = sorted({int(x) for x in re.findall(r"\b[1-6]\b", fa)})
+    want = set(item["set"])
+    jac = len(set(got) & want) / len(set(got) | want) if set(got) | want else 1.0
+    return {"correct": got == item["set"], "score": float(got == item["set"]), "pred": got, "gold": item["gold"],
+            "detail": {"jaccard": round(jac, 4), "took_octet_prefix": float(got == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8713,6 +8753,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "cidr_check": task(load_cidr_check, score_cidr_check, 24, 120),
     "roman_arith": task(load_roman_arith, score_roman_arith, 24, 120),
     "rooms_needed": task(load_rooms_needed, score_rooms_needed, 24, 120),
     "pace_speed": task(load_pace_speed, score_pace_speed, 24, 120),

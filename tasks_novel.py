@@ -10001,7 +10001,8 @@ def load_event_order(lang, n, seed):
 
 def score_event_order(item, reply):
     line = (final_answer(reply["content"]) or "").lower()
-    found = sorted((line.find(e.lower()), e) for e in item["gold"] if e.lower() in line)
+    key = {e: e.lower().removeprefix("the ") for e in item["gold"]}  # "Gym, Dentist" names the events too
+    found = sorted((line.find(key[e]), e) for e in item["gold"] if key[e] in line)
     ok = [e for _, e in found] == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": line[:120], "gold": ", ".join(item["gold"]),
             "detail": {f"ok_e{item['n']}": float(ok)}}

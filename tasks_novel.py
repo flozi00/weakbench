@@ -6279,8 +6279,8 @@ def load_sql_result(lang, n, seed):
         r = rng_of("sql_result", i)
         kind = SR_KINDS[i % 4]
         while True:
-            rows = [(k + 1, r.choice(["north", "south", "east"]), r.choice([None, r.randint(1, 9) * 10]),
-                     r.choice([None, "paid", "open"])) for k in range(r.randint(6, 9))]
+            rows = [(k + 1, r.choice(["north", "south", "east", "west", "centre"]), r.choice([None, r.randint(1, 9) * 10]),
+                     r.choice([None, "paid", "open"])) for k in range(r.randint(7, 10))]
             db = sqlite3.connect(":memory:")
             db.execute("CREATE TABLE orders (id INTEGER, region TEXT, amount INTEGER, status TEXT)")
             db.executemany("INSERT INTO orders VALUES (?, ?, ?, ?)", rows)

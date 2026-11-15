@@ -1886,3 +1886,17 @@ def test_trip_cost():
 
 if __name__ == "__main__":
     test_trip_cost()
+
+
+def test_password_rules():
+    import tasks_novel as tn
+    xs = tn.load_password_rules("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert all(1 <= len(x["set"]) <= 5 for x in xs)
+    x = xs[0]
+    for c in (f"Answer: {x['gold']}", "Answer: " + " and ".join(map(str, x["set"])), "Answer: numbers " + ", ".join(map(str, x["set"]))):
+        assert tn.score_password_rules(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_password_rules()

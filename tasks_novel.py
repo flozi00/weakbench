@@ -8770,6 +8770,68 @@ def score_trip_cost(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "one_way_only": float(v is not None and abs(v - item["bait"]) < 0.015)}}
 
 
+# ---------------------------------------------------------------- password_rules (apply a stated policy to candidates)
+PW_USERS = ["mila", "jonas", "petra", "ömer", "lukas", "sanna"]
+
+
+def _pw_checks(pw, user, minlen):
+    return {"length": len(pw) >= minlen, "digit": any(c.isdigit() for c in pw), "upper": any(c.isupper() for c in pw),
+            "repeat": not re.search(r"(.)\1\1", pw), "user": user.lower() not in pw.lower()}
+
+
+def load_password_rules(lang, n, seed):
+    import string
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("password_rules", i, att)
+        while True:  # 1-4 valid candidates
+            user, minlen = r.choice(PW_USERS), r.choice([8, 10, 12])
+            cands = []
+            for k in range(6):
+                while True:
+                    base = "".join(r.choice(string.ascii_lowercase) for _ in range(r.randint(minlen - 2, minlen + 4)))
+                    pw = list(base)
+                    for _ in range(r.randint(0, 2)):
+                        pw[r.randrange(len(pw))] = r.choice(string.digits)
+                    for _ in range(r.randint(0, 2)):
+                        j = r.randrange(len(pw))
+                        pw[j] = pw[j].upper()
+                    pw = "".join(pw)
+                    flaw = r.random()
+                    if flaw < 0.2:
+                        j = r.randrange(len(pw) - 2)
+                        pw = pw[:j] + pw[j] * 3 + pw[j + 3:]
+                    elif flaw < 0.35:
+                        j = r.randrange(len(pw) - len(user))
+                        pw = pw[:j] + (user.capitalize() if r.random() < 0.5 else user) + pw[j + len(user):]
+                    if pw not in cands:
+                        break
+                cands.append(pw)
+            ok = [pw for pw in cands if all(_pw_checks(pw, user, minlen).values())]
+            if 1 <= len(ok) <= 4:
+                break
+        rules = ([f"at least {minlen} characters", "at least one digit", "at least one capital letter",
+                  "no character three times in a row", f"must not contain the user name '{user}' (in any case)"] if lang == "en" else
+                 [f"mindestens {minlen} Zeichen", "mindestens eine Ziffer", "mindestens ein Großbuchstabe",
+                  "kein Zeichen dreimal hintereinander", f"darf den Benutzernamen „{user}“ nicht enthalten (egal ob groß oder klein)"])
+        lst = "\n".join(f"{k + 1}. {pw}" for k, pw in enumerate(cands))
+        q = (f"Password policy:\n- " + "\n- ".join(rules) + f"\nWhich of these candidate passwords are valid? Give their numbers.\n{lst}"
+             if lang == "en" else
+             f"Passwortregeln:\n- " + "\n- ".join(rules) + f"\nWelche dieser Passwörter sind gültig? Nenne ihre Nummern.\n{lst}")
+        gold = sorted(k + 1 for k, pw in enumerate(cands) if pw in ok)
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(map(str, gold)), "set": gold, "n": len(cands),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_password_rules(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    got = sorted({int(x) for x in re.findall(r"(?<![\w.])([1-9])(?![\w.]|\.\d)", fa) if 1 <= int(x) <= item["n"]})
+    ok = got == item["set"]
+    return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],
+            "detail": {"too_many": float(bool(set(got) - set(item["set"]))), "too_few": float(bool(set(item["set"]) - set(got)))}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10375,6 +10437,7 @@ TASKS = {
     "implausible_value": task(load_implausible_value, score_implausible_value, 24, 120),
     "coupon_best": task(load_coupon_best, score_coupon_best, 24, 120),
     "trip_cost": task(load_trip_cost, score_trip_cost, 24, 120),
+    "password_rules": task(load_password_rules, score_password_rules, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

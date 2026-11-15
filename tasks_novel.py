@@ -7648,6 +7648,37 @@ def score_risk_stats(item, reply):
             "detail": {f"ok_{item['kind']}": float(near(item["gold"])), "took_other_measure": float(near(item["bait"]) and item["bait"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- break_even (contribution margin, not price)
+def load_break_even(lang, n, seed):
+    import math
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("break_even", i, att)
+        while True:
+            fixed = r.randrange(1500, 60001, 250)
+            price = r.randint(8, 120)
+            var = r.randint(2, price - 3)
+            gold, bait = math.ceil(fixed / (price - var)), math.ceil(fixed / price)
+            if fixed % (price - var) and gold != bait:  # a remainder, so rounding up matters
+                break
+        q = (f"A small workshop sells handmade lamps. Rent, insurance and wages cost {fixed} € per month regardless of sales. "
+             f"Each lamp sells for {price} €; material and shipping cost {var} € per lamp. How many lamps must it sell in a month "
+             f"so that it does not make a loss?" if lang == "en" else
+             f"Eine kleine Werkstatt verkauft handgemachte Lampen. Miete, Versicherung und Löhne kosten unabhängig vom Absatz "
+             f"{fixed} € im Monat. Jede Lampe kostet {price} €; Material und Versand kosten {var} € pro Lampe. Wie viele Lampen "
+             f"muss sie im Monat verkaufen, damit sie keinen Verlust macht?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "floor": gold - 1,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_break_even(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ignored_variable_cost": float(v == item["bait"]), "rounded_down": float(v == item["floor"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9229,6 +9260,7 @@ TASKS = {
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
     "risk_stats": task(load_risk_stats, score_risk_stats, 24, 120),
+    "break_even": task(load_break_even, score_break_even, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

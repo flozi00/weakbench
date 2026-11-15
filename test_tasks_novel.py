@@ -1473,3 +1473,18 @@ if __name__ == "__main__":
     test_revoked_rule()
     test_lookalike()
     test_puzzle_mutation()
+
+
+def test_break_even():
+    import tasks_novel as tn
+    xs = tn.load_break_even("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs:
+        assert x["gold"] not in (x["bait"], x["floor"])
+    x = xs[0]
+    assert tn.score_break_even(x, {"content": f"... Answer: {x['gold']} Lampen"})["correct"]
+    assert tn.score_break_even(x, {"content": f"Answer: {x['bait']}"})["detail"]["ignored_variable_cost"] == 1
+
+
+if __name__ == "__main__":
+    test_break_even()

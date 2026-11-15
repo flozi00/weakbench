@@ -5805,10 +5805,13 @@ def load_weighted_mean(lang, n, seed):
                  f"Du gießt {l1} Liter Wasser mit {t1} °C und {l2} Liter mit {t2} °C in einen Eimer. Ohne Wärmeverlust: Welche "
                  "Temperatur hat die Mischung in °C?")
         else:
-            cps = r.sample([2, 3, 5, 6, 8, 10], 3)
-            grades = [r.choice([1.0, 1.3, 1.7, 2.0, 2.3, 2.7, 3.0, 3.3, 4.0]) for _ in range(3)]
-            gold = sum(c * g for c, g in zip(cps, grades)) / sum(cps)
-            plain = sum(grades) / 3
+            while True:  # the weighting must matter
+                cps = r.sample([2, 3, 5, 6, 8, 10], 3)
+                grades = [r.choice([1.0, 1.3, 1.7, 2.0, 2.3, 2.7, 3.0, 3.3, 4.0]) for _ in range(3)]
+                gold = sum(c * g for c, g in zip(cps, grades)) / sum(cps)
+                plain = sum(grades) / 3
+                if abs(gold - plain) >= 0.2:
+                    break
             lines = ", ".join((f"{g:g} in a course worth {c} credits" if lang == "en" else
                                f"{g:g}".replace(".", ",") + f" in einem Kurs mit {c} Leistungspunkten") for c, g in zip(cps, grades))
             q = (f"A student got the grades {lines}. The overall grade weights each course by its credits. What is the overall "

@@ -2130,3 +2130,19 @@ def test_seven_segment():
 
 if __name__ == "__main__":
     test_seven_segment()
+
+
+def test_calendar_grid():
+    import tasks_novel as tn
+    xs = tn.load_calendar_grid("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    w = next(x for x in xs if x["kind"] == "weekday")
+    assert tn.score_calendar_grid(w, {"content": f"Antwort: {w['gold']}"})["correct"]
+    assert not tn.score_calendar_grid(w, {"content": "Antwort: Montag oder Dienstag"})["correct"] or w["gold"] in ("Montag", "Dienstag") and False
+    c = next(x for x in xs if x["kind"] == "count")
+    assert tn.score_calendar_grid(c, {"content": f"Antwort: {c['gold']}"})["correct"]
+    assert {x["gold"] for x in xs if x["kind"] == "count"} == {"4", "5"}
+
+
+if __name__ == "__main__":
+    test_calendar_grid()

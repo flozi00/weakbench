@@ -9387,6 +9387,50 @@ def score_seven_segment(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_d{len(item['gold'])}": float(ok)}}
 
 
+# ---------------------------------------------------------------- calendar_grid (read a printed month calendar)
+CG_DAYS = {"en": ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"], "de": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]}
+CG_FULL = {"en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+           "de": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]}
+
+
+def load_calendar_grid(lang, n, seed):
+    import calendar
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("calendar_grid", i, att)
+        year, month = r.randint(2027, 2035), r.randint(1, 12)
+        weeks = calendar.Calendar(0).monthdayscalendar(year, month)
+        grid = " ".join(f"{d:>2}" for d in CG_DAYS[lang]) + "\n" + "\n".join(" ".join(f"{d:>2}" if d else "  " for d in w) for w in weeks)
+        kind = ("weekday", "count")[i % 2]
+        if kind == "weekday":
+            day = r.randint(1, calendar.monthrange(year, month)[1])
+            wd = calendar.weekday(year, month, day)
+            gold = CG_FULL[lang][wd]
+            q = (f"Here is a month calendar (weeks start on Monday):\n```\n{grid}\n```\nOn which weekday is the {day}th?" if lang == "en" else
+                 f"Hier ist ein Monatskalender (Wochen beginnen am Montag):\n```\n{grid}\n```\nAuf welchen Wochentag fällt der {day}.?")
+        else:
+            wd = r.randrange(7)
+            gold = str(sum(1 for w in weeks if w[wd]))
+            q = (f"Here is a month calendar (weeks start on Monday):\n```\n{grid}\n```\nHow many {CG_FULL[lang][wd]}s are in this month?"
+                 if lang == "en" else
+                 f"Hier ist ein Monatskalender (Wochen beginnen am Montag):\n```\n{grid}\n```\nWie viele {CG_FULL[lang][wd]}e hat dieser Monat?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "kind": kind, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_calendar_grid(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    if item["kind"] == "weekday":
+        named = [d for d in CG_FULL[item["lang"]] + CG_FULL["en" if item["lang"] == "de" else "de"] if re.search(rf"\b{d}", fa, re.I)]
+        idx = {CG_FULL[l].index(d) for d in named for l in ("en", "de") if d in CG_FULL[l]}
+        gi = CG_FULL[item["lang"]].index(item["gold"])
+        ok = idx == {gi}
+    else:
+        v = last_int(fa)
+        ok = v is not None and str(v) == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -11004,6 +11048,7 @@ TASKS = {
     "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),
     "free_shipping": task(load_free_shipping, score_free_shipping, 24, 120),
     "seven_segment": task(load_seven_segment, score_seven_segment, 24, 120),
+    "calendar_grid": task(load_calendar_grid, score_calendar_grid, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

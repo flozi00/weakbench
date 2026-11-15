@@ -259,20 +259,22 @@ def load_belebele(lang, n, seed):
             for i in ids if i in rows]
 
 
-LID_LANGS = {"spa_Latn": (["Spanish"], ["Spanisch"]), "por_Latn": (["Portuguese"], ["Portugiesisch"]),
-             "cat_Latn": (["Catalan"], ["Katalanisch"]), "ita_Latn": (["Italian"], ["Italienisch"]), "ron_Latn": (["Romanian"], ["Rumänisch"]),
+LID_LANGS = {"spa_Latn": (["Spanish", "Castilian"], ["Spanisch", "Kastilisch"]), "por_Latn": (["Portuguese"], ["Portugiesisch"]),
+             "cat_Latn": (["Catalan", "Valencian"], ["Katalanisch", "Valencianisch"]), "ita_Latn": (["Italian"], ["Italienisch"]),
+             "ron_Latn": (["Romanian", "Moldovan"], ["Rumänisch", "Moldauisch"]),
              "ces_Latn": (["Czech"], ["Tschechisch"]), "slk_Latn": (["Slovak"], ["Slowakisch"]), "pol_Latn": (["Polish"], ["Polnisch"]),
              "dan_Latn": (["Danish"], ["Dänisch"]), "swe_Latn": (["Swedish"], ["Schwedisch"]),
              "nob_Latn": (["Norwegian", "Bokmål", "Bokmal"], ["Norwegisch", "Bokmål"]),
-             "nld_Latn": (["Dutch"], ["Niederländisch", "Holländisch"]), "afr_Latn": (["Afrikaans"], ["Afrikaans"]),
+             "nld_Latn": (["Dutch", "Flemish", "Nederlands"], ["Niederländisch", "Holländisch", "Flämisch"]), "afr_Latn": (["Afrikaans"], ["Afrikaans"]),
              "ukr_Cyrl": (["Ukrainian"], ["Ukrainisch"]), "rus_Cyrl": (["Russian"], ["Russisch"]),
              "fin_Latn": (["Finnish"], ["Finnisch"]), "est_Latn": (["Estonian"], ["Estnisch"]), "hun_Latn": (["Hungarian"], ["Ungarisch"]),
-             "ind_Latn": (["Indonesian"], ["Indonesisch"]), "zsm_Latn": (["Malay", "Malaysian"], ["Malaiisch", "Malaysisch"])}
+             "ind_Latn": (["Indonesian", "Bahasa Indonesia"], ["Indonesisch"]),
+             "zsm_Latn": (["Malay", "Malaysian", "Bahasa Melayu", "Bahasa Malaysia"], ["Malaiisch", "Malaysisch"])}
 
 
 def load_lang_id(lang, n, seed):
     """Language identification on FLORES passages (Belebele): 20 languages in confusable groups (es/pt/ca/it/ro, cs/sk/pl,
-    da/sv/no, nl/af, uk/ru, fi/et/hu, id/ms); two sentences of one passage, the language named in the cell language."""
+    da/sv/no, nl/af, uk/ru, fi/et/hu, id/ms); whole sentences of one passage up to 250+ characters, the language named in the cell language."""
     codes = sorted(LID_LANGS)
     links = sorted({r["link"] for r in rows_of(BELEBELE, "data/eng_Latn.jsonl")})
     items, cache = [], {}
@@ -283,8 +285,11 @@ def load_lang_id(lang, n, seed):
             cache[code] = {x["link"]: x for x in rows_of(BELEBELE, f"data/{code}.jsonl")}
         rows = cache[code]
         link = r.choice([lk for lk in links if lk in rows])
-        sents = re.split(r"(?<=[.!?])\s+", rows[link]["flores_passage"])
-        text = " ".join(sents[:2])
+        text = ""  # whole sentences until at least 250 characters (2 short sentences were often names and numbers)
+        for sent in re.split(r"(?<=[.!?])\s+", rows[link]["flores_passage"]):
+            text = (text + " " + sent).strip()
+            if len(text) >= 250:
+                break
         q = (f"Which language is this text written in? Name the language.\n\n{text}\n\nReply with a line \"Answer: <language>\"."
              if lang == "en" else
              f"In welcher Sprache ist dieser Text geschrieben? Nenne die Sprache.\n\n{text}\n\nAntworte mit einer Zeile \"Antwort: <Sprache>\".")
@@ -295,6 +300,7 @@ def load_lang_id(lang, n, seed):
 
 def score_lang_id(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", tasks_novel.final_answer(reply["content"]) or "")
+    fa = re.sub(r"(?i)\b(?:not|nicht|kein\w*)\s+\w+", " ", fa)  # "Slovak, not Czech"
     named = {c for c, (en, de) in LID_LANGS.items() if any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in en + de)}
     ok = named == {item["code"]}
     return {"correct": ok, "score": float(ok), "pred": sorted(named), "gold": item["gold"], "detail": {f"ok_{item['code'][:3]}": float(ok)}}

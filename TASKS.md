@@ -9,7 +9,7 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `mmlu_shuffled` | opt-in: the `mmlu_prox_lite` items with the options reversed (gold remapped, same ids) | de, en | 300 / 588 | off | letter; sub-metric `xt_correct_agree` = share of items whose verdict matches `mmlu_prox_lite` in the same run (position robustness) |
 | `global_mmlu_lite` | CohereLabs/Global-MMLU-Lite (human-translated) | de, en | – / 400 | off | letter A–D |
 | `belebele` | facebook/belebele | de, en | 200 / 900 | off | letter A–D |
-| `lang_id` | language identification on two FLORES sentences (Belebele, pinned) in 20 languages chosen in confusable groups: es/pt/ca/it/ro, cs/sk/pl, da/sv/no, nl/af, uk/ru, fi/et/hu, id/ms; the language named in EN or DE | de, en | 40 / 120 | auto | exactly the right language; `ok_<code>` |
+| `lang_id` | language identification on FLORES sentences (at least 250 characters) (Belebele, pinned) in 20 languages chosen in confusable groups: es/pt/ca/it/ro, cs/sk/pl, da/sv/no, nl/af, uk/ru, fi/et/hu, id/ms; the language named in EN or DE | de, en | 40 / 120 | auto | exactly the right language; `ok_<code>` |
 | `truthfulqa` | truthfulqa/truthful_qa (EN) + Eurolingua/truthfulqax (DE, openGPT-X translation), MC1 | de, en | 200 / 817 | off | letter A–M (options shuffled per id) |
 | `mgsm` | juletxara/mgsm | de, en | 250 / 250 | on | final number (DE number format aware) |
 | `mgsm_mixed` | juletxara/mgsm with the problem's sentences alternating DE/EN (the other language first, 247 aligned items), the instruction in the cell's language | de, en | 150 / 247 | on | final number + the reply must be in the cell's language (`lang_mismatch`) |

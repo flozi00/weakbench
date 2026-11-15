@@ -12,6 +12,8 @@ def test_lang_id():
     assert quality.score_lang_id(x, {"content": "Answer: Slovak"})["correct"]
     assert not quality.score_lang_id(x, {"content": "Answer: Czech or Slovak"})["correct"]
     assert not quality.score_lang_id(x, {"content": "Answer: Czech"})["correct"]
+    assert quality.score_lang_id(x, {"content": "Answer: It's Slovak, not Czech"})["correct"]
+    assert min(len(y["messages"][0]["content"]) for y in xs) > 250
 
 
 if __name__ == "__main__":

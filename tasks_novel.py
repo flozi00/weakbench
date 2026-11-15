@@ -8187,6 +8187,43 @@ def score_multikey_rank(item, reply):
             "detail": {"reversed_tiebreak": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- bus_meet (two regular departures, next common time)
+def load_bus_meet(lang, n, seed):
+    import math
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("bus_meet", i, att)
+        while True:
+            a, b = r.choice([6, 8, 9, 10, 12, 15, 18, 20]), r.choice([8, 10, 12, 14, 15, 16, 20, 25])
+            sa, sb = r.randrange(5 * 60, 7 * 60), r.randrange(5 * 60, 7 * 60)
+            if a == b or (sb - sa) % math.gcd(a, b):
+                continue  # never meet
+            t = max(sa, sb)
+            while (t - sa) % a or (t - sb) % b:
+                t += 1
+            naive = max(sa, sb) + a * b // math.gcd(a, b)  # "start + lcm", ignoring the offsets
+            if t != naive and t != max(sa, sb) and t < 22 * 60:
+                break
+        hm = lambda m: f"{m // 60}:{m % 60:02d}"  # noqa: E731
+        q = (f"Bus line 3 leaves the central station every {a} minutes, the first one at {hm(sa)}. Bus line 7 leaves the same "
+             f"stop every {b} minutes, the first one at {hm(sb)}. At what time do a line 3 and a line 7 bus leave at the same "
+             f"minute for the first time?" if lang == "en" else
+             f"Die Buslinie 3 fährt alle {a} Minuten am Hauptbahnhof ab, der erste Bus um {hm(sa)} Uhr. Die Linie 7 fährt an "
+             f"derselben Haltestelle alle {b} Minuten ab, der erste Bus um {hm(sb)} Uhr. Um wie viel Uhr fahren zum ersten Mal "
+             f"ein Bus der Linie 3 und einer der Linie 7 in derselben Minute ab?")
+        items.append({"id": str(i), "lang": lang, "gold": hm(t), "bait": hm(naive),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_bus_meet(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    m = re.search(r"(?<!\d)0?(\d{1,2})[:.h](\d{2})(?!\d)", fa)
+    v = f"{int(m[1])}:{m[2]}" if m else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"start_plus_lcm": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9780,6 +9817,7 @@ TASKS = {
     "auction_price": task(load_auction_price, score_auction_price, 24, 120),
     "parcel_price": task(load_parcel_price, score_parcel_price, 24, 120),
     "multikey_rank": task(load_multikey_rank, score_multikey_rank, 24, 120),
+    "bus_meet": task(load_bus_meet, score_bus_meet, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

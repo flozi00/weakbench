@@ -1667,3 +1667,18 @@ def test_multikey_rank():
 
 if __name__ == "__main__":
     test_multikey_rank()
+
+
+def test_bus_meet():
+    import tasks_novel as tn
+    xs = tn.load_bus_meet("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    h, m = x["gold"].split(":")
+    for c in (f"Antwort: {x['gold']} Uhr", f"Antwort: um {int(h):02d}.{m} Uhr", f"Antwort: {x['gold']} (nach 3 Takten)"):
+        assert tn.score_bus_meet(x, {"content": c})["correct"], c
+    assert tn.score_bus_meet(x, {"content": f"Antwort: {x['bait']}"})["detail"]["start_plus_lcm"] == 1
+
+
+if __name__ == "__main__":
+    test_bus_meet()

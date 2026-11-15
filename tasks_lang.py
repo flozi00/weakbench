@@ -2787,7 +2787,8 @@ AW_ITEMS = [("comparative", "Mein Bruder ist größer ___ ich.", "als"), ("compa
             ("other", "Er singt ___ ein Profi.", "wie"), ("other", "Es kam ganz anders, ___ wir dachten.", "als"),
             ("equative", "Der Film war nicht halb so gut ___ das Buch.", "wie"),
             ("other", "Sie macht es genau so, ___ ihre Mutter es gemacht hat.", "wie"),
-            ("equative", "Der neue Laptop ist so leicht ___ ein Buch.", "wie")]
+            ("equative", "Der neue Laptop ist so leicht ___ ein Buch.", "wie"),
+            ("equative", "Wir kamen so früh ___ möglich.", "wie"), ("other", "Er tat so, ___ wäre nichts passiert.", "als")]
 
 
 def load_de_als_wie(lang, n, seed):
@@ -3119,7 +3120,7 @@ TASKS = {
     "de_passive": task(("de",), load_de_passive, score_de_passive, 64, 24, lang_check=False),
     "en_usage": task(("en",), load_en_usage, score_en_usage, 16, 24, lang_check=False),
     "sentence_order": task(("de", "en"), load_sentence_order, score_sentence_order, 512, 12, lang_check=False),
-    "de_als_wie": task(("de",), load_de_als_wie, score_de_als_wie, 16, 22, lang_check=False),
+    "de_als_wie": task(("de",), load_de_als_wie, score_de_als_wie, 16, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

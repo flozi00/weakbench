@@ -8336,18 +8336,12 @@ def load_workday_deadline(lang, n, seed):
 
 def score_workday_deadline(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    fa = fa.rsplit("=", 1)[-1]
-    v = None
     names = WDL_MONTHS[item["lang"]]
-    m = re.search(r"(?<!\d)(\d{1,2})\.\s*(\d{1,2})\.", fa)  # 12.03.
-    if m:
-        v = (int(m[2]), int(m[1]))
-    else:
-        for k, nm in enumerate(names):
-            mm = re.search(rf"(?<!\d)(\d{{1,2}})(?:\.|st|nd|rd|th)?\s*(?:of\s+)?{nm}|{nm}\s+(\d{{1,2}})(?!\d)", fa, re.I)
-            if mm:
-                v = (k + 1, int(mm[1] or mm[2]))
-                break
+    found = [(m.start(), (int(m[2]), int(m[1]))) for m in re.finditer(r"(?<![\d.])(\d{1,2})\.\s*(\d{1,2})(?![\d])", fa)]  # 27.04(.)
+    for k, nm in enumerate(names):
+        for mm in re.finditer(rf"(?<!\d)(\d{{1,2}})(?:\.|st|nd|rd|th)?\s*(?:of\s+)?{nm}|{nm}\s+(\d{{1,2}})(?!\d)", fa, re.I):
+            found.append((mm.start(), (k + 1, int(mm[1] or mm[2]))))
+    v = max(found)[1] if found else None  # the last date named: "1. April + 6 Arbeitstage -> 27. April"
     ok = v == tuple(item["date"])
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"calendar_days": float(v == tuple(item["naive"])), "forgot_holiday": float(v == tuple(item["no_hol"]))}}
@@ -8383,8 +8377,8 @@ def load_fare_group(lang, n, seed):
                     f"20 % off the total.")
         rules_de = (f"Einzelfahrscheine: Zone 1 {eur(zones[1])} €, Zonen 1-2 {eur(zones[2])} €, Zonen 1-3 {eur(zones[3])} €. "
                     f"Hauptverkehrszeit (werktags 6:00-9:00 Uhr): +0,50 € pro vollem Fahrschein. Kinder von 6 bis 14 zahlen die "
-                    f"Hälfte des vollen Fahrscheins (samt Zuschlag), Senioren (ab 65) drei Viertel davon, Kinder unter 6 fahren kostenlos. Gruppen von "
-                    f"mehr als {group} Personen (alle mitgezählt) bekommen 20 % auf den Gesamtpreis.")
+                    f"Hälfte des vollen Fahrscheins (samt Zuschlag), Senioren (ab 65) drei Viertel des vollen Fahrscheins, Kinder unter 6 fahren kostenlos. Gruppen von "
+                    f"mehr als {group} Personen (alle mitgezählt) bekommen 20 % Rabatt auf den Gesamtpreis.")
         zr = ["zone 1", "zones 1-2", "zones 1-3"][z - 1] if lang == "en" else ["Zone 1", "Zonen 1-2", "Zonen 1-3"][z - 1]
         parts = ([(adults, "adult", "adults"), (kids, "child aged 6-14", "children aged 6-14"), (seniors, "senior", "seniors"),
                   (small, "child under 6", "children under 6")] if lang == "en" else
@@ -8433,7 +8427,7 @@ def answer_value(line, lang):
     bare = re.sub(r"\([^()]*\)", " ", line)  # a working note in brackets: "64 m² (= 8 x 6 - 4)"
     if re.search(r"\d", bare):
         line = bare
-    tail = re.split(r"=|→|->", line)
+    tail = re.split(r"=|→|->|\b(?:ergibt|macht|gives|makes)\b", line)
     return parse_number(tail[-1] if len(tail) > 1 else line, lang, first=True)
 
 

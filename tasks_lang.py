@@ -4322,6 +4322,43 @@ def score_de_tense_identify(item, reply):
     return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- de_das_function (Wortart von "das"/"dass" bestimmen)
+# One spelling, four functions: Artikel ("das Buch"), Relativpronomen ("das Buch, das ..."), Demonstrativpronomen
+# ("Das stimmt.") and the conjunction "dass". The marked word must be classified; the answer is one of four labels.
+DF_ITEMS = [("[Das] Fahrrad steht im Hof.", "Artikel"), ("Ich lese gerade [das] Buch von Marie.", "Artikel"),
+            ("Wir brauchen [das] neue Formular.", "Artikel"), ("Hast du [das] Fenster geschlossen?", "Artikel"),
+            ("Das Buch, [das] auf dem Tisch liegt, gehört mir.", "Relativpronomen"),
+            ("Das Kind, [das] dort spielt, ist mein Neffe.", "Relativpronomen"),
+            ("Ein Auto, [das] so wenig verbraucht, ist selten.", "Relativpronomen"),
+            ("Das Haus, in [das] wir ziehen, ist alt.", "Relativpronomen"),
+            ("[Das] stimmt nicht.", "Demonstrativpronomen"), ("Ich habe [das] schon gestern gesagt.", "Demonstrativpronomen"),
+            ("[Das] ist mein Bruder.", "Demonstrativpronomen"), ("Glaubst du [das] wirklich?", "Demonstrativpronomen"),
+            ("Ich hoffe, [dass] du kommst.", "Konjunktion"), ("Es ist schade, [dass] es regnet.", "Konjunktion"),
+            ("Er sagt, [dass] er müde ist.", "Konjunktion"), ("[Dass] du hier bist, freut mich.", "Konjunktion")]
+DF_LABELS = {"Artikel": ["artikel", "begleiter"], "Relativpronomen": ["relativpronomen"],
+             "Demonstrativpronomen": ["demonstrativpronomen", "demonstrativ"], "Konjunktion": ["konjunktion", "subjunktion"]}
+
+
+def load_de_das_function(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": "Welche Wortart hat das Wort in eckigen Klammern? Wähle aus: Artikel, Relativpronomen, "
+                           "Demonstrativpronomen, Konjunktion. Antworte nur mit der Wortart.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(DF_ITEMS[:min(n or 16, 16)])]
+
+
+def score_de_das_function(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
+    t = re.sub(r"\b(?:nicht|kein\w*)\s+\w+", " ", t)
+    found = set()
+    for k in ("Demonstrativpronomen", "Relativpronomen", "Artikel", "Konjunktion"):  # longest/specific first
+        for a in DF_LABELS[k]:
+            if re.search(rf"\b{a}", t):
+                found.add(k)
+                t = re.sub(rf"\b{a}\w*", " ", t)
+    ok = found == {item["gold"]}
+    return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {f"ok_{item['gold'].lower()}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4875,6 +4912,7 @@ TASKS = {
     "de_case_identify": task(("de",), load_de_case_identify, score_de_case_identify, 24, 48, lang_check=False),
     "en_tense_identify": task(("en",), load_en_tense_identify, score_en_tense_identify, 24, 48, lang_check=False),
     "de_tense_identify": task(("de",), load_de_tense_identify, score_de_tense_identify, 24, 48, lang_check=False),
+    "de_das_function": task(("de",), load_de_das_function, score_de_das_function, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

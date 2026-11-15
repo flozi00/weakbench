@@ -1079,3 +1079,18 @@ def test_de_tense_identify():
 
 if __name__ == "__main__":
     test_de_tense_identify()
+
+
+def test_de_das_function():
+    import tasks_lang as tl
+    xs = tl.load_de_das_function("de", None, 0)
+    for x in xs:
+        assert tl.score_de_das_function(x, {"content": x["gold"]})["correct"]
+    r = next(x for x in xs if x["gold"] == "Relativpronomen")
+    assert not tl.score_de_das_function(r, {"content": "Pronomen"})["correct"]
+    assert tl.score_de_das_function(r, {"content": "Relativpronomen (bezieht sich auf 'Buch')"})["correct"]
+    assert not tl.score_de_das_function(r, {"content": "Relativpronomen oder Demonstrativpronomen"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_das_function()

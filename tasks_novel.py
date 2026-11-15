@@ -6943,10 +6943,10 @@ def load_savings_plan(lang, n, seed):
             simple += dep * (1 + D(str(rate)) / 100 * (years - k))
         rs = f"{rate:g}" if lang == "en" else f"{rate:g}".replace(".", ",")
         q = (f"At the start of each year you pay {dep} € into a savings account. At the end of each year the bank adds {rs} % "
-             f"interest on the whole balance (rounded to the cent). What is the balance after {years} years, just after the last "
+             f"interest on the whole balance (rounded to the cent, half up). What is the balance after {years} years, just after the last "
              "interest payment?" if lang == "en" else
              f"Zu Beginn jedes Jahres zahlst du {dep} € auf ein Sparkonto ein. Am Ende jedes Jahres schreibt die Bank {rs} % Zinsen "
-             f"auf das ganze Guthaben gut (auf den Cent gerundet). Wie hoch ist das Guthaben nach {years} Jahren, direkt nach der "
+             f"auf das ganze Guthaben gut (kaufmännisch auf den Cent gerundet). Wie hoch ist das Guthaben nach {years} Jahren, direkt nach der "
              "letzten Zinsgutschrift?")
         items.append({"id": str(i), "lang": lang, "gold": float(bal), "simple": float(round(simple, 2)),
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
@@ -6954,7 +6954,9 @@ def load_savings_plan(lang, n, seed):
 
 
 def score_savings_plan(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    eur = re.search(r"(\d[\d.,  ]*\d)\s*(?:€|\beuros?\b|\beur\b)|€\s*(\d[\d.,  ]*\d)", fa, re.I)  # the first euro amount
+    v = parse_number(eur[1] or eur[2], item["lang"]) if eur else answer_value(fa, item["lang"])
     ok = v is not None and abs(v - item["gold"]) <= 0.011
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"took_simple_interest": float(v is not None and abs(v - item["simple"]) <= 0.011)}}

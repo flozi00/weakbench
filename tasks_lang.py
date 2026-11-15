@@ -3033,13 +3033,14 @@ def load_de_direct_speech(lang, n, seed):
 def score_de_direct_speech(item, reply):
     def norm(t):
         t = re.sub(r"[„“”»«\"]", '"', t)  # every quote style counts
+        t = re.sub(r'!"\s*,', '",', t).replace('!"', '."')  # "!" or "." per sentence: the source carries no tone
+        t = re.sub(r':\s*"', ': "', t)  # a missing space after the colon is a typing slip
         return re.sub(r"\s+", " ", t).strip()
-    lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
+    lines = [re.sub(r"^\s*(?:>|antwort\s*:|answer\s*:)\s*", "", x.strip("*` "), flags=re.I) for x in (reply["content"] or "").splitlines()]
+    cands = {norm(x) for x in lines if x.strip() and re.search(r"[„“”»«\"]", x)}  # lines with quotes: the candidate sentences
     gold = norm(item["gold"])
-    golds = {gold, gold.replace('!",', '",').replace('!"', '."')}  # an exclamation may also end with a full stop
-    got = [norm(x.strip("*` ")) for x in lines]
-    ok = any(g in got for g in golds)
-    return {"correct": ok, "score": float(ok), "pred": (got[0] if got else "")[:100], "gold": item["gold"],
+    ok = cands == {gold}  # two different candidates are a hedge
+    return {"correct": ok, "score": float(ok), "pred": (sorted(cands)[0] if cands else "")[:100], "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
 

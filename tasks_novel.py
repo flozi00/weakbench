@@ -9987,6 +9987,66 @@ def score_genetics_cross(item, reply):
             "detail": {f"ok_g{item['genes']}": float(near(item["gold"])), "genotype_bait": float(near(item["bait"]))}}
 
 
+# ---------------------------------------------------------------- merge_conflict
+# A 3-way merge of a config file: base, Anna's and Ben's version, line by line (no lines added or removed). A line
+# conflicts only when both changed it AND to different values; a line both changed the same way, or only one changed,
+# merges cleanly (the traps). 0-3 conflicts, balanced by item. `ok_c<conflicts>`, `same_change_flagged`.
+MC_KEYS = ["port", "timeout", "retries", "log_level", "cache_size", "workers", "region", "max_upload", "theme", "language"]
+MC_VALS = {"port": ["8080", "8081", "9000", "443"], "timeout": ["30", "45", "60", "90"], "retries": ["3", "5", "2", "4"],
+           "log_level": ["info", "debug", "warn", "error"], "cache_size": ["256", "512", "1024", "128"],
+           "workers": ["4", "8", "2", "16"], "region": ["eu-west", "eu-central", "us-east", "ap-south"],
+           "max_upload": ["10MB", "25MB", "50MB", "5MB"], "theme": ["light", "dark", "auto", "contrast"],
+           "language": ["de", "en", "fr", "es"]}
+
+
+def load_merge_conflict(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("merge_conflict", i, att)
+        keys = r.sample(MC_KEYS, r.randint(6, 8))
+        base = {k: r.choice(MC_VALS[k]) for k in keys}
+        n_conf = i % 4
+        kinds = ["conflict"] * n_conf + ["same"] * r.randint(1, 2) + ["anna"] * r.randint(1, 2) + ["ben"] * r.randint(0, 2)
+        kinds += ["keep"] * (len(keys) - len(kinds))
+        kinds = kinds[:len(keys)]
+        r.shuffle(kinds)
+        anna, ben = dict(base), dict(base)
+        for k, kind in zip(keys, kinds):
+            other = [v for v in MC_VALS[k] if v != base[k]]
+            a, b = r.sample(other, 2)
+            if kind in ("anna", "same", "conflict"):
+                anna[k] = a
+            if kind == "ben":
+                ben[k] = a
+            if kind == "same":
+                ben[k] = a
+            if kind == "conflict":
+                ben[k] = b
+        gold = [j + 1 for j, kd in enumerate(kinds) if kd == "conflict"]
+        same = [j + 1 for j, kd in enumerate(kinds) if kd == "same"]
+        show = lambda d: "\n".join(f"{j + 1}: {k} = {d[k]}" for j, k in enumerate(keys))  # noqa: E731
+        q = (f"Anna and Ben both edited the same config file, starting from the same base version. A merge tool does a 3-way merge "
+             f"of each line on its own (neighbouring lines do not affect each other). Which line numbers are merge conflicts? Answer with the line numbers, comma-separated, or \"none\".\n\n"
+             f"BASE:\n{show(base)}\n\nANNA:\n{show(anna)}\n\nBEN:\n{show(ben)}" if lang == "en" else
+             f"Anna und Ben haben dieselbe Konfigurationsdatei bearbeitet, beide ausgehend von derselben Basisversion. Ein Merge-Werkzeug führt "
+             f"für jede Zeile einzeln einen 3-Wege-Merge durch (Nachbarzeilen beeinflussen sich nicht). Welche Zeilennummern sind Merge-Konflikte? Antworte mit den "
+             f"Zeilennummern, durch Kommas getrennt, oder mit \"keine\".\n\nBASIS:\n{show(base)}\n\nANNA:\n{show(anna)}\n\nBEN:\n{show(ben)}")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "same": same,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_merge_conflict(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    if re.search(r"\b(?:none|keine?|no conflicts?|kein(?:e|en)? konflikte?)\b", fa, re.I) and not re.search(r"\d", fa):
+        v = []
+    else:
+        v = sorted({int(x) for x in re.findall(r"\b\d+\b", fa)}) if re.search(r"\d", fa) else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_c{len(item['gold'])}": float(ok), "same_change_flagged": float(bool(v) and bool(set(v) & set(item["same"])))}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11095,6 +11155,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "merge_conflict": task(load_merge_conflict, score_merge_conflict, 24, 96),
     "genetics_cross": task(load_genetics_cross, score_genetics_cross, 24, 72),
     "grid_paths": task(load_grid_paths, score_grid_paths, 24, 120),
     "free_shipping": task(load_free_shipping, score_free_shipping, 24, 120),

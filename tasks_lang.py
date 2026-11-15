@@ -3385,6 +3385,37 @@ def score_en_perfect_past(item, reply):
             "detail": {"ok_perfect" if item["perfect"] else "ok_past": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_reflexive_case (mir/mich, dir/dich)
+# The reflexive pronoun is dative when the clause already has an accusative object ("Ich wasche mir die Hände"),
+# or the verb takes the dative ("Ich merke mir"); otherwise accusative ("Ich wasche mich").
+DRC_ITEMS = [("Ich wasche ___ jeden Morgen kalt.", "mich"), ("Ich wasche ___ vor dem Essen die Hände.", "mir"),
+            ("Du hast ___ beim Sport verletzt.", "dich"), ("Du hast ___ beim Sport das Knie verletzt.", "dir"),
+            ("Ich kaufe ___ morgen ein neues Fahrrad.", "mir"), ("Ich freue ___ auf das Wochenende.", "mich"),
+            ("Kannst du ___ die Nummer merken?", "dir"), ("Beeil ___, der Bus fährt gleich!", "dich"),
+            ("Ich putze ___ zweimal am Tag die Zähne.", "mir"), ("Ich habe ___ gestern stark erkältet.", "mich"),
+            ("Stell ___ vor, wir hätten im Lotto gewonnen!", "dir"), ("Ich stelle ___ kurz vor: Ich heiße Ana.", "mich"),
+            ("Du solltest ___ die Haare schneiden lassen.", "dir"), ("Ärgere ___ nicht über so eine Kleinigkeit!", "dich"),
+            ("Ich ziehe ___ schnell eine Jacke an.", "mir"), ("Ich ziehe ___ schnell um und komme dann.", "mich"),
+            ("Hast du ___ schon die Schuhe angezogen?", "dir"), ("Erinnerst du ___ an unseren ersten Urlaub?", "dich"),
+            ("Ich kann ___ das nicht leisten.", "mir"), ("Du musst ___ entscheiden: Tee oder Kaffee?", "dich")]
+
+
+def load_de_reflexive_case(lang, n, seed):
+    out = []
+    for i, (sent, g) in enumerate(DRC_ITEMS[:min(n or 20, 20)]):
+        opts = ("mir", "mich") if g in ("mir", "mich") else ("dir", "dich")
+        out.append({"id": str(i), "lang": "de", "gold": g, "opts": opts, "dative": g in ("mir", "dir"),
+                    "messages": [{"role": "user", "content": f"Setze „{opts[0]}“ oder „{opts[1]}“ ein. Antworte nur mit dem Wort.\n\n{sent}"}]})
+    return out
+
+
+def score_de_reflexive_case(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_dative" if item["dative"] else "ok_accusative": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -3914,6 +3945,7 @@ TASKS = {
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "de_wenn_als": task(("de",), load_de_wenn_als, score_de_wenn_als, 20, 20, lang_check=False),
+    "de_reflexive_case": task(("de",), load_de_reflexive_case, score_de_reflexive_case, 20, 20, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

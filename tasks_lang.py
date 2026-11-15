@@ -3138,6 +3138,40 @@ def score_de_weak_nouns(item, reply):
                        {"took_nominative": float(v is not None and v.lower() == item["nom"].lower())})}}
 
 
+# ---------------------------------------------------------------- en_relative_commas (the context decides the commas)
+# One referent -> the clause adds information -> commas. Several -> the clause picks one out -> no commas.
+RC_ITEMS = [("brother", "brothers", "lives in Leeds", "is a nurse", "who"), ("sister", "sisters", "works in a bank", "is visiting us", "who"),
+            ("car", "cars", "is parked outside", "needs new tyres", "which"), ("laptop", "laptops", "I bought last year", "is very slow", "which"),
+            ("neighbour", "neighbours", "has a big dog", "is moving away", "who"), ("daughter", "daughters", "studies law", "is getting married", "who"),
+            ("bike", "bikes", "has a red frame", "was stolen", "which"), ("phone", "phones", "I use for work", "keeps crashing", "which")]
+
+
+def load_en_relative_commas(lang, n, seed):
+    items = []
+    for i in range(min(n or 16, 16)):
+        sg, pl, rel, pred, pron = RC_ITEMS[i % 8]
+        one = (i // 8) % 2 == 0
+        ctx = f"I have only one {sg}." if one else f"I have two {pl}."
+        p = pron if not (rel.startswith("I ") and pron == "which") else "which"
+        with_c = f"My {sg}, {p} {rel}, {pred}."
+        without = f"My {sg} {'that' if pron == 'which' else 'who'} {rel} {pred}."
+        a, b = (with_c, without) if i % 2 == 0 else (without, with_c)
+        gold_text = with_c if one else without
+        items.append({"id": str(i), "lang": "en", "gold": "A" if a == gold_text else "B", "one": one,
+                      "messages": [{"role": "user", "content": f"Context: {ctx}\nWhich sentence is punctuated correctly for this "
+                                    f"context?\nA: {a}\nB: {b}\nAnswer with A or B only."}]})
+    return items
+
+
+def score_en_relative_commas(item, reply):
+    text = reply["content"] or ""
+    line = re.findall(r"Answer\W*:?\W*\b([AB])\b", text, re.I)
+    m = line[-1:] or re.findall(r"\b([AB])\b(?!\s+[a-z])", text)
+    v = m[0].upper() if len({x.upper() for x in m}) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_one" if item["one"] else "ok_several": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3464,6 +3498,7 @@ TASKS = {
     "de_direct_speech": task(("de",), load_de_direct_speech, score_de_direct_speech, 64, 16, lang_check=False),
     "en_dependent_preps": task(("en",), load_en_dependent_preps, score_en_dependent_preps, 16, 20, lang_check=False),
     "de_weak_nouns": task(("de",), load_de_weak_nouns, score_de_weak_nouns, 16, 40, lang_check=False),
+    "en_relative_commas": task(("en",), load_en_relative_commas, score_en_relative_commas, 16, 16, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

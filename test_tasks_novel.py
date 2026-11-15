@@ -1836,6 +1836,16 @@ def test_implausible_value():
         out = [nm for nm, h, w, a in rows if not (140 <= float(h.replace(",", ".")) <= 215 and 40 <= float(w.replace(",", ".")) <= 150
                                                    and 16 <= float(a.replace(",", ".")) <= 70)]
         assert out == [x["gold"]], (out, x["gold"])
+        for nm, h, w, a in rows:  # no other row looks starved or impossible by BMI
+            if nm != x["gold"]:
+                assert 15.5 <= float(w) / (float(h) / 100) ** 2 <= 40, (nm, h, w)
+    flagged = 0  # the impossible value must not stand out by its number of digits
+    for x in xs:
+        rows = re.findall(r"^\| (\w+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$", x["messages"][0]["content"], re.M)[1:]
+        cols = list(zip(*[(h.strip(), w.strip(), a.strip()) for _, h, w, a in rows]))
+        odd = {rows[k][0] for c in cols for k, v in enumerate(c) if len(v) != sorted(len(u) for u in c)[len(c) // 2]}
+        flagged += odd == {x["gold"]}
+    assert flagged / len(xs) < 0.5, flagged
     x = xs[0]
     assert tn.score_implausible_value(x, {"content": f"Antwort: {x['gold']}"})["correct"]
     assert tn.score_implausible_value(x, {"content": f"Antwort: {x['bait']}"})["detail"]["picked_unusual"] == 1

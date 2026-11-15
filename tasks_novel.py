@@ -8644,17 +8644,22 @@ def load_implausible_value(lang, n, seed):
     for i, att in common.redraws(n or 120, items):
         r = rng_of("implausible_value", i, att)
         names = r.sample(IV_NAMES, r.randint(6, 8))
-        rows = {nm: [r.randint(158, 192), r.randint(55, 98), r.randint(22, 61)] for nm in names}
+        rows = {}
+        for nm in names:  # weight from height with a normal BMI (19-32), so no row looks starved or impossible by chance
+            h = r.randint(158, 194)
+            rows[nm] = [h, round(r.uniform(19, 32) * (h / 100) ** 2), r.randint(22, 61)]
         bad, odd = r.sample(names, 2)
         col = r.randrange(3)
-        # the impossible value: a unit slip or an impossible magnitude
-        rows[bad][col] = r.choice({0: ["1.78", "17", "1780"], 1: ["7", "750", "0.8"], 2: ["4", "230", "-3"]}[col])
-        # an unusual but possible value in another row (the bait)
+        # the impossible value has the same number of digits as its column (no format giveaway)
+        rows[bad][col] = r.choice({0: [258, 278, 312], 1: [12, 15, 19] if rows[bad][1] < 100 else [480, 520, 610], 2: [8, 11, 13]}[col])
         ocol = (col + r.randint(1, 2)) % 3
-        rows[odd][ocol] = r.choice({0: [203, 151], 1: [128, 47], 2: [67, 19]}[ocol])
+        h = rows[odd][0]
+        unusual = {0: r.choice([203, 151]), 1: (128 if h >= 185 else 47 if h <= 160 else round(33 * (h / 100) ** 2)), 2: r.choice([67, 19])}
+        rows[odd][ocol] = unusual[ocol]
+        if ocol == 0:  # a new height keeps a plausible weight
+            rows[odd][1] = round(r.uniform(21, 28) * (rows[odd][0] / 100) ** 2)
         head = "| Name | Height (cm) | Weight (kg) | Age |" if lang == "en" else "| Name | Größe (cm) | Gewicht (kg) | Alter |"
-        fmt = lambda v: v if isinstance(v, str) and lang == "en" else (v.replace(".", ",") if isinstance(v, str) else str(v))  # noqa: E731
-        table = "\n".join(f"| {nm} | " + " | ".join(fmt(v) for v in rows[nm]) + " |" for nm in names)
+        table = "\n".join(f"| {nm} | " + " | ".join(str(v) for v in rows[nm]) + " |" for nm in names)
         q = (f"Employee records of a small company:\n{head}\n|---|---|---|---|\n{table}\nExactly one value in the table cannot "
              f"be right (a typing or unit error); some others are just unusual. Whose row contains the impossible value?" if lang == "en" else
              f"Personaldaten einer kleinen Firma:\n{head}\n|---|---|---|---|\n{table}\nGenau ein Wert in der Tabelle kann nicht "
@@ -8666,6 +8671,7 @@ def load_implausible_value(lang, n, seed):
 
 def score_implausible_value(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = re.sub(r"\b(?:not|nicht|kein\w*)\s+\w+", " ", fa, flags=re.I)  # "not Hannes but Greta"
     hits = sorted((m.start(), nm) for nm in item["names"] if (m := re.search(rf"\b{nm}\b", fa)))
     v = hits[0][1] if len(hits) == 1 or (len(hits) == 2 and not re.search(r"\b(?:or|oder)\b|/", fa)) else None
     ok = v == item["gold"]

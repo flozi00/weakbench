@@ -5491,6 +5491,62 @@ def score_json_repair(item, reply):
             "gold": item["gold"], "detail": {"valid_json": float(isinstance(got, dict)), "changed_value": float(isinstance(got, dict) and not ok)}}
 
 
+# ---------------------------------------------------------------- exam_slots (graph colouring in disguise)
+ES_COURSES = {"en": ["Maths", "Biology", "History", "Art", "Physics", "French", "Music"],
+              "de": ["Mathe", "Biologie", "Geschichte", "Kunst", "Physik", "Französisch", "Musik"]}
+ES_STUDENTS = ["Alex", "Bea", "Chris", "Dana", "Emil", "Fiona", "Gus"]
+
+
+def _es_chromatic(nodes, edges):
+    import itertools
+    for k in range(1, len(nodes) + 1):
+        for colours in itertools.product(range(k), repeat=len(nodes)):
+            if colours[0] == 0 and all(colours[a] != colours[b] for a, b in edges):
+                return k
+    return len(nodes)
+
+
+def load_exam_slots(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("exam_slots", i)
+        hard = i % 2 == 0  # the answer exceeds the biggest single-student load (an odd cycle of conflicts)
+        while True:
+            m = r.randint(5, 7)
+            courses = list(range(m))
+            studs = []
+            for s_ in ES_STUDENTS[:r.randint(4, 7)]:
+                studs.append((s_, sorted(r.sample(courses, r.randint(2, 3)))))
+            edges = {(a, b) for _, cs in studs for a in cs for b in cs if a < b}
+            used = sorted({c for _, cs in studs for c in cs})
+            if len(used) < m:
+                continue
+            chi = _es_chromatic(courses, edges)
+            load = max(len(cs) for _, cs in studs)
+            if (chi > load) == hard:
+                break
+        names = ES_COURSES[lang]
+        lines = "\n".join(f"- {s_}: " + ", ".join(names[c] for c in cs) for s_, cs in studs)
+        q = (f"Each student below writes an exam in each of their courses. All exams of one slot run at the same time, so two "
+             f"exams that share a student cannot be in the same slot. Exams that share no student may share a slot.\n{lines}\n"
+             "What is the smallest number of slots needed for all exams?" if lang == "en" else
+             f"Jede Person unten schreibt in jedem ihrer Kurse eine Prüfung. Alle Prüfungen eines Termins finden gleichzeitig statt, "
+             f"zwei Prüfungen mit einer gemeinsamen Person dürfen also nicht im selben Termin liegen. Prüfungen ohne gemeinsame Person "
+             f"dürfen sich einen Termin teilen.\n{lines}\nWie viele Termine braucht man mindestens für alle Prüfungen?")
+        items.append({"id": str(i), "lang": lang, "gold": chi, "load": load, "hard": hard,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_exam_slots(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    d = {"ok_hard" if item["hard"] else "ok_plain": float(ok)}
+    if item["hard"]:
+        d["took_max_load"] = float(v == item["load"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7066,6 +7122,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "exam_slots": task(load_exam_slots, score_exam_slots, 24, 120),
     "json_repair": task(load_json_repair, score_json_repair, 24, 120),
     "csv_field": task(load_csv_field, score_csv_field, 24, 120),
     "edit_rule": task(load_edit_rule, score_edit_rule, 24, 120),

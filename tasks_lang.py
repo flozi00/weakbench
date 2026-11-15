@@ -2316,14 +2316,19 @@ def score_revise_on_feedback(item, reply):
 # ---------------------------------------------------------------- time_prep (prepositions of time)
 # A gap before a generated time expression: EN at/on/in (at 5 pm, on Monday, in May, in 2019, on 3 May, at night,
 # in the morning), DE um/am/im/in (um 5 Uhr, am Montag, im Mai, im Jahr 2019 / 2019, am 3. Mai, in der Nacht).
-TP_EN = [("at", lambda r: f"{r.randint(1, 12)} pm"), ("on", lambda r: r.choice(["Monday", "Friday", "Sunday"])),
-         ("in", lambda r: r.choice(["May", "October", "March"])), ("in", lambda r: str(r.randint(1990, 2023))),
-         ("on", lambda r: f"{r.randint(2, 28)} {r.choice(['May', 'June', 'July'])}"), ("at", lambda r: "night"),
-         ("in", lambda r: r.choice(["the morning", "the evening"])), ("at", lambda r: "the weekend")]
-TP_DE = [("um", lambda r: f"{r.randint(1, 12)} Uhr"), ("am", lambda r: r.choice(["Montag", "Freitag", "Sonntag"])),
-         ("im", lambda r: r.choice(["Mai", "Oktober", "März"])), ("im", lambda r: f"Jahr {r.randint(1990, 2023)}"),
-         ("am", lambda r: f"{r.randint(2, 28)}. {r.choice(['Mai', 'Juni', 'Juli'])}"), ("in", lambda r: "der Nacht"),
-         ("am", lambda r: r.choice(["Morgen", "Abend"])), ("um", lambda r: "Mitternacht")]
+TP_DAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+TP_DAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+TP_MON_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+TP_MON_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+TP_EN = [("at", lambda r: f"{r.randint(1, 12)} pm"), ("on", lambda r: r.choice(TP_DAYS_EN)),
+         ("in", lambda r: r.choice(TP_MON_EN)), ("in", lambda r: str(r.randint(1990, 2023))),
+         ("on", lambda r: f"{r.randint(2, 28)} {r.choice(TP_MON_EN)}"), ("at", lambda r: f"{r.randint(1, 12)}:30"),
+         ("in", lambda r: r.choice(["the morning", "the afternoon", "the evening"])),
+         ("on", lambda r: f"{r.choice(TP_DAYS_EN)} {r.choice(['morning', 'afternoon', 'evening'])}")]
+TP_DE = [("um", lambda r: f"{r.randint(1, 12)} Uhr"), ("am", lambda r: r.choice(TP_DAYS_DE)),
+         ("im", lambda r: r.choice(TP_MON_DE)), ("im", lambda r: f"Jahr {r.randint(1990, 2023)}"),
+         ("am", lambda r: f"{r.randint(2, 28)}. {r.choice(TP_MON_DE)}"), ("in", lambda r: f"der Nacht zum {r.choice(TP_DAYS_DE)}"),
+         ("am", lambda r: r.choice(["Morgen", "Vormittag", "Nachmittag", "Abend"])), ("um", lambda r: f"halb {r.randint(2, 12)}")]
 TP_FRAME = {"en": "The meeting with Clara takes place ___ {t}.", "de": "Das Treffen mit Clara findet ___ {t} statt."}
 
 

@@ -4091,6 +4091,31 @@ def score_en_place_preps(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_since_for (since / for / ago)
+# German "seit" covers both since (a point) and for (a span), "vor" is "ago": a classic transfer error.
+SFA_ITEMS = [("I have lived here ___ 2015.", "since"), ("I have lived here ___ ten years.", "for"),
+             ("She moved to Leeds three years ___.", "ago"), ("We have been waiting ___ two hours.", "for"),
+             ("He has worked here ___ last summer.", "since"), ("I met him a long time ___.", "ago"),
+             ("They have been married ___ 25 years.", "for"), ("It has been raining ___ this morning.", "since"),
+             ("The shop closed two weeks ___.", "ago"), ("I haven't seen her ___ Christmas.", "since"),
+             ("He has been ill ___ a week.", "for"), ("The film started ten minutes ___.", "ago"),
+             ("She has played the piano ___ she was six.", "since"), ("We stayed in Rome ___ five days.", "for"),
+             ("I called you an hour ___.", "ago"), ("Nobody has used this room ___ Monday.", "since"),
+             ("I've known him ___ ages.", "for"), ("The bus left a minute ___.", "ago")]
+
+
+def load_en_since_for(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": ("since", "for", "ago"),
+             "messages": [{"role": "user", "content": f"Fill the gap with \"since\", \"for\" or \"ago\". Answer with the word only.\n\n{sent}"}]}
+            for i, (sent, g) in enumerate(SFA_ITEMS[:min(n or 18, 18)])]
+
+
+def score_en_since_for(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4639,6 +4664,7 @@ TASKS = {
     "dual_output": task(("de", "en"), load_dual_output, score_dual_output, 16, 16, lang_check=False),
     "de_genus_meaning": task(("de",), load_de_genus_meaning, score_de_genus_meaning, 16, None, lang_check=False),
     "en_place_preps": task(("en",), load_en_place_preps, score_en_place_preps, 18, 18, lang_check=False),
+    "en_since_for": task(("en",), load_en_since_for, score_en_since_for, 18, 18, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

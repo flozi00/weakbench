@@ -2909,6 +2909,60 @@ def score_en_hyphens(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_ersatzinfinitiv (modal verbs in the Perfekt)
+# "Er muss arbeiten." -> "Er hat arbeiten müssen." (infinitive, not "gemusst"); in a subordinate clause the auxiliary
+# goes before the verb cluster: "..., weil er hat arbeiten müssen." (not "weil er arbeiten müssen hat").
+EI_ROWS = [("Er", "muss", "müssen", "gemusst", "heute lange arbeiten", "arbeiten"),
+           ("Sie", "kann", "können", "gekonnt", "den Termin nicht wahrnehmen", "wahrnehmen"),
+           ("Wir", "dürfen", "dürfen", "gedurft", "im Garten grillen", "grillen"),
+           ("Ich", "will", "wollen", "gewollt", "das Auto selbst reparieren", "reparieren"),
+           ("Ihr", "sollt", "sollen", "gesollt", "den Bericht früher abgeben", "abgeben"),
+           ("Die Kinder", "müssen", "müssen", "gemusst", "früh ins Bett gehen", "gehen"),
+           ("Du", "kannst", "können", "gekonnt", "die Frage sofort beantworten", "beantworten"),
+           ("Anna", "darf", "dürfen", "gedurft", "den Hund mitbringen", "mitbringen"),
+           ("Der Chef", "will", "wollen", "gewollt", "das Projekt verschieben", "verschieben"),
+           ("Wir", "sollen", "sollen", "gesollt", "die Fenster schließen", "schließen")]
+EI_AUX = {"Er": "hat", "Sie": "hat", "Wir": "haben", "Ich": "habe", "Ihr": "habt", "Die Kinder": "haben", "Du": "hast",
+          "Anna": "hat", "Der Chef": "hat"}
+
+
+def load_de_ersatzinfinitiv(lang, n, seed):
+    items = []
+    for i in range(min(n or 20, 20)):
+        subj, fin, inf, part, rest, verb = EI_ROWS[i % 10]
+        sub = i >= 10
+        obj = rest[: -len(verb)].strip()
+        sent = f"{subj} {fin} {rest}."
+        aux = EI_AUX[subj]
+        if sub:
+            s_ = subj if subj in ("Ich", "Du", "Ihr", "Wir") else subj[0].lower() + subj[1:] if subj in ("Er", "Sie") else subj
+            sent = f"Ich weiß, dass {s_.lower() if subj in ('Ich', 'Du', 'Ihr', 'Wir') else s_} {rest} {fin}."
+            ask = "Setze den Nebensatz ins Perfekt. Antworte nur mit dem ganzen Satz.\n\n"
+            gold = f"{aux} {verb} {inf}"
+        else:
+            ask = "Setze den Satz ins Perfekt. Antworte nur mit dem Satz.\n\n"
+            gold = f"{aux} {obj + ' ' if obj else ''}{verb} {inf}"
+        items.append({"id": str(i), "lang": "de", "gold": gold, "sub": sub, "aux": aux, "verb": verb, "inf": inf, "part": part,
+                      "messages": [{"role": "user", "content": ask + sent}]})
+    return items
+
+
+def score_de_ersatzinfinitiv(item, reply):
+    t = re.sub(r"\s+", " ", (reply["content"] or "").strip().splitlines()[0] if (reply["content"] or "").strip() else "").lower()
+    aux, verb, inf = item["aux"], item["verb"], item["inf"]
+    participle = item["part"] in t
+    if item["sub"]:
+        ok = f"{aux} {verb} {inf}" in t  # "dass er hat arbeiten müssen"
+        wrong_order = f"{verb} {inf} {aux}" in t
+    else:
+        ok = bool(re.search(rf"\b{aux}\b.*\b{verb} {inf}\b", t)) and not t.rstrip(".").endswith(aux)
+        wrong_order = False
+    ok = ok and not participle
+    return {"correct": ok, "score": float(ok), "pred": t[:100], "gold": item["gold"],
+            "detail": {"ok_sub" if item["sub"] else "ok_main": float(ok), "took_participle": float(participle),
+                       "wrong_order": float(wrong_order)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3230,6 +3284,7 @@ TASKS = {
     "md_translate": task(("de", "en"), load_md_translate, score_md_translate, 1024, 6, lang_check=False),
     "de_prefix_meaning": task(("de",), load_de_prefix_meaning, score_de_prefix_meaning, 16, 16, lang_check=False),
     "en_hyphens": task(("en",), load_en_hyphens, score_en_hyphens, 16, 20, lang_check=False),
+    "de_ersatzinfinitiv": task(("de",), load_de_ersatzinfinitiv, score_de_ersatzinfinitiv, 96, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

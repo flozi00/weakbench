@@ -7574,7 +7574,8 @@ def load_nth_weekday(lang, n, seed):
         days = [d for d in range(1, calendar.monthrange(y, mo)[1] + 1) if _dt.date(y, mo, d).weekday() == wd]
         gold = days[k] if k == -1 else days[k - 1]
         # the typical slip: counting from the 1st's week, i.e. one week late when the weekday falls before the 1st's weekday
-        bait = gold + 7 if k != -1 and wd < first.weekday() and gold + 7 <= calendar.monthrange(y, mo)[1] else gold - 7
+        last_day = calendar.monthrange(y, mo)[1]
+        bait = gold - 7 if k == -1 or gold + 7 > last_day else gold + 7  # one week off, inside the month
         W = WD[lang]
         q = (f"{NW_MONTHS['en'][mo - 1]} 1, {y} is a {W[first.weekday()]}. On which day of the month is the {NW_ORD['en'][k]} "
              f"{W[wd]} of {NW_MONTHS['en'][mo - 1]} {y}? Answer with the day number." if lang == "en" else

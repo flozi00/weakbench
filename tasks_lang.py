@@ -3277,13 +3277,13 @@ def gap_pick(item, reply, opts):
 
 # ---------------------------------------------------------------- de_seit_vor (seit / vor / ab / in)
 SV_ITEMS = [("Ich wohne ___ drei Jahren in Leipzig.", "seit"), ("Ich bin ___ drei Jahren nach Leipzig gezogen.", "vor"),
-            ("___ Montag gilt der neue Fahrplan.", "ab"), ("Der Zug fährt ___ zehn Minuten ab.", "in"),
+            ("___ nächstem Montag gilt der neue Fahrplan.", "ab"), ("Der Zug fährt ___ zehn Minuten ab.", "in"),
             ("Wir kennen uns ___ der Schulzeit.", "seit"), ("Sie hat ___ einer Woche angerufen.", "vor"),
             ("___ nächstem Jahr arbeite ich in Teilzeit.", "ab"), ("Das Paket kommt ___ zwei Tagen an.", "in"),
             ("Er wartet schon ___ einer Stunde auf dich.", "seit"), ("Das Geschäft hat ___ einem Monat geschlossen.", "vor"),
-            ("Die Praxis ist ___ 8 Uhr geöffnet.", "ab"), ("___ einer halben Stunde beginnt der Film.", "in"),
+            ("Die Praxis öffnet morgen erst ___ 10 Uhr.", "ab"), ("___ einer halben Stunde beginnt der Film.", "in"),
             ("___ dem Umzug fährt sie mit dem Rad zur Arbeit.", "seit"), ("Ich habe ihn ___ zwei Wochen zuletzt gesehen.", "vor"),
-            ("Die Brücke ist ___ morgen gesperrt.", "ab"), ("___ drei Wochen sind Ferien.", "in"),
+            ("Die Brücke ist ___ morgen gesperrt.", "ab"), ("___ drei Wochen beginnen die Ferien.", "in"),
             ("Es regnet ___ Stunden ohne Pause.", "seit"), ("___ hundert Jahren gab es hier noch keinen Strom.", "vor"),
             ("Kinder zahlen ___ sechs Jahren den vollen Preis.", "ab"), ("Ich rufe dich ___ fünf Minuten zurück.", "in")]
 

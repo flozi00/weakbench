@@ -7021,6 +7021,52 @@ def score_pace_speed(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "took_decimal_minutes": float(bait)}}
 
 
+# ---------------------------------------------------------------- rooms_needed (maximum overlap)
+def _rn_max(meets, touching):
+    ev = []
+    for a, b in meets:
+        ev += [(a, 1), (b, 0 if not touching else 2)]  # end before start at the same minute, unless touching counts
+    cur = best = 0
+    for t, k in sorted(ev):
+        cur += 1 if k == 1 else -1
+        best = max(best, cur)
+    return best
+
+
+def load_rooms_needed(lang, n, seed):
+    fmt = lambda m: f"{m // 60:02d}:{m % 60:02d}"  # noqa: E731
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("rooms_needed", i, att)
+        while True:
+            meets = []
+            for _ in range(r.randint(6, 9)):
+                a = r.randrange(8 * 60, 16 * 60, 30)
+                meets.append((a, a + r.choice([30, 60, 90, 120])))
+            gold, touch = _rn_max(meets, False), _rn_max(meets, True)
+            if gold != touch or i % 3 == 0:  # two thirds of the items have back-to-back meetings that matter
+                break
+        names = ["Budget", "Hiring", "Design", "Sales", "Support", "Legal", "IT", "Training", "Board"] if lang == "en" else \
+            ["Budget", "Personal", "Design", "Vertrieb", "Support", "Recht", "IT", "Schulung", "Vorstand"]
+        lines = "\n".join(f"- {names[k]}: {fmt(a)}–{fmt(b)}" for k, (a, b) in enumerate(meets))
+        q = (f"These meetings take place today:\n{lines}\nA room is free again the moment a meeting ends (a meeting ending at 10:00 "
+             "and one starting at 10:00 can use the same room). What is the smallest number of rooms needed?" if lang == "en" else
+             f"Heute finden diese Besprechungen statt:\n{lines}\nEin Raum ist frei, sobald eine Besprechung endet (eine Besprechung bis "
+             "10:00 und eine ab 10:00 können denselben Raum nutzen). Wie viele Räume braucht man mindestens?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "touch": touch,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_rooms_needed(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    d = {}
+    if item["touch"] != item["gold"]:
+        d["took_touching_overlap"] = float(v == item["touch"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8601,6 +8647,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "rooms_needed": task(load_rooms_needed, score_rooms_needed, 24, 120),
     "pace_speed": task(load_pace_speed, score_pace_speed, 24, 120),
     "savings_plan": task(load_savings_plan, score_savings_plan, 24, 120),
     "resistors": task(load_resistors, score_resistors, 24, 120),

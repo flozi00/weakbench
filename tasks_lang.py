@@ -2909,7 +2909,7 @@ def score_de_umlaut_input(item, reply):
     t = reply["content"] or ""
     copied = UI_TRANSLIT.findall(t)
     has = len(re.findall(r"[äöüÄÖÜß]", t))
-    ok = not copied and has >= 1 and len(t.split()) >= 8
+    ok = not copied and len(t.split()) >= 8  # umlauts are not required: some correct replies need none
     return {"correct": ok, "score": float(ok), "pred": ", ".join(copied[:5]), "gold": None,
             "detail": {"copied_translit": float(bool(copied)), "has_umlauts": float(has >= 1)}}
 

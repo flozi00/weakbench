@@ -1674,13 +1674,14 @@ def score_double_meaning(item, reply):
 
 
 # ---------------------------------------------------------------- concise_rewrite (judge + exact: cut the padding, keep every fact)
-# A generated, padded announcement (filler phrases, repetitions, hedges) carrying 6 facts. The rewrite must fit a hard
-# word limit (about 40 % of the original) and keep every fact token (checked in code); the judge checks that nothing
-# changed meaning or was added, and that the result reads well.
-CR_EVENTS = {"en": ["first-aid course", "team workshop on data protection", "tour of the new warehouse", "evening talk on solar panels"],
-             "de": ["Erste-Hilfe-Kurs", "Team-Workshop zum Datenschutz", "Führung durch das neue Lager", "Abendvortrag über Solaranlagen"]}
+# A generated, padded announcement (filler phrases, repetitions, hedges) carrying 7 facts. The rewrite must fit a hard
+# word limit (about 40 % of the original) and keep every fact (checked in code, each anchored to its context so one
+# number cannot stand in for another); the judge checks that nothing changed meaning or was added, and readability.
+CR_EVENTS = {"en": ["a first-aid course", "a team workshop on data protection", "a tour of the new warehouse", "an evening talk on solar panels"],
+             "de": ["ein Erste-Hilfe-Kurs", "ein Team-Workshop zum Datenschutz", "eine Führung durch das neue Lager", "ein Abendvortrag über Solaranlagen"]}
 CR_HOSTS = ["Marta Kowalski", "Jonas Brandt", "Aylin Demir", "Pieter de Vries", "Lucía Romero", "Tobias Engel"]
 CR_ROOMS = ["B.204", "C.017", "A.311", "D.105"]
+CR_MONTHS = {"en": ["March", "April", "May", "June"], "de": ["März", "April", "Mai", "Juni"]}
 CR_JUDGE = """ORIGINAL (padded):
 {src}
 
@@ -1696,40 +1697,67 @@ For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 def load_concise_rewrite(lang, n, seed):
     tasks_judge.check_judge()
     items = []
-    months = {"en": ["March", "April", "May", "June"], "de": ["März", "April", "Mai", "Juni"]}[lang]
     for i in range(n or 16):
         r = random.Random(f"concise_rewrite:{i}")
         ev, host, room = CR_EVENTS[lang][i % 4], CR_HOSTS[(i // 4) % 6], CR_ROOMS[i % 4]
-        day, month = r.randint(2, 27), months[(i // 2) % 4]
-        start, cost, seats, dl = r.choice(["9:30", "10:00", "14:00", "16:30"]), r.choice([0, 15, 25, 40]), r.randint(8, 24), r.randint(1, day - 1) if day > 2 else 1
+        mi = (i // 2) % 4
+        month = CR_MONTHS[lang][mi]
+        start = r.choice(["9:30", "10:00", "14:00", "16:30"])
+        while True:  # day, deadline and seats distinct, none equal to the start hour
+            day, seats = r.randint(5, 27), r.randint(8, 24)
+            dl = r.randint(2, day - 2)
+            if len({day, dl, seats, int(start.split(":")[0])}) == 4:
+                break
+        cost = r.choice([0, 15, 25, 40])
         date = f"{day}. {month}" if lang == "de" else f"{month} {day}"
         dl_date = f"{dl}. {month}" if lang == "de" else f"{month} {dl}"
-        price = (("free of charge" if not cost else f"{cost} €") if lang == "en" else ("kostenlos" if not cost else f"{cost} €"))
         if lang == "en":
+            price = "participation is free of charge" if not cost else f"participation costs €{cost}"
             src = (f"We would just like to take this opportunity to let you all know that, as some of you may perhaps already have heard, "
-                   f"we are planning to hold a {ev}. It is going to take place, as things currently stand, on {date}, and it will "
-                   f"begin at {start}, so please do make a note of the start time, which is {start}. The {ev} will be led by our "
+                   f"we are planning to hold {ev}. It is going to take place, as things currently stand, on {date}, and it will "
+                   f"begin at {start}, so please do make a note of the start time, which is {start}. The event will be led by our "
                    f"colleague {host}, who has kindly agreed to run it. In terms of the location, it will be held in room {room}. "
-                   f"With regard to the costs involved, we can tell you that participation is {price}. Please be aware that, "
+                   f"With regard to the costs involved, we can tell you that {price}. Please be aware that, "
                    f"due to the size of the room, the number of places is unfortunately limited to a maximum of {seats} people. "
                    f"If you are interested in taking part, we would ask you to please register by {dl_date} at the very latest. "
                    f"Thank you very much in advance for your attention to this matter.")
             req = "Rewrite this announcement concisely in at most {k} words. Keep every fact. Reply with the rewrite only.\n\n"
         else:
+            price = "die Teilnahme kostenlos ist" if not cost else f"die Teilnahme {cost} € kostet"
             src = (f"Wir möchten an dieser Stelle die Gelegenheit nutzen, Sie alle darüber zu informieren, dass, wie einige von Ihnen "
-                   f"vielleicht bereits gehört haben, ein {ev} geplant ist. Dieser findet nach aktuellem Stand am {date} statt und "
+                   f"vielleicht bereits gehört haben, {ev} geplant ist. Der Termin findet nach aktuellem Stand am {date} statt und "
                    f"beginnt um {start} Uhr, bitte merken Sie sich also die Anfangszeit, nämlich {start} Uhr. Geleitet wird der "
                    f"Termin von unserer Kollegin bzw. unserem Kollegen {host}, die bzw. der sich freundlicherweise bereit erklärt "
                    f"hat, ihn durchzuführen. Was den Ort betrifft, so findet er in Raum {room} statt. Hinsichtlich der Kosten können "
-                   f"wir Ihnen mitteilen, dass die Teilnahme {price} ist. Bitte beachten Sie, dass die Zahl der Plätze aufgrund der "
+                   f"wir Ihnen mitteilen, dass {price}. Bitte beachten Sie, dass die Zahl der Plätze aufgrund der "
                    f"Raumgröße leider auf höchstens {seats} Personen begrenzt ist. Wenn Sie Interesse an einer Teilnahme haben, "
                    f"bitten wir Sie, sich spätestens bis zum {dl_date} anzumelden. Vielen Dank im Voraus für Ihre Aufmerksamkeit.")
             req = "Formuliere diese Ankündigung knapp in höchstens {k} Wörtern um. Behalte jede Information. Antworte nur mit dem neuen Text.\n\n"
         k = round(len(src.split()) * 0.4)
-        facts = [str(day), start, host.split()[-1], room, str(seats), str(dl)] + ([str(cost)] if cost else [])
-        items.append({"id": str(i), "lang": lang, "src": src, "limit": k, "facts": facts, "free": not cost,
+        items.append({"id": str(i), "lang": lang, "src": src, "limit": k, "day": day, "dl": dl, "mi": mi, "start": start,
+                      "host": host.split()[-1], "room": room, "seats": seats, "cost": cost,
                       "messages": [{"role": "user", "content": req.format(k=k) + src}]})
     return items
+
+
+def _cr_missing(item, text):
+    """The facts a rewrite lost. Times, dates and rooms are normalised ("09.30 Uhr", "4:30 p.m.", "02.05.", "B 204")."""
+    # "09:30", "9.30 Uhr", "9h30" -> 9:30; a dot only before Uhr/h/a.m./p.m., so "18.03." stays a date
+    t = re.sub(r"\b0?(\d{1,2})(?::(\d{2})|[.h](\d{2})(?=\s*(?:Uhr|h\b|a\.?m|p\.?m)))", lambda m: f"{int(m[1])}:{m[2] or m[3]}", text)
+    t = re.sub(r"\b(\d{1,2}):(\d{2})\s*p\.?m\.?", lambda m: f"{int(m[1]) % 12 + 12}:{m[2]}", t, flags=re.I)
+    t = re.sub(r"\b(\d{1,2})\s*Uhr\b", r"\1:00", t)
+    names = [CR_MONTHS["en"][item["mi"]], CR_MONTHS["de"][item["mi"]]]
+    mon = "|".join(map(re.escape, names)) + rf"|0?{item['mi'] + 3}\."
+    def date(d):
+        return rf"(?<![\d.:])0?{d}(?:\.|st|nd|rd|th)?\s*(?:of\s+)?(?:{mon})|(?:{mon.split('|0?')[0]})\s+0?{d}\b"
+    h, mm = item["start"].split(":")
+    letter, num = item["room"].split(".")
+    checks = {"date": date(item["day"]), "deadline": date(item["dl"]), "time": rf"(?<![\d:]){h}:{mm}\b",
+              "host": rf"\b{re.escape(item['host'])}\b", "room": rf"\b{letter}[.\s-]?{num}\b",
+              "seats": rf"(?<![\d.:]){item['seats']}\b(?![.:]\d)",
+              "price": (r"free|kostenlos|kostenfrei|gratis|no (?:charge|cost)|costs? nothing|kostet nichts|ohne kosten|keine kosten|(?:€\s*0|0\s*€)\b"
+                        if not item["cost"] else rf"(?<![\d.]){item['cost']}(?:[.,]00|,-)?\s*(?:€|euro|eur\b)|(?:€|eur)\s*{item['cost']}\b")}
+    return [k for k, pat in checks.items() if not re.search(pat, t, re.I)]
 
 
 def score_concise_rewrite(item, reply):
@@ -1737,9 +1765,7 @@ def score_concise_rewrite(item, reply):
     text = (reply["content"] or "").strip()
     words = len(re.findall(r"\S+", text))
     within = 0 < words <= item["limit"]
-    missing = [f for f in item["facts"] if not re.search(rf"(?<![\d.:]){re.escape(f)}(?![\d]|:\d)", text)]
-    if item["free"] and not re.search(r"free|kostenlos|kostenfrei|gratis|no charge|keine kosten|0 €", text, re.I):
-        missing.append("free")
+    missing = _cr_missing(item, text)
     out = tasks_judge.judge("", CR_JUDGE.format(src=item["src"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)

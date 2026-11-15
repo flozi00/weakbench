@@ -699,14 +699,23 @@ def test_concise_rewrite():
     url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
     try:
         tasks_judge.configure(url, "mock", 32768)
-        for lang in ("de", "en"):
-            for x in to.load_concise_rewrite(lang, None, 0):
-                f = x["facts"]
-                good = (f"{f[2]} leitet am {f[0]}. um {f[1]} Uhr in Raum {f[3]} den Termin. Max. {f[4]} Plätze, Anmeldung bis {f[5]}. "
-                        + ("Kostenlos." if x["free"] else f"Kosten: {f[6]} €."))
-                r = to.score_concise_rewrite(x, {"content": good})
-                assert r["detail"]["facts_kept"] == 1 and r["detail"]["within_limit"] == 1, (good, x["limit"])
-                assert to.score_concise_rewrite(x, {"content": x["src"]})["detail"]["within_limit"] == 0
+        for x in to.load_concise_rewrite("de", None, 0):
+            mon = ["März", "April", "Mai", "Juni"][x["mi"]]
+            cost = "kostenlos" if not x["cost"] else f"{x['cost']} Euro"
+            good = (f"{x['host']} leitet am {x['day']:02d}.{x['mi'] + 3:02d}. ab {x['start'].replace(':', '.')} Uhr in Raum "
+                    f"{x['room'].replace('.', ' ')} den Termin. Teilnahme {cost}, max. {x['seats']} Plätze, Anmeldung bis {x['dl']}. {mon}.")
+            r = to.score_concise_rewrite(x, {"content": good})
+            assert r["detail"]["facts_kept"] == 1 and r["detail"]["within_limit"] == 1, (good, to._cr_missing(x, good))
+            assert to.score_concise_rewrite(x, {"content": x["src"]})["detail"]["within_limit"] == 0
+            assert to._cr_missing(x, good.replace(f"{x['day']:02d}.{x['mi'] + 3:02d}.", "irgendwann")) == ["date"]
+        for x in to.load_concise_rewrite("en", None, 0):
+            mon = ["March", "April", "May", "June"][x["mi"]]
+            h, mm = map(int, x["start"].split(":"))
+            tm = f"{h - 12}:{mm:02d} p.m." if h > 12 else x["start"]
+            cost = "free" if not x["cost"] else f"€{x['cost']}"
+            good = (f"{x['host']} runs it on {mon} {x['day']} at {tm} in room {x['room']}; {cost}; {x['seats']} places; register by {mon} {x['dl']}.")
+            assert to._cr_missing(x, good) == [], (good, to._cr_missing(x, good))
+            assert "seats" in to._cr_missing(x, good.replace(f"{x['seats']} places", "few places"))
     finally:
         stop()
         tasks_judge.configure(None, None, None)

@@ -4012,6 +4012,43 @@ def score_de_adj_endings(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- en_modal_perfect (modal + have + past participle)
+# Past deduction and regret: "must have left", "should have told", "can't have seen"; wrong forms are the bare past
+# ("must rained"), a regularised or simple-past participle ("must have went", "should have telled"), "of" for "have",
+# or a passive that cannot take the object. Neither the longer nor the shorter form pays.
+EMP_ITEMS = [("You ___ me earlier; now it is too late.", "should have told", "should have telled"),
+             ("The street is wet, so it ___ during the night.", "must have rained", "must rained"),
+             ("She ___ the keys at home; they are not in her bag.", "must have left", "must have leaved"),
+             ("He ___ you at the party, he was in Rome that night.", "can't have seen", "can't have saw"),
+             ("I ___ harder for the exam, but I was lazy.", "should have studied", "should have been studied"),
+             ("They ___ the train if they had left on time.", "would have caught", "would have catched"),
+             ("We ___ the wrong road; this isn't the way to the lake.", "must have taken", "must have took"),
+             ("You ___ that; it was very rude.", "shouldn't have said", "shouldn't have sayed"),
+             ("The cake is gone; the kids ___ it.", "must have eaten", "must of eaten"),
+             ("She ___ the email, she never checks her inbox.", "might not have read", "might not have red"),
+             ("He ___ more careful with the ladder.", "could have been", "could have being"),
+             ("I ___ you, but my phone was dead.", "would have called", "would have been called"),
+             ("They ___ already; the lights are off.", "must have gone", "must have went"),
+             ("You ___ the stove on, I checked it twice.", "can't have left", "can't have leaved"),
+             ("We ___ the tickets online, it would have been cheaper.", "should have bought", "should have buyed"),
+             ("She ___ the answer, she studied it yesterday.", "must have known", "must have knew")]
+
+
+def load_en_modal_perfect(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Which form is correct in standard written English: \"{two_opts(i, g, (g, w))[0]}\" "
+                           f"or \"{two_opts(i, g, (g, w))[1]}\"? Reply with the form only.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(EMP_ITEMS[:n or len(EMP_ITEMS)])]
+
+
+def score_en_modal_perfect(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"] or "")).lower().replace("’", "'")
+    found = [o for o in item["opts"] if re.search(rf"(?<![\w']){re.escape(o)}(?![\w'])", t)]
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_modal_perfect": float(ok)}}
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5312,6 +5349,7 @@ TASKS = {
     "de_capitals_rules": task(("de",), load_de_capitals_rules, score_de_capitals_rules, 16, None, lang_check=False),
     "en_agreement_quant": task(("en",), load_en_agreement_quant, score_en_agreement_quant, 16, None, lang_check=False),
     "de_adj_endings": task(("de",), load_de_adj_endings, score_de_adj_endings, 16, None, lang_check=False),
+    "en_modal_perfect": task(("en",), load_en_modal_perfect, score_en_modal_perfect, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

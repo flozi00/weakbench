@@ -5673,6 +5673,66 @@ def score_fifo_cost(item, reply):
                        "took_lifo": float(v is not None and abs(v - item["lifo"]) < 0.006)}}
 
 
+# ---------------------------------------------------------------- train_connect (earliest arrival with changes)
+TC_TOWNS = ["Ahlen", "Borna", "Celle", "Dahme", "Emden"]
+
+
+def _tc_earliest(trains, src, dst, t0, change=5):
+    best = {src: t0}
+    for dep_s, dep, arr_s, arr in sorted(trains, key=lambda x: x[1]):
+        ready = best.get(dep_s)
+        if ready is None:
+            continue
+        need = ready if dep_s == src and ready == t0 else ready + change
+        if dep_s == src and best[src] == t0:
+            need = t0
+        if dep >= need and arr < best.get(arr_s, 10 ** 9):
+            best[arr_s] = arr
+    return best.get(dst)
+
+
+def load_train_connect(lang, n, seed):
+    fmt = lambda m: f"{m // 60:02d}:{m % 60:02d}"  # noqa: E731
+    items = []
+    for i in range(n or 120):
+        r = rng_of("train_connect", i)
+        change_wins = i % 2 == 0
+        while True:
+            t0 = r.randrange(6 * 60, 18 * 60, 5)
+            trains = []
+            for _ in range(r.randint(8, 10)):
+                a, b = r.sample(TC_TOWNS, 2)
+                dep = t0 + r.randrange(0, 150, 5)
+                trains.append((a, dep, b, dep + r.randrange(20, 120, 5)))
+            src, dst = TC_TOWNS[0], TC_TOWNS[-1]
+            dep_d = t0 + r.randrange(0, 60, 5)
+            trains.append((src, dep_d, dst, dep_d + r.randrange(60, 200, 5)))  # a direct train always exists
+            gold = _tc_earliest(trains, src, dst, t0)
+            direct = min(arr for s_, dep, d_, arr in trains if s_ == src and d_ == dst and dep >= t0)
+            if gold is not None and (gold < direct) == change_wins:
+                break
+        r.shuffle(trains)
+        lines = "\n".join(f"- {s_} {fmt(dep)} -> {d_} {fmt(arr)}" for s_, dep, d_, arr in trains)
+        q = (f"Timetable (departure -> arrival):\n{lines}\nYou are in {src} at {fmt(t0)}. Changing trains takes at least 5 "
+             f"minutes. When is the earliest you can arrive in {dst}? Answer as HH:MM." if lang == "en" else
+             f"Fahrplan (Abfahrt -> Ankunft):\n{lines}\nDu bist um {fmt(t0)} in {src}. Umsteigen dauert mindestens 5 Minuten. "
+             f"Wann kannst du frühestens in {dst} sein? Antworte im Format HH:MM.")
+        items.append({"id": str(i), "lang": lang, "gold": fmt(gold), "direct": fmt(direct), "change_wins": change_wins,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_train_connect(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    times = [f"{int(h):02d}:{m}" for h, m in re.findall(r"\b(\d{1,2})[:.](\d{2})\b", fa)]
+    v = times[-1] if times else None
+    ok = v == item["gold"]
+    d = {"ok_change" if item["change_wins"] else "ok_direct": float(ok)}
+    if item["change_wins"]:
+        d["took_direct"] = float(v == item["direct"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7248,6 +7308,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "train_connect": task(load_train_connect, score_train_connect, 24, 120),
     "fifo_cost": task(load_fifo_cost, score_fifo_cost, 24, 120),
     "cell_rule": task(load_cell_rule, score_cell_rule, 24, 120),
     "exam_slots": task(load_exam_slots, score_exam_slots, 24, 120),

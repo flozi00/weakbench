@@ -4073,10 +4073,10 @@ def score_de_genus_meaning(item, reply):
 # Only items with one standard choice in both BrE and AmE (no "in/on the street", "at/in the hospital" cases).
 EPP_ITEMS = [("She lives ___ Berlin.", "in"), ("The keys are ___ the table.", "on"), ("I'll meet you ___ the bus stop.", "at"),
              ("There is a picture ___ the wall.", "on"), ("He is waiting ___ the front door.", "at"), ("The milk is ___ the fridge.", "in"),
-             ("Please wait ___ the reception desk.", "at"), ("The cat is sleeping ___ the sofa.", "on"), ("They swam ___ the lake.", "in"),
+             ("Please wait ___ the reception desk.", "at"), ("The cat is sleeping ___ the sofa.", "on"), ("There are many fish ___ the lake.", "in"),
              ("My office is ___ the third floor.", "on"), ("Turn left ___ the traffic lights.", "at"), ("He grew up ___ a small village.", "in"),
              ("I read it ___ a newspaper.", "in"), ("She is working ___ home today.", "at"), ("The plane is ___ the sky.", "in"),
-             ("Write your name ___ the top of the page.", "at"), ("There is a spider ___ the ceiling.", "on"), ("Sign ___ the dotted line.", "on")]
+             ("Turn right ___ the end of the road.", "at"), ("There is a spider ___ the ceiling.", "on"), ("Sign ___ the dotted line.", "on")]
 
 
 def load_en_place_preps(lang, n, seed):

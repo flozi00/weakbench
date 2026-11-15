@@ -8556,10 +8556,10 @@ def load_series_runs(lang, n, seed):
                 break
         series = ", ".join(map(str, vals))
         ask = ({"falls": "In how many weeks was the number lower than in the week before?",
-                "streak": "How long is the longest run of consecutive weeks in which the number rose compared with the previous week? Give the number of weeks.",
+                "streak": "How many rises compared with the previous week happened directly one after another, at most? Count the rises, not the weeks they span (example: 10, 12, 15, 11 has 2 rises in a row).",
                 "best_jump": "In which week (1 = first week) was the rise compared with the week before the largest?"} if lang == "en" else
                {"falls": "In wie vielen Wochen war die Zahl niedriger als in der Woche davor?",
-                "streak": "Wie lang ist die längste Folge aufeinanderfolgender Wochen, in denen die Zahl jeweils gegenüber der Vorwoche gestiegen ist? Gib die Zahl der Wochen an.",
+                "streak": "Wie viele Anstiege gegenüber der Vorwoche gab es höchstens direkt hintereinander? Zähle die Anstiege, nicht die Wochen, über die sie reichen (Beispiel: 10, 12, 15, 11 hat 2 Anstiege in Folge).",
                 "best_jump": "In welcher Woche (1 = erste Woche) war der Anstieg gegenüber der Vorwoche am größten?"})[kind]
         q = (f"Weekly sign-ups of a sports club, week 1 to week {len(vals)}: {series}.\n{ask}" if lang == "en" else
              f"Wöchentliche Neuanmeldungen eines Sportvereins, Woche 1 bis Woche {len(vals)}: {series}.\n{ask}")
@@ -8569,7 +8569,16 @@ def load_series_runs(lang, n, seed):
 
 
 def score_series_runs(item, reply):
-    v = stated_int(reply, r"(?:weeks?|wochen?|times|mal)")
+    fa = final_answer(reply["content"]) or ""
+    units = r"(?:weeks?|wochen?|times|mal|rises?|increases?|anstiege?|falls?|rückgänge?)"
+    m = re.search(r"(\d+)\s*(?:rises?|increases?|anstiege?|falls?|rückgänge?)\b", fa, re.I)  # "..., i.e. 3 rises": an explicit count
+    if item["kind"] != "best_jump" and m:
+        v = int(m[1])
+    else:
+        content = reply["content"] or ""
+        if item["kind"] != "best_jump":  # "weeks 4 to 7" is a span label, not the count
+            content = re.sub(r"\b(?:weeks?|wochen?)\s*\d+(?:\s*(?:[–-]|to|bis|and|und)\s*(?:(?:weeks?|wochen?)\s*)?\d+)?", " ", content, flags=re.I)
+        v = stated_int({**reply, "content": content}, units)
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok), "bait": float(v == item["bait"])}}

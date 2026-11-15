@@ -1786,6 +1786,11 @@ def test_series_runs():
     x = next(y for y in xs if y["kind"] == "best_jump")
     for c in (f"Answer: week {x['gold']}", f"Answer: {x['gold']}", f"Answer: in week {x['gold']} (+15)"):
         assert tn.score_series_runs(x, {"content": c})["correct"], c
+    y = next(z for z in xs if z["kind"] == "streak")
+    g = y["gold"]
+    for c in (f"Answer: {g}", f"Answer: {g} rises (weeks 4 to {4 + g})", f"Answer: from week 4 to week {4 + g}, i.e. {g} rises",
+              f"Answer: weeks 4 to {4 + g}, {g} rises", f"Answer: {g} times"):
+        assert tn.score_series_runs(y, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

@@ -2542,6 +2542,39 @@ def score_de_weil_denn(item, reply):
     return {"correct": ok, "score": float(ok), "pred": t[:120], "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- de_capitals (Groß- und Kleinschreibung)
+# The sentence comes all lowercase; the model restores the capitals. Traps: nominalisations, time words, Sie / sie.
+DC_ITEMS = [("nominal", "Beim Laufen höre ich gern Musik."), ("nominal", "Wir wünschen dir alles Gute zum Geburtstag."),
+            ("nominal", "Im Allgemeinen ist das Wetter hier mild."), ("nominal", "Es gibt nichts Neues aus dem Büro."),
+            ("nominal", "Das Schöne an diesem Job ist die Freiheit."), ("nominal", "Er hat sich zum Lernen in die Bibliothek gesetzt."),
+            ("nominal", "Sie hat etwas Wichtiges vergessen."), ("nominal", "Das Rauchen ist hier verboten."),
+            ("time", "Wir treffen uns heute Abend am Bahnhof."), ("time", "Am Montagabend habe ich keine Zeit."),
+            ("time", "Montags gehe ich immer schwimmen."), ("time", "Er kommt morgen früh mit dem Zug."),
+            ("time", "Gestern Mittag war es sehr heiß."), ("time", "Abends lese ich meistens ein Buch."),
+            ("address", "Können Sie mir bitte helfen, Frau Weber?"), ("address", "Ich habe Ihnen die Unterlagen geschickt."),
+            ("address", "Anna sagt, sie kommt später."), ("address", "Haben Sie Ihren Schlüssel gefunden?"),
+            ("nominal", "Er ist der Erste, der angekommen ist."), ("time", "Seit Langem habe ich nicht mehr so gelacht.")]
+
+
+def load_de_capitals(lang, n, seed):
+    rows = DC_ITEMS[:min(n or len(DC_ITEMS), len(DC_ITEMS))]
+    return [{"id": str(i), "lang": "de", "gold": g, "kind": k,
+             "messages": [{"role": "user", "content": "Schreib diesen Satz mit korrekter Groß- und Kleinschreibung. "
+                           "Antworte nur mit dem Satz.\n\n" + g.lower()}]}
+            for i, (k, g) in enumerate(rows)]
+
+
+def score_de_capitals(item, reply):
+    words = lambda t: re.findall(r"[A-Za-zÄÖÜäöüß]+", t)  # noqa: E731
+    lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
+    got, want = words(lines[0] if lines else ""), words(item["gold"])
+    same = len(got) == len(want) and [g.lower() for g in got] == [w.lower() for w in want]
+    wrong = sum(g != w for g, w in zip(got, want)) if same else len(want)
+    ok = same and wrong == 0
+    return {"correct": ok, "score": float(ok), "pred": " ".join(got)[:120], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "wrong_words": wrong, "changed_words": float(not same)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2850,6 +2883,7 @@ TASKS = {
     "quote_keep": task(("de", "en"), load_quote_keep, score_quote_keep, 256, 24, lang_check=False),
     "en_article_sound": task(("en",), load_en_article_sound, score_en_article_sound, 16, 27, lang_check=False),
     "de_weil_denn": task(("de",), load_de_weil_denn, score_de_weil_denn, 64, 30, lang_check=False),
+    "de_capitals": task(("de",), load_de_capitals, score_de_capitals, 96, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

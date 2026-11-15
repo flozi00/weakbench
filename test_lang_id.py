@@ -18,3 +18,16 @@ def test_lang_id():
 
 if __name__ == "__main__":
     test_lang_id()
+
+
+def test_xl_faithful():
+    for lang in ("de", "en"):
+        xs = quality.load_xl_faithful(lang, None, 0)
+        assert len(xs) == 80 and sum(x["changed"] for x in xs) == 40 and len({x["messages"][0]["content"] for x in xs}) == 80
+        assert not any("COVID-2" in x["messages"][0]["content"] for x in xs)
+        x = xs[1]
+        assert quality.score_xl_faithful(x, {"content": f"Answer: {x['gold']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_xl_faithful()

@@ -306,6 +306,55 @@ def score_lang_id(item, reply):
     return {"correct": ok, "score": float(ok), "pred": sorted(named), "gold": item["gold"], "detail": {f"ok_{item['code'][:3]}": float(ok)}}
 
 
+def load_xl_faithful(lang, n, seed):
+    """Is the translation faithful? A FLORES sentence (Belebele passages, pinned) in the other language and a candidate
+    translation in the cell language; in half the items one number of the candidate is changed. Cross-lingual reading
+    with attention to detail: the model must compare, not just judge fluency."""
+    src_code = "eng_Latn" if lang == "de" else "deu_Latn"
+    tgt_code = BELEBELE_CONFIG[lang]
+    key = lambda r: r["link"]  # noqa: E731
+    src = {key(r): r["flores_passage"] for r in rows_of(BELEBELE, f"data/{src_code}.jsonl")}
+    tgt = {key(r): r["flores_passage"] for r in rows_of(BELEBELE, f"data/{tgt_code}.jsonl")}
+    split = lambda t: re.split(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ\"„])", t)  # noqa: E731
+    pairs = []
+    for k in sorted(set(src) & set(tgt)):
+        a, b = split(src[k]), split(tgt[k])
+        if len(a) != len(b):
+            continue  # sentence alignment only where both passages split alike
+        for x, y in zip(a, b):
+            num = r"(?<![\w.,:/-])\d+(?![\w.,:/-]\d|[\w-])"  # free-standing numbers, not COVID-19, 3.5, 12:30
+            nx, ny = re.findall(num, x), re.findall(num, y)
+            if nx and sorted(nx) == sorted(ny) and 60 <= len(y) <= 300:
+                pairs.append((x, y, ny))
+    items = []
+    order = random.Random(f"xl_faithful:{lang}").sample(range(len(pairs)), min(len(pairs), n or 80))
+    for i, k in enumerate(order):
+        x, y, ny = pairs[k]
+        r = random.Random(f"xl_faithful:{lang}:{i}")
+        changed = i % 2 == 1
+        if changed:
+            num = r.choice(ny)
+            new = str(int(num) + r.choice([1, 2, 3, 10]) if int(num) < 1000 else int(num) + 1)
+            y = re.sub(rf"(?<![\w.,:/-]){num}(?![\w.,:/-]\d|[\w-])", new, y, count=1)
+        yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
+        q = (f"Original (German):\n{x}\n\nTranslation:\n{y}\n\nIs the translation faithful in every detail (all facts and numbers "
+             f"the same)? Answer yes or no." if lang == "en" else
+             f"Original (Englisch):\n{x}\n\nÜbersetzung:\n{y}\n\nIst die Übersetzung in jedem Detail treu (alle Fakten und Zahlen "
+             f"gleich)? Antworte mit ja oder nein.")
+        items.append({"id": str(i), "lang": lang, "gold": no if changed else yes, "changed": changed,
+                      "messages": [{"role": "user", "content": q + "\n" + tasks_novel.ASK[lang]}]})
+    return items
+
+
+def score_xl_faithful(item, reply):
+    fa = (tasks_novel.final_answer(reply["content"]) or "").lower()
+    yn = [w for w in re.findall(r"[a-z]+", fa) if w in ("yes", "no", "ja", "nein")]
+    v = ({"yes": "ja", "no": "nein"} if item["lang"] == "de" else {"ja": "yes", "nein": "no"}).get(yn[0], yn[0]) if yn else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_changed" if item["changed"] else "ok_faithful": float(ok)}}
+
+
 def load_gpqa(lang, n, seed):
     rows = {r["Record ID"]: r for r in rows_of(GPQA, f"gpqa_{lang}.jsonl")}
     items = []
@@ -794,6 +843,7 @@ TASKS = {
     "global_mmlu_lite": task(LANGS5, load_gmmlu, score_mc, False, 4096, 0, 400),
     "belebele": task(LANGS5, load_belebele, score_mc, False, 4096, 200, None),
     "lang_id": task(("de", "en"), load_lang_id, score_lang_id, False, 256, 40, 120, lang_check=False),
+    "xl_faithful": task(("de", "en"), load_xl_faithful, score_xl_faithful, False, 512, 40, 80, lang_check=False),
     "mgsm": task(("en", "de", "fr", "es"), load_mgsm, score_math, True, 12288, None, None),
     # code-switched input: sentences alternate DE/EN, the answer must come in the instruction's language
     "mgsm_mixed": task(("en", "de"), load_mgsm_mixed, score_math, True, 12288, 100, None),

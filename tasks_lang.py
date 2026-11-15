@@ -3904,6 +3904,35 @@ def score_de_genitive(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- de_joined_spelling (Getrennt- und Zusammenschreibung)
+# Only cases with one correct form in the current Duden (no "kennenlernen/kennen lernen" variants); joined gold in half.
+JS_ITEMS = [("Am Wochenende wollen wir ___.", "Rad fahren", "radfahren"), ("Wir sind nach dem Essen ___.", "spazieren gegangen", "spazierengegangen"),
+            ("Das Konzert wird morgen ___.", "stattfinden", "statt finden"), ("Sie möchte an dem Kurs ___.", "teilnehmen", "Teil nehmen"),
+            ("Er kann noch nicht ___.", "Auto fahren", "autofahren"), ("___ ist sie im Urlaub.", "Zurzeit", "Zur Zeit"),
+            ("Meine Tochter lernt ___.", "Klavier spielen", "klavierspielen"), ("Hast du ___ gehört?", "irgendetwas", "irgend etwas"),
+            ("Wir treffen uns ___ im Kino.", "heute Abend", "heuteabend"), ("Kannst du morgen kurz ___?", "vorbeikommen", "vorbei kommen"),
+            ("Viele Kinder ___ vor Gewitter.", "haben Angst", "habenangst"), ("Ich muss das ___.", "herausfinden", "heraus finden"),
+            ("Was hast du ___ gemacht?", "gestern Abend", "gesternabend"), ("___ kommt er bestimmt zurück.", "Irgendwann", "Irgend wann"),
+            ("Mein Bruder will ___ lernen.", "Ski fahren", "skifahren"), ("Bitte ___ Sie das Formular.", "ausfüllen", "aus füllen")]
+
+
+def load_de_joined_spelling(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Schreibweise ist nach aktueller deutscher Rechtschreibung richtig: "
+                           f"„{two_opts(i, g, (g, w))[0]}“ oder „{two_opts(i, g, (g, w))[1]}“? Antworte nur mit der Schreibweise.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(JS_ITEMS[:n or len(JS_ITEMS)])]
+
+
+def score_de_joined_spelling(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"] or ""))
+    # exact spelling incl. the space and capitals: "Rad fahren" must not match "radfahren", nor "Zurzeit" "zur Zeit"
+    found = [o for o in item["opts"] if re.search(rf"(?<![\wäöüß]){re.escape(o)}(?![\wäöüß])", t)]
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_joined" if " " not in item["gold"] else "ok_separate": float(ok)}}
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5200,6 +5229,7 @@ TASKS = {
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),
     "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
     "de_genitive": task(("de",), load_de_genitive, score_de_genitive, 16, None, lang_check=False),
+    "de_joined_spelling": task(("de",), load_de_joined_spelling, score_de_joined_spelling, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

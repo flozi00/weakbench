@@ -8678,6 +8678,51 @@ def score_implausible_value(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"picked_unusual": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- coupon_best (pick the best of several coupon rules)
+CB_ITEMS = {"en": ["T-shirt", "jeans", "sneakers", "cap", "jacket", "socks"], "de": ["T-Shirt", "Jeans", "Sneaker", "Mütze", "Jacke", "Socken"]}
+
+
+def load_coupon_best(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("coupon_best", i, att)
+        while True:
+            cart = [(nm, r.randrange(8, 121)) for nm in r.sample(CB_ITEMS[lang], r.randint(2, 4))]
+            total = sum(p for _, p in cart)
+            pct, fixed, fmin = r.choice([10, 15, 20, 25]), r.choice([10, 15, 20, 25]), r.choice([50, 75, 100, 120])
+            cheapest = min(p for _, p in cart)
+            options = {"A": total * F(100 - pct, 100), "B": total - fixed if total >= fmin else F(total),
+                       "C": total - cheapest if len(cart) >= 3 else F(total)}
+            best = min(options.values())
+            winners = [k for k, v in options.items() if v == best]
+            biggest_number = "A" if pct >= fixed else "B"  # picking the coupon with the bigger printed number
+            want = "ABC"[i % 3]  # each coupon wins a third of the time
+            if winners == [want] and (best * 100).denominator == 1:
+                break
+        eur = lambda x: f"{float(x):.2f}" if lang == "en" else f"{float(x):.2f}".replace(".", ",")  # noqa: E731
+        lines = "\n".join(f"- {nm}: {p} €" for nm, p in cart)
+        q = (f"Shopping cart:\n{lines}\nYou may use exactly one coupon:\nA: {pct} % off the whole order\nB: {fixed} € off orders of "
+             f"at least {fmin} €\nC: buy 3 or more items, get the cheapest one free\nWhich coupon gives the lowest price, and what do "
+             f"you pay? Answer like \"B, 85.00 €\"." if lang == "en" else
+             f"Warenkorb:\n{lines}\nDu darfst genau einen Gutschein einlösen:\nA: {pct} % auf die ganze Bestellung\nB: {fixed} € "
+             f"Rabatt ab {fmin} € Bestellwert\nC: ab 3 Artikeln ist der günstigste gratis\nWelcher Gutschein ergibt den niedrigsten "
+             f"Preis, und was zahlst du? Antworte etwa so: „B, 85,00 €“.")
+        items.append({"id": str(i), "lang": lang, "gold": f"{winners[0]}, {eur(best)} €", "letter": winners[0], "price": float(best),
+                      "bait": biggest_number, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_coupon_best(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    m = re.search(r"(?<![A-Za-z])([ABC])(?![A-Za-z])", fa)
+    letter = m[1] if m else None
+    v = answer_value(fa[m.end():] if m else fa, item["lang"])
+    ok_l, ok_p = letter == item["letter"], v is not None and abs(v - item["price"]) < 0.006
+    return {"correct": ok_l and ok_p, "score": (ok_l + ok_p) / 2, "pred": f"{letter}, {v}", "gold": item["gold"],
+            "detail": {"letter_ok": float(ok_l), "price_ok": float(ok_p), "bigger_number": float(letter == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10281,6 +10326,7 @@ TASKS = {
     "series_runs": task(load_series_runs, score_series_runs, 24, 120),
     "elevator_route": task(load_elevator_route, score_elevator_route, 24, 120),
     "implausible_value": task(load_implausible_value, score_implausible_value, 24, 120),
+    "coupon_best": task(load_coupon_best, score_coupon_best, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

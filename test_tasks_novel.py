@@ -1853,3 +1853,18 @@ def test_implausible_value():
 
 if __name__ == "__main__":
     test_implausible_value()
+
+
+def test_coupon_best():
+    import tasks_novel as tn
+    from collections import Counter
+    xs = tn.load_coupon_best("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert max(Counter(x["letter"] for x in xs).values()) < 70
+    x = xs[0]
+    for c in (f"Antwort: {x['gold']}", f"Antwort: Gutschein {x['letter']}, ich zahle {x['gold'].split(', ')[1]}"):
+        assert tn.score_coupon_best(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_coupon_best()

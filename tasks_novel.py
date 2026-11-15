@@ -7073,6 +7073,55 @@ def score_rooms_needed(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- roman_arith (subtractive notation both ways)
+RA_VALS = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"),
+           (5, "V"), (4, "IV"), (1, "I")]
+
+
+def _ra_to(n):
+    out = ""
+    for v, s_ in RA_VALS:
+        while n >= v:
+            out += s_
+            n -= v
+    return out
+
+
+def _ra_additive(s_):
+    return sum({"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}[c] for c in s_)
+
+
+def load_roman_arith(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("roman_arith", i, att)
+        while True:
+            a, b = r.randint(14, 1999), r.randint(4, 999)
+            ra, rb = _ra_to(a), _ra_to(b)
+            if any(x in ra + rb for x in ("IV", "IX", "XL", "XC", "CD", "CM")):  # a subtractive pair to read
+                break
+        sub = i % 2 == 1 and a > b
+        res = a - b if sub else a + b
+        naive = _ra_additive(ra) - _ra_additive(rb) if sub else _ra_additive(ra) + _ra_additive(rb)
+        op = "−" if sub else "+"
+        q = (f"Compute {ra} {op} {rb} and write the result as a Roman numeral." if lang == "en" else
+             f"Berechne {ra} {op} {rb} und schreibe das Ergebnis als römische Zahl.")
+        items.append({"id": str(i), "lang": lang, "gold": _ra_to(res), "value": res, "naive": _ra_to(naive) if naive > 0 else "-",
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_roman_arith(item, reply):
+    lines = re.findall(r"(?:Answer|Antwort)\W*:?\s*(.+)", reply["content"] or "", re.I)
+    toks = re.findall(r"\b[MDCLXVI]+\b", lines[-1] if lines else "")
+    v = toks[-1] if toks else None
+    ok = v == item["gold"]
+    digits = re.findall(r"\d+", lines[-1] if lines else "")
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_additive": float(v == item["naive"]),
+                       "ok_value_only": float(not ok and bool(digits) and int(digits[-1]) == item["value"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8653,6 +8702,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "roman_arith": task(load_roman_arith, score_roman_arith, 24, 120),
     "rooms_needed": task(load_rooms_needed, score_rooms_needed, 24, 120),
     "pace_speed": task(load_pace_speed, score_pace_speed, 24, 120),
     "savings_plan": task(load_savings_plan, score_savings_plan, 24, 120),

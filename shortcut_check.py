@@ -1,9 +1,10 @@
-"""Shortcut detector: the best accuracy a constant reply ("yes", "A", "die", "cannot be determined", ...) reaches per
-generated task, scored offline. >= 0.6 is flagged; 0.5 on a trap/control-twin task is the expected ceiling of always
+"""Shortcut detector: the best accuracy a constant reply ("yes", "A", "die", "cannot be determined", ..., and the task's
+own three most common gold answers) reaches per generated task, scored offline. >= 0.6 is flagged; 0.5 on a trap/control-twin task is the expected ceiling of always
 abstaining (the ok_trap / ok_control split shows it).
 
     uv run shortcut_check.py [task,task,...]
 """
+import collections
 import importlib
 import sys
 
@@ -21,7 +22,9 @@ for name in tasks:
     best = (0, None)
     for lang in t["langs"]:
         items = t["load"](lang, t["counts"]["full"][lang] or None, 0)
-        for rep in REPLIES:
+        common = [g for g, _ in collections.Counter(str(it.get("gold")) for it in items).most_common(3) if g != "None"]
+        own = [f"{p}{g}" for g in common for p in ("Answer: ", "Antwort: ", "")]  # e.g. always "4", always "Bella"
+        for rep in REPLIES + own:
             sc = [t["score"](it, {"content": rep, "reasoning": "", "tool_calls": [], "finish_reason": "stop"})["correct"] for it in items]
             acc = sum(bool(x) for x in sc) / len(sc)
             if acc > best[0]:

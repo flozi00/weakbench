@@ -1540,6 +1540,8 @@ def test_league_table():
     x = xs[0]
     assert tn.score_league_table(x, {"content": f"Antwort: {x['gold']}"})["correct"]
     assert not tn.score_league_table(x, {"content": f"Antwort: {x['gold']} oder {x['tied'][0]}"})["correct"]
+    assert tn.score_league_table(x, {"content": f"Antwort: {x['gold'].lower()}, vor {x['tied'][0]} dank Tordifferenz"})["correct"]
+    assert not tn.score_league_table(x, {"content": "Antwort: " + " ".join(f"{k + 1}. {t}" for k, t in enumerate(x["teams"]))})["correct"]
 
 
 if __name__ == "__main__":

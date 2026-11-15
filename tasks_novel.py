@@ -7816,9 +7816,11 @@ def load_league_table(lang, n, seed):
 
 
 def score_league_table(item, reply):
-    fa = final_answer(reply["content"]) or ""
-    named = [t for t in item["teams"] if re.search(rf"\b{t}\b", fa)]
-    v = named[0] if len(named) == 1 else None
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    hits = sorted((m.start(), t) for t in item["teams"] if (m := re.search(rf"\b{t}\b", fa, re.I)))
+    # "Farley, ahead of Ashford": the first team; a hedge ("Farley or Holm") or a whole table names no single team
+    hedge = re.search(r"\b(?:or|oder)\b|/", fa)
+    v = hits[0][1] if len(hits) == 1 or (len(hits) == 2 and not hedge) else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ranked_by_goals": float(v == item["bait"]), "lost_tie_break": float(v in item["tied"])}}

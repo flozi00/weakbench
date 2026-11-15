@@ -7424,6 +7424,47 @@ def score_dark_patterns(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- vat_calc (percent of what?)
+def load_vat_calc(lang, n, seed):
+    from decimal import Decimal as D, ROUND_HALF_UP
+    q2 = lambda x: x.quantize(D("0.01"), rounding=ROUND_HALF_UP)  # noqa: E731
+    fmt = (lambda x: f"{x:.2f} €") if lang == "en" else (lambda x: f"{x:.2f} €".replace(".", ","))
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("vat_calc", i, att)
+        rate = r.choice([7, 19])
+        kind = ("net", "vat", "gross")[i % 3]
+        net = D(r.randrange(500, 50000)) / 100
+        gross = q2(net * (100 + rate) / 100)
+        if kind == "net":
+            gold, bait = q2(gross * 100 / (100 + rate)), q2(gross * (100 - rate) / 100)
+            q = (f"A price is {fmt(gross)} including {rate} % VAT. What is the price without VAT?" if lang == "en" else
+                 f"Ein Preis beträgt {fmt(gross)} inklusive {rate} % Mehrwertsteuer. Wie hoch ist der Preis ohne Mehrwertsteuer?")
+        elif kind == "vat":
+            gold, bait = q2(gross - gross * 100 / (100 + rate)), q2(gross * rate / 100)
+            q = (f"A price is {fmt(gross)} including {rate} % VAT. How much of it is VAT?" if lang == "en" else
+                 f"Ein Preis beträgt {fmt(gross)} inklusive {rate} % Mehrwertsteuer. Wie viel davon ist Mehrwertsteuer?")
+        else:
+            gold, bait = gross, q2(net * 100 / (100 - rate))
+            q = (f"A price is {fmt(net)} plus {rate} % VAT. What is the price including VAT?" if lang == "en" else
+                 f"Ein Preis beträgt {fmt(net)} zuzüglich {rate} % Mehrwertsteuer. Wie hoch ist der Preis inklusive Mehrwertsteuer?")
+        q += " Round to the cent." if lang == "en" else " Runde auf den Cent."
+        if abs(gold - bait) < D("0.02"):
+            continue
+        items.append({"id": str(i), "lang": lang, "gold": float(gold), "bait": float(bait), "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_vat_calc(item, reply):
+    fa = result_side(final_answer(reply["content"]) or "")
+    eur = re.search(r"(\d[\d.,  ]*\d)\s*(?:€|\beuros?\b|\beur\b)|€\s*(\d[\d.,  ]*\d)", fa, re.I)
+    v = parse_number(eur[1] or eur[2], item["lang"]) if eur else answer_value(fa, item["lang"])
+    near = lambda x: v is not None and abs(v - x) < 0.006  # noqa: E731
+    return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(near(item["gold"])), "took_percent_of_gross": float(near(item["bait"]))}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9004,6 +9045,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "vat_calc": task(load_vat_calc, score_vat_calc, 24, 120),
     "dark_patterns": task(load_dark_patterns, score_dark_patterns, 24, 120),
     "ledger_balance": task(load_ledger_balance, score_ledger_balance, 24, 120),
     "critical_path": task(load_critical_path, score_critical_path, 24, 120),

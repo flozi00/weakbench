@@ -645,3 +645,24 @@ def test_delay_notice():
 
 if __name__ == "__main__":
     test_delay_notice()
+
+
+def test_de_gender_fair():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_de_gender_fair("de", None, 0)[0]
+        good = "Liebe Lehrkräfte, bitte erinnern Sie die Schülerinnen und Schüler daran, dass alle ihren Ausweis mitbringen müssen. Die Lehrkräfte der Oberstufe treffen sich am Montag."
+        assert to.score_de_gender_fair(x, {"content": good})["correct"]
+        y = to.load_de_gender_fair("de", None, 0)[2]
+        assert to.score_de_gender_fair(y, {"content": "Die Studierenden melden sich bis Freitag an. Wer als Tutorin oder Tutor arbeiten will, meldet sich bei der Lehrperson. Jede Studentin und jeder Student erhält danach den Zugang."})["correct"]
+        for bad in (good.replace("Lehrkräfte,", "Lehrer*innen,"), good.replace("Liebe Lehrkräfte", "Liebe Lehrer"),
+                    good.replace("Schülerinnen und Schüler", "SchülerInnen")):
+            assert not to.score_de_gender_fair(x, {"content": bad})["correct"], bad
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_de_gender_fair()

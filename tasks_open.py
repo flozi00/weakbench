@@ -1529,6 +1529,71 @@ def score_en_learner_feedback(item, reply):
             "detail": {"corrected": float(met[0]), "rule_right": float(met[1]), "simple": float(met[2]), "no_new_errors": float(met[3])}}
 
 
+# ---------------------------------------------------------------- de_gender_fair (judge + exact: gender-fair German without symbols)
+# A text in generic masculine is rewritten gender-fair WITHOUT Gendersternchen, colon, underscore or Binnen-I (many
+# style guides of public bodies forbid them): neutral forms (Lehrkräfte, Studierende, Team, Personal) or pairs. That
+# is real German writing skill: agreement, pronouns and articles must follow the new nouns. The masculine forms and
+# the symbols are checked in code; meaning, grammar and naturalness by the judge.
+GF_TEXTS = [
+    ("Liebe Lehrer, bitte erinnern Sie Ihre Schüler daran, dass jeder Schüler seinen Ausweis mitbringen muss. Die Lehrer der "
+     "Oberstufe treffen sich am Montag.", ["Lehrer", "Schüler"]),
+    ("Alle Mitarbeiter sind eingeladen. Jeder Mitarbeiter kann einen Gast mitbringen; die Kollegen aus dem Vertrieb "
+     "organisieren das Buffet. Ein Ansprechpartner steht am Eingang.", ["Mitarbeiter", "Kollegen", "Ansprechpartner"]),
+    ("Die Studenten müssen sich bis Freitag anmelden. Wer als Tutor arbeiten will, meldet sich beim Dozenten. Jeder Student "
+     "erhält danach seinen Zugang.", ["Studenten", "Student", "Tutor", "Dozenten"]),
+    ("Wir suchen einen erfahrenen Entwickler. Der Bewerber sollte drei Jahre Erfahrung haben. Unsere Kunden schätzen "
+     "Entwickler, die gut erklären können.", ["Entwickler", "Bewerber", "Kunden"]),
+    ("Die Ärzte der Station bitten alle Besucher, die Hände zu desinfizieren. Jeder Besucher darf höchstens eine Stunde "
+     "bleiben. Fragen beantworten die Pfleger.", ["Ärzte", "Besucher", "Pfleger"]),
+    ("Liebe Leser, unsere Autoren freuen sich über Post. Jeder Leser, der einen Brief schickt, nimmt an der Verlosung teil. "
+     "Die Gewinner werden benachrichtigt.", ["Leser", "Autoren", "Gewinner"]),
+    ("Die Teilnehmer treffen sich um neun Uhr. Jeder Teilnehmer bringt seinen Laptop mit. Die Referenten stellen sich "
+     "zu Beginn vor.", ["Teilnehmer", "Referenten"]),
+    ("Alle Bürger der Stadt können Vorschläge einreichen. Ein Experte prüft jeden Vorschlag, bevor die Politiker im Rat "
+     "darüber abstimmen.", ["Bürger", "Experte", "Politiker"])]
+GF_JUDGE = """ORIGINAL (generic masculine):
+{src}
+
+REWRITE (should be gender-fair German without gender symbols):
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The rewrite keeps every fact and instruction of the original (same people, deadlines, rules); nothing added or lost.
+2. No generic masculine remains for groups of people; neutral forms ("Lehrkräfte", "Studierende", "Teilnehmende",
+   "das Team") or pair forms ("Ärztinnen und Ärzte") are used. A masculine noun for a group counts as remaining.
+3. The German is grammatically correct after the change: articles, adjective endings, pronouns ("jeder ... seinen" must
+   be adapted, e.g. "alle ... ihren"), and verb agreement all fit the new nouns.
+4. It reads naturally, like a text a careful public office would publish (no clumsy chains of pair forms in every clause)."""
+
+
+def load_de_gender_fair(lang, n, seed):
+    tasks_judge.check_judge()
+    return [{"id": str(i), "lang": "de", "src": src, "masc": masc,
+             "messages": [{"role": "user", "content": "Formuliere diesen Text geschlechtergerecht um. Verwende keine Gendersternchen, "
+                           "keinen Doppelpunkt, keinen Unterstrich und kein Binnen-I, sondern neutrale Formen oder Paarformen. "
+                           "Antworte nur mit dem neuen Text.\n\n" + src}]}
+            for i, (src, masc) in enumerate(GF_TEXTS[:min(n or 8, 8)])]
+
+
+def score_de_gender_fair(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    symbols = bool(re.search(r"\w[*:_]in(?:nen)?\b|\w[a-zäöüß]In(?:nen)?\b|\w/-?in(?:nen)?\b", text))
+    # a masculine form standing alone; inside a pair ("Lehrerinnen und Lehrer") it is fine
+    pair = lambda w: re.search(rf"\w+in(?:nen)?\s+(?:und|oder|bzw\.)\s+(?:\w+\s+)?{w}\b|\b{w}\s+(?:und|oder|bzw\.)\s+(?:\w+\s+)?\w+in(?:nen)?\b", text)  # noqa: E731
+    left = [w for w in item["masc"] if re.search(rf"\b{w}\b", text) and not pair(w)]
+    out = tasks_judge.judge("", GF_JUDGE.format(src=item["src"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 4:
+        raise ValueError(f"unusable de_gender_fair verdict {out[:120]!r}")
+    facts, neutral, grammar, natural = (_yes(x) for x in v)
+    met = [not symbols, not left, facts, neutral, grammar, natural]
+    return {"correct": all(met), "score": round(sum(met) / 6, 4), "pred": text[:160], "gold": None,
+            "detail": {"no_symbols": float(not symbols), "no_masculine_left": float(not left), "facts_kept": float(facts),
+                       "neutral_judge": float(neutral), "grammar": float(grammar), "natural": float(natural)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2082,6 +2147,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                                  "think": False, "max_tokens": 512,
                                  "counts": {"quick": {"en": 12}, "full": {"en": None}},
                                  "lang_check": True, "opt_in": True, "needs_judge": True},
+         "de_gender_fair": {"langs": ("de",), "load": load_de_gender_fair, "score": score_de_gender_fair,
+                            "think": False, "max_tokens": 512,
+                            "counts": {"quick": {"de": 8}, "full": {"de": None}},
+                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

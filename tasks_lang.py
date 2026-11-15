@@ -2945,7 +2945,7 @@ def score_de_umlaut_input(item, reply):
 
 
 # ---------------------------------------------------------------- en_question_tags (auxiliary, polarity, special cases)
-QT_ITEMS = [("plain", "She can swim", ["can't she", "cannot she"]), ("plain", "He has finished the report", ["hasn't he"]),
+QT_ITEMS = [("plain", "She can swim", ["can't she"]), ("plain", "He has finished the report", ["hasn't he"]),
             ("plain", "They won't be late", ["will they"]), ("plain", "You didn't call him", ["did you"]),
             ("plain", "We should leave now", ["shouldn't we"]), ("plain", "It was raining", ["wasn't it"]),
             ("special", "I am late again", ["aren't i", "am i not"]), ("special", "Let's take a break", ["shall we"]),
@@ -2970,8 +2970,10 @@ def score_en_question_tags(item, reply):
     def norm(t):
         t = t.lower().replace("’", "'")
         return " ".join(re.findall(r"[a-z']+", t))
-    t = norm(reply["content"] or "")
-    t = t.split("?")[0] if "?" in t else t
+    raw = reply["content"] or ""
+    if re.search(r"/|\bor\b", raw, re.I):
+        return {"correct": False, "score": 0.0, "pred": raw[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": 0.0}}
+    t = norm(raw.split("?")[0] if "?" in raw else raw)
     ok = any(re.search(r"(?:^|\s)" + re.escape(norm(g)) + r"(?:\s|$)", t) for g in item["tags"]) and len(t.split()) <= 6
     return {"correct": ok, "score": float(ok), "pred": t[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 

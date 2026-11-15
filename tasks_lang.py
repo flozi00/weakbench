@@ -3272,7 +3272,7 @@ def strip_lead(text):
 def gap_pick(item, reply, opts):
     """The option a gap-fill reply chose. A reply that repeats the sentence is read at the gap (the words before "___" in
     the prompt, then an option); otherwise the reply must name exactly one option. Brackets are notes."""
-    text = re.sub(r"\([^()]*\)", " ", (reply["content"] or "").lower().replace("’", "'"))
+    text = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"]).lower().replace("’", "'"))  # "Die Lösung lautet der": not "die"
     words = re.findall(r"[a-zäöüß']+", text)
     low = [o.lower() for o in opts]
     gap_line = next((ln for ln in reversed(item["messages"][-1]["content"].splitlines()) if "___" in ln), "")
@@ -4034,6 +4034,41 @@ def score_dual_output(item, reply):
                        "note_one_sentence": float(met[4]), "switched": float(met[1] and met[2] and item["msg_lang"] != item["note_lang"])}}
 
 
+# ---------------------------------------------------------------- de_genus_meaning (the article decides the meaning)
+# Nouns whose gender changes the meaning: der See / die See, das Band / der Band, die Leiter / der Leiter, die Steuer /
+# das Steuer, das Tor / der Tor, der Kiefer / die Kiefer, das Gehalt / der Gehalt, das Erbe / der Erbe. Nominative gaps.
+GM_ITEMS = [("Im Sommer schwimmen wir im Bodensee; ___ See ist dort sehr klar.", "der", ("der", "die")),
+            ("Bei Sturm ist ___ See rau, und die Fischer bleiben im Hafen.", "die", ("der", "die")),
+            ("___ Band mit den Fotos steht im obersten Regal.", "der", ("der", "das")),
+            ("___ Band hält das Paket zusammen.", "das", ("der", "das")),
+            ("___ Leiter der Abteilung hat die Besprechung abgesagt.", "der", ("der", "die")),
+            ("___ Leiter steht im Keller, falls du an die Lampe willst.", "die", ("der", "die")),
+            ("___ Steuer muss bis Ende Mai bezahlt werden.", "die", ("die", "das")),
+            ("Bei Glatteis muss man ___ Steuer gut festhalten.", "das", ("die", "das")),
+            ("___ Tor fiel in der letzten Minute.", "das", ("der", "das")),
+            ("___ Tor glaubte jedes Wort, das man ihm erzählte.", "der", ("der", "das")),
+            ("___ Kiefer im Garten ist über zwanzig Meter hoch.", "die", ("der", "die")),
+            ("Nach dem Unfall war ___ Kiefer gebrochen; er konnte kaum sprechen.", "der", ("der", "die")),
+            ("___ Gehalt wird am Monatsende überwiesen.", "das", ("der", "das")),
+            ("___ Gehalt an Vitamin C ist in Paprika besonders hoch.", "der", ("der", "das")),
+            ("___ Erbe der Großmutter war ein altes Haus am See.", "das", ("der", "das")),
+            ("___ Erbe des Hofes ist sein ältester Sohn.", "der", ("der", "das"))]
+
+
+def load_de_genus_meaning(lang, n, seed):
+    items = GM_ITEMS
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Setze den Artikel „{two_opts(i, g, o)[0]}“ oder „{two_opts(i, g, o)[1]}“ ein; "
+                           f"der Artikel entscheidet hier über die Bedeutung. Antworte nur mit dem Artikel.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(items[:n or len(items)])]
+
+
+def score_de_genus_meaning(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v is not None and v.lower() == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4580,6 +4615,7 @@ TASKS = {
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),
     "dual_output": task(("de", "en"), load_dual_output, score_dual_output, 16, 16, lang_check=False),
+    "de_genus_meaning": task(("de",), load_de_genus_meaning, score_de_genus_meaning, 16, None, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

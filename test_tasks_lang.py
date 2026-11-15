@@ -799,7 +799,7 @@ def test_gap_tasks_full_sentence():
     """A reply that repeats the sentence with the gold filled in scores correct in every gap_pick task."""
     import tasks_lang as tl
     bad = []
-    for name in ("de_als_wie", "en_usage", "time_prep", "en_dependent_preps", "en_article_sound", "collocations", "de_seit_vor", "en_gerund_inf", "de_position_verbs", "de_wenn_als", "de_reflexive_case", "en_countable", "en_adj_adv", "de_paronyms", "en_comparison", "de_verb_preps", "en_confusables"):
+    for name in ("de_als_wie", "en_usage", "time_prep", "en_dependent_preps", "en_article_sound", "collocations", "de_seit_vor", "en_gerund_inf", "de_position_verbs", "de_wenn_als", "de_reflexive_case", "en_countable", "en_adj_adv", "de_paronyms", "en_comparison", "de_verb_preps", "en_confusables", "de_genus_meaning"):
         t = tl.TASKS[name]
         for lang in t["langs"]:
             for it in t["load"](lang, None, 0):

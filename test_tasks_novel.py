@@ -2068,7 +2068,8 @@ def test_leap_days():
     xs = tn.load_leap_days("de", None, 0)
     assert len({x["messages"][0]["content"] for x in xs}) == 120 and all(x["gold"] != x["bait"] for x in xs)
     x = xs[0]
-    for c in (f"Antwort: {x['gold']} Schaltjahre", f"Antwort: {x['gold']}", f"Antwort: {x['bait']} - 1 = {x['gold']}"):
+    for c in (f"Antwort: {x['gold']} Schaltjahre", f"Antwort: {x['gold']}", f"Antwort: {x['bait']} - 1 = {x['gold']}",
+              f"Answer: from 1700 to 2100: {x['gold']}"):
         assert tn.score_leap_days(x, {"content": c})["correct"], c
 
 

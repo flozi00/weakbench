@@ -9269,7 +9269,9 @@ def load_leap_days(lang, n, seed):
 
 
 def score_leap_days(item, reply):
-    v = stated_int(reply, r"(?:leap|schalt)")
+    fa = final_answer(reply["content"]) or ""
+    tail = re.split(r":\s+", fa)[-1]  # "from 1700 to 2100: 101": the restated range is no answer range
+    v = stated_int({**reply, "content": "Answer: " + tail}, r"(?:leap|schalt)")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"forgot_century_rule": float(v == item["bait"])}}
 

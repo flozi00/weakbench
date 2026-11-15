@@ -4469,6 +4469,7 @@ def load_de_comparison(lang, n, seed):
 
 def score_de_comparison(item, reply):
     t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"]))
+    t = re.sub(r"^\W*(?:komparativ|superlativ)\w*\s*:\s*", "", t.strip(), flags=re.I)  # "Komparativ: älter"
     w = [x.lower() for x in re.findall(r"[A-Za-zÄÖÜäöüß]+", t)]
     gap = item["messages"][0]["content"].splitlines()[-1]
     pre = [x.lower() for x in re.findall(r"[A-Za-zÄÖÜäöüß]+", gap.split("___")[0])][-2:]

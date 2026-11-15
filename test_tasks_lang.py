@@ -1140,6 +1140,8 @@ def test_de_comparison():
         for c in (x["gold"], sent.replace("___", x["gold"]), f"„{x['gold']}“"):
             assert tl.score_de_comparison(x, {"content": c})["correct"], c
     assert not tl.score_de_comparison(xs[0], {"content": "alter"})["correct"]
+    assert tl.score_de_comparison(xs[0], {"content": "Komparativ: älter"})["correct"]
+    assert tl.score_de_comparison(xs[9], {"content": "Superlativ: am längsten"})["correct"]
     assert not tl.score_de_comparison(xs[2], {"content": "guter"})["correct"]
 
 

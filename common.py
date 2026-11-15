@@ -313,7 +313,7 @@ def hf_list(repo, revision, repo_type="datasets"):
 
 
 # our own hand-written / translated sets, private, pinned
-DATA_REPO, DATA_REV = "flozi00/weakbench-data", "06fdc81a0714ceb09925a4a7a2483bf02689f2d0"
+DATA_REPO, DATA_REV = "flozi00/weakbench-data", "e579e119fa434f625d07dfe8a2b2ee31bd6dca42"
 
 
 def distinct(load, pool=600):

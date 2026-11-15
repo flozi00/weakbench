@@ -10167,6 +10167,50 @@ def score_lru_cache(item, reply):
             "detail": {f"ok_k{item['k']}": float(ok), "fifo_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- hanoi_state
+# Tower of Hanoi with 4-6 disks, solved in the minimum number of moves from peg A to peg C; which disks lie on a named
+# peg after move m (bottom to top)? The model must run (or derive) the optimal sequence, not recite it; m is mid-solve.
+# `ok_d<disks>`.
+def hanoi_moves(n, a="A", b="B", c="C"):
+    return [] if n == 0 else hanoi_moves(n - 1, a, c, b) + [(n, a, c)] + hanoi_moves(n - 1, b, a, c)
+
+
+def load_hanoi_state(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("hanoi_state", i, att)
+        while True:
+            d = r.choice([4, 5, 6])
+            moves = hanoi_moves(d)
+            m = r.randint(5, len(moves) - 3)
+            pegs = {"A": list(range(d, 0, -1)), "B": [], "C": []}
+            for disk, src, dst in moves[:m]:
+                assert pegs[src][-1] == disk
+                pegs[dst].append(pegs[src].pop())
+            peg = "ABC"[i % 3]
+            if pegs[peg] or i % 6 == 5:  # an empty peg as the answer only now and then
+                break
+        gold = pegs[peg]
+        q = (f"Tower of Hanoi: {d} disks, numbered 1 (smallest) to {d} (largest), start on peg A. They are moved to peg C in "
+             f"the minimum number of moves (one disk per move, never a larger disk on a smaller one). After move {m}, which "
+             f"disks are on peg {peg}? List them from bottom to top, comma-separated, or say \"empty\"." if lang == "en" else
+             f"Türme von Hanoi: {d} Scheiben, nummeriert von 1 (kleinste) bis {d} (größte), liegen auf Stab A. Sie werden mit "
+             f"der kleinstmöglichen Zahl an Zügen auf Stab C gebracht (eine Scheibe pro Zug, nie eine größere auf eine "
+             f"kleinere). Welche Scheiben liegen nach Zug {m} auf Stab {peg}? Nenne sie von unten nach oben, durch Kommas "
+             f"getrennt, oder sage \"leer\".")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "disks": d,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_hanoi_state(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    nums = [int(x) for x in re.findall(r"\b\d+\b", fa)]
+    v = [] if not nums and re.search(r"\b(?:empty|leer|none|keine)\b", fa, re.I) else (nums or None)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_d{item['disks']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11275,6 +11319,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "hanoi_state": task(load_hanoi_state, score_hanoi_state, 24, 96),
     "lru_cache": task(load_lru_cache, score_lru_cache, 24, 96),
     "dice_roll": task(load_dice_roll, score_dice_roll, 24, 96),
     "merge_conflict": task(load_merge_conflict, score_merge_conflict, 24, 96),

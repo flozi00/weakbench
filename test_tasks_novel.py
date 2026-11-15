@@ -18,7 +18,7 @@ def test_all():
         assert (want is None or len(full) == want) and len({i["id"] for i in full}) == len(full), name
         assert [i["id"] for i in quick] == [i["id"] for i in full[:len(quick)]], name
         assert [i["gold"] for i in t["load"]("en", len(quick), 0)] == [i["gold"] for i in full[:len(quick)]], name
-        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path", "stale_answer", "pii_redact", "prob_fallacies", "framing", "merge_conflict") else []:  # own tests below
+        for it in full[:50] if name not in ("if_gen", "math_missing", "schedule", "syllogism", "extract", "probability", "event_order", "mini_sudoku", "timezones", "calib_math", "meeting_actions", "game_theory", "knights_knaves", "gears", "jugs", "linalg", "data2text", "near_miss_qa", "format_bait", "false_premise", "ambiguous_ref", "blocks_plan", "regex_synth", "fake_entity", "knapsack", "table_build", "maze_path", "stale_answer", "pii_redact", "prob_fallacies", "framing", "merge_conflict", "hanoi_state") else []:  # own tests below
             ans = "Antwort" if it["lang"] == "de" else "Answer"
             gold = "; ".join([str(it["gold"][0]), ", ".join(it["gold"][1])]) if name == "dialog_state" else \
                 f"({it['gold'][0]}, {it['gold'][1]}) {tn.DIR_NAME['en'][it['gold'][2]]}" if name == "spatial" else it["gold"]
@@ -2154,6 +2154,15 @@ def test_merge_conflict():
     assert not r["correct"] and r["detail"]["same_change_flagged"] == 1.0
 
 
+
+def test_hanoi_state():
+    for it in tn.load_hanoi_state("en", 24, 0) + tn.load_hanoi_state("de", 24, 0):
+        g = ", ".join(map(str, it["gold"])) or ("leer" if it["lang"] == "de" else "empty")
+        assert tn.score_hanoi_state(it, reply(f"x\n**Answer: {g}**"))["correct"], it["gold"]
+        if len(it["gold"]) > 1:
+            assert not tn.score_hanoi_state(it, reply("Answer: " + ", ".join(map(str, it["gold"][::-1]))))["correct"]
+
 if __name__ == "__main__":
+    test_hanoi_state()
     test_merge_conflict()
     test_calendar_grid()

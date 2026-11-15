@@ -4508,6 +4508,52 @@ def score_de_verb_case(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_dative" if item["gold"] == "ihm" else "ok_accusative": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_reflexive (himself or him; verbs not reflexive in English)
+# German "sich" verbs that are NOT reflexive in English (sich freuen, sich erinnern, sich beeilen, sich entspannen) and
+# true reflexives; the transfer error "He relaxed himself" / "I remember myself" is the bait. Gold balanced 8/8.
+ERF_ITEMS = [("He cut ___ while he was cooking.", "himself", ("himself", "him")),
+             ("She taught ___ to play the guitar.", "herself", ("herself", "her")),
+             ("Tom saw Peter and waved to ___.", "him", ("himself", "him")),
+             ("The children enjoyed ___ at the party.", "themselves", ("themselves", "them")),
+             ("Anna's mother called ___ yesterday.", "her", ("herself", "her")),
+             ("Please help ___ to some cake!", "yourself", ("yourself", "you")),
+             ("I met Lisa and told ___ the news.", "her", ("herself", "her")),
+             ("He looked at ___ in the mirror.", "himself", ("himself", "him")),
+             ("After work, she likes to relax ___.", "—", ("herself", "—")),
+             ("Hurry ___, the train is leaving!", "—", ("yourself", "—")),
+             ("I remember ___ that day very well.", "—", ("myself", "—")),
+             ("We met ___ at the station at six.", "—", ("ourselves", "—")),
+             ("She was so happy that she hugged ___ the dog.", "—", ("herself", "—")),
+             ("Sit ___ down and have a coffee.", "—", ("yourself", "—")),
+             ("The machine switches ___ off after an hour.", "itself", ("itself", "—")),
+             ("They blamed ___ for the accident.", "themselves", ("themselves", "—"))]
+
+
+def load_en_reflexive(lang, n, seed):
+    out = []
+    for i, (sent, g, o) in enumerate(ERF_ITEMS[:min(n or 16, 16)]):
+        a, b = two_opts(i, g, o)
+        show = lambda x: "\"nothing\"" if x == "—" else f"\"{x}\""  # noqa: E731
+        out.append({"id": str(i), "lang": "en", "gold": g, "opts": o,
+                    "messages": [{"role": "user", "content": f"Which fits the gap: {show(a)} or {show(b)} (nothing = the gap stays "
+                                  f"empty)? Answer with that choice only.\n\n{sent}"}]})
+    return out
+
+
+def score_en_reflexive(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
+    t = re.sub(r"\b(?:not|no)\s+\w+", " ", t) if not re.match(r"\W*(?:nothing|no word|none|empty|—|-)\W*$", t) else t
+    pron = [o for o in item["opts"] if o != "—"]
+    said = [p for p in pron if re.search(rf"\b{p}\b", t)]
+    nothing = bool(re.search(r"\b(?:nothing|no word|none|empty|leave it empty|no pronoun)\b|^\W*[—-]\W*$", t))
+    v = said[0] if len(said) == 1 and not nothing else "—" if nothing and not said else None
+    if v is None and len(said) == 2:  # "himself" contains no "him" as a word, so two hits are a real hedge
+        v = None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_none" if item["gold"] == "—" else "ok_pronoun": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -5066,6 +5112,7 @@ TASKS = {
     "antonym_context": task(("de", "en"), load_antonym_context, score_antonym_context, 12, None, lang_check=False),
     "de_comparison": task(("de",), load_de_comparison, score_de_comparison, 16, 16, lang_check=False),
     "de_verb_case": task(("de",), load_de_verb_case, score_de_verb_case, 16, 16, lang_check=False),
+    "en_reflexive": task(("en",), load_en_reflexive, score_en_reflexive, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

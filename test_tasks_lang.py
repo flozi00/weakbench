@@ -1147,3 +1147,19 @@ def test_de_comparison():
 
 if __name__ == "__main__":
     test_de_comparison()
+
+
+def test_en_reflexive():
+    import tasks_lang as tl
+    xs = tl.load_en_reflexive("en", None, 0)
+    for x in xs:
+        rep = "nothing" if x["gold"] == "—" else x["gold"]
+        assert tl.score_en_reflexive(x, {"content": rep})["correct"], x
+        other = [o for o in x["opts"] if o != x["gold"]][0]
+        assert not tl.score_en_reflexive(x, {"content": "nothing" if other == "—" else other})["correct"]
+    r = next(x for x in xs if "relax" in x["messages"][0]["content"])
+    assert tl.score_en_reflexive(r, {"content": "Nothing - 'relax' is not reflexive in English."})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_reflexive()

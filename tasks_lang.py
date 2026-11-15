@@ -4482,6 +4482,32 @@ def score_de_comparison(item, reply):
             "detail": {"ok_superlative" if item["gold"].endswith(("sten", "ste")) else "ok_comparative": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_verb_case (Dativ- oder Akkusativverb: ihm oder ihn)
+# helfen, danken, gratulieren, folgen, gehören, vertrauen, begegnen, zuhören, widersprechen take the dative; unterstützen,
+# anrufen, fragen, besuchen, kennen, treffen, beraten, bitten the accusative (English "help him" / "call him" hide it).
+DVC_ITEMS = [("Kannst du ___ beim Umzug helfen?", "ihm"), ("Ich rufe ___ heute Abend an.", "ihn"),
+             ("Wir danken ___ für die Einladung.", "ihm"), ("Wir unterstützen ___ bei dem Projekt.", "ihn"),
+             ("Ich gratuliere ___ zum Geburtstag.", "ihm"), ("Ich frage ___ morgen nach dem Weg.", "ihn"),
+             ("Der Hund folgt ___ überallhin.", "ihm"), ("Wir besuchen ___ am Sonntag.", "ihn"),
+             ("Das Fahrrad gehört ___.", "ihm"), ("Kennst du ___ schon lange?", "ihn"),
+             ("Ich vertraue ___ völlig.", "ihm"), ("Wir treffen ___ vor dem Kino.", "ihn"),
+             ("Gestern bin ich ___ im Park begegnet.", "ihm"), ("Die Bank berät ___ bei der Geldanlage.", "ihn"),
+             ("Hör ___ doch einfach mal zu!", "ihm"), ("Ich bitte ___ um einen Gefallen.", "ihn")]
+
+
+def load_de_verb_case(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": ("ihm", "ihn"),
+             "messages": [{"role": "user", "content": f"Setze „{two_opts(i, g, ('ihm', 'ihn'))[0]}“ oder „{two_opts(i, g, ('ihm', 'ihn'))[1]}“ "
+                           f"ein (gemeint ist ein Mann). Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g) in enumerate(DVC_ITEMS[:min(n or 16, 16)])]
+
+
+def score_de_verb_case(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_dative" if item["gold"] == "ihm" else "ok_accusative": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -5039,6 +5065,7 @@ TASKS = {
     "en_that_function": task(("en",), load_en_that_function, score_en_that_function, 16, 16, lang_check=False),
     "antonym_context": task(("de", "en"), load_antonym_context, score_antonym_context, 12, None, lang_check=False),
     "de_comparison": task(("de",), load_de_comparison, score_de_comparison, 16, 16, lang_check=False),
+    "de_verb_case": task(("de",), load_de_verb_case, score_de_verb_case, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

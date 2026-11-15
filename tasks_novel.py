@@ -4407,6 +4407,54 @@ def score_interval_math(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "naive": float(naive and item["kind"] != "sum")}}
 
 
+# ---------------------------------------------------------------- count_mentions (counting in a long text)
+# A generated log of short entries mentioning several people. How many entries mention the exact name X? Look-alikes
+# (Anna vs Annabel vs Hanna, Tom vs Tomas) and the name inside a compound ("Annas" counts? no: we ask for entries
+# that mention X, and possessives do count) make it harder. Length 15 / 30 / 45 entries.
+CM_SETS = [("Anna", ["Annabel", "Hanna", "Anne"]), ("Tom", ["Tomas", "Tim", "Thomas"]), ("Lena", ["Lea", "Helena", "Leni"]),
+           ("Ben", ["Benno", "Bea", "Benedikt"])]
+CM_ACT = {"en": ["called the office", "sent a report", "booked a room", "fixed the printer", "ordered coffee",
+                 "cancelled a meeting", "updated the plan", "asked about the budget"],
+          "de": ["rief im Büro an", "schickte einen Bericht", "buchte einen Raum", "reparierte den Drucker", "bestellte Kaffee",
+                 "sagte ein Meeting ab", "aktualisierte den Plan", "fragte nach dem Budget"]}
+
+
+def load_count_mentions(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("count_mentions", i)
+        target, looks = CM_SETS[i % len(CM_SETS)]
+        length = (15, 30, 45)[(i // 4) % 3]
+        others = ["Mira", "Paul", "Jonas", "Sofia"]
+        lines, count = [], 0
+        for k in range(length):
+            roll = r.random()
+            if roll < 0.25:
+                who, hit = target, True
+            elif roll < 0.5:
+                who, hit = r.choice(looks), False
+            else:
+                who, hit = r.choice(others), False
+            act = r.choice(CM_ACT[lang])
+            if hit and r.random() < 0.3:  # the target as the second person in an entry
+                lines.append(f"{k + 1:02d}: {r.choice(others)} {act}" + (f" with {target}." if lang == "en" else f" mit {target}."))
+            else:
+                lines.append(f"{k + 1:02d}: {who} {act}.")
+            count += hit
+        q = (f"In how many entries is {target} mentioned (exactly this name, not similar names)?" if lang == "en" else
+             f"In wie vielen Einträgen wird {target} erwähnt (genau dieser Name, keine ähnlichen Namen)?")
+        items.append({"id": str(i), "lang": lang, "gold": count, "len": length, "target": target,
+                      "messages": [{"role": "user", "content": "\n".join(lines) + f"\n\n{q}\n" + ASK[lang]}]})
+    return items
+
+
+def score_count_mentions(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_len{item['len']}": float(ok), "off_by_one": float(v is not None and abs(v - item["gold"]) == 1)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5978,6 +6026,7 @@ TASKS = {
     "table_join": task(load_table_join, score_table_join, 24, 120),
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
+    "count_mentions": task(load_count_mentions, score_count_mentions, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

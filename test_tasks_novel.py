@@ -1295,7 +1295,19 @@ def test_interval_math():
             assert not r["correct"] and r["detail"]["naive"] == 1.0
 
 
+
+def test_count_mentions():
+    import re as _re
+    import tasks_novel as tn
+    for x in tn.load_count_mentions("en", 12, 0):
+        target = x["target"]
+        body = x["messages"][0]["content"].split("\n\n")[0]
+        assert sum(bool(_re.search(r"\b" + target + r"\b", ln)) for ln in body.splitlines()) == x["gold"]
+        assert tn.score_count_mentions(x, {"content": f"Answer: {x['gold']}"})["correct"]
+
+
 if __name__ == "__main__":
+    test_count_mentions()
     test_interval_math()
     test_dedup_records()
     test_table_join()

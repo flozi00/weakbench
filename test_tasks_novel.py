@@ -2031,6 +2031,10 @@ def test_element_facts():
     h = next(x for x in xs if x["kind"] == "heavier")
     lo = [p for p in h["pair"] if p != h["gold"]][0]
     assert tn.score_element_facts(h, {"content": f"Antwort: {lo} hat die niedrigere Ordnungszahl als {h['gold']}"})["correct"]
+    assert tn.score_element_facts(h, {"content": f"Antwort: Nicht {lo}, sondern {h['gold']}"})["correct"]
+    assert tn.score_element_facts(s, {"content": f"Antwort: Es ist {s['gold']}"})["correct"]
+    nm = next(x for x in xs if x["kind"] == "name")
+    assert not tn.score_element_facts(nm, {"content": f"Antwort: {nm['gold']} oder Zinn"})["correct"] or nm["gold"] == "Zinn"
 
 
 if __name__ == "__main__":

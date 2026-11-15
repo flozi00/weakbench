@@ -9174,16 +9174,20 @@ def load_element_facts(lang, n, seed):
 
 def score_element_facts(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = re.sub(r"(?i)\b(?:not|nicht|kein\w*)\s+\w+", " ", fa)  # "Not silver but gold"
+    hit = lambda x: re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I)  # noqa: E731
     if item["kind"] == "name":
-        ok = any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in item["names"])
+        others = [x for e in EF_ELEMENTS for x in (e[2], e[3], *EF_ALT.get(e[2], []), *EF_ALT.get(e[3], [])) if x not in item["names"]]
+        ok = any(hit(x) for x in item["names"]) and not any(hit(x) for x in others)  # "Iron or Tin" fails
     elif item["kind"] == "symbol":
-        toks = re.findall(r"(?<![A-Za-z])[A-Z][a-z]?(?![A-Za-z])", fa)  # case-sensitive: "Co" is not "CO"
+        syms = {e[1] for e in EF_ELEMENTS}
+        toks = [t for t in re.findall(r"(?<![A-Za-z])[A-Z][a-z]?(?![A-Za-z])", fa) if t in syms]  # "It is Fe": not "It"; "Co" is not "CO"
         ok = toks[:1] == [item["gold"]]
     else:
         pos = {x: m.start() for x in item["pair"] if (m := re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I))}
         order = sorted(pos, key=pos.get)
         v = order[0] if order else None
-        if len(order) == 2 and re.search(r"(?i)\b(?:lower|smaller|fewer|niedrigere?|kleinere?|weniger)\b", fa):
+        if len(order) == 2 and re.search(r"(?i)\b(?:lower|smaller|fewer|niedrigere?|kleinere?|weniger)\b|<", fa):
             v = order[1]
         ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}

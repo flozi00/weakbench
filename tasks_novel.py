@@ -6743,6 +6743,51 @@ def score_refund_policy(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- cond_table (which conditional?)
+CT_SETS = [({"en": ("cyclists", "drivers"), "de": ("Radfahrende", "Autofahrende")},
+            {"en": ("late", "on time"), "de": ("zu spät", "pünktlich")}),
+           ({"en": ("vaccinated", "unvaccinated"), "de": ("geimpft", "ungeimpft")},
+            {"en": ("ill", "healthy"), "de": ("krank", "gesund")}),
+           ({"en": ("students", "employees"), "de": ("Studierende", "Angestellte")},
+            {"en": ("satisfied", "unsatisfied"), "de": ("zufrieden", "unzufrieden")})]
+
+
+def load_cond_table(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("cond_table", i, att)
+        rows, cols = CT_SETS[i % 3]
+        g1, g2 = rows[lang]
+        o1, o2 = cols[lang]
+        while True:
+            a, b, c, d = (r.randint(5, 120) for _ in range(4))  # a: g1&o1, b: g1&o2, c: g2&o1, d: g2&o2
+            p_o_given_g = 100 * a / (a + b)
+            p_g_given_o = 100 * a / (a + c)
+            joint = 100 * a / (a + b + c + d)
+            if min(abs(p_o_given_g - p_g_given_o), abs(p_o_given_g - joint), abs(p_g_given_o - joint)) > 3:
+                break
+        ask_g = (i // 3) % 2 == 0  # ask P(outcome | group) or P(group | outcome)
+        gold, rev = (p_o_given_g, p_g_given_o) if ask_g else (p_g_given_o, p_o_given_g)
+        head = f"| | {o1} | {o2} |\n|---|---|---|\n| {g1} | {a} | {b} |\n| {g2} | {c} | {d} |"
+        if lang == "en":
+            q = (f"What percentage of the {g1} were {o1}?" if ask_g else f"What percentage of those who were {o1} were {g1}?")
+            text = f"Counts from a survey:\n{head}\n{q} Round to one decimal."
+        else:
+            q = (f"Wie viel Prozent der {g1} waren {o1}?" if ask_g else f"Wie viel Prozent derer, die {o1} waren, waren {g1}?")
+            text = f"Zählung aus einer Umfrage:\n{head}\n{q} Runde auf eine Nachkommastelle."
+        items.append({"id": str(i), "lang": lang, "gold": round(gold, 1), "bait": round(rev, 1), "joint": round(joint, 1),
+                      "messages": [{"role": "user", "content": text + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cond_table(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.5
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"took_reversed": float(v is not None and abs(v - item["bait"]) <= 0.5),
+                       "took_joint": float(v is not None and abs(v - item["joint"]) <= 0.5)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8323,6 +8368,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "cond_table": task(load_cond_table, score_cond_table, 24, 120),
     "refund_policy": task(load_refund_policy, score_refund_policy, 24, 120),
     "org_chart": task(load_org_chart, score_org_chart, 24, 120),
     "temp_delta": task(load_temp_delta, score_temp_delta, 24, 120),

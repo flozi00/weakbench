@@ -4120,17 +4120,18 @@ def score_en_since_for(item, reply):
 # Generated office German with 2-4 anglicisms dropped in (Meeting, Deadline, reviewen, ...) and German or Latin/Greek
 # alternatives in the same slots (Strategie, professionellen) that must not be listed. "Anglicism" is asked, not
 # "English word", so established loans (Deadline, Update) count.
-DG_SLOTS = [("Wir müssen das {w} auf morgen verschieben.", ["Meeting", "Briefing", "Review", "Kick-off"]),
+DG_SLOTS = [("Wir müssen das {w} auf morgen verschieben.", ["Meeting", "Briefing", "Review"]),
             ("Die {w} für den Bericht ist Freitag.", ["Deadline"]),
             ("Kannst du mir kurz ein {w} geben?", ["Update", "Feedback"]),
             ("Das ist ein echter {w} für unser Projekt.", ["Gamechanger", "Showstopper"]),
             ("Lass uns die Präsentation noch einmal {w}.", ["reviewen", "checken", "pitchen"]),
-            ("Ich schicke dir die Unterlagen {w}.", ["asap", "later"]),
+            ("Ich schicke dir die Unterlagen {w}.", ["asap", "später"]),
             ("Unser {w} ist dieses Quartal deutlich gestiegen.", ["Revenue", "Traffic", "Output"]),
             ("Bitte trag den Termin in den {w} ein.", ["Calendar", "Shared Drive"]),
             ("Die neue Kollegin macht einen sehr {w} Eindruck.", ["smarten", "professionellen"]),
             ("Wir brauchen eine klare {w} für das nächste Jahr.", ["Roadmap", "Strategie"])]
-DG_GERMAN = {"Strategie", "professionellen"}  # German alternatives in the slot lists
+DG_GERMAN = {"Strategie", "professionellen", "später"}  # German alternatives in the slot lists
+DG_FRAME = ["Projekt", "Präsentation", "Bericht", "Termin", "Unterlagen", "Quartal", "Kollegin", "Eindruck"]  # listing them is a false alarm
 
 
 def load_denglisch_spot(lang, n, seed):
@@ -4144,9 +4145,7 @@ def load_denglisch_spot(lang, n, seed):
             sents.append(tpl.format(w=w))
             if w not in DG_GERMAN:
                 words.append(w)
-        if not 2 <= len(words) <= 4:
-            words, sents = [], []
-            continue
+        assert 1 <= len(words) <= 4
         q = ("Welche Wörter in diesem deutschen Text sind aus dem Englischen übernommen (Anglizismen, auch eingedeutschte wie "
              "„checken“)? Nenne genau diese Wörter, durch Kommas getrennt, in der Form, in der sie im Text stehen.\n\n" + " ".join(sents))
         items.append({"id": str(i), "lang": "de", "gold": ", ".join(words), "words": words,
@@ -4156,8 +4155,11 @@ def load_denglisch_spot(lang, n, seed):
 
 def score_denglisch_spot(item, reply):
     t = strip_lead(reply["content"]).lower()
-    cands = {w.lower() for tpl, opts in DG_SLOTS for w in opts}
-    got = {w for w in cands if re.search(rf"(?<![\w-]){re.escape(w)}(?![\w-])", t)}
+    # an explanation of what is NOT an anglicism ("Strategie ist kein Anglizismus") is not a listing
+    t = re.split(r"[.;\n][^.;\n]*\b(?:kein|keine|nicht)\b|\b(?:kein|keine|nicht)\b", t)[0]
+    cands = {w.lower() for tpl, opts in DG_SLOTS for w in opts} | {w.lower() for w in DG_FRAME}
+    flex = lambda w: re.escape(w).replace(r"\-", r"[\s-]?").replace(r"\ ", r"[\s-]?")  # noqa: E731  Kick off, Shared-Drive
+    got = {w for w in cands if re.search(rf"(?<![\w-]){flex(w)}s?(?![\w-])", t)}
     gold = {w.lower() for w in item["words"]}
     tp = len(got & gold)
     f1 = 2 * tp / (len(got) + len(gold)) if got or gold else 1.0

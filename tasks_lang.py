@@ -3784,6 +3784,31 @@ def score_en_indirect_q(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_foreign_plural (Latin/Greek-origin plurals)
+# Only nouns with ONE standard plural (Duden): no Kaktusse/Kakteen, Kontos/Konten, Risikos/Risiken or Kommas/Kommata.
+FP_ITEMS = [("das Museum", "Museen"), ("das Thema", "Themen"), ("das Praktikum", "Praktika"), ("das Album", "Alben"),
+            ("die Firma", "Firmen"), ("das Virus", "Viren"), ("das Zentrum", "Zentren"), ("das Studium", "Studien"),
+            ("das Gymnasium", "Gymnasien"), ("das Stadion", "Stadien"), ("der Rhythmus", "Rhythmen"),
+            ("der Mechanismus", "Mechanismen"), ("das Material", "Materialien"), ("das Fossil", "Fossilien"),
+            ("das Ministerium", "Ministerien"), ("das Datum", "Daten"), ("das Prinzip", "Prinzipien"), ("der Bus", "Busse")]
+
+
+def load_de_foreign_plural(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "sing": w,
+             "messages": [{"role": "user", "content": f"Wie lautet der Plural von „{w}“? Antworte nur mit dem Pluralwort (ohne Artikel)."}]}
+            for i, (w, g) in enumerate(FP_ITEMS[:min(n or 18, 18)])]
+
+
+def score_de_foreign_plural(item, reply):
+    words = re.findall(r"[A-Za-zÄÖÜäöüß]+", re.sub(r"\([^()]*\)", " ", reply["content"] or ""))
+    words = [w for w in words if w.lower() not in ("die", "plural", "der", "von", "lautet", "antwort", "answer", "ist")]
+    v = words[0] if words else None
+    ok = v == item["gold"]
+    stem = item["sing"].split()[1]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"s_plural": float(v in (stem + "s", stem + "e"))}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4323,6 +4348,7 @@ TASKS = {
     "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
     "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
+    "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

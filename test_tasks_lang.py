@@ -917,3 +917,17 @@ def test_en_indirect_q():
 
 if __name__ == "__main__":
     test_en_indirect_q()
+
+
+def test_de_foreign_plural():
+    import tasks_lang as tl
+    xs = tl.load_de_foreign_plural("de", None, 0)
+    for x in xs:
+        for c in (x["gold"], f"die {x['gold']}", f"Der Plural lautet „{x['gold']}“.", f"**{x['gold']}**"):
+            assert tl.score_de_foreign_plural(x, {"content": c})["correct"], c
+    assert tl.score_de_foreign_plural(xs[0], {"content": "Museums"})["detail"]["s_plural"] == 1
+    assert not tl.score_de_foreign_plural(xs[0], {"content": "museen"})["correct"]  # capitalisation is part of German
+
+
+if __name__ == "__main__":
+    test_de_foreign_plural()

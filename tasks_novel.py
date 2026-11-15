@@ -4321,16 +4321,19 @@ def load_dedup_records(lang, n, seed):
         table = "\n".join(f"| {x} | {y} | {z} |" for x, y, z in rows)
         head = "| Name | E-Mail | Telefon |" if lang == "de" else "| Name | E-mail | Phone |"
         q = ("Wie viele verschiedene Kunden enthält die Liste? Zeilen mit derselben E-Mail-Adresse oder Telefonnummer "
-             "(nur anders geschrieben) gehören zur selben Person." if lang == "de" else
+             "(nur anders geschrieben) gehören zur selben Person; ein gleicher Name allein heißt nicht dieselbe Person."
+             if lang == "de" else
              "How many distinct customers does the list contain? Rows with the same e-mail address or phone number "
-             "(only written differently) belong to the same person.")
+             "(only written differently) belong to the same person; the same name alone does not make the same person.")
         items.append({"id": str(i), "lang": lang, "gold": k + 1, "naive": len(rows),
                       "messages": [{"role": "user", "content": f"{head}\n|---|---|---|\n{table}\n\n{q}\n" + ASK[lang]}]})
     return items
 
 
 def score_dedup_records(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    line = final_answer(reply["content"]) or ""
+    near = re.search(r"(\d+)\s*(?:kunden|customers|personen|people)", line, re.I)  # "9 rows, 5 customers"
+    v = int(near.group(1)) if near else answer_value(line, item["lang"])
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"naive": float(v == item["naive"])}}
 

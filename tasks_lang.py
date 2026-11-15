@@ -2507,17 +2507,20 @@ K2_FORMS = {"haben": {"ich": "hätte", "du": "hättest", "er": "hätte", "wir": 
 K2_WUERDE = {"ich": "würde", "du": "würdest", "er": "würde", "wir": "würden", "ihr": "würdet", "sie": "würden"}
 K2_COND = {"haben": "mehr Zeit ___ (haben)", "sein": "nicht so müde ___ (sein)", "können": "besser kochen ___ (können)",
            "wissen": "die Antwort ___ (wissen)", "müssen": "nicht arbeiten ___ (müssen)"}
-K2_MAIN = ["öfter ins Kino gehen", "dich anrufen", "ein Fest geben", "dir helfen", "früher aufstehen"]
+# main clauses that fit each condition (so the sentence makes sense)
+K2_MAIN = {"haben": ["öfter ins Kino gehen", "ein Fest geben"], "sein": ["früher aufstehen", "dir helfen"],
+           "können": ["ein Fest geben", "öfter selbst kochen"], "wissen": ["dir helfen", "dich anrufen"],
+           "müssen": ["länger schlafen", "öfter ins Kino gehen"]}
+K2_ALT = {"wärst": {"wärst", "wärest"}, "wärt": {"wärt", "wäret"}}
 
 
 def load_de_konj2(lang, n, seed):
     items = []
     persons = list(K2_WUERDE)
     verbs = list(K2_FORMS)
-    for i in range(n or 96):
-        r = random.Random(f"de_konj2:{i}")
+    for i in range(n or 60):
         pers, verb = persons[i % 6], verbs[(i // 6) % 5]
-        main = r.choice(K2_MAIN)
+        main = K2_MAIN[verb][(i // 30) % 2]  # dealt out: 30 person x verb cells x 2 fitting main clauses
         subj = "die beiden" if pers == "sie" else pers  # bare "sie" could be singular: hätte/würde would fit too
         obj, inf = main.rsplit(" ", 1)
         if pers == "du":
@@ -2534,7 +2537,9 @@ def load_de_konj2(lang, n, seed):
 
 def score_de_konj2(item, reply):
     w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
-    ok = w[:2] == list(item["forms"])
+    a0, a1 = (K2_ALT.get(f, {f}) for f in item["forms"])
+    first = next((k for k, x in enumerate(w) if x in a0), None)  # the pair in order anywhere: labels or a full sentence
+    ok = first is not None and any(x in a1 for x in w[first + 1:])
     return {"correct": ok, "score": float(ok), "pred": " ".join(w[:2]), "gold": item["gold"],
             "detail": {f"ok_{item['verb']}": float(ok)}}
 

@@ -699,11 +699,14 @@ def test_code_comments_lang():
 def test_de_konj2():
     import tasks_lang as tl
     it = tl.load_de_konj2("de", None, 0)
-    assert len({x["messages"][0]["content"] for x in it}) > 60
+    assert len({x["messages"][0]["content"] for x in it}) == len(it) == 60
     x = next(y for y in it if y["verb"] == "wissen" and "Wenn du" in y["messages"][0]["content"])
     assert x["forms"] == ("wüsstest", "würdest")
     assert tl.score_de_konj2(x, {"content": "wüsstest / würdest"})["correct"]
     assert not tl.score_de_konj2(x, {"content": "weißt / würdest"})["correct"]
+    assert tl.score_de_konj2(x, {"content": "Wenn du die Antwort wüsstest, würdest du mir helfen."})["correct"]
+    s2 = next(y for y in it if y["forms"] == ("wärst", "würdest"))
+    assert tl.score_de_konj2(s2, {"content": "wärest / würdest"})["correct"]
 
 
 if __name__ == "__main__":

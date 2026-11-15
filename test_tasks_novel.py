@@ -1306,7 +1306,19 @@ def test_count_mentions():
         assert tn.score_count_mentions(x, {"content": f"Answer: {x['gold']}"})["correct"]
 
 
+
+def test_weekday_calc():
+    import tasks_novel as tn
+    xs = tn.load_weekday_calc("de", 12, 0)
+    x = xs[1]  # century
+    assert x["kind"] == "century"
+    for x in xs:
+        assert tn.score_weekday_calc(x, {"content": "Antwort: " + x["gold"]})["correct"]
+    assert tn.score_weekday_calc(xs[0], {"content": "Antwort: nicht Montag, sondern " + xs[0]["gold"]})["correct"]
+
+
 if __name__ == "__main__":
+    test_weekday_calc()
     test_count_mentions()
     test_interval_math()
     test_dedup_records()

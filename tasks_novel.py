@@ -4455,6 +4455,45 @@ def score_count_mentions(item, reply):
             "detail": {f"ok_len{item['len']}": float(ok), "off_by_one": float(v is not None and abs(v - item["gold"]) == 1)}}
 
 
+# ---------------------------------------------------------------- weekday_calc (calendar arithmetic across leap days)
+WD = {"en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      "de": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]}
+
+
+def load_weekday_calc(lang, n, seed):
+    import datetime as _dt
+    items = []
+    for i in range(n or 120):
+        r = rng_of("weekday_calc", i)
+        kind = ("leap", "century", "plain")[i % 3]
+        if kind == "leap":
+            year = r.choice([2024, 2028, 2032, 1996])
+        elif kind == "century":
+            year = r.choice([1900, 2000, 2100])
+        else:
+            year = r.choice([2023, 2025, 2026, 2027])
+        start = _dt.date(year, 2, r.randint(10, 27))  # every span crosses the end of February
+        days = r.randint(5, 40)
+        end = start + _dt.timedelta(days=days)
+        sd = start.strftime("%Y-%m-%d")
+        q = (f"{sd} was a {WD['en'][start.weekday()]}. Which weekday is {days} days later?" if lang == "en" else
+             f"Der {sd} war ein {WD['de'][start.weekday()]}. Welcher Wochentag ist {days} Tage später?")
+        items.append({"id": str(i), "lang": lang, "gold": WD[lang][end.weekday()], "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_weekday_calc(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower()
+    hits = [(fa.rfind(w.lower()), k) for k, w in enumerate(WD[item["lang"]]) if w.lower() in fa]
+    v = max(hits)[1] if hits else None
+    g = WD[item["lang"]].index(item["gold"])
+    ok = v == g
+    off = v is not None and (v - g) % 7 in (1, 6)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "off_one_day": float(off)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6026,6 +6065,7 @@ TASKS = {
     "table_join": task(load_table_join, score_table_join, 24, 120),
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
+    "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
     "count_mentions": task(load_count_mentions, score_count_mentions, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},

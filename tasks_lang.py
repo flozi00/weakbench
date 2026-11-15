@@ -4097,7 +4097,7 @@ SFA_ITEMS = [("I have lived here ___ 2015.", "since"), ("I have lived here ___ t
              ("She moved to Leeds three years ___.", "ago"), ("We have been waiting ___ two hours.", "for"),
              ("He has worked here ___ last summer.", "since"), ("I met him a long time ___.", "ago"),
              ("They have been married ___ 25 years.", "for"), ("It has been raining ___ this morning.", "since"),
-             ("The shop closed two weeks ___.", "ago"), ("I haven't seen her ___ Christmas.", "since"),
+             ("The shop closed two weeks ___.", "ago"), ("I haven't seen her ___ we left school.", "since"),
              ("He has been ill ___ a week.", "for"), ("The film started ten minutes ___.", "ago"),
              ("She has played the piano ___ she was six.", "since"), ("We stayed in Rome ___ five days.", "for"),
              ("I called you an hour ___.", "ago"), ("Nobody has used this room ___ Monday.", "since"),

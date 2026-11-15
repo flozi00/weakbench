@@ -8529,6 +8529,52 @@ def score_nutrition_portion(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "per_100g_value": float(v is not None and abs(v - item["bait"]) < 1e-9 and item["bait"] != item["gold"])}}
 
 
+# ---------------------------------------------------------------- series_runs (reading a time series: changes and streaks)
+def load_series_runs(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("series_runs", i, att)
+        kind = ("falls", "streak", "best_jump")[i % 3]
+        while True:
+            vals = [r.randint(40, 120)]
+            for _ in range(r.randint(9, 13)):
+                vals.append(max(5, vals[-1] + r.choice([-1, 1]) * r.randint(0, 15)))
+            d = [b - a for a, b in zip(vals, vals[1:])]
+            if 0 in d:
+                continue  # "unchanged" weeks would need their own rule
+            falls = sum(x < 0 for x in d)
+            run = best = 0
+            for x in d:
+                run = run + 1 if x > 0 else 0
+                best = max(best, run)
+            jump = max(range(len(d)), key=lambda j: d[j])
+            if sorted(d)[-1] == sorted(d)[-2]:
+                continue  # the biggest rise must be unique
+            gold = {"falls": falls, "streak": best, "best_jump": jump + 2}[kind]
+            bait = {"falls": falls + 1, "streak": best + 1, "best_jump": vals.index(max(vals)) + 1}[kind]  # off by one / highest week
+            if bait != gold:
+                break
+        series = ", ".join(map(str, vals))
+        ask = ({"falls": "In how many weeks was the number lower than in the week before?",
+                "streak": "How long is the longest run of consecutive weeks in which the number rose compared with the previous week? Give the number of weeks.",
+                "best_jump": "In which week (1 = first week) was the rise compared with the week before the largest?"} if lang == "en" else
+               {"falls": "In wie vielen Wochen war die Zahl niedriger als in der Woche davor?",
+                "streak": "Wie lang ist die längste Folge aufeinanderfolgender Wochen, in denen die Zahl jeweils gegenüber der Vorwoche gestiegen ist? Gib die Zahl der Wochen an.",
+                "best_jump": "In welcher Woche (1 = erste Woche) war der Anstieg gegenüber der Vorwoche am größten?"})[kind]
+        q = (f"Weekly sign-ups of a sports club, week 1 to week {len(vals)}: {series}.\n{ask}" if lang == "en" else
+             f"Wöchentliche Neuanmeldungen eines Sportvereins, Woche 1 bis Woche {len(vals)}: {series}.\n{ask}")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_series_runs(item, reply):
+    v = stated_int(reply, r"(?:weeks?|wochen?|times|mal)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10129,6 +10175,7 @@ TASKS = {
     "tank_level": task(load_tank_level, score_tank_level, 24, 120),
     "chord_transpose": task(load_chord_transpose, score_chord_transpose, 24, 120),
     "nutrition_portion": task(load_nutrition_portion, score_nutrition_portion, 24, 120),
+    "series_runs": task(load_series_runs, score_series_runs, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

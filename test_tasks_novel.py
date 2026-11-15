@@ -1777,3 +1777,16 @@ def test_nutrition_portion():
 
 if __name__ == "__main__":
     test_nutrition_portion()
+
+
+def test_series_runs():
+    import tasks_novel as tn
+    xs = tn.load_series_runs("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = next(y for y in xs if y["kind"] == "best_jump")
+    for c in (f"Answer: week {x['gold']}", f"Answer: {x['gold']}", f"Answer: in week {x['gold']} (+15)"):
+        assert tn.score_series_runs(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_series_runs()

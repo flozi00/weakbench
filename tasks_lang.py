@@ -3245,15 +3245,16 @@ DW_ITEMS = [("Das Buch, ___ ich gerade lese, ist spannend.", "das"), ("Das ist a
 
 
 def load_de_das_was(lang, n, seed):
-    return [{"id": str(i), "lang": "de", "gold": g,
+    return [{"id": str(i), "lang": "de", "gold": g, "pre": sent.split("___")[0].strip(),
              "messages": [{"role": "user", "content": "Setze „das“ oder „was“ ein (Standardschriftdeutsch). Antworte nur mit dem Wort.\n\n" + sent}]}
             for i, (sent, g) in enumerate(DW_ITEMS[:min(n or 20, 20)])]
 
 
 def score_de_das_was(item, reply):
     t = re.sub(r"\([^()]*\)", " ", (reply["content"] or "").lower())
+    at_gap = re.search(re.escape(item["pre"].lower()) + r"\s*(das|was)\b", t)  # the sentence repeated: the word at the gap
     w = [x for x in re.findall(r"[a-zäöüß]+", t) if x in ("das", "was")]
-    v = w[0] if len(set(w)) == 1 else (w[-1] if w and t.strip().startswith(("antwort", "answer")) and len(set(w)) == 1 else None)
+    v = at_gap[1] if at_gap else (w[0] if len(set(w)) == 1 else None)
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_{item['gold']}": float(ok), **({"took_das": float(v == "das")} if item["gold"] == "was" else {})}}

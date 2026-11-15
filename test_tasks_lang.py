@@ -1130,3 +1130,18 @@ def test_antonym_context():
 
 if __name__ == "__main__":
     test_antonym_context()
+
+
+def test_de_comparison():
+    import tasks_lang as tl
+    xs = tl.load_de_comparison("de", None, 0)
+    for x in xs:
+        sent = x["messages"][0]["content"].splitlines()[-1].split(" (")[0]
+        for c in (x["gold"], sent.replace("___", x["gold"]), f"„{x['gold']}“"):
+            assert tl.score_de_comparison(x, {"content": c})["correct"], c
+    assert not tl.score_de_comparison(xs[0], {"content": "alter"})["correct"]
+    assert not tl.score_de_comparison(xs[2], {"content": "guter"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_comparison()

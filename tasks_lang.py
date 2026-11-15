@@ -4446,6 +4446,41 @@ def score_antonym_context(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"other_sense": float(v in item["bait"])}}
 
 
+# ---------------------------------------------------------------- de_comparison (Steigerung: Komparativ und Superlativ)
+# Predicative forms only (no case endings): umlaut (älter, größer), irregular (besser, mehr, lieber, höher, näher),
+# -er stems that drop e (dunkler, teurer), superlative with -est (am kürzesten, am heißesten). Duden-doubtful
+# adjectives with two forms (gesünder/gesunder, nässer/nasser) are left out.
+DCM_ITEMS = [("Mein Bruder ist drei Jahre ___ als ich. (alt)", "älter"), ("Berlin ist ___ als Bonn. (groß)", "größer"),
+             ("Heute geht es mir ___ als gestern. (gut)", "besser"), ("Ich trinke ___ Tee als Kaffee. (gern)", "lieber"),
+             ("Wir brauchen ___ Zeit, als wir dachten. (viel)", "mehr"), ("Der Turm ist ___ als die Kirche. (hoch)", "höher"),
+             ("Die Haltestelle ist ___ als der Bahnhof. (nah)", "näher"), ("Im Winter ist es abends ___. (dunkel)", "dunkler"),
+             ("Das Hotel war ___ als geplant. (teuer)", "teurer"), ("Am Sonntag schläft sie am ___. (lang)", "längsten"),
+             ("Dieser Weg ist am ___. (kurz)", "kürzesten"), ("Im August war es am ___. (heiß)", "heißesten"),
+             ("Von allen Läufern war er am ___. (schnell)", "schnellsten"), ("Dieses Kleid gefällt mir am ___. (gut)", "besten"),
+             ("Am ___ esse ich Pizza. (gern)", "liebsten"), ("Der Mount Everest ist der ___ Berg der Welt. (hoch)", "höchste")]
+
+
+def load_de_comparison(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": "Setze die richtige Steigerungsform des Wortes in Klammern ein (Komparativ oder "
+                           "Superlativ, wie der Satz es verlangt). Antworte nur mit dem fehlenden Wort.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(DCM_ITEMS[:min(n or 16, 16)])]
+
+
+def score_de_comparison(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"]))
+    w = [x.lower() for x in re.findall(r"[A-Za-zÄÖÜäöüß]+", t)]
+    gap = item["messages"][0]["content"].splitlines()[-1]
+    pre = [x.lower() for x in re.findall(r"[A-Za-zÄÖÜäöüß]+", gap.split("___")[0])][-2:]
+    v = next((w[k + len(pre)] for k in range(len(w) - len(pre)) if pre and w[k:k + len(pre)] == pre), None)  # the sentence repeated
+    if v is None:
+        w = w[1:] if w[:1] == ["am"] else w  # "am längsten" for "am ___"
+        v = w[0] if w else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_superlative" if item["gold"].endswith(("sten", "ste")) else "ok_comparative": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -5002,6 +5037,7 @@ TASKS = {
     "de_das_function": task(("de",), load_de_das_function, score_de_das_function, 16, 16, lang_check=False),
     "en_that_function": task(("en",), load_en_that_function, score_en_that_function, 16, 16, lang_check=False),
     "antonym_context": task(("de", "en"), load_antonym_context, score_antonym_context, 12, None, lang_check=False),
+    "de_comparison": task(("de",), load_de_comparison, score_de_comparison, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

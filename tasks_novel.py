@@ -5990,6 +5990,56 @@ def score_sheet_eval(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_topdown": float(v == item["topdown"])}}
 
 
+# ---------------------------------------------------------------- duty_rota (rotation over working days)
+DR_PEOPLE = ["Aylin", "Bruno", "Carla", "Deniz", "Elif"]
+
+
+def load_duty_rota(lang, n, seed):
+    import datetime as _dt
+    WDn = WD[lang]
+    items = []
+    for i in range(n or 120):
+        r = rng_of("duty_rota", i)
+        while True:
+            people = DR_PEOPLE[:r.randint(3, 5)]
+            start = _dt.date(2026, r.randint(1, 11), r.randint(1, 28))
+            if start.weekday() >= 5:
+                continue
+            holiday = start + _dt.timedelta(days=r.randint(3, 20))
+            if holiday.weekday() >= 5:
+                continue
+            target = start + _dt.timedelta(days=r.randint(8, 30))
+            if target.weekday() >= 5 or target == holiday:
+                continue
+            k, d = 0, start
+            while d < target:
+                d += _dt.timedelta(days=1)
+                if d.weekday() < 5 and d != holiday:
+                    k += 1
+            gold = people[k % len(people)]
+            naive = people[(target - start).days % len(people)]
+            if gold != naive:
+                break
+        fmt = lambda d: f"{WDn[d.weekday()]}, {d.isoformat()}"  # noqa: E731
+        q = (f"A duty rota rotates through {', '.join(people)} in this order, one person per working day (Monday to Friday). "
+             f"Weekends do not count, and {fmt(holiday)} is a public holiday with no duty. {people[0]} is on duty on {fmt(start)}. "
+             f"Who is on duty on {fmt(target)}?" if lang == "en" else
+             f"Ein Dienstplan wechselt in dieser Reihenfolge zwischen {', '.join(people)}, eine Person pro Arbeitstag (Montag bis "
+             f"Freitag). Wochenenden zählen nicht, und {fmt(holiday)} ist ein Feiertag ohne Dienst. {people[0]} hat am {fmt(start)} "
+             f"Dienst. Wer hat am {fmt(target)} Dienst?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": naive,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_duty_rota(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    named = [p for p in DR_PEOPLE if re.search(r"\b" + p + r"\b", fa)]
+    v = named[0] if len(named) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calendar_days": float(v == item["naive"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7566,6 +7616,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "duty_rota": task(load_duty_rota, score_duty_rota, 24, 120),
     "sheet_eval": task(load_sheet_eval, score_sheet_eval, 24, 120),
     "overlap_count": task(load_overlap_count, score_overlap_count, 24, 120),
     "tax_brackets": task(load_tax_brackets, score_tax_brackets, 24, 120),

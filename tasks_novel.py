@@ -7263,8 +7263,9 @@ def load_critical_path(lang, n, seed):
         for j in range(k):
             if deps[j]:
                 after = " and ".join(names[d] for d in deps[j]) if lang == "en" else " und ".join(names[d] for d in deps[j])
-                lines.append(f"- {names[j]}: {dur[j]} days, can only start after {after} is finished" if lang == "en" else
-                             f"- {names[j]}: {dur[j]} Tage, kann erst beginnen, wenn {after} fertig ist")
+                pl = len(deps[j]) > 1
+                lines.append(f"- {names[j]}: {dur[j]} days, can only start after {after} {'are' if pl else 'is'} finished" if lang == "en" else
+                             f"- {names[j]}: {dur[j]} Tage, kann erst beginnen, wenn {after} fertig {'sind' if pl else 'ist'}")
             else:
                 lines.append(f"- {names[j]}: {dur[j]} days, can start at once" if lang == "en" else f"- {names[j]}: {dur[j]} Tage, kann sofort beginnen")
         q = ("A project consists of these tasks. Any number of tasks can run at the same time if their requirements are met.\n"

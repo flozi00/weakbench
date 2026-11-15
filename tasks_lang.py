@@ -3076,6 +3076,40 @@ def score_en_dependent_preps(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])}}
 
 
+# ---------------------------------------------------------------- de_weak_nouns (n-Deklination)
+# (noun nominative, form in acc/dat/gen, the genitive form if irregular)
+WN_NOUNS = [("Kunde", "Kunden", "Kunden"), ("Student", "Studenten", "Studenten"), ("Nachbar", "Nachbarn", "Nachbarn"),
+            ("Herr", "Herrn", "Herrn"), ("Kollege", "Kollegen", "Kollegen"), ("Name", "Namen", "Namens"),
+            ("Mensch", "Menschen", "Menschen"), ("Junge", "Jungen", "Jungen")]
+WN_FRAMES = [("akk", "Ich habe gestern den ___ ({n}) getroffen."), ("dat", "Wir sprechen morgen mit dem ___ ({n})."),
+             ("gen", "Das ist das Auto des ___ ({n}).")]
+
+
+def load_de_weak_nouns(lang, n, seed):
+    items = []
+    for i in range(min(n or 24, 24)):
+        nom, obl, gen = WN_NOUNS[i % 8]
+        case, frame = WN_FRAMES[(i // 8) % 3]
+        if nom == "Name" and case != "gen":  # "den/dem Namen ... getroffen / sprechen mit" makes no sense: a fitting frame
+            frame = {"akk": "Ich habe den ___ ({n}) vergessen.", "dat": "Unter diesem ___ ({n}) kennt ihn niemand."}[case]
+        if nom == "Herr" and case == "gen":
+            frame = "Das ist der Hut des alten ___ ({n})."
+        gold = gen if case == "gen" else obl
+        items.append({"id": str(i), "lang": "de", "gold": gold, "nom": nom, "case": case,
+                      "messages": [{"role": "user", "content": "Setze das Nomen in Klammern in der richtigen Form ein. Antworte nur "
+                                    "mit dem Wort.\n\n" + frame.format(n=nom)}]})
+    return items
+
+
+def score_de_weak_nouns(item, reply):
+    words = re.findall(r"[A-Za-zÄÖÜäöüß]+", (reply["content"] or ""))
+    cands = [w for w in words if w.lower().startswith(item["nom"].lower()[:4])]
+    v = cands[0] if len(set(c.lower() for c in cands)) == 1 else None
+    ok = v is not None and v.lower() == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['case']}": float(ok), "took_nominative": float(v is not None and v.lower() == item["nom"].lower())}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3401,6 +3435,7 @@ TASKS = {
     "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 32, lang_check=False),
     "de_direct_speech": task(("de",), load_de_direct_speech, score_de_direct_speech, 64, 16, lang_check=False),
     "en_dependent_preps": task(("en",), load_en_dependent_preps, score_en_dependent_preps, 16, 20, lang_check=False),
+    "de_weak_nouns": task(("de",), load_de_weak_nouns, score_de_weak_nouns, 16, 24, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

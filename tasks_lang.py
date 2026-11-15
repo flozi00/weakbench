@@ -3303,6 +3303,42 @@ def score_de_seit_vor(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_wenn_als (wenn / als / wann)
+# als = one past event; wenn = repeated (also in the past), present or future; wann = (indirect) question for the time
+WA_ITEMS = [("___ ich gestern nach Hause kam, war die Tür offen.", "als"),
+            ("___ ich als Kind in Hamburg wohnte, ging ich oft an den Hafen.", "als"),
+            ("___ wir 2019 in Rom waren, regnete es die ganze Woche.", "als"),
+            ("Sie weinte vor Freude, ___ sie die Zusage bekam.", "als"),
+            ("___ der Film zu Ende war, gingen alle schweigend hinaus.", "als"),
+            ("Ich war zwölf, ___ meine Schwester geboren wurde.", "als"),
+            ("Immer ___ es regnete, spielten wir im Keller.", "wenn"),
+            ("Jedes Mal, ___ er anrief, war ich gerade unter der Dusche.", "wenn"),
+            ("Früher bekamen wir ein Eis, ___ wir sonntags bei Oma waren.", "wenn"),
+            ("___ du morgen Zeit hast, können wir zusammen kochen.", "wenn"),
+            ("Ruf mich bitte an, ___ du am Bahnhof ankommst.", "wenn"),
+            ("___ das Wasser kocht, gib die Nudeln hinein.", "wenn"),
+            ("___ ich im Sommer Urlaub habe, fahre ich ans Meer.", "wenn"),
+            ("Weißt du, ___ der Zug abfährt?", "wann"),
+            ("Ich habe vergessen, ___ das Konzert beginnt.", "wann"),
+            ("Sag mir bitte, ___ du heute nach Hause kommst.", "wann"),
+            ("Niemand wusste, ___ die Lieferung ankommen würde.", "wann"),
+            ("Er fragte mich, ___ ich zuletzt beim Zahnarzt war.", "wann"),
+            ("Bis ___ musst du den Antrag abgeben?", "wann"),
+            ("Seit ___ wohnst du schon in Leipzig?", "wann")]
+
+
+def load_de_wenn_als(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g,
+             "messages": [{"role": "user", "content": "Setze „wenn“, „als“ oder „wann“ ein. Antworte nur mit dem Wort.\n\n" + sent}]}
+            for i, (sent, g) in enumerate(WA_ITEMS[:min(n or 20, 20)])]
+
+
+def score_de_wenn_als(item, reply):
+    v = gap_pick(item, reply, ("wenn", "als", "wann"))
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -3831,6 +3867,7 @@ TASKS = {
     "en_phrasal_sense": task(("en",), load_en_phrasal_sense, score_en_phrasal_sense, 16, 20, lang_check=False),
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
+    "de_wenn_als": task(("de",), load_de_wenn_als, score_de_wenn_als, 20, 20, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),
     "de_position_verbs": task(("de",), load_de_position_verbs, score_de_position_verbs, 16, 20, lang_check=False),

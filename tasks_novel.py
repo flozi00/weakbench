@@ -6116,6 +6116,42 @@ def score_bin_pack(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- dose_calc (unit chain with a cap)
+def load_dose_calc(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("dose_calc", i)
+        capped = i % 2 == 0
+        while True:
+            per_kg = r.choice([5, 10, 12, 15, 20])
+            conc = r.choice([100, 120, 125, 200, 250])  # mg per 5 ml
+            kg = r.randint(8, 70)
+            mx = r.choice([250, 400, 500, 600, 800, 1000])
+            mg_raw = per_kg * kg
+            mg = min(mg_raw, mx)
+            ml = mg * 5 / conc
+            if (mg_raw > mx) == capped and abs(ml * 10 - round(ml * 10)) < 1e-9:
+                break
+        name = "Xyloran"
+        q = (f"The (invented) syrup {name} contains {conc} mg per 5 ml. The dose is {per_kg} mg per kg body weight, but never more "
+             f"than {mx} mg per single dose. How many ml is one dose for a person weighing {kg} kg?" if lang == "en" else
+             f"Der (erfundene) Saft {name} enthält {conc} mg pro 5 ml. Die Dosis beträgt {per_kg} mg pro kg Körpergewicht, aber nie "
+             f"mehr als {mx} mg pro Einzeldosis. Wie viele ml sind eine Dosis für eine Person mit {kg} kg?")
+        items.append({"id": str(i), "lang": lang, "gold": round(ml, 1), "mg": mg, "capped": capped,
+                      "uncapped": round(mg_raw * 5 / conc, 1),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_dose_calc(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.1
+    d = {"ok_capped" if item["capped"] else "ok_uncapped": float(ok), "took_mg": float(v == item["mg"])}
+    if item["capped"]:
+        d["ignored_cap"] = float(v is not None and abs(v - item["uncapped"]) <= 0.1)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7692,6 +7728,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "dose_calc": task(load_dose_calc, score_dose_calc, 24, 120),
     "bin_pack": task(load_bin_pack, score_bin_pack, 24, 120),
     "duty_rota": task(load_duty_rota, score_duty_rota, 24, 120),
     "sheet_eval": task(load_sheet_eval, score_sheet_eval, 24, 120),

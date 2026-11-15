@@ -3036,8 +3036,9 @@ def score_de_direct_speech(item, reply):
         return re.sub(r"\s+", " ", t).strip()
     lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
     gold = norm(item["gold"])
+    golds = {gold, gold.replace('!",', '",').replace('!"', '."')}  # an exclamation may also end with a full stop
     got = [norm(x.strip("*` ")) for x in lines]
-    ok = gold in got
+    ok = any(g in got for g in golds)
     return {"correct": ok, "score": float(ok), "pred": (got[0] if got else "")[:100], "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok)}}
 

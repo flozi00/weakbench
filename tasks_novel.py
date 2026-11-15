@@ -7555,6 +7555,45 @@ def score_count_range(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok), "took_endpoint_error": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- nth_weekday (the 3rd Monday of a month)
+NW_ORD = {"en": {1: "1st", 2: "2nd", 3: "3rd", 4: "4th", -1: "last"}, "de": {1: "erste", 2: "zweite", 3: "dritte", 4: "vierte", -1: "letzte"}}
+NW_MONTHS = {"en": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+             "de": ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]}
+
+
+def load_nth_weekday(lang, n, seed):
+    import calendar
+    import datetime as _dt
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("nth_weekday", i, att)
+        y, mo = r.randint(2020, 2035), r.randint(1, 12)
+        k = (1, 2, 3, 4, -1)[i % 5]
+        wd = r.randrange(7)
+        first = _dt.date(y, mo, 1)
+        days = [d for d in range(1, calendar.monthrange(y, mo)[1] + 1) if _dt.date(y, mo, d).weekday() == wd]
+        gold = days[k] if k == -1 else days[k - 1]
+        # the typical slip: counting from the 1st's week, i.e. one week late when the weekday falls before the 1st's weekday
+        bait = gold + 7 if k != -1 and wd < first.weekday() and gold + 7 <= calendar.monthrange(y, mo)[1] else gold - 7
+        W = WD[lang]
+        q = (f"{NW_MONTHS['en'][mo - 1]} 1, {y} is a {W[first.weekday()]}. On which day of the month is the {NW_ORD['en'][k]} "
+             f"{W[wd]} of {NW_MONTHS['en'][mo - 1]} {y}? Answer with the day number." if lang == "en" else
+             f"Der 1. {NW_MONTHS['de'][mo - 1]} {y} ist ein {W[first.weekday()]}. Auf welchen Tag des Monats fällt der {NW_ORD['de'][k]} "
+             f"{W[wd]} im {NW_MONTHS['de'][mo - 1]} {y}? Antworte mit der Tageszahl.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "last": k == -1,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_nth_weekday(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    nums = [int(x) for x in re.findall(r"\b(\d{1,2})\b(?!\d)", re.sub(r"\b(19|20)\d\d\b", " ", fa))]  # years ignored
+    v = nums[0] if nums else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_last" if item["last"] else "ok_nth": float(ok), "took_week_off": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9135,6 +9174,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),
     "vat_calc": task(load_vat_calc, score_vat_calc, 24, 120),

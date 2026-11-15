@@ -1006,3 +1006,18 @@ def test_dual_output():
 
 if __name__ == "__main__":
     test_dual_output()
+
+
+def test_denglisch_spot():
+    import tasks_lang as tl
+    xs = tl.load_denglisch_spot("de", None, 0)
+    assert len(xs) == 40 and len({x["messages"][0]["content"] for x in xs}) == 40
+    x = xs[0]
+    assert tl.score_denglisch_spot(x, {"content": x["gold"]})["correct"]
+    assert tl.score_denglisch_spot(x, {"content": "Antwort: " + ", ".join(f"„{w}“" for w in x["words"])})["correct"]
+    r = tl.score_denglisch_spot(x, {"content": x["gold"] + ", Strategie, professionellen"})
+    assert not r["correct"] and r["detail"]["false_alarm"] >= 0
+
+
+if __name__ == "__main__":
+    test_denglisch_spot()

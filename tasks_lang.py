@@ -4116,6 +4116,55 @@ def score_en_since_for(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- denglisch_spot (find the English words in German text)
+# Generated office German with 2-4 anglicisms dropped in (Meeting, Deadline, reviewen, ...) and German or Latin/Greek
+# alternatives in the same slots (Strategie, professionellen) that must not be listed. "Anglicism" is asked, not
+# "English word", so established loans (Deadline, Update) count.
+DG_SLOTS = [("Wir müssen das {w} auf morgen verschieben.", ["Meeting", "Briefing", "Review", "Kick-off"]),
+            ("Die {w} für den Bericht ist Freitag.", ["Deadline"]),
+            ("Kannst du mir kurz ein {w} geben?", ["Update", "Feedback"]),
+            ("Das ist ein echter {w} für unser Projekt.", ["Gamechanger", "Showstopper"]),
+            ("Lass uns die Präsentation noch einmal {w}.", ["reviewen", "checken", "pitchen"]),
+            ("Ich schicke dir die Unterlagen {w}.", ["asap", "later"]),
+            ("Unser {w} ist dieses Quartal deutlich gestiegen.", ["Revenue", "Traffic", "Output"]),
+            ("Bitte trag den Termin in den {w} ein.", ["Calendar", "Shared Drive"]),
+            ("Die neue Kollegin macht einen sehr {w} Eindruck.", ["smarten", "professionellen"]),
+            ("Wir brauchen eine klare {w} für das nächste Jahr.", ["Roadmap", "Strategie"])]
+DG_GERMAN = {"Strategie", "professionellen"}  # German alternatives in the slot lists
+
+
+def load_denglisch_spot(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 40, items):
+        r = random.Random(f"denglisch_spot:{i}" + (f"~{att}" if att else ""))
+        slots = r.sample(DG_SLOTS, 4)
+        words, sents = [], []
+        for tpl, opts in slots:
+            w = r.choice(opts)
+            sents.append(tpl.format(w=w))
+            if w not in DG_GERMAN:
+                words.append(w)
+        if not 2 <= len(words) <= 4:
+            words, sents = [], []
+            continue
+        q = ("Welche Wörter in diesem deutschen Text sind aus dem Englischen übernommen (Anglizismen, auch eingedeutschte wie "
+             "„checken“)? Nenne genau diese Wörter, durch Kommas getrennt, in der Form, in der sie im Text stehen.\n\n" + " ".join(sents))
+        items.append({"id": str(i), "lang": "de", "gold": ", ".join(words), "words": words,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_denglisch_spot(item, reply):
+    t = strip_lead(reply["content"]).lower()
+    cands = {w.lower() for tpl, opts in DG_SLOTS for w in opts}
+    got = {w for w in cands if re.search(rf"(?<![\w-]){re.escape(w)}(?![\w-])", t)}
+    gold = {w.lower() for w in item["words"]}
+    tp = len(got & gold)
+    f1 = 2 * tp / (len(got) + len(gold)) if got or gold else 1.0
+    return {"correct": got == gold, "score": round(f1, 4), "pred": sorted(got), "gold": item["gold"],
+            "detail": {"missed": len(gold - got), "false_alarm": len(got - gold)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4665,6 +4714,7 @@ TASKS = {
     "de_genus_meaning": task(("de",), load_de_genus_meaning, score_de_genus_meaning, 16, None, lang_check=False),
     "en_place_preps": task(("en",), load_en_place_preps, score_en_place_preps, 18, 18, lang_check=False),
     "en_since_for": task(("en",), load_en_since_for, score_en_since_for, 18, 18, lang_check=False),
+    "denglisch_spot": task(("de",), load_denglisch_spot, score_denglisch_spot, 20, 40, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

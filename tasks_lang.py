@@ -3476,6 +3476,7 @@ def _vf_gold(sent, phr, verb):
 
 def load_de_vorfeld(lang, n, seed):
     return [{"id": str(i), "lang": "de", "gold": _vf_gold(sent, phr, verb), "src": sent, "phrase": phr, "verb": verb,
+             "subj": sent.split(f" {verb} ", 1)[0],
              "messages": [{"role": "user", "content": f"Stelle den Satz so um, dass „{phr}“ am Satzanfang steht. Verwende genau dieselben "
                            f"Wörter. Antworte nur mit dem Satz.\n\n{sent}"}]}
             for i, (sent, phr, verb) in enumerate(VF_ITEMS[:min(n or 20, 20)])]
@@ -3491,7 +3492,11 @@ def score_de_vorfeld(item, reply):
     same = sorted(w) == want
     first = w[:len(pw)] == pw
     second = w[len(pw):len(pw) + 1] == [item["verb"]]
-    ok = w == words(item["gold"])  # the whole standard order: subject right after the verb, the verb bracket kept
+    subj = words(item["subj"])
+    after = w[len(pw) + 1:len(pw) + 1 + len(subj)]
+    # the subject right after the verb and the clause-final element (participle, infinitive, prefix) still last; the middle
+    # field may vary ("habe ich schon den Brief" / "habe ich den Brief schon")
+    ok = same and first and second and after == subj and w[-1:] == words(item["src"])[-1:]
     return {"correct": ok, "score": float(ok), "pred": line[:100], "gold": item["gold"],
             "detail": {"same_words": float(same), "phrase_first": float(first), "verb_second": float(second)}}
 

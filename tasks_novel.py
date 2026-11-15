@@ -6042,6 +6042,76 @@ def score_duty_rota(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calendar_days": float(v == item["naive"])}}
 
 
+# ---------------------------------------------------------------- bin_pack (optimal vs first fit)
+def _bp_min(ws, cap):
+    ws = sorted(ws, reverse=True)
+    best = [len(ws)]
+
+    def go(k, bins):
+        if len(bins) >= best[0]:
+            return
+        if k == len(ws):
+            best[0] = len(bins)
+            return
+        seen = set()
+        for j in range(len(bins)):
+            if bins[j] + ws[k] <= cap and bins[j] not in seen:
+                seen.add(bins[j])
+                bins[j] += ws[k]
+                go(k + 1, bins)
+                bins[j] -= ws[k]
+        bins.append(ws[k])
+        go(k + 1, bins)
+        bins.pop()
+    go(0, [])
+    return best[0]
+
+
+def _bp_ff(ws, cap):
+    bins = []
+    for w in ws:
+        for j in range(len(bins)):
+            if bins[j] + w <= cap:
+                bins[j] += w
+                break
+        else:
+            bins.append(w)
+    return len(bins)
+
+
+def load_bin_pack(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("bin_pack", i)
+        ff_worse = i % 2 == 0
+        while True:
+            cap = r.choice([10, 12, 15, 20])
+            ws = [r.randint(2, cap - 1) for _ in range(r.randint(6, 9))]
+            g, ff = _bp_min(ws, cap), _bp_ff(ws, cap)
+            if (ff > g) == ff_worse:
+                break
+        q = (f"Parcels weighing {', '.join(map(str, ws))} kg must be packed into boxes that hold at most {cap} kg each. Parcels "
+             "cannot be split. What is the smallest number of boxes needed?" if lang == "en" else
+             f"Pakete mit {', '.join(map(str, ws))} kg sollen in Kisten verpackt werden, die jeweils höchstens {cap} kg tragen. "
+             "Pakete lassen sich nicht teilen. Wie viele Kisten braucht man mindestens?")
+        items.append({"id": str(i), "lang": lang, "gold": g, "ff": ff, "ff_worse": ff_worse,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_bin_pack(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    if re.search(r"\b(?:box|kiste)\s*\d", fa, re.I):  # "Box 1: 9+1, Box 2: ... -> 4": the last number
+        v = last_int(fa)
+    else:
+        v = answer_value(fa, item["lang"])
+    ok = v == item["gold"]
+    d = {"ok_ff_worse" if item["ff_worse"] else "ok_ff_optimal": float(ok)}
+    if item["ff_worse"]:
+        d["took_first_fit"] = float(v == item["ff"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7618,6 +7688,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "bin_pack": task(load_bin_pack, score_bin_pack, 24, 120),
     "duty_rota": task(load_duty_rota, score_duty_rota, 24, 120),
     "sheet_eval": task(load_sheet_eval, score_sheet_eval, 24, 120),
     "overlap_count": task(load_overlap_count, score_overlap_count, 24, 120),

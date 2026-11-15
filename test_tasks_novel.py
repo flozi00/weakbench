@@ -1904,3 +1904,18 @@ def test_password_rules():
 
 if __name__ == "__main__":
     test_password_rules()
+
+
+def test_meet_city():
+    import tasks_novel as tn
+    from collections import Counter
+    xs = tn.load_meet_city("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    assert all(x["gold"] != x["bait"] for x in xs) and max(Counter(x["gold"] for x in xs).values()) < 30
+    x = xs[0]
+    assert tn.score_meet_city(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+    assert tn.score_meet_city(x, {"content": f"Antwort: {x['gold']}, nicht {x['bait']}"})["correct"]
+
+
+if __name__ == "__main__":
+    test_meet_city()

@@ -8837,6 +8837,50 @@ def score_password_rules(item, reply):
             "detail": {"too_many": float(bool(set(got) - set(item["set"]))), "too_few": float(bool(set(item["set"]) - set(got)))}}
 
 
+# ---------------------------------------------------------------- meet_city (min-max vs min-sum objective from a table)
+MC_CITIES = ["Kassel", "Fulda", "Erfurt", "Göttingen", "Würzburg", "Gießen", "Halle", "Bamberg"]
+MC_FRIENDS = ["Ana", "Ben", "Cem", "Dora"]
+
+
+def load_meet_city(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("meet_city", i, att)
+        obj = ("max", "sum")[i % 2]
+        while True:
+            cities = r.sample(MC_CITIES, 4)
+            friends = MC_FRIENDS[:r.choice([3, 4])]
+            t = {c: [r.randrange(40, 241, 5) for _ in friends] for c in cities}
+            by_max = sorted(cities, key=lambda c: max(t[c]))
+            by_sum = sorted(cities, key=lambda c: sum(t[c]))
+            if max(t[by_max[0]]) < max(t[by_max[1]]) and sum(t[by_sum[0]]) < sum(t[by_sum[1]]) and by_max[0] != by_sum[0]:
+                break
+        gold, bait = (by_max[0], by_sum[0]) if obj == "max" else (by_sum[0], by_max[0])
+        head = "| " + ("City" if lang == "en" else "Stadt") + " | " + " | ".join(friends) + " |"
+        rows = "\n".join(f"| {c} | " + " | ".join(str(x) for x in t[c]) + " |" for c in cities)
+        ask = ({"max": "They want the meeting city where the LONGEST single journey is as short as possible (nobody should travel too long).",
+                "sum": "They want the meeting city where the TOTAL travel time of all of them together is as small as possible."} if lang == "en" else
+               {"max": "Sie wollen die Stadt, in der die LÄNGSTE einzelne Anreise so kurz wie möglich ist (niemand soll zu lange fahren).",
+                "sum": "Sie wollen die Stadt, in der die GESAMTE Fahrzeit aller zusammen so klein wie möglich ist."})[obj]
+        q = (f"Travel times in minutes from each friend's home to four possible meeting cities:\n{head}\n|---|" + "---|" * len(friends) +
+             f"\n{rows}\n{ask} Which city?" if lang == "en" else
+             f"Fahrzeiten in Minuten vom Wohnort jeder Person zu vier möglichen Treffpunkten:\n{head}\n|---|" + "---|" * len(friends) +
+             f"\n{rows}\n{ask} Welche Stadt?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "obj": obj, "cities": cities,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_meet_city(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = re.sub(r"\b(?:not|nicht)\s+\w+", " ", fa, flags=re.I)
+    hits = sorted((m.start(), c) for c in item["cities"] if (m := re.search(rf"\b{c}\b", fa)))
+    v = hits[0][1] if len(hits) == 1 or (len(hits) == 2 and not re.search(r"\b(?:or|oder)\b|/", fa)) else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['obj']}": float(ok), "other_objective": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10443,6 +10487,7 @@ TASKS = {
     "coupon_best": task(load_coupon_best, score_coupon_best, 24, 120),
     "trip_cost": task(load_trip_cost, score_trip_cost, 24, 120),
     "password_rules": task(load_password_rules, score_password_rules, 24, 120),
+    "meet_city": task(load_meet_city, score_meet_city, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

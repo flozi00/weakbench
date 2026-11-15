@@ -2677,7 +2677,7 @@ def score_de_passive(item, reply):
 # ---------------------------------------------------------------- en_usage (classic English usage traps, closed choice)
 EU_ITEMS = [("fewer_less", "There were ___ people at the meeting than last year.", ("fewer", "less"), "fewer"),
             ("fewer_less", "We need ___ sugar in this recipe.", ("fewer", "less"), "less"),
-            ("fewer_less", "This checkout is for customers with ten items or ___ than ten items.", ("fewer", "less"), "fewer"),
+            ("fewer_less", "She made ___ mistakes in the second test.", ("fewer", "less"), "fewer"),
             ("fewer_less", "She earns ___ money than her brother.", ("fewer", "less"), "less"),
             ("who_whom", "To ___ should I send the invoice?", ("who", "whom"), "whom"),
             ("who_whom", "The woman ___ called yesterday is my aunt.", ("who", "whom"), "who"),

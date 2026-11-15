@@ -1719,7 +1719,7 @@ def load_agreement_attractor(lang, n, seed):
 
 
 def score_agreement_attractor(item, reply):
-    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in ("is", "are", "ist", "sind")]
+    w = [x for x in re.findall(r"[a-z]+", strip_lead(reply["content"]).lower()) if x in ("is", "are", "ist", "sind")]
     ok = w[:1] == [item["gold"]]  # the first: "ist (Singular, nicht sind)" explains after the answer
     return {"correct": ok, "score": float(ok), "pred": w[-1:], "gold": item["gold"],
             "detail": {f"ok_attr{item['attractors']}": float(ok), "ok_plural" if item["plural"] else "ok_singular": float(ok)}}
@@ -2581,7 +2581,7 @@ def load_en_conditionals(lang, n, seed):
 
 
 def score_en_conditionals(item, reply):
-    t = (reply["content"] or "").lower().replace("’", "'")
+    t = strip_lead(reply["content"]).lower().replace("’", "'")
     for a, b in EC_EXPAND:
         t = t.replace(a, b)
     hedge = bool(re.search(r"/|\bor\b", t))
@@ -2777,7 +2777,7 @@ def score_en_question_tags(item, reply):
         t = re.sub(r"\bcan't\b", "can not", t).replace("won't", "will not")
         t = re.sub(r"\b(\w+)n't\b", r"\1 not", t).replace("cannot", "can not")
         return " ".join(re.findall(r"[a-z]+", t))
-    raw = (reply["content"] or "").split("?")[0]  # the answer part; an explanation after the "?" is ignored
+    raw = strip_lead(reply["content"]).split("?")[0]  # the answer part; an explanation after the "?" is ignored
     tagish = r"\s*[\w’']+\s+(?:i|you|he|she|it|we|they|there)(?:\s+not)?\s*"
     if sum(bool(re.fullmatch(tagish, seg, re.I)) for seg in raw.split(",")) > 1:  # "can she, can't she": a hedge
         return {"correct": False, "score": 0.0, "pred": raw[:40], "gold": item["gold"], "detail": {f"ok_{item['kind']}": 0.0}}
@@ -3261,6 +3261,12 @@ def two_opts(i, gold, opts):
     so "always the first/second shown" scores 50 %."""
     other = next(x for x in opts if x != gold)
     return (gold, other) if (i // 2) % 2 == 0 else (other, gold)
+
+
+def strip_lead(text):
+    """A short reply without its frame: "Answer: The answer is are." -> "are." (the scorers below read the first word)."""
+    t = re.sub(r"^\W*(?:answer|antwort)\s*\**\s*:\s*", "", (text or "").strip(), flags=re.I)
+    return tasks_novel.LEAD_IN.sub("", t.strip("*„“\"' "))
 
 
 def gap_pick(item, reply, opts):
@@ -3800,7 +3806,7 @@ def load_de_foreign_plural(lang, n, seed):
 
 
 def score_de_foreign_plural(item, reply):
-    words = re.findall(r"[A-Za-zÄÖÜäöüß]+", re.sub(r"\([^()]*\)", " ", reply["content"] or ""))
+    words = re.findall(r"[A-Za-zÄÖÜäöüß]+", re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])))
     stem = item["sing"].split()[1]
     words = [w for w in words if w.lower() not in ("die", "plural", "der", "das", "von", "lautet", "antwort", "answer", "ist", stem.lower())]
     v = words[0] if words else None
@@ -4241,7 +4247,7 @@ def load_de_plural_adj(lang, n, seed):
 
 
 def score_de_plural_adj(item, reply):
-    w = re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower())
+    w = re.findall(r"[a-zäöüß]+", strip_lead(reply["content"]).lower())
     other = item["gold"][:-1] if item["gold"].endswith("en") else item["gold"] + "n"
     ok = item["gold"] in w[:2] and other not in w  # "gute oder guten" is no answer
     return {"correct": ok, "score": float(ok), "pred": w[:2], "gold": item["gold"],

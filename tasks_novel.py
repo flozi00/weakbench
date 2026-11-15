@@ -182,9 +182,18 @@ ASK = {"en": "Think it through, then finish with one line \"Answer: <your answer
 ANSWER = re.compile(r"(?im)^\W*(?:final\s+)?(?:answer|antwort)\W{0,4}?[:：]\s*(.+?)\s*$")  # "**Answer**: x" too
 
 
+LEAD_IN = re.compile(r"^(?:the (?:correct |final |right )?(?:answer|solution|result) is|"
+                     r"die (?:richtige |korrekte )?(?:antwort|lösung) (?:lautet|ist)|das ergebnis (?:lautet|ist)|richtig ist)\s*:?\s*", re.I)
+
+
 def final_answer(text):
+    """The text after the last "Answer:" line, without quotes, markdown and a lead-in like "The answer is" /
+    "Die Lösung lautet" (every scorer that reads a short answer otherwise sees "the" or "die" first)."""
     m = ANSWER.findall(text or "")
-    return m[-1].strip().strip("`*\"'«»„“”").strip().rstrip(".!").strip("`*\"'«»„“”").strip() if m else None
+    if not m:
+        return None
+    clean = lambda x: x.strip().strip("`*\"'«»„“”").strip().rstrip(".!").strip("`*\"'«»„“”").strip()  # noqa: E731
+    return clean(LEAD_IN.sub("", clean(m[-1])))
 
 
 def last_int(text):
@@ -5407,7 +5416,7 @@ def load_csv_field(lang, n, seed):
 def score_csv_field(item, reply):
     lines = re.findall(r"(?:Answer|Antwort)\s*\**\s*[:\-–]\s*(.+)", reply["content"] or "", re.I)  # raw: final_answer strips quotes
     v = re.sub(r"^\**|\**$", "", lines[-1].strip()).strip().strip("`").strip() if lines else ""
-    v = re.sub(r"(?<=[\w\"”])\.$", "", v)  # "Answer: 344."
+    v = re.sub(r"(?<=[\w\"”])\.$", "", LEAD_IN.sub("", v))  # "Answer: The answer is 344."
     norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()  # noqa: E731
     forms = {v}
     if len(v) >= 2 and v[0] in '"“„' and v[-1] in '"“”':

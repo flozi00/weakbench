@@ -3809,6 +3809,43 @@ def score_de_foreign_plural(item, reply):
             "detail": {"s_plural": float(v in (stem + "s", stem + "e"))}}
 
 
+# ---------------------------------------------------------------- en_apostrophe (possessive vs plural vs contraction)
+APO_ITEMS = [("The ___ car is parked outside. (one girl)", "girl's", ("girl's", "girls'")),
+             ("The ___ changing room is on the left. (several girls)", "girls'", ("girl's", "girls'")),
+             ("The ___ house is the one with the red door. (the Smith family)", "Smiths'", ("Smith's", "Smiths'")),
+             ("___ raining again.", "It's", ("Its", "It's")),
+             ("The company changed ___ logo.", "its", ("its", "it's")),
+             ("The ___ toys are all over the floor. (children)", "children's", ("childrens'", "children's")),
+             ("We need three more ___ for the party.", "chairs", ("chairs", "chair's")),
+             ("My ___ office is on the third floor. (one boss)", "boss's", ("boss's", "bosses'")),
+             ("___ the one who called?", "Who's", ("Whose", "Who's")),
+             ("___ bag is this?", "Whose", ("Whose", "Who's")),
+             ("The ___ cars were all blue. (several teachers)", "teachers'", ("teacher's", "teachers'")),
+             ("Many ___ were sold last year.", "cars", ("cars", "car's")),
+             ("___ going to be late, so start without them.", "They're", ("Their", "They're")),
+             ("The dog wagged ___ tail.", "its", ("its", "it's")),
+             ("The ___ meeting starts at nine. (the women)", "women's", ("womens'", "women's")),
+             ("Two ___ notice is required. (weeks)", "weeks'", ("week's", "weeks'"))]
+
+
+def load_en_apostrophe(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{two_opts(i, g, o)[0]}\" or \"{two_opts(i, g, o)[1]}\". "
+                           f"Answer with that form only, exactly as written.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(APO_ITEMS[:min(n or 16, 16)])]
+
+
+def score_en_apostrophe(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", reply["content"] or "").replace("’", "'").replace("‘", "'")
+    found = [o for o in sorted(item["opts"], key=len, reverse=True)
+             if re.search(rf"(?<![\w']){re.escape(o)}(?![\w']|'(?=\w))", t, re.I)]
+    # the two forms differ only in the apostrophe, so match case-insensitively but keep the apostrophe exact
+    found = [o for o in found if not any(o != p and o.lower() == p.lower() for p in found)] or found
+    v = found[0] if len(found) == 1 else None
+    ok = v is not None and v.lower() == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4349,6 +4386,7 @@ TASKS = {
     "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
+    "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

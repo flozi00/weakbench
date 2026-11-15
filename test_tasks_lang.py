@@ -1112,3 +1112,18 @@ def test_en_that_function():
 
 if __name__ == "__main__":
     test_en_that_function()
+
+
+def test_antonym_context():
+    import tasks_lang as tl
+    for lang in ("de", "en"):
+        xs = tl.load_antonym_context(lang, None, 0)
+        assert len(xs) == 12
+        for x in xs:
+            assert tl.score_antonym_context(x, {"content": x["gold"].capitalize() + "."})["correct"]
+            for b in x["bait"]:
+                assert not tl.score_antonym_context(x, {"content": b})["correct"]
+
+
+if __name__ == "__main__":
+    test_antonym_context()

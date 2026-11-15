@@ -4397,6 +4397,51 @@ def score_en_that_function(item, reply):
     return {"correct": ok, "score": float(ok), "pred": sorted(found), "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- antonym_context (the opposite of a polysemous word in context)
+# The same word needs a different opposite per sentence ("leichte Tasche" -> schwer, "leichte Aufgabe" -> schwer/schwierig,
+# "leichter Wind" -> stark). Gold lists all standard opposites; the other sense's opposite is the bait.
+AC_ITEMS = {"de": [("Die Tasche ist [leicht], ich trage sie gern.", ["schwer"], ["schwierig"]),
+                   ("Die Aufgabe war [leicht], alle hatten sie richtig.", ["schwer", "schwierig"], []),
+                   ("Heute weht nur ein [leichter] Wind.", ["starker", "stark", "kräftiger", "kräftig", "heftiger", "heftig"], ["schwer"]),
+                   ("Das Brot ist noch [frisch].", ["alt", "altbacken", "trocken", "hart"], ["warm"]),
+                   ("Am Morgen ist die Luft [frisch].", ["warm", "mild", "stickig", "schwül"], ["alt", "altbacken"]),
+                   ("Er hat ein [hartes] Herz.", ["weiches", "weich", "gütiges", "mitfühlendes", "warmes"], []),
+                   ("Das Bett ist mir zu [hart].", ["weich"], ["gütig"]),
+                   ("Die Suppe ist schon [kalt].", ["warm", "heiß"], ["herzlich"]),
+                   ("Sie hat mich sehr [kalt] begrüßt.", ["herzlich", "warm", "freundlich"], ["heiß"]),
+                   ("Die Straße ist hier sehr [breit].", ["schmal", "eng"], ["nüchtern"]),
+                   ("Der Laden hat heute [offen].", ["geschlossen", "zu"], ["verschlossen"]),
+                   ("Sie ist ein sehr [offener] Mensch.", ["verschlossener", "verschlossen", "zurückhaltender", "zurückhaltend"], ["geschlossen"])],
+            "en": [("The box is [light], you can carry it easily.", ["heavy"], ["dark"]),
+                   ("The room is very [light] in the morning.", ["dark", "dim"], ["heavy"]),
+                   ("The bread is still [fresh].", ["stale", "old"], ["stuffy"]),
+                   ("Open the window, the air is not [fresh].", ["stale", "stuffy"], []),
+                   ("He gave a very [hard] answer to that easy question.", ["soft", "gentle", "kind"], ["easy"]),
+                   ("The exam was [hard].", ["easy", "simple"], ["soft"]),
+                   ("The water is [cold].", ["hot", "warm"], ["friendly"]),
+                   ("She gave me a [cold] look.", ["warm", "friendly", "kind"], ["hot"]),
+                   ("The shop is [open] until six.", ["closed", "shut"], ["reserved"]),
+                   ("He is very [open] about his feelings.", ["reserved", "secretive", "guarded", "closed"], []),
+                   ("This knife is [sharp].", ["blunt", "dull"], ["vague"]),
+                   ("The photo is [sharp].", ["blurry", "blurred", "fuzzy", "unsharp"], ["blunt"])]}
+
+
+def load_antonym_context(lang, n, seed):
+    items = AC_ITEMS[lang]
+    q = ("Nenne das Gegenteil des Wortes in eckigen Klammern, so wie es in diesem Satz gemeint ist. Antworte nur mit einem Wort.\n\n"
+         if lang == "de" else "Give the opposite of the word in brackets as it is meant in this sentence. Answer with one word only.\n\n")
+    return [{"id": str(i), "lang": lang, "gold": g[0], "ok": g, "bait": b, "messages": [{"role": "user", "content": q + sent}]}
+            for i, (sent, g, b) in enumerate(items[:n or len(items)])]
+
+
+def score_antonym_context(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
+    w = re.findall(r"[a-zäöüß]+", t)
+    v = w[0] if w else None
+    ok = v in item["ok"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"other_sense": float(v in item["bait"])}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4952,6 +4997,7 @@ TASKS = {
     "de_tense_identify": task(("de",), load_de_tense_identify, score_de_tense_identify, 24, 48, lang_check=False),
     "de_das_function": task(("de",), load_de_das_function, score_de_das_function, 16, 16, lang_check=False),
     "en_that_function": task(("en",), load_en_that_function, score_en_that_function, 16, 16, lang_check=False),
+    "antonym_context": task(("de", "en"), load_antonym_context, score_antonym_context, 12, None, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

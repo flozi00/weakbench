@@ -4069,6 +4069,28 @@ def score_de_genus_meaning(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- en_place_preps (in / on / at for places)
+# Only items with one standard choice in both BrE and AmE (no "in/on the street", "at/in the hospital" cases).
+EPP_ITEMS = [("She lives ___ Berlin.", "in"), ("The keys are ___ the table.", "on"), ("I'll meet you ___ the bus stop.", "at"),
+             ("There is a picture ___ the wall.", "on"), ("He is waiting ___ the front door.", "at"), ("The milk is ___ the fridge.", "in"),
+             ("Please wait ___ the reception desk.", "at"), ("The cat is sleeping ___ the sofa.", "on"), ("They swam ___ the lake.", "in"),
+             ("My office is ___ the third floor.", "on"), ("Turn left ___ the traffic lights.", "at"), ("He grew up ___ a small village.", "in"),
+             ("I read it ___ a newspaper.", "in"), ("She is working ___ home today.", "at"), ("The plane is ___ the sky.", "in"),
+             ("Write your name ___ the top of the page.", "at"), ("There is a spider ___ the ceiling.", "on"), ("Sign ___ the dotted line.", "on")]
+
+
+def load_en_place_preps(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": ("in", "on", "at"),
+             "messages": [{"role": "user", "content": f"Fill the gap with \"in\", \"on\" or \"at\". Answer with the word only.\n\n{sent}"}]}
+            for i, (sent, g) in enumerate(EPP_ITEMS[:min(n or 18, 18)])]
+
+
+def score_en_place_preps(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4616,6 +4638,7 @@ TASKS = {
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),
     "dual_output": task(("de", "en"), load_dual_output, score_dual_output, 16, 16, lang_check=False),
     "de_genus_meaning": task(("de",), load_de_genus_meaning, score_de_genus_meaning, 16, None, lang_check=False),
+    "en_place_preps": task(("en",), load_en_place_preps, score_en_place_preps, 18, 18, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

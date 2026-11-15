@@ -10412,6 +10412,67 @@ def score_cube_net(item, reply):
             "detail": {"ok_straight" if item["straight"] else "ok_bent": float(ok), "neighbour_bait": float(v in item["nbrs"])}}
 
 
+# ---------------------------------------------------------------- knight_moves
+# The fewest moves a chess knight needs between two squares, on a board with 1-3 blocked squares (it may not land on
+# them). Search the model must run itself. In half the items the blocks force a detour (a memorised distance table
+# fails), in the other half they lie off every shortest path (a reflexive +2 fails). `ok_detour` / `ok_distractor`,
+# `open_board_bait`.
+def km_dist(a, b, blocked, size=8):
+    from collections import deque
+    seen, dq = {a: 0}, deque([a])
+    while dq:
+        c = dq.popleft()
+        if c == b:
+            return seen[c]
+        for dx, dy in ((1, 2), (2, 1), (-1, 2), (-2, 1), (1, -2), (2, -1), (-1, -2), (-2, -1)):
+            nb = (c[0] + dx, c[1] + dy)
+            if 0 <= nb[0] < size and 0 <= nb[1] < size and nb not in blocked and nb not in seen:
+                seen[nb] = seen[c] + 1
+                dq.append(nb)
+    return None
+
+
+def load_knight_moves(lang, n, seed):
+    items = []
+    sq = lambda c: "abcdefgh"[c[0]] + str(c[1] + 1)  # noqa: E731
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("knight_moves", i, att)
+        detour = i % 2 == 0  # even items: the blocks force a detour (+2, knight parity); odd: they are off every shortest path
+        want = (i // 2) % 2 + 4 if detour else (i // 2) % 2 + 2  # gold 2-5 in equal parts
+        while True:
+            a, b = (r.randrange(8), r.randrange(8)), (r.randrange(8), r.randrange(8))
+            free = km_dist(a, b, set())
+            if free != (want - 2 if detour else want):
+                continue
+            on_path = {c for c in itertools.product(range(8), repeat=2) if c not in (a, b)
+                       and km_dist(a, c, set()) + km_dist(c, b, set()) == free}
+            pool = sorted(on_path) if detour else [c for c in itertools.product(range(8), repeat=2)
+                                                   if c not in on_path and c not in (a, b)]
+            blocked = set(r.sample(pool, min(len(pool), r.randint(1, 3))))
+            d = km_dist(a, b, blocked)
+            if d == want:
+                break
+        bl = ", ".join(sq(c) for c in sorted(blocked))
+        one = len(blocked) == 1
+        q = (f"On an empty 8x8 chessboard a knight stands on {sq(a)}. " + (f"The square {bl} is blocked: the knight may not land "
+             f"on it (it may jump over it)." if one else f"The squares {bl} are blocked: the knight may not land on them (it may "
+             f"jump over them).") + f" What is the smallest number of knight moves to reach {sq(b)}?" if lang == "en" else
+             f"Auf einem leeren 8x8-Schachbrett steht ein Springer auf {sq(a)}. " + (f"Das Feld {bl} ist gesperrt: Der Springer darf "
+             f"dort nicht landen (überspringen darf er es)." if one else f"Die Felder {bl} sind gesperrt: Der Springer darf dort "
+             f"nicht landen (überspringen darf er sie).") + f" Mit wie vielen Springerzügen erreicht er {sq(b)} mindestens?")
+        items.append({"id": str(i), "lang": lang, "gold": d, "bait": free, "detour": detour,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_knight_moves(item, reply):
+    v = last_int(re.sub(r"\b[a-h][1-8]\b", " ", final_answer(reply["content"]) or ""))  # "a1 -> c2 -> ...: 3": squares are no answer
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_detour" if item["detour"] else "ok_distractor": float(ok),
+                       "open_board_bait": float(item["detour"] and v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11520,6 +11581,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "knight_moves": task(load_knight_moves, score_knight_moves, 24, 96),
     "cube_net": task(load_cube_net, score_cube_net, 24, 96),
     "sliding_puzzle": task(load_sliding_puzzle, score_sliding_puzzle, 24, 96),
     "toy_machine": task(load_toy_machine, score_toy_machine, 24, 96),

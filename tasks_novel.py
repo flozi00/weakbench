@@ -6687,6 +6687,61 @@ def score_org_chart(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_direct_manager": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- refund_policy (apply a stated policy with exceptions)
+RP_ITEMS = {"en": ["a jacket", "headphones", "a coffee machine", "a backpack", "a desk lamp"],
+            "de": ["eine Jacke", "Kopfhörer", "eine Kaffeemaschine", "einen Rucksack", "eine Schreibtischlampe"]}
+
+
+def load_refund_policy(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("refund_policy", i, att)
+        days, fee = r.choice([14, 30]), r.choice([10, 15, 20])
+        price = r.randrange(40, 300, 5)
+        kind = ("window", "opened", "sale", "receipt")[i % 4]
+        member = r.random() < 0.5
+        # the case: every rule but the one under test is satisfied; the tested rule fires or not (half each)
+        fires = (i // 4) % 2 == 0
+        age = (days + r.randint(1, 10)) if kind == "window" and fires else r.randint(1, days)
+        opened = kind == "opened" and fires
+        sale = kind == "sale" and fires
+        receipt = not (kind == "receipt" and fires)
+        if kind == "receipt" and fires and r.random() < 0.5:
+            member = True  # the member exception: no receipt needed
+        if age > days or sale or (not receipt and not member):
+            gold = 0.0
+        else:
+            gold = price * (1 - fee / 100) if opened else float(price)
+        naive = float(price)
+        thing = r.choice(RP_ITEMS[lang])
+        pol = (f"Refund policy: Items can be returned within {days} days of purchase. Opened items are refunded minus a {fee} % fee. "
+               "Sale items cannot be returned. A receipt is required, except for loyalty-club members, who are identified by "
+               "their card." if lang == "en" else
+               f"Rückgaberegeln: Artikel können innerhalb von {days} Tagen nach dem Kauf zurückgegeben werden. Geöffnete Artikel werden "
+               f"abzüglich einer Gebühr von {fee} % erstattet. Reduzierte Artikel sind vom Umtausch ausgeschlossen. Ein Kassenbon ist "
+               "nötig, außer bei Mitgliedern des Kundenclubs, die sich mit ihrer Karte ausweisen.")
+        case = (f"Customer: I bought {thing} for {price} € {age} days ago. It was {'a sale item' if sale else 'not on sale'}, the box is "
+                f"{'opened' if opened else 'still sealed'}. I {'have' if receipt else 'lost'} the receipt"
+                + (" and I am a loyalty-club member (here is my card)." if member else ".") if lang == "en" else
+                f"Kunde: Ich habe vor {age} Tagen {thing} für {price} € gekauft. Der Artikel war {'reduziert' if sale else 'nicht reduziert'}, "
+                f"die Verpackung ist {'geöffnet' if opened else 'noch versiegelt'}. Den Kassenbon habe ich {'dabei' if receipt else 'verloren'}"
+                + (" und ich bin Mitglied im Kundenclub (hier ist meine Karte)." if member else "."))
+        q = (f"{pol}\n\n{case}\n\nHow many euros does the customer get back under this policy? (0 if none.)" if lang == "en" else
+             f"{pol}\n\n{case}\n\nWie viele Euro bekommt der Kunde nach diesen Regeln zurück? (0, wenn nichts.)")
+        items.append({"id": str(i), "lang": lang, "gold": round(gold, 2), "naive": naive, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_refund_policy(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 0.006
+    d = {f"ok_{item['kind']}": float(ok)}
+    if item["naive"] != item["gold"]:
+        d["ignored_rule"] = float(v is not None and abs(v - item["naive"]) < 0.006)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8267,6 +8322,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "refund_policy": task(load_refund_policy, score_refund_policy, 24, 120),
     "org_chart": task(load_org_chart, score_org_chart, 24, 120),
     "temp_delta": task(load_temp_delta, score_temp_delta, 24, 120),
     "board_moves": task(load_board_moves, score_board_moves, 24, 120),

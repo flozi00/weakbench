@@ -3872,6 +3872,40 @@ def score_de_eszett(item, reply):
             "detail": {"ok_eszett" if "ß" in item["gold"] else "ok_ss": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
+# The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
+# "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
+DVP_ITEMS = [("Wir warten seit einer Stunde ___ den Bus.", "auf", ("auf", "für")),
+             ("Ich denke oft ___ meine Großmutter.", "an", ("an", "über")),
+             ("Sie interessiert sich sehr ___ Astronomie.", "für", ("für", "in")),
+             ("Die Kinder haben Angst ___ dem Gewitter.", "vor", ("vor", "von")),
+             ("Ich freue mich schon ___ die Ferien nächsten Monat.", "auf", ("auf", "über")),
+             ("Er freut sich ___ das Geschenk, das er gestern bekommen hat.", "über", ("auf", "über")),
+             ("Das hängt ganz ___ dem Wetter ab.", "von", ("von", "auf")),
+             ("Wir müssen uns ___ den Termin am Montag vorbereiten.", "auf", ("auf", "für")),
+             ("Sie hat sich ___ den Lärm beschwert.", "über", ("über", "von")),
+             ("Ich kümmere mich ___ die Blumen, während ihr weg seid.", "um", ("um", "für")),
+             ("Sie bittet ihren Chef ___ einen freien Tag.", "um", ("um", "für")),
+             ("Wir sprechen morgen ___ das neue Projekt.", "über", ("über", "von")),
+             ("Sie besteht ___ einer schriftlichen Bestätigung.", "auf", ("auf", "an")),
+             ("Ich habe mich ___ die laute Musik gewöhnt.", "an", ("an", "zu")),
+             ("Das Team besteht ___ fünf Personen.", "aus", ("aus", "von")),
+             ("Er nimmt ___ dem Wettbewerb teil.", "an", ("an", "in"))]
+
+
+def load_de_verb_preps(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": o,
+             "messages": [{"role": "user", "content": f"Setze „{two_opts(i, g, o)[0]}“ oder „{two_opts(i, g, o)[1]}“ ein. "
+                           f"Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, o) in enumerate(DVP_ITEMS[:min(n or 16, 16)])]
+
+
+def score_de_verb_preps(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4414,6 +4448,7 @@ TASKS = {
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),
     "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
+    "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

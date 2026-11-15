@@ -2475,6 +2475,35 @@ def score_quote_keep(item, reply):
             "detail": {"quote_kept": float(kept), "translated": float(translated), "quote_translated": float(q_trans)}}
 
 
+# ---------------------------------------------------------------- en_article_sound (a / an by sound)
+# (sentence, gold, spelling misleads). Half the items look like the other article by their first letter.
+AS_ITEMS = [("I waited for ___ hour.", "an", True), ("She is ___ honest person.", "an", True), ("He is ___ heir to the company.", "an", True),
+            ("She has ___ MBA from Mannheim.", "an", True), ("He was ___ FBI agent.", "an", True), ("The doctor ordered ___ X-ray.", "an", True),
+            ("We met ___ 8-year-old girl.", "an", True), ("It was ___ honour to meet you.", "an", True), ("I bought ___ hourly ticket.", "an", True),
+            ("She studies at ___ university.", "a", True), ("He is ___ European citizen.", "a", True), ("I bought ___ one-way ticket.", "a", True),
+            ("Every ___ user needs a password.", None, None), ("Send me ___ URL.", "a", True), ("It costs ___ euro.", "a", True),
+            ("That is ___ unique idea.", "a", True), ("She wore ___ uniform.", "a", True), ("It was ___ once-in-a-lifetime trip.", "a", True),
+            ("We stayed in ___ hotel.", "a", True), ("He found ___ umbrella.", "an", False), ("She ate ___ apple.", "an", False),
+            ("They own ___ house.", "a", False), ("He drove ___ old car.", "an", False), ("It is ___ useful tool.", "a", True),
+            ("We saw ___ elephant.", "an", False), ("She wrote ___ book.", "a", False), ("I need ___ hammer.", "a", False),
+            ("He is ___ engineer.", "an", False), ("Every user is ___ utility customer.", "a", True)]
+AS_ITEMS = [x for x in AS_ITEMS if x[1]]  # "Every ___ user" has no article slot; dropped
+
+
+def load_en_article_sound(lang, n, seed):
+    rows = AS_ITEMS[:min(n or len(AS_ITEMS), len(AS_ITEMS))]
+    return [{"id": str(i), "lang": "en", "gold": g, "tricky": t,
+             "messages": [{"role": "user", "content": "Fill the gap with a or an. Answer with that word only.\n\n" + sent}]}
+            for i, (sent, g, t) in enumerate(rows)]
+
+
+def score_en_article_sound(item, reply):
+    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in ("a", "an")]
+    ok = w[:1] == [item["gold"]]
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"],
+            "detail": {"ok_sound_vs_letter" if item["tricky"] else "ok_plain": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2781,6 +2810,7 @@ TASKS = {
     "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 24, lang_check=False),
     "false_friends": task(("de", "en"), load_false_friends, score_false_friends, 128, 12),
     "quote_keep": task(("de", "en"), load_quote_keep, score_quote_keep, 256, 24, lang_check=False),
+    "en_article_sound": task(("en",), load_en_article_sound, score_en_article_sound, 16, 28, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

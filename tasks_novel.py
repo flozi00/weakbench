@@ -6968,7 +6968,7 @@ def load_pace_speed(lang, n, seed):
     for i, att in common.redraws(n or 120, items):
         r = rng_of("pace_speed", i, att)
         kind = ("to_speed", "to_pace", "finish")[i % 3]
-        m, s_ = r.randint(3, 8), r.choice([0, 10, 15, 20, 30, 40, 45, 50])
+        m, s_ = r.randint(3, 8), r.choice([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 0])
         pace = m + s_ / 60
         pstr = f"{m}:{s_:02d}"
         if kind == "to_speed":
@@ -7003,7 +7003,7 @@ def score_pace_speed(item, reply):
     if item["kind"] == "to_speed":
         v = answer_value(fa, item["lang"])
         ok = v is not None and abs(v - item["gold"]) <= 0.05
-        bait = v is not None and abs(v - item["bait"]) <= 0.05
+        bait = v is not None and abs(v - item["bait"]) <= 0.05 and item["bait"] != item["gold"]
     else:
         pat = r"\b(\d{1,2}):(\d{2})\b" if item["kind"] == "to_pace" else r"\b(\d{1,2}):(\d{2}):(\d{2})\b"
         m = re.findall(pat, fa)

@@ -2051,6 +2051,12 @@ def test_country_currency():
     pl = next(x for x in xs if x["cc"] == "PL")
     assert not tn.score_country_currency(pl, {"content": "Antwort: Euro"})["correct"]
     assert tn.score_country_currency(pl, {"content": "Antwort: Polnischer Złoty"})["correct"]
+    fake = lambda cc: {"cc": cc, "gold": ""}  # noqa: E731
+    for cc, line in (("BR", "the reality is it varies"), ("KR", "I won't guess"), ("PE", "no solution"), ("ZA", "a random guess"),
+                     ("TR", "try again"), ("CA", "US dollar"), ("PK", "Indian rupee"), ("DK", "Czech crown")):
+        assert not tn.score_country_currency(fake(cc), {"content": f"Answer: {line}"})["correct"], (cc, line)
+    for cc, line in (("CA", "Canadian dollar"), ("SA", "Saudi riyal"), ("RO", "lei"), ("SE", "kronor"), ("MX", "pesos"), ("TR", "TRY")):
+        assert tn.score_country_currency(fake(cc), {"content": f"Answer: {line}"})["correct"], (cc, line)
 
 
 if __name__ == "__main__":

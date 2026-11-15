@@ -9201,15 +9201,24 @@ CUR = {"AR": ("ARS", ["peso"], ["peso"]), "AU": ("AUD", ["dollar"], ["dollar"]),
        "CZ": ("CZK", ["koruna", "crown"], ["krone", "koruna"]), "DE": ("EUR", ["euro"], ["euro"]), "DK": ("DKK", ["krone", "crown"], ["krone"]),
        "EG": ("EGP", ["pound"], ["pfund"]), "ET": ("ETB", ["birr"], ["birr"]), "GB": ("GBP", ["pound", "sterling"], ["pfund"]),
        "HU": ("HUF", ["forint"], ["forint"]), "ID": ("IDR", ["rupiah"], ["rupiah"]), "IL": ("ILS", ["shekel", "sheqel"], ["schekel", "shekel"]),
-       "IN": ("INR", ["rupee"], ["rupie"]), "IS": ("ISK", ["krona", "crown"], ["krone"]), "JP": ("JPY", ["yen"], ["yen"]),
+       "IN": ("INR", ["rupee"], ["rupie"]), "IS": ("ISK", ["krona", "kronur", "crown"], ["krone"]), "JP": ("JPY", ["yen"], ["yen"]),
        "KE": ("KES", ["shilling"], ["schilling"]), "KR": ("KRW", ["won"], ["won"]), "KZ": ("KZT", ["tenge"], ["tenge"]),
        "MA": ("MAD", ["dirham"], ["dirham"]), "MX": ("MXN", ["peso"], ["peso"]), "NG": ("NGN", ["naira"], ["naira"]),
        "NO": ("NOK", ["krone", "crown"], ["krone"]), "NZ": ("NZD", ["dollar"], ["dollar"]), "PE": ("PEN", ["sol"], ["sol"]),
        "PH": ("PHP", ["peso"], ["peso"]), "PK": ("PKR", ["rupee"], ["rupie"]), "PL": ("PLN", ["zloty", "złoty"], ["zloty", "złoty"]),
-       "RO": ("RON", ["leu"], ["leu"]), "RU": ("RUB", ["ruble", "rouble"], ["rubel"]), "SE": ("SEK", ["krona", "crown"], ["krone"]),
+       "RO": ("RON", ["leu", "lei"], ["leu", "lei"]), "RU": ("RUB", ["ruble", "rouble"], ["rubel"]), "SE": ("SEK", ["krona", "kronor", "crown"], ["krone"]),
        "TH": ("THB", ["baht"], ["baht"]), "TR": ("TRY", ["lira"], ["lira"]), "UA": ("UAH", ["hryvnia", "hryvnya"], ["hrywnja", "griwna", "hryvnia"]),
        "US": ("USD", ["dollar"], ["dollar"]), "VN": ("VND", ["dong", "đồng"], ["dong", "đồng"]), "ZA": ("ZAR", ["rand"], ["rand"]),
        "IR": ("IRR", ["rial"], ["rial"]), "SA": ("SAR", ["riyal", "rial"], ["riyal", "rial"])}
+
+
+# nationality words (EN/DE stems) for countries whose currency name is shared ("US dollar" is no answer for Canada)
+CUR_NAT = {"US": ["us", "u.s.", "american", "amerikanisch", "us-"], "CA": ["canadian", "kanadisch"], "AU": ["australian", "australisch"],
+           "NZ": ["new zealand", "neuseeland"], "AR": ["argentin"], "CL": ["chilean", "chilenisch"], "CO": ["colombian", "kolumbianisch"],
+           "MX": ["mexican", "mexikanisch"], "PH": ["philippine", "philippinisch"], "CZ": ["czech", "tschechisch"], "DK": ["danish", "dänisch"],
+           "IS": ["iceland", "isländisch"], "NO": ["norwegian", "norwegisch"], "SE": ["swedish", "schwedisch"],
+           "GB": ["british", "britisch", "sterling", "uk"], "EG": ["egyptian", "ägyptisch"], "IN": ["indian", "indisch"],
+           "PK": ["pakistani", "pakistanisch"], "IR": ["iranian", "iranisch"], "SA": ["saudi"], "CH": ["swiss", "schweizer"], "FR": ["french", "französisch"]}
 
 
 def load_country_currency(lang, n, seed):
@@ -9227,9 +9236,14 @@ def load_country_currency(lang, n, seed):
 
 
 def score_country_currency(item, reply):
-    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "").lower()
+    raw = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = raw.lower()
     code, en, de = CUR[item["cc"]]
-    ok = bool(re.search(rf"\b{code.lower()}\b", fa)) or any(re.search(rf"(?<![a-zäöüßđồ]){re.escape(x)}", fa) for x in en + de)
+    ok = bool(re.search(rf"\b{code}\b", raw)) or any(  # the code in capitals only: "try", "pen", "mad" are words
+        re.search(rf"(?<![a-zäöüßđồ]){re.escape(x)}(?:s|es|n|en|or)?(?![a-zäöüßđồ'’])", fa) for x in en + de)  # pesos, Rubeln; not "won't"
+    nat = lambda cc: any(re.search(rf"(?<![a-zäöü]){re.escape(w)}", fa) for w in CUR_NAT.get(cc, []))  # noqa: E731
+    if ok and not nat(item["cc"]) and any(nat(cc) for cc in CUR_NAT if cc != item["cc"]):
+        ok = False  # "US dollar" for Canada, "Indian rupee" for Pakistan
     if code != "EUR" and re.search(r"\beuro\b|\beur\b", fa):
         ok = False  # a non-euro country answered with the euro
     return {"correct": ok, "score": float(ok), "pred": fa[:40], "gold": item["gold"], "detail": {}}

@@ -2809,7 +2809,7 @@ TASKS = {
     "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 24, lang_check=False),
     "false_friends": task(("de", "en"), load_false_friends, score_false_friends, 128, 12),
     "quote_keep": task(("de", "en"), load_quote_keep, score_quote_keep, 256, 24, lang_check=False),
-    "en_article_sound": task(("en",), load_en_article_sound, score_en_article_sound, 16, 28, lang_check=False),
+    "en_article_sound": task(("en",), load_en_article_sound, score_en_article_sound, 16, 27, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

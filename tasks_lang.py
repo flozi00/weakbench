@@ -3316,7 +3316,7 @@ GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed"
             ("meaning", "Remember ___ the door when you leave!", "lock", "inf"),
             ("meaning", "I will never forget ___ the Alps for the first time.", "see", "gerund"),
             ("meaning", "Don't forget ___ your mother tonight.", "call", "inf"),
-            ("meaning", "The printer didn't work, so I tried ___ it off and on again, and it worked.", "switch", "gerund"),
+            ("meaning", "The printer didn't work, so I tried ___ it off and on again to see if that helped.", "switch", "gerund"),
             ("meaning", "I tried ___ the box, but it was too heavy.", "lift", "inf")]
 
 

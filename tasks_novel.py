@@ -7458,6 +7458,9 @@ def load_vat_calc(lang, n, seed):
 
 def score_vat_calc(item, reply):
     fa = result_side(final_answer(reply["content"]) or "")
+    if item["kind"] == "vat":
+        tail = re.split(r"\b(?:davon|of which|vat|mwst|mehrwertsteuer)\b", fa, flags=re.I)
+        fa = tail[-1] if len(tail) > 1 and re.search(r"\d", tail[-1]) else fa  # "Netto 75,95 €, davon MwSt 14,43 €"
     eur = re.search(r"(\d[\d.,  ]*\d)\s*(?:€|\beuros?\b|\beur\b)|€\s*(\d[\d.,  ]*\d)", fa, re.I)
     v = parse_number(eur[1] or eur[2], item["lang"]) if eur else answer_value(fa, item["lang"])
     near = lambda x: v is not None and abs(v - x) < 0.006  # noqa: E731

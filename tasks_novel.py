@@ -5362,6 +5362,53 @@ def score_edit_rule(item, reply):
             "detail": {f"ok_rule_{item['rule']}": float(ok), "broke_exception": float(broke)}}
 
 
+# ---------------------------------------------------------------- csv_field (careful parsing)
+CF_CITY = ["Berlin", "Köln", "Hamburg", "Leipzig", "Bremen"]
+CF_NOTE = ['Smith, John', 'paid, but late', 'say "hi"', 'A, B and C', '', 'ok', 'call back "today", please']
+
+
+def load_csv_field(lang, n, seed):
+    import csv
+    import io
+    items = []
+    head = ["id", "name", "city", "note", "amount"]
+    for i in range(n or 120):
+        r = rng_of("csv_field", i)
+        while True:
+            rows = [[str(100 + j), r.choice(["Ana", "Bo", "Cy", "Di", "Ed"]) + " " + r.choice(["Lee", "Kim", "Roe"]),
+                     r.choice(CF_CITY), r.choice(CF_NOTE), str(r.randint(5, 500))] for j in range(4)]
+            buf = io.StringIO()
+            csv.writer(buf, lineterminator="\n").writerows([head] + rows)
+            text = buf.getvalue()
+            k = r.randrange(4)
+            col = r.choice([2, 3, 4])  # after the note column the naive split shifts
+            line = text.splitlines()[k + 1]
+            naive = line.split(",")
+            gold = rows[k][col]
+            nv = naive[col] if col < len(naive) else ""
+            if nv != gold and gold != "":
+                break
+        q = (f"Here is a CSV file:\n```\n{text}```\nWhat is the value of the column \"{head[col]}\" in the row with id {rows[k][0]}? "
+             "Give the value without quotes." if lang == "en" else
+             f"Hier ist eine CSV-Datei:\n```\n{text}```\nWelchen Wert hat die Spalte „{head[col]}“ in der Zeile mit der id {rows[k][0]}? "
+             "Gib den Wert ohne Anführungszeichen an.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": nv.strip('"'),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_csv_field(item, reply):
+    lines = re.findall(r"(?:Answer|Antwort)\s*\**\s*:\s*(.+)", reply["content"] or "")  # raw: final_answer strips quotes
+    v = re.sub(r"^\**|\**$", "", lines[-1].strip()).strip().strip("`").strip() if lines else ""
+    norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()  # noqa: E731
+    forms = {v}
+    if len(v) >= 2 and v[0] in '"“„' and v[-1] in '"“”':
+        forms |= {v[1:-1], v[1:-1].replace('""', '"')}  # one wrapping pair, or the CSV-escaped form
+    ok = any(norm(f) == norm(item["gold"]) for f in forms)
+    return {"correct": ok, "score": float(ok), "pred": v[:80], "gold": item["gold"],
+            "detail": {"took_naive_split": float(any(norm(f) == norm(item["naive"]) for f in forms) and not ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6937,6 +6984,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "csv_field": task(load_csv_field, score_csv_field, 24, 120),
     "edit_rule": task(load_edit_rule, score_edit_rule, 24, 120),
     "split_bill": task(load_split_bill, score_split_bill, 24, 120),
     "new_concept": task(load_new_concept, score_new_concept, 24, 120),

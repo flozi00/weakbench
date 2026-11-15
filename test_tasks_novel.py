@@ -1933,6 +1933,14 @@ def test_geo_coords():
     assert not tn.score_geo_coords(c, {"content": f"Antwort: {c['gold']} oder {other}"})["correct"]
     y = next(x for x in xs if x["kind"] == "city")
     assert tn.score_geo_coords(y, {"content": f"Antwort: {y['names'][0]}"})["correct"]
+    fake = lambda cc, kind="country", names=(): {"kind": kind, "cc": cc, "gold": "", "names": list(names), "lang": "en"}  # noqa: E731
+    assert not tn.score_geo_coords(fake("KR"), {"content": "Answer: North Korea"})["correct"]
+    assert not tn.score_geo_coords(fake("US"), {"content": "Answer: South America"})["correct"]
+    assert tn.score_geo_coords(fake("GB"), {"content": "Answer: Northern Ireland"})["correct"]
+    assert not tn.score_geo_coords(fake("IE"), {"content": "Answer: Northern Ireland"})["correct"]
+    assert tn.score_geo_coords(fake("AU"), {"content": "Answer: Australia, New South Wales"})["correct"]
+    assert tn.score_geo_coords(fake("US"), {"content": "Answer: Albuquerque, New Mexico, U.S."})["correct"]
+    assert tn._geo_fmt(-27.483, 0, 2).startswith("27°28′59″S")
     e = next(x for x in tn.load_geo_coords("en", None, 0) if x["kind"] == "country")
     assert tn.score_geo_coords(e, {"content": f"Answer: {e['gold']}"})["correct"]
 

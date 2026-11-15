@@ -8893,7 +8893,9 @@ def _geo_fmt(la, lo, style):
         return f"{abs(la):.2f}° {'N' if la >= 0 else 'S'}, {abs(lo):.2f}° {'E' if lo >= 0 else 'W'}"
     if style == 1:
         return f"{la:.3f}, {lo:.3f}"
-    dms = lambda v: f"{int(abs(v))}°{int(abs(v) * 60 % 60):02d}′{int(abs(v) * 3600 % 60):02d}″"  # noqa: E731
+    def dms(v):  # rounded to the second, carried into minutes and degrees
+        t = round(abs(v) * 3600)
+        return f"{t // 3600}°{t // 60 % 60:02d}′{t % 60:02d}″"
     return f"{dms(la)}{'N' if la >= 0 else 'S'} {dms(lo)}{'E' if lo >= 0 else 'W'}"
 
 
@@ -8924,8 +8926,10 @@ def load_geo_coords(lang, n, seed):
 def score_geo_coords(item, reply):
     g = GEO_PLACES.value
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    has = lambda nm: re.search(rf"(?<![\w]){re.escape(nm)}(?![\w])", fa, re.I)  # noqa: E731
-    named = {cc for cc, (en, de) in g["countries"].items() if any(has(x) for x in en + de)}
+    fa = re.sub(r"(?i)\bnew south wales|neusüdwales|\bnew mexico|neumexiko|\bnew england\b", " ", fa)  # regions, not countries
+    fa = re.sub(r"(?i)\bnorthern ireland\b", " Nordirland ", fa)  # not "Ireland"
+    has = lambda nm: re.search(rf"(?<![\w]){re.escape(nm.rstrip('.'))}\.?(?![\w])", fa, re.I)  # noqa: E731  "U.S" after final_answer
+    named = {cc for cc, (en, de) in {**g["countries"], **g.get("decoys", {})}.items() if any(has(x) for x in en + de)}
     if item["kind"] == "country":
         ok = named == {item["cc"]}  # one country, the right one ("Germany or Austria" fails)
     else:

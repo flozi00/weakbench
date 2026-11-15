@@ -1914,7 +1914,7 @@ def load_double_negation(lang, n, seed):
         stmts = [dn_statement(r, x, target_negs if j == 0 else r.randrange(4), lang)[0] for j, x in enumerate(people)]
         on = target_negs % 2 == 0
         r.shuffle(stmts)
-        q_neg = r.random() < 0.5
+        q_neg = (i // 4) % 2 == 1  # dealt out: with target_negs = i % 4 every (negs, polarity) cell is equally filled
         yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
         x = people[0]
         items.append({"id": str(i), "lang": lang, "negs": target_negs, "gold": yes if on != q_neg else no,

@@ -1352,9 +1352,19 @@ def test_median_traps():
     assert not ok(f"Answer: {g} (or 46 if unsorted)")
 
 
+
+def test_work_rates():
+    import tasks_novel as tn
+    x = next(x for x in tn.load_work_rates("en", 20, 0) if x["exact"] > 70)
+    h, m = divmod(x["gold"], 60)
+    for t in (f"Answer: {h} h {m} min", f"Answer: {x['gold']} min = {x['exact'] / 60:.2f} h", f"Answer: {x['gold']}"):
+        assert tn.score_work_rates(x, {"content": t})["correct"], t
+
+
 if __name__ == "__main__":
     test_weekday_calc()
     test_median_traps()
+    test_work_rates()
     test_recipe_scale()
     test_unit_price()
     test_count_mentions()

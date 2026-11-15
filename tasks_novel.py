@@ -4790,7 +4790,11 @@ def load_work_rates(lang, n, seed):
 
 
 def score_work_rates(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    hm = re.search(r"(\d+)\s*(?:h|std|stunden?|hours?)\b\D{0,8}?(\d+)\s*min", fa, re.I)
+    mins = re.findall(r"(\d+(?:[.,]\d+)?)\s*min", fa, re.I)
+    v = (int(hm[1]) * 60 + int(hm[2]) if hm else float(mins[0].replace(",", ".")) if len(set(mins)) == 1
+         else answer_value(fa, item["lang"]))  # "1 h 43 min" -> 103, "103 min = 1.71 h" -> 103
     ok = v is not None and abs(v - item["exact"]) <= 1
     d = {"ok_drain" if item["drain"] else "ok_plain": float(ok),
          "took_average": float(v is not None and abs(v - item["avg"]) <= 1)}

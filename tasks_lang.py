@@ -2544,13 +2544,13 @@ def score_de_weil_denn(item, reply):
 
 # ---------------------------------------------------------------- de_capitals (Groß- und Kleinschreibung)
 # The sentence comes all lowercase; the model restores the capitals. Traps: nominalisations, time words, Sie / sie.
-DC_ITEMS = [("nominal", "Beim Laufen höre ich gern Musik."), ("nominal", "Wir wünschen dir alles Gute zum Geburtstag."),
+DC_ITEMS = [("nominal", "Ich höre beim Laufen gern Musik."), ("nominal", "Wir wünschen der ganzen Familie alles Gute zum Geburtstag."),
             ("nominal", "Im Allgemeinen ist das Wetter hier mild."), ("nominal", "Es gibt nichts Neues aus dem Büro."),
             ("nominal", "Das Schöne an diesem Job ist die Freiheit."), ("nominal", "Er hat sich zum Lernen in die Bibliothek gesetzt."),
             ("nominal", "Sie hat etwas Wichtiges vergessen."), ("nominal", "Das Rauchen ist hier verboten."),
             ("time", "Wir treffen uns heute Abend am Bahnhof."), ("time", "Am Montagabend habe ich keine Zeit."),
-            ("time", "Montags gehe ich immer schwimmen."), ("time", "Er kommt am Dienstagmorgen mit dem Zug."),
-            ("time", "Gestern Mittag war es sehr heiß."), ("time", "Abends lese ich meistens ein Buch."),
+            ("time", "Ich gehe montags immer schwimmen."), ("time", "Er kommt am Dienstagmorgen mit dem Zug."),
+            ("time", "Gestern Mittag war es sehr heiß."), ("time", "Ich lese abends meistens ein Buch."),
             ("address", "Können Sie mir bitte helfen, Frau Weber?"), ("address", "Ich habe Ihnen die Unterlagen geschickt."),
             ("address", "Anna sagt, sie kommt später."), ("address", "Haben Sie Ihren Schlüssel gefunden?"),
             ("nominal", "Er ist der Erste, der angekommen ist."), ("address", "Wir wünschen Ihnen und Ihrer Familie schöne Feiertage.")]
@@ -2560,14 +2560,17 @@ def load_de_capitals(lang, n, seed):
     rows = DC_ITEMS[:min(n or len(DC_ITEMS), len(DC_ITEMS))]
     return [{"id": str(i), "lang": "de", "gold": g, "kind": k,
              "messages": [{"role": "user", "content": "Schreib diesen Satz mit korrekter Groß- und Kleinschreibung. "
-                           "Antworte nur mit dem Satz.\n\n" + g.lower()}]}
+                           + ("Er stammt aus einer E-Mail an Frau Weber, die gesiezt wird. " if k == "address" and "Anna" not in g else "")
+                           + "Antworte nur mit dem Satz.\n\n" + g.lower()}]}
             for i, (k, g) in enumerate(rows)]
 
 
 def score_de_capitals(item, reply):
     words = lambda t: re.findall(r"[A-Za-zÄÖÜäöüß]+", t)  # noqa: E731
-    lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
-    got, want = words(lines[0] if lines else ""), words(item["gold"])
+    want = words(item["gold"])
+    lines = [words(x) for x in (reply["content"] or "").splitlines() if x.strip()]
+    same_line = [x for x in lines if [g.lower() for g in x] == [w.lower() for w in want]]  # skip an intro line
+    got = same_line[0] if same_line else (lines[0] if lines else [])
     same = len(got) == len(want) and [g.lower() for g in got] == [w.lower() for w in want]
     wrong = sum(g != w for g, w in zip(got, want)) if same else len(want)
     ok = same and wrong == 0

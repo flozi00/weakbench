@@ -2503,6 +2503,38 @@ def score_en_article_sound(item, reply):
             "detail": {"ok_sound_vs_letter" if item["tricky"] else "ok_plain": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_weil_denn (verb position after the conjunction)
+# weil / da send the finite verb to the end, denn keeps it second. Spoken German often says "weil er hat keine Zeit";
+# written standard German does not. Exact clause check.
+WD_MAIN = ["Ich bleibe heute zu Hause.", "Wir verschieben das Treffen.", "Anna nimmt ein Taxi."]
+WD_CLAUSE = [("er", "hat", "keine Zeit"), ("es", "regnet", "seit Stunden"), ("der Zug", "fährt", "erst um acht"),
+             ("wir", "müssen", "morgen früh aufstehen"), ("die Chefin", "ist", "krank")]
+
+
+def load_de_weil_denn(lang, n, seed):
+    items = []
+    for i in range(min(n or 30, 30)):
+        conj = ("weil", "denn", "da")[i % 3]
+        subj, verb, rest = WD_CLAUSE[(i // 3) % 5]
+        main = WD_MAIN[(i // 3 + i // 15) % 3]
+        second = f"{subj[0].upper()}{subj[1:]} {verb} {rest}."
+        gold = f"{conj} {subj} {verb} {rest}" if conj == "denn" else f"{conj} {subj} {rest} {verb}"
+        items.append({"id": str(i), "lang": "de", "gold": gold, "conj": conj, "bait": f"{conj} {subj} {verb} {rest}",
+                      "messages": [{"role": "user", "content": f"Verbinde die beiden Sätze mit „{conj}“ zu einem Satz "
+                                    f"(Standardschriftdeutsch, der erste Satz bleibt vorne). Antworte nur mit dem Satz.\n\n{main} {second}"}]})
+    return items
+
+
+def score_de_weil_denn(item, reply):
+    t = re.sub(r"\s+", " ", (reply["content"] or "").lower())
+    ok = item["gold"].lower() in t
+    vl = item["conj"] != "denn"
+    d = {"ok_vl" if vl else "ok_v2": float(ok)}
+    if vl:
+        d["took_v2"] = float(item["bait"].lower() in t)
+    return {"correct": ok, "score": float(ok), "pred": t[:120], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2810,6 +2842,7 @@ TASKS = {
     "false_friends": task(("de", "en"), load_false_friends, score_false_friends, 128, 12),
     "quote_keep": task(("de", "en"), load_quote_keep, score_quote_keep, 256, 24, lang_check=False),
     "en_article_sound": task(("en",), load_en_article_sound, score_en_article_sound, 16, 27, lang_check=False),
+    "de_weil_denn": task(("de",), load_de_weil_denn, score_de_weil_denn, 64, 30, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

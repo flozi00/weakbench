@@ -10338,6 +10338,80 @@ def score_sliding_puzzle(item, reply):
             "detail": {f"ok_m{'8-11' if item['moves'] <= 11 else '12-16'}": float(ok), "start_bait": float(v == item["start_tile"])}}
 
 
+# ---------------------------------------------------------------- cube_net
+# A cube net (6 lettered squares on a grid, generated: any 6-square shape that folds into a cube) and the question which
+# letter ends up opposite a given one. Mental folding, not a memorised cross. The asked letter is never in a straight
+# line two squares away (the one pattern people know), in half the items. `ok_straight` / `ok_bent`, `neighbour_bait`.
+def cn_fold(cells):
+    """Roll a cube over the net from the first cell; returns {cell: body face 0-5} or None when two cells share a face
+    (not a net). Body faces are named by their direction at the start: 0 down, 1 up, 2 east, 3 west, 4 north, 5 south."""
+    vec = {0: (0, 0, -1), 1: (0, 0, 1), 2: (1, 0, 0), 3: (-1, 0, 0), 4: (0, 1, 0), 5: (0, -1, 0)}
+    start, seen, out = cells[0], set(), {}
+
+    def roll(v, dx, dy):  # rolling toward +x: east goes down, down goes west, west up, up east (same for y)
+        x, y, z = v
+        return (dx * z, y, -dx * x) if dx else (x, dy * z, -dy * y)
+
+    def visit(c, orient):
+        if c in seen:
+            return True
+        seen.add(c)
+        face = next(f for f, v in orient.items() if v == (0, 0, -1))
+        if face in out.values():
+            return False
+        out[c] = face
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nb = (c[0] + dx, c[1] + dy)
+            if nb in cells and nb not in seen and not visit(nb, {f: roll(v, dx, dy) for f, v in orient.items()}):
+                return False
+        return True
+
+    return out if visit(start, dict(vec)) and len(out) == 6 else None
+
+
+def load_cube_net(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("cube_net", i, att)
+        while True:
+            cells = [(0, 0)]
+            while len(cells) < 6:
+                c = r.choice(cells)
+                nb = (c[0] + r.choice((-1, 0, 1)), c[1]) if r.random() < 0.5 else (c[0], c[1] + r.choice((-1, 0, 1)))
+                if nb not in cells:
+                    cells.append(nb)
+            fold = cn_fold(cells)
+            if not fold:
+                continue
+            letters = r.sample("ABCDEFGHKLMNPRST", 6)
+            lab = dict(zip(cells, letters))
+            ask = r.choice(cells)
+            opp = next(c for c in cells if fold[c] == fold[ask] ^ 1)  # 0/1, 2/3, 4/5 are opposite
+            straight = (ask[0] == opp[0] and abs(ask[1] - opp[1]) == 2) or (ask[1] == opp[1] and abs(ask[0] - opp[0]) == 2)
+            if straight == (i % 2 == 0):
+                break
+        xs, ys = [c[0] for c in cells], [c[1] for c in cells]
+        grid = "\n".join(" ".join(lab.get((x, y), ".") for x in range(min(xs), max(xs) + 1))
+                          for y in range(max(ys), min(ys) - 1, -1))
+        q = (f"This is the net of a cube (each letter is one square face, \".\" is empty space):\n\n{grid}\n\nThe net is "
+             f"folded into a cube. Which letter is on the face opposite {lab[ask]}?" if lang == "en" else
+             f"Das ist das Netz eines Würfels (jeder Buchstabe ist eine quadratische Fläche, „.“ ist leer):\n\n{grid}\n\n"
+             f"Das Netz wird zu einem Würfel gefaltet. Welcher Buchstabe liegt der Fläche {lab[ask]} gegenüber?")
+        nbrs = [lab[c] for c in cells if abs(c[0] - ask[0]) + abs(c[1] - ask[1]) == 1]
+        items.append({"id": str(i), "lang": lang, "gold": lab[opp], "letters": letters, "nbrs": nbrs, "straight": straight,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cube_net(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    found = {x for x in re.findall(r"\b([A-Z])\b", fa) if x in item["letters"]}
+    v = found.pop() if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_straight" if item["straight"] else "ok_bent": float(ok), "neighbour_bait": float(v in item["nbrs"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11446,6 +11520,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "cube_net": task(load_cube_net, score_cube_net, 24, 96),
     "sliding_puzzle": task(load_sliding_puzzle, score_sliding_puzzle, 24, 96),
     "toy_machine": task(load_toy_machine, score_toy_machine, 24, 96),
     "hanoi_state": task(load_hanoi_state, score_hanoi_state, 24, 96),

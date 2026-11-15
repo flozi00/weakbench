@@ -772,3 +772,24 @@ def test_honest_ad():
 
 if __name__ == "__main__":
     test_honest_ad()
+
+
+def test_vegan_adapt():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_vegan_adapt("de", None, 0)[0]  # Pfannkuchen
+        lines = "\n".join(f"- {a:g} {u} {nm}".replace(",", ",") for nm, a, u in x["scaled"])
+        good = lines.replace(".", ",") + "\n- 450 ml Hafermilch\n- 3 EL Apfelmus statt Eiern\n- 30 g vegane Butter\n1. Verrühren. 2. Ausbacken."
+        r = to.score_vegan_adapt(x, {"content": good})
+        assert r["detail"]["scaled_ok"] == 1 and r["detail"]["vegan"] == 1, r  # "statt Eiern" is the thing replaced
+        good2 = good
+        assert to.score_vegan_adapt(x, {"content": good2})["correct"], to.score_vegan_adapt(x, {"content": good2})
+        assert to.score_vegan_adapt(x, {"content": good2 + "\n- 2 Eier"})["detail"]["vegan"] == 0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_vegan_adapt()

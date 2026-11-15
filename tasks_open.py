@@ -1951,6 +1951,82 @@ def score_honest_ad(item, reply):
                        "no_overclaim": float(no_claims), "limitation_stated": float(limit_ok), "grammar": float(grammar)}}
 
 
+# ---------------------------------------------------------------- vegan_adapt (judge + exact: scale and substitute)
+# A recipe for p servings with 2-3 animal ingredients; scale it to q servings AND make it vegan. Plant ingredients must
+# carry the exactly scaled amounts (code); no animal ingredient may remain (code, word list); the judge checks the
+# substitutes are sensible in kind and amount and the method still works.
+VA_RECIPES = {"en": [("pancakes", [("flour", 200, "g"), ("sugar", 30, "g"), ("salt", 2, "g")], [("milk", 300, "ml"), ("eggs", 2, ""), ("butter", 20, "g")]),
+                     ("pasta bake", [("pasta", 400, "g"), ("tomatoes", 600, "g"), ("onion", 1, "")], [("cheese", 150, "g"), ("cream", 200, "ml")]),
+                     ("muffins", [("flour", 250, "g"), ("sugar", 100, "g"), ("baking powder", 10, "g")], [("butter", 80, "g"), ("eggs", 2, ""), ("yoghurt", 150, "g")]),
+                     ("curry", [("rice", 300, "g"), ("chickpeas", 400, "g"), ("curry paste", 40, "g")], [("chicken", 400, "g"), ("cream", 150, "ml")])],
+              "de": [("Pfannkuchen", [("Mehl", 200, "g"), ("Zucker", 30, "g"), ("Salz", 2, "g")], [("Milch", 300, "ml"), ("Eier", 2, ""), ("Butter", 20, "g")]),
+                     ("Nudelauflauf", [("Nudeln", 400, "g"), ("Tomaten", 600, "g"), ("Zwiebel", 1, "")], [("Käse", 150, "g"), ("Sahne", 200, "ml")]),
+                     ("Muffins", [("Mehl", 250, "g"), ("Zucker", 100, "g"), ("Backpulver", 10, "g")], [("Butter", 80, "g"), ("Eier", 2, ""), ("Joghurt", 150, "g")]),
+                     ("Curry", [("Reis", 300, "g"), ("Kichererbsen", 400, "g"), ("Currypaste", 40, "g")], [("Hähnchen", 400, "g"), ("Sahne", 150, "ml")])]}
+VA_ANIMAL = {"en": r"\b(?:milk|eggs?|butter|cheese|cream|yogh?urt|chicken|honey)\b", "de": r"\b(?:milch|eier?n?|butter|käse|sahne|joghurt|hähnchen|honig)\b"}
+VA_PLANT_OK = {"en": r"(?:oat|soy|almond|plant|vegan|coconut|nut)[\s-]*$", "de": r"(?:hafer|soja|mandel|pflanz\w*|vegan\w*|kokos|nuss)[\s-]*$"}
+VA_JUDGE = """ORIGINAL RECIPE ({p} servings):
+{orig}
+
+ADAPTED RECIPE (should be for {q} servings and vegan):
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Every animal ingredient is replaced by a sensible plant-based substitute of a fitting kind and amount for {q} servings
+   (e.g. plant milk for milk, flax or banana or aquafaba for eggs, margarine or oil for butter).
+2. The method still works and is coherent with the new ingredients; nothing important is missing.
+3. The language is correct {language}."""
+
+
+def load_vegan_adapt(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 16):
+        r = random.Random(f"vegan_adapt:{i}")
+        dish, plant, animal = VA_RECIPES[lang][i % 4]
+        p, q = [(2, 3), (2, 5), (4, 6), (4, 10), (3, 6), (6, 9)][(i // 4) % 6]  # distinct per dish for up to 24 items
+        fmt = lambda nm, a, u: f"- {a:g} {u} {nm}".replace("  ", " ") if u else f"- {a:g} {nm}"  # noqa: E731
+        base = [(nm, a * p / 4, u) for nm, a, u in plant + animal]
+        orig = "\n".join(fmt(nm, a, u) for nm, a, u in base)
+        req = (f"Here is a recipe for {dish} for {p} servings:\n{orig}\nAdapt it for {q} servings and make it vegan. List all "
+               f"ingredients with amounts, then 2-4 short steps." if lang == "en" else
+               f"Hier ist ein Rezept für {dish} für {p} Portionen:\n{orig}\nPasse es für {q} Portionen an und mach es vegan. Nenne "
+               f"alle Zutaten mit Mengen, dann 2-4 kurze Schritte.")
+        scaled = [(nm, a * q / p, u) for nm, a, u in base[:len(plant)]]
+        items.append({"id": str(i), "lang": lang, "orig": orig, "p": p, "q": q, "scaled": scaled,
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_vegan_adapt(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    low = text.lower()
+    # an animal word counts unless a plant prefix stands right before it ("Hafermilch", "oat milk", "vegane Butter")
+    # ... and unless it is the thing replaced ("statt Eiern", "instead of butter", "ohne Sahne")
+    gone = r"(?:statt|anstelle von|anstatt|ohne|ersetzt|instead of|without|replaces?|in place of|no)\s+(?:der |die |das |the )?$"
+    left = [m[0] for m in re.finditer(VA_ANIMAL[item["lang"]], low) if not re.search(VA_PLANT_OK[item["lang"]], low[:m.start()])
+            and not re.search(gone, low[max(0, m.start() - 20):m.start()])]
+    num = lambda x: x.replace(",", ".")  # noqa: E731
+    missing = []
+    for nm, a, u in item["scaled"]:
+        line = next((ln for ln in low.splitlines() if nm.lower() in ln), "")
+        vals = [float(num(v)) for v in re.findall(r"\d+(?:[.,]\d+)?", line)]
+        if not any(abs(v - a) <= max(0.06 * a, 0.5) for v in vals):
+            missing.append(nm)
+    out = tasks_judge.judge("", VA_JUDGE.format(p=item["p"], q=item["q"], orig=item["orig"], text=text or "(empty)",
+                                                language="German" if item["lang"] == "de" else "English"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable vegan_adapt verdict {out[:120]!r}")
+    subs, method, grammar = (_yes(x) for x in v)
+    met = [not left, not missing, subs, method, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"vegan": float(not left), "scaled_ok": float(not missing), "substitutes": float(subs), "method": float(method),
+                       "grammar": float(grammar)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2524,6 +2600,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                        "think": False, "max_tokens": 384,
                        "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
                        "lang_check": True, "opt_in": True, "needs_judge": True},
+         "vegan_adapt": {"langs": ("de", "en"), "load": load_vegan_adapt, "score": score_vegan_adapt,
+                         "think": False, "max_tokens": 512,
+                         "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
+                         "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

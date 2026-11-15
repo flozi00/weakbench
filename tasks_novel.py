@@ -8473,7 +8473,13 @@ def load_chord_transpose(lang, n, seed):
 
 
 def score_chord_transpose(item, reply):
-    fa = (final_answer(reply["content"]) or "").replace("♯", "#").replace("–", " ").replace(",", " ").replace("|", " ")
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "").replace("♯", "#").replace("->", "→")
+    arrows = fa.count("→")
+    if arrows == item["n"]:  # "Dm → F#m, F# → A#, ...": the chord after each arrow
+        fa = " ".join(re.findall(r"→\s*(\S+)", fa))
+    elif arrows == 1:  # "source → target"
+        fa = fa.split("→")[1]
+    fa = fa.replace("–", " ").replace(",", " ").replace("|", " ")
     flat = {"Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#"}  # flats are wrong per the prompt, but read for the detail
     toks = re.findall(r"\b[A-G](?:#|b)?(?:m7|m|7)?(?![\w#])", fa)
     v = " ".join(toks[-item["n"]:]) if len(toks) >= item["n"] else None
@@ -8484,7 +8490,7 @@ def score_chord_transpose(item, reply):
 
 
 # ---------------------------------------------------------------- nutrition_portion (per-100 g label to a real portion)
-NP_FOODS = {"en": ["muesli", "crackers", "yoghurt", "granola bar mix", "peanut butter"], "de": ["Müsli", "Cracker", "Joghurt", "Riegelmischung", "Erdnussbutter"]}
+NP_FOODS = {"en": ["muesli", "crackers", "yoghurt", "nut mix", "peanut butter"], "de": ["Müsli", "Cracker", "Joghurt", "Nussmischung", "Erdnussbutter"]}
 
 
 def load_nutrition_portion(lang, n, seed):
@@ -8498,25 +8504,27 @@ def load_nutrition_portion(lang, n, seed):
         kind = ("kcal", "sugar")[i % 2]
         per = kcal if kind == "kcal" else sugar
         gold = F(per * portion * k, 100)
-        if gold.denominator > 10:  # at most one decimal
-            gold = F(round(float(gold) * 10), 10)
+        exact = float(gold)
+        gold = F(round(exact * 10), 10)  # the one-decimal answer; the scorer accepts the exact value too
         bait = per * k  # the per-100 g value taken as the portion value
         unit = "kcal" if kind == "kcal" else "g"
         g = f"{float(gold):g}"
         what = ({"kcal": "energy (kcal)", "sugar": "sugar (g)"} if lang == "en" else {"kcal": "Energie (kcal)", "sugar": "Zucker (g)"})[kind]
         q = (f"The label of a pack of {food} says per 100 g: {kcal} kcal, {sugar} g sugar. One portion is {portion} g. How much "
              f"{what} do {k} portion{'s' if k > 1 else ''} contain? Round to one decimal if needed." if lang == "en" else
-             f"Auf der Packung {food} steht pro 100 g: {kcal} kcal, {sugar} g Zucker. Eine Portion sind {portion} g. Wie viel "
+             f"Auf einer Packung {food} steht pro 100 g: {kcal} kcal, {sugar} g Zucker. Eine Portion sind {portion} g. Wie viel "
              f"{what} enthalten {k} Portion{'en' if k > 1 else ''}? Runde bei Bedarf auf eine Nachkommastelle.")
-        items.append({"id": str(i), "lang": lang, "gold": float(gold), "bait": float(bait), "kind": kind, "unit": unit,
+        items.append({"id": str(i), "lang": lang, "gold": float(gold), "exact": exact, "bait": float(bait), "kind": kind, "unit": unit,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_nutrition_portion(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
-    v = answer_value(fa, item["lang"])
-    ok = v is not None and abs(v - item["gold"]) <= 0.1 + 1e-9
+    fa = re.split(r"=|→|->", fa)[-1]
+    m = re.search(rf"(\d+(?:[.,]\d+)?)\s*{re.escape(item['unit'])}\b", fa)  # "3 portions contain 14.4 g": the number with the unit
+    v = answer_value(m[1] if m else fa, item["lang"])
+    ok = v is not None and abs(v - item["exact"]) <= 0.05 + 1e-9  # the rounded or the exact value
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_{item['kind']}": float(ok), "per_100g_value": float(v is not None and abs(v - item["bait"]) < 1e-9 and item["bait"] != item["gold"])}}
 

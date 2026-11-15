@@ -6465,8 +6465,8 @@ def load_claim_check(lang, n, seed):
     M = CC_MONTHS[lang]
     for i in range(n or 120):
         r = rng_of("claim_check", i)
-        kind = ("rise", "best", "total", "undecidable")[i % 4]
-        want_true = (i // 4) % 2 == 0
+        kind = "undecidable" if i % 3 == 2 else ("rise", "best", "total")[(i // 3) % 3]  # labels in equal thirds
+        want_true = i % 3 == 0
         while True:
             vals = [r.randrange(20, 90) for _ in M]
             if kind == "rise":

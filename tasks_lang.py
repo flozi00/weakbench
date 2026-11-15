@@ -2323,7 +2323,7 @@ TP_EN = [("at", lambda r: f"{r.randint(1, 12)} pm"), ("on", lambda r: r.choice([
 TP_DE = [("um", lambda r: f"{r.randint(1, 12)} Uhr"), ("am", lambda r: r.choice(["Montag", "Freitag", "Sonntag"])),
          ("im", lambda r: r.choice(["Mai", "Oktober", "März"])), ("im", lambda r: f"Jahr {r.randint(1990, 2023)}"),
          ("am", lambda r: f"{r.randint(2, 28)}. {r.choice(['Mai', 'Juni', 'Juli'])}"), ("in", lambda r: "der Nacht"),
-         ("am", lambda r: r.choice(["Morgen", "Abend"])), ("am", lambda r: "Wochenende")]
+         ("am", lambda r: r.choice(["Morgen", "Abend"])), ("um", lambda r: "Mitternacht")]
 TP_FRAME = {"en": "The meeting with Clara takes place ___ {t}.", "de": "Das Treffen mit Clara findet ___ {t} statt."}
 
 

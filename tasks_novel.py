@@ -5196,12 +5196,12 @@ def _nc_conds(r):
     lo = r.randint(10, 40)
     hi = lo + r.randint(30, 50)
     primes = {2, 3, 5, 7, 11, 13, 17, 19, 23}
-    return [("it is even", "sie ist gerade", lambda x: x % 2 == 0),
-            ("its digit sum is a prime number", "ihre Quersumme ist eine Primzahl", lambda x: sum(map(int, str(x))) in primes),
-            (f"it is divisible by {k}", f"sie ist durch {k} teilbar", lambda x, k=k: x % k == 0),
-            (f"it lies between {lo} and {hi} (both included)", f"sie liegt zwischen {lo} und {hi} (beide eingeschlossen)",
+    return [("it is even", "sie gerade ist", lambda x: x % 2 == 0),
+            ("its digit sum is a prime number", "ihre Quersumme eine Primzahl ist", lambda x: sum(map(int, str(x))) in primes),
+            (f"it is divisible by {k}", f"sie durch {k} teilbar ist", lambda x, k=k: x % k == 0),
+            (f"it lies between {lo} and {hi} (both included)", f"sie zwischen {lo} und {hi} liegt (beide eingeschlossen)",
              lambda x, lo=lo, hi=hi: lo <= x <= hi),
-            ("its last digit is larger than its first digit", "ihre letzte Ziffer ist größer als ihre erste Ziffer",
+            ("its last digit is larger than its first digit", "ihre letzte Ziffer größer als ihre erste Ziffer ist",
              lambda x: int(str(x)[-1]) > int(str(x)[0]))]
 
 
@@ -5222,7 +5222,7 @@ def load_new_concept(lang, n, seed):
         d = (f"A number is a {word} if {pos[0][li]} and {pos[1][li]}" if lang == "en" else
              f"Eine Zahl ist ein {word.capitalize()}, wenn {pos[0][li]} und {pos[1][li]}")
         if exc:
-            d += f", unless {exc[li]}" if lang == "en" else f", außer {exc[li]}"
+            d += f", unless {exc[li]}" if lang == "en" else f", außer wenn {exc[li]}"
         q = (f"{d}.\nWhich of these numbers are {word}s? {', '.join(map(str, nums))}\nList all of them, separated by commas "
              "(or write none)." if lang == "en" else
              f"{d}.\nWelche dieser Zahlen sind {word.capitalize()}s? {', '.join(map(str, nums))}\nNenne alle, durch Kommas getrennt "

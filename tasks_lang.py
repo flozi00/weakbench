@@ -2522,7 +2522,8 @@ def load_de_konj2(lang, n, seed):
         obj, inf = main.rsplit(" ", 1)
         if pers == "du":
             obj = obj.replace("dich", "mich").replace("dir", "mir")
-        sent = f"Wenn {subj} {K2_COND[verb]}, ___ {subj} {obj} {inf}."
+        main_subj = "sie" if pers == "sie" else subj
+        sent = f"Wenn {subj} {K2_COND[verb]}, ___ {main_subj} {obj} {inf}."
         gold = (K2_FORMS[verb][pers], K2_WUERDE[pers])
         items.append({"id": str(i), "lang": "de", "gold": " / ".join(gold), "forms": gold, "verb": verb,
                       "messages": [{"role": "user", "content": "Setze die richtigen Verbformen im Konjunktiv II ein "

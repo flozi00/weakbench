@@ -7929,6 +7929,41 @@ def score_loan_payoff(item, reply):
             "detail": {"ignored_interest": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- seat_pairs (adjacency on a seat map with an aisle)
+def load_seat_pairs(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("seat_pairs", i, att)
+        while True:
+            rows = r.randint(4, 8)
+            grid = [[r.random() < 0.45 for _ in range(6)] for _ in range(rows)]  # True = taken; seats A-F, aisle between C and D
+            pairs = sum(1 for row in grid for k in (0, 1, 3, 4) if not row[k] and not row[k + 1])
+            aisle = sum(1 for row in grid if not row[2] and not row[3])
+            if pairs >= 2 and aisle >= 1:
+                break
+        first = r.randint(1, 30)
+        lines = "\n".join(f"{first + k:>2}  {' '.join('X' if t else '.' for t in row[:3])}   {' '.join('X' if t else '.' for t in row[3:])}"
+                           for k, row in enumerate(grid))
+        q = (f"Seat map of a small plane (X = taken, . = free). Each row has seats A B C | aisle | D E F:\n     A B C   D E F\n{lines}\n"
+             f"Two people want to sit directly next to each other in the same row; seats across the aisle (C and D) are NOT next "
+             f"to each other. How many different pairs of free side-by-side seats are there? (In a row with A, B and C free, A-B "
+             f"and B-C are two pairs.)" if lang == "en" else
+             f"Sitzplan eines kleinen Flugzeugs (X = belegt, . = frei). Jede Reihe hat die Plätze A B C | Gang | D E F:\n"
+             f"     A B C   D E F\n{lines}\nZwei Personen wollen direkt nebeneinander in derselben Reihe sitzen; Plätze über "
+             f"den Gang hinweg (C und D) gelten NICHT als nebeneinander. Wie viele verschiedene Paare freier, nebeneinander "
+             f"liegender Plätze gibt es? (Sind in einer Reihe A, B und C frei, sind A-B und B-C zwei Paare.)")
+        items.append({"id": str(i), "lang": lang, "gold": pairs, "bait": pairs + aisle,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_seat_pairs(item, reply):
+    v = stated_int(reply, r"(?:pairs?|paare?)")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"counted_across_aisle": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9516,6 +9551,7 @@ TASKS = {
     "league_table": task(load_league_table, score_league_table, 24, 120),
     "access_rules": task(load_access_rules, score_access_rules, 24, 120),
     "loan_payoff": task(load_loan_payoff, score_loan_payoff, 24, 120),
+    "seat_pairs": task(load_seat_pairs, score_seat_pairs, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

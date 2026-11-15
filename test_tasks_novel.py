@@ -1577,3 +1577,19 @@ def test_loan_payoff():
 
 if __name__ == "__main__":
     test_loan_payoff()
+
+
+def test_seat_pairs():
+    import tasks_novel as tn
+    xs = tn.load_seat_pairs("en", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    for x in xs:  # recount from the printed map
+        rows = re.findall(r"^\s*\d+  ([X.] [X.] [X.])   ([X.] [X.] [X.])$", x["messages"][0]["content"], re.M)
+        n = sum(1 for a, b in rows for side in (a.split(), b.split()) for k in (0, 1) if side[k] == side[k + 1] == ".")
+        assert n == x["gold"] < x["bait"]
+    x = xs[0]
+    assert tn.score_seat_pairs(x, {"content": f"Answer: {x['gold']} pairs"})["correct"]
+
+
+if __name__ == "__main__":
+    test_seat_pairs()

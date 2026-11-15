@@ -6663,7 +6663,7 @@ def load_org_chart(lang, n, seed):
                 counts[q_] = counts.get(q_, 0) + 1
             hub = max(counts, key=lambda x: (counts[x], x))
             if (lca not in (a, b) and (boss[a] != lca or boss[b] != lca) and len(ca) + len(cb) >= 6
-                    and at_root == (i % 4 == 0) and (lca == hub) == (i % 4 in (0, 1))):  # root / busiest boss: half at most
+                    and at_root == (i % 4 == 0) and (lca == hub) == (i % 4 == 0)):  # root / busiest boss: a quarter each
                 break
         bait = boss[a] if boss[a] != lca else boss[b]
         lines = [f"{p} reports to {q}." if lang == "en" else f"{p} berichtet an {q}." for p, q in boss.items()]

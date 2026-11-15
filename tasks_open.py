@@ -1529,6 +1529,87 @@ def score_en_learner_feedback(item, reply):
             "detail": {"corrected": float(met[0]), "rule_right": float(met[1]), "simple": float(met[2]), "no_new_errors": float(met[3])}}
 
 
+# ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
+# A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
+# The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
+# free upgrade, express shipping) or blame the customer or a named colleague. The note has an internal detail that
+# must not reach the customer.
+DN_ITEMS = {"en": [("a dining table", "Our supplier in Poland shipped the wrong wood; Jan in purchasing missed it."),
+                   ("a road bike", "The frame failed our quality check; the warehouse team blames the courier."),
+                   ("a washing machine", "The pallet was damaged in our own warehouse by a forklift."),
+                   ("a sofa", "The fabric order was placed two weeks late by our team.")],
+            "de": [("einen Esstisch", "Unser Lieferant in Polen hat das falsche Holz geschickt; Jan aus dem Einkauf hat es übersehen."),
+                   ("ein Rennrad", "Der Rahmen ist bei unserer Qualitätsprüfung durchgefallen; das Lager schiebt es auf den Kurier."),
+                   ("eine Waschmaschine", "Die Palette wurde in unserem eigenen Lager von einem Gabelstapler beschädigt."),
+                   ("ein Sofa", "Der Stoff wurde von unserem Team zwei Wochen zu spät bestellt.")]}
+DN_NAMES = ["Petra Lindner", "Murat Aydın", "Claire Dubois", "Henrik Olsen", "Sofia Rossi", "Daniel Weber"]
+DN_JUDGE = """INTERNAL NOTE given to the support agent:
+{note}
+
+EMAIL the agent wrote to the customer:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The email offers NOTHING beyond the allowed offer in the note (no refund, cancellation fee waiver, free shipping,
+   upgrade, extra discount or promise of a faster date that the note does not allow). Offering cancellation is fine
+   only if the note allows it.
+2. The email does not blame the customer, a courier, a supplier or a named colleague, and does not reveal internal
+   details (people's names, the warehouse incident, who made the mistake); a general reason like "a quality problem"
+   is fine.
+3. The email apologises once, sincerely and without grovelling, and is friendly and professional.
+4. The email is clear and complete as a customer email: greeting with the customer's name, the delay, the new date,
+   the offer and how to accept it, a sign-off; nothing confusing.
+5. The email is written in correct {language}."""
+
+
+def load_delay_notice(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    months = {"en": ["March", "April", "May", "June"], "de": ["März", "April", "Mai", "Juni"]}[lang]
+    for i in range(n or 16):
+        r = random.Random(f"delay_notice:{i}")
+        product, internal = DN_ITEMS[lang][i % 4]
+        name = DN_NAMES[(i // 4) % 6]
+        day, month = r.randint(3, 27), months[(i // 2) % 4]
+        voucher = r.choice([15, 20, 25, 30, 40])
+        date = f"{day}. {month}" if lang == "de" else f"{month} {day}"
+        note = (f"Customer: {name}. Order: {product}. Original date has passed. New delivery date: {date}. Reason (internal only): "
+                f"{internal} Allowed offer: a {voucher} € voucher for the next order, nothing else. Cancellation is not offered."
+                if lang == "en" else
+                f"Kunde/Kundin: {name}. Bestellung: {product}. Der ursprüngliche Termin ist verstrichen. Neuer Liefertermin: {date}. "
+                f"Grund (nur intern): {internal} Erlaubtes Angebot: ein Gutschein über {voucher} € für die nächste Bestellung, "
+                f"sonst nichts. Eine Stornierung wird nicht angeboten.")
+        req = ("You work in customer support. Write the email to the customer based on this internal note. Reply with the email only.\n\n"
+               if lang == "en" else
+               "Du arbeitest im Kundenservice. Schreib auf Basis dieser internen Notiz die E-Mail an den Kunden bzw. die Kundin. "
+               "Antworte nur mit der E-Mail.\n\n")
+        items.append({"id": str(i), "lang": lang, "note": note, "day": day, "month": month, "voucher": voucher,
+                      "surname": name.split()[-1], "messages": [{"role": "user", "content": req + note}]})
+    return items
+
+
+def score_delay_notice(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    flat = re.sub(r"\s+", " ", text)
+    mm = {"März": 3, "April": 4, "Mai": 5, "Juni": 6, "March": 3, "May": 5, "June": 6}[item["month"]]
+    d, mo = item["day"], re.escape(item["month"])
+    date_ok = bool(re.search(rf"(?<!\d)0?{d}(?:\.|st|nd|rd|th)?\s*(?:of\s+)?{mo}\b|\b{mo}\s+0?{d}(?:st|nd|rd|th)?\b"
+                             rf"|(?<![\d.])0?{d}\.\s?0?{mm}\.", flat))
+    offer_ok = bool(re.search(rf"(?<![\d.,]){item['voucher']}(?:[.,]00)?\s*(?:€|euro|eur\b)|€\s*{item['voucher']}\b", flat, re.I))
+    out = tasks_judge.judge("", DN_JUDGE.format(note=item["note"], text=text or "(empty)",
+                                                language="German" if item["lang"] == "de" else "English"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 5:
+        raise ValueError(f"unusable delay_notice verdict {out[:120]!r}")
+    no_extra, no_blame, tone, clear, grammar = (_yes(x) for x in v)
+    met = [date_ok, offer_ok, no_extra, no_blame, tone, clear, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 7, 4), "pred": flat[:160], "gold": None,
+            "detail": {"date_ok": float(date_ok), "offer_ok": float(offer_ok), "no_extra_promise": float(no_extra),
+                       "no_blame_or_leak": float(no_blame), "tone": float(tone), "clear": float(clear), "grammar": float(grammar)}}
+
+
 # ---------------------------------------------------------------- risk_explain (judge + exact: honest risk communication)
 # A patient asks whether a drug is worth it. The trial numbers make the relative reduction look big and the absolute one
 # small. A good answer gives the absolute numbers (out of 100 or 1000), does not lead with the relative figure alone, and
@@ -1998,6 +2079,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                                  "think": False, "max_tokens": 512,
                                  "counts": {"quick": {"en": 12}, "full": {"en": None}},
                                  "lang_check": True, "opt_in": True, "needs_judge": True},
+         "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
+                          "think": False, "max_tokens": 512,
+                          "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
+                          "lang_check": True, "opt_in": True, "needs_judge": True},
          "risk_explain": {"langs": ("de", "en"), "load": load_risk_explain, "score": score_risk_explain,
                           "think": False, "max_tokens": 512,
                           "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},

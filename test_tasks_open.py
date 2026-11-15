@@ -621,3 +621,27 @@ if __name__ == "__main__":
     test_faithful()
     test_checklist()
     print("ok")
+
+
+def test_delay_notice():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        for lang in ("de", "en"):
+            for x in to.load_delay_notice(lang, None, 0):
+                d, m, v = x["day"], x["month"], x["voucher"]
+                good = (f"Liebe Frau {x['surname']}, Ihre Lieferung kommt am {d}. {m}. Als Entschuldigung erhalten Sie einen Gutschein über {v} €."
+                        if lang == "de" else f"Dear {x['surname']}, your order will arrive on {m} {d}. We'd like to offer a €{v} voucher.")
+                assert to.score_delay_notice(x, {"content": good})["correct"], good
+                bad = good.replace(f" {v} ", f" {v + 5} ").replace(f"€{v} ", f"€{v + 5} ").replace(str(d), str(d % 27 + 1))
+                r = to.score_delay_notice(x, {"content": bad})["detail"]
+                assert r["offer_ok"] == 0 and r["date_ok"] == 0, bad
+        x = to.load_delay_notice("de", None, 0)[0]
+        assert to.score_delay_notice(x, {"content": f"am {x['day']:02d}.{['März','April','Mai','Juni'].index(x['month']) + 3:02d}. ... {x['voucher']},00 Euro"})["correct"]
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_delay_notice()

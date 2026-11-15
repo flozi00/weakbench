@@ -2869,6 +2869,40 @@ def score_de_prefix_meaning(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- en_hyphens (compound modifiers)
+EH_ITEMS = [("before", "She is a ___ author.", "well-known", "well known"), ("after", "The author is ___.", "well known", "well-known"),
+            ("before", "We bought a ___ car.", "two-year-old", "two year old"), ("after", "The car is ___.", "two years old", "two-years-old"),
+            ("before", "It was a ___ decision.", "last-minute", "last minute"), ("after", "We decided at the ___.", "last minute", "last-minute"),
+            ("before", "This is a ___ problem.", "long-term", "long term"), ("after", "In the ___, prices will fall.", "long term", "long-term"),
+            ("before", "They live in a ___ flat.", "fourth-floor", "fourth floor"), ("after", "Their flat is on the ___.", "fourth floor", "fourth-floor"),
+            ("before", "He gave a ___ answer.", "well-thought-out", "well thought out"),
+            ("after", "His answer was ___.", "well thought out", "well-thought-out"),
+            ("ly", "It is a ___ job.", "highly paid", "highly-paid"), ("ly", "She wrote a ___ report.", "beautifully written", "beautifully-written"),
+            ("ly", "They sell ___ goods.", "locally produced", "locally-produced"), ("ly", "It was a ___ plan.", "carefully planned", "carefully-planned"),
+            ("before", "We need a ___ solution.", "short-term", "short term"), ("after", "It helps in the ___.", "short term", "short-term"),
+            ("before", "It was a ___ walk.", "ten-minute", "ten minute"), ("after", "The walk takes ___.", "ten minutes", "ten-minutes")]
+
+
+def load_en_hyphens(lang, n, seed):
+    rows = EH_ITEMS[:min(n or len(EH_ITEMS), len(EH_ITEMS))]
+    out = []
+    for i, (k, sent, good, bad) in enumerate(rows):
+        a, b = (good, bad) if i % 2 == 0 else (bad, good)
+        out.append({"id": str(i), "lang": "en", "gold": "A" if a == good else "B", "kind": k,
+                    "messages": [{"role": "user", "content": f"Which option is correct in standard written English?\n\n{sent}\n\n"
+                                  f"A: {a}\nB: {b}\n\nAnswer with A or B only."}]})
+    return out
+
+
+def score_en_hyphens(item, reply):
+    text = reply["content"] or ""
+    line = re.findall(r"Answer\W*:?\W*\b([AB])\b", text, re.I)
+    m = line[-1:] or re.findall(r"\b([AB])\b", text)
+    v = m[0].upper() if len({x.upper() for x in m}) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3189,6 +3223,7 @@ TASKS = {
     "en_question_tags": task(("en",), load_en_question_tags, score_en_question_tags, 16, 20, lang_check=False),
     "md_translate": task(("de", "en"), load_md_translate, score_md_translate, 1024, 6, lang_check=False),
     "de_prefix_meaning": task(("de",), load_de_prefix_meaning, score_de_prefix_meaning, 16, 16, lang_check=False),
+    "en_hyphens": task(("en",), load_en_hyphens, score_en_hyphens, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

@@ -1240,6 +1240,65 @@ def score_decision_memo(item, reply):
                        "clear": float(met[3]), "within_limit": float(met[4])}}
 
 
+# ---------------------------------------------------------------- interpreter (judge: translate, never answer)
+# The model is the interpreter between a German-speaking doctor and an English-speaking patient. Each utterance must be
+# rendered into the other language, in the first person, without answering, adding advice or commenting. Questions
+# addressed to "you" are the hardest: helpful models answer them instead of passing them on.
+IP_SYS = ("You are a professional interpreter between Dr. Krämer, who speaks only German, and the patient Mr. Hill, who speaks "
+          "only English. Render every message into the other person's language, faithfully, in the first person, as the speaker "
+          "said it. Never answer, add, explain or comment yourself.")
+IP_TURNS = [("de", "Guten Tag, Herr Hill. Wo genau tut es weh?"), ("en", "Right here, below my ribs on the right side."),
+            ("de", "Seit wann haben Sie diese Schmerzen?"), ("en", "Since Tuesday night. Can you give me something for it right now?"),
+            ("de", "Haben Sie heute schon etwas gegessen?"), ("en", "Just a coffee. Do you think it is serious, doctor?"),
+            ("de", "Ich möchte zuerst einen Ultraschall machen. Sind Sie damit einverstanden?"),
+            ("en", "Yes, of course. How long will it take?"), ("de", "Etwa zehn Minuten. Bitte legen Sie sich hin."),
+            ("en", "What would you do in my place, honestly?"), ("de", "Nehmen Sie regelmäßig Medikamente?"),
+            ("en", "Only something for my blood pressure, but I forgot the name.")]
+IP_JUDGE = """An interpreter between a German-speaking doctor and an English-speaking patient received this message from the
+{who} (in {src}):
+"{msg}"
+The interpreter output:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The output is a faithful rendering of the message in {tgt}: same meaning, nothing left out, nothing added.
+2. The interpreter did NOT answer the question or respond in their own voice, did not add advice, explanations or comments,
+   and kept the speaker's first person ("I", "you" as in the original)."""
+
+
+def load_interpreter(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(min(n or 12, 12)):
+        msgs = [{"role": "system", "content": IP_SYS}]
+        for j in range(i):  # the earlier turns, already interpreted (shown as the source text only, a clean history)
+            src_l, msg = IP_TURNS[j]
+            msgs += [{"role": "user", "content": f"[{'Dr. Krämer' if src_l == 'de' else 'Mr. Hill'}]: {msg}"},
+                     {"role": "assistant", "content": "(interpreted)"}]
+        src_l, msg = IP_TURNS[i]
+        msgs.append({"role": "user", "content": f"[{'Dr. Krämer' if src_l == 'de' else 'Mr. Hill'}]: {msg}"})
+        tgt = "en" if src_l == "de" else "de"
+        items.append({"id": str(i), "lang": tgt, "src_lang": src_l, "msg": msg, "messages": msgs})
+    return items
+
+
+def score_interpreter(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    names = {"de": "German", "en": "English"}
+    out = tasks_judge.judge("", IP_JUDGE.format(who="doctor" if item["src_lang"] == "de" else "patient", src=names[item["src_lang"]],
+                                                msg=item["msg"], tgt=names[item["lang"]], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 2:
+        raise ValueError(f"unusable interpreter verdict {out[:120]!r}")
+    faithful, role = (_yes(x) for x in v)
+    q = item["msg"].rstrip().endswith("?")
+    return {"correct": faithful and role, "score": (faithful + role) / 2, "pred": text[:160], "gold": None,
+            "detail": {"faithful": float(faithful), "stayed_interpreter": float(role),
+                       **({"stayed_interpreter_on_question": float(role)} if q else {})}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1637,6 +1696,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "interpreter": {"langs": ("de",), "load": load_interpreter, "score": score_interpreter,
+                         "think": False, "max_tokens": 256,
+                         "counts": {"quick": {"de": 12}, "full": {"de": None}},
+                         "lang_check": True, "opt_in": True, "needs_judge": True},
          "decision_memo": {"langs": ("de", "en"), "load": load_decision_memo, "score": score_decision_memo,
                            "think": False, "max_tokens": 512,
                            "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},

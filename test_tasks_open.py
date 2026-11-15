@@ -387,6 +387,19 @@ def test_decision_memo():
         tasks_judge.configure(None, None, None)
 
 
+def test_interpreter():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "NO"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_interpreter("de", None, 0)
+        assert len(it) == 12 and it[0]["lang"] == "en" and it[1]["lang"] == "de"
+        r = to.score_interpreter(it[3], {"content": "I'm sorry, I can't prescribe anything."})
+        assert not r["correct"] and r["detail"]["stayed_interpreter_on_question"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -502,6 +515,7 @@ if __name__ == "__main__":
     test_rhyme_poem()
     test_analogy_transfer()
     test_decision_memo()
+    test_interpreter()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

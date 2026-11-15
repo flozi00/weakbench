@@ -2348,6 +2348,39 @@ def score_time_prep(item, reply):
     return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": {f"ok_k{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_case_article (case after prepositions)
+# Genitive prepositions (colloquial German says "wegen dem Regen" - the bait), dative, accusative, and two-way
+# prepositions where motion takes the accusative and location the dative (springt auf den Tisch / schläft auf dem Tisch).
+CA_ART = {"akk": {"m": "den", "n": "das", "f": "die"}, "dat": {"m": "dem", "n": "dem", "f": "der"},
+          "gen": {"m": "des", "n": "des", "f": "der"}}
+CA_FRAMES = [("gen", "Das Spiel fällt wegen ___ {n} aus.", [("Regens", "m"), ("Sturms", "m"), ("Gewitters", "n"), ("Hitze", "f")]),
+             ("gen", "Während ___ {n} war es im Saal still.", [("Konzerts", "n"), ("Vortrags", "m"), ("Prüfung", "f"), ("Pause", "f")]),
+             ("dat", "Sie fährt mit ___ {n} zur Arbeit.", [("Bus", "m"), ("Fahrrad", "n"), ("Bahn", "f"), ("Zug", "m")]),
+             ("akk", "Er kauft ein Geschenk für ___ {n}.", [("Lehrer", "m"), ("Kind", "n"), ("Nachbarin", "f"), ("Chef", "m")]),
+             ("akk", "Die Katze springt auf ___ {n}.", [("Tisch", "m"), ("Sofa", "n"), ("Mauer", "f"), ("Schrank", "m")]),
+             ("dat", "Die Katze schläft auf ___ {n}.", [("Tisch", "m"), ("Sofa", "n"), ("Mauer", "f"), ("Schrank", "m")])]
+
+
+def load_de_case_article(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        case, sent, nouns = CA_FRAMES[i % len(CA_FRAMES)]
+        noun, g = nouns[(i // len(CA_FRAMES)) % len(nouns)]
+        items.append({"id": str(i), "lang": "de", "gold": CA_ART[case][g], "case": case,
+                      "messages": [{"role": "user", "content": "Setze den passenden bestimmten Artikel in die Lücke ein (Standarddeutsch). "
+                                    "Antworte nur mit dem Artikel.\n\n" + sent.format(n=noun)}]})
+    return items
+
+
+def score_de_case_article(item, reply):
+    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower()) if x in ("der", "die", "das", "den", "dem", "des")]
+    ok = w[:1] == [item["gold"]]
+    d = {f"ok_{item['case']}": float(ok)}
+    if item["case"] == "gen":
+        d["took_dative"] = float(w[:1] == ["dem"] or (w[:1] == ["der"] and item["gold"] == "des"))
+    return {"correct": ok, "score": float(ok), "pred": w[:1], "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -2651,6 +2684,7 @@ TASKS = {
     "de_grammar_fix": task(("de",), load_de_grammar_fix, score_de_grammar_fix, 128, 40, lang_check=False),
     "bilingual_notice": task(("de",), load_bilingual_notice, score_bilingual_notice, 512, 20, lang_check=False),
     "revise_on_feedback": task(("de", "en"), load_revise_on_feedback, score_revise_on_feedback, 512, 20),
+    "de_case_article": task(("de",), load_de_case_article, score_de_case_article, 16, 60, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

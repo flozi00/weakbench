@@ -3412,6 +3412,34 @@ def score_mirror_language(item, reply):
             "detail": {f"ok_{item['target']}": float(ok), "took_system_lang": float(got == item["lang"])}}
 
 
+# ---------------------------------------------------------------- de_position_verbs (legen/liegen, stellen/stehen ...)
+PV_ITEMS = [("motion", "Ich ___ das Buch auf den Tisch.", ("lege", "liege")), ("position", "Das Buch ___ auf dem Tisch.", ("liegt", "legt")),
+            ("motion", "Sie ___ die Vase auf das Regal.", ("stellt", "steht")), ("position", "Die Vase ___ auf dem Regal.", ("steht", "stellt")),
+            ("motion", "Er ___ sich auf die Bank.", ("setzt", "sitzt")), ("position", "Er ___ auf der Bank.", ("sitzt", "setzt")),
+            ("motion", "Gestern ___ ich das Bild an die Wand.", ("hängte", "hing")), ("position", "Gestern ___ das Bild noch an der Wand.", ("hing", "hängte")),
+            ("motion", "Wir ___ die Flaschen in den Kühlschrank.", ("stellen", "stehen")), ("position", "Die Flaschen ___ im Kühlschrank.", ("stehen", "stellen")),
+            ("motion", "Er hat den Schlüssel unter die Matte ___.", ("gelegt", "gelegen")), ("position", "Der Schlüssel hat unter der Matte ___.", ("gelegen", "gelegt")),
+            ("motion", "Die Kinder ___ sich vor den Fernseher.", ("setzen", "sitzen")), ("position", "Die Kinder ___ vor dem Fernseher.", ("sitzen", "setzen")),
+            ("motion", "Ich habe das Fahrrad in den Keller ___.", ("gestellt", "gestanden")), ("position", "Das Fahrrad hat im Keller ___.", ("gestanden", "gestellt")),
+            ("motion", "Sie ___ den Mantel an den Haken.", ("hängt", "hängen")), ("position", "Der Mantel ___ am Haken.", ("hängt", "hängen")),
+            ("motion", "Leg die Zeitung bitte neben ___ Laptop.", ("den", "dem")), ("position", "Die Zeitung liegt neben ___ Laptop.", ("dem", "den"))]
+
+
+def load_de_position_verbs(lang, n, seed):
+    out = []
+    for i, (kind, sent, (gold, other)) in enumerate(PV_ITEMS[:min(n or 20, 20)]):
+        a, b = (gold, other) if i % 4 < 2 else (other, gold)
+        out.append({"id": str(i), "lang": "de", "gold": gold, "opts": (gold, other), "kind": kind,
+                    "messages": [{"role": "user", "content": f"Setze „{a}“ oder „{b}“ ein. Antworte nur mit dem Wort.\n\n{sent}"}]})
+    return out
+
+
+def score_de_position_verbs(item, reply):
+    v = gap_pick(item, reply, item["opts"])
+    ok = v == item["gold"].lower()
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3744,6 +3772,7 @@ TASKS = {
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),
+    "de_position_verbs": task(("de",), load_de_position_verbs, score_de_position_verbs, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

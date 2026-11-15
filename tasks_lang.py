@@ -3933,6 +3933,32 @@ def score_de_joined_spelling(item, reply):
             "detail": {"ok_joined" if " " not in item["gold"] else "ok_separate": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_capitals_rules (Groß- und Kleinschreibung beyond nouns)
+# Nominalised verbs and times of day are capitalised, adverbs ("abends", "am besten") are not; only one-form cases.
+# Lower-case gold in half the items, so "always the capitalised one" scores 50 %.
+CR_ITEMS = [("Diese Lösung gefällt mir am ___.", "besten", "Besten"), ("Wir treffen uns heute ___.", "Abend", "abend"),
+            ("Beim ___ vergesse ich die Zeit.", "Lesen", "lesen"), ("Sie geht ___ immer joggen.", "abends", "Abends"),
+            ("Ich bezahle im ___.", "Voraus", "voraus"), ("Der Laden hat ___ geschlossen.", "sonntags", "Sonntags"),
+            ("Kannst du das auf ___ sagen?", "Deutsch", "deutsch"), ("Das Kind ist ___ eingeschlafen.", "schnell", "Schnell"),
+            ("Zum ___ gab es Applaus.", "Schluss", "schluss"), ("Wir müssen uns ___ beeilen.", "sehr", "Sehr"),
+            ("Das ___ fällt mir schwer.", "Aufstehen", "aufstehen"), ("Er kam ___ zu spät.", "wieder", "Wieder"),
+            ("Ich habe ___ nichts gegessen.", "morgens", "Morgens"), ("Wir sehen uns am ___.", "Montag", "montag"),
+            ("Sie hat das ___ verstanden.", "sofort", "Sofort"), ("Nach dem ___ ruhen wir uns aus.", "Wandern", "wandern")]
+
+
+def load_de_capitals_rules(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Schreibweise ist nach deutscher Rechtschreibung richtig: "
+                           f"„{two_opts(i, g, (g, w))[0]}“ oder „{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(CR_ITEMS[:n or len(CR_ITEMS)])]
+
+
+def score_de_capitals_rules(item, reply):
+    r = score_de_joined_spelling(item, reply)  # exact, case-sensitive pick of one offered form
+    r["detail"] = {"ok_upper" if item["gold"][0].isupper() else "ok_lower": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5230,6 +5256,7 @@ TASKS = {
     "de_eszett": task(("de",), load_de_eszett, score_de_eszett, 16, None, lang_check=False),
     "de_genitive": task(("de",), load_de_genitive, score_de_genitive, 16, None, lang_check=False),
     "de_joined_spelling": task(("de",), load_de_joined_spelling, score_de_joined_spelling, 16, None, lang_check=False),
+    "de_capitals_rules": task(("de",), load_de_capitals_rules, score_de_capitals_rules, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

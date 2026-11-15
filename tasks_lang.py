@@ -3786,11 +3786,11 @@ def score_en_indirect_q(item, reply):
 
 # ---------------------------------------------------------------- de_foreign_plural (Latin/Greek-origin plurals)
 # Only nouns with ONE standard plural (Duden): no Kaktusse/Kakteen, Kontos/Konten, Risikos/Risiken or Kommas/Kommata.
-FP_ITEMS = [("das Museum", "Museen"), ("das Thema", "Themen"), ("das Praktikum", "Praktika"), ("das Album", "Alben"),
+FP_ITEMS = [("das Museum", "Museen"), ("das Kriterium", "Kriterien"), ("das Praktikum", "Praktika"), ("das Album", "Alben"),
             ("die Firma", "Firmen"), ("das Virus", "Viren"), ("das Zentrum", "Zentren"), ("das Studium", "Studien"),
             ("das Gymnasium", "Gymnasien"), ("das Stadion", "Stadien"), ("der Rhythmus", "Rhythmen"),
             ("der Mechanismus", "Mechanismen"), ("das Material", "Materialien"), ("das Fossil", "Fossilien"),
-            ("das Ministerium", "Ministerien"), ("das Datum", "Daten"), ("das Prinzip", "Prinzipien"), ("der Bus", "Busse")]
+            ("das Ministerium", "Ministerien"), ("das Datum", "Daten"), ("das Individuum", "Individuen"), ("der Bus", "Busse")]
 
 
 def load_de_foreign_plural(lang, n, seed):
@@ -3801,10 +3801,10 @@ def load_de_foreign_plural(lang, n, seed):
 
 def score_de_foreign_plural(item, reply):
     words = re.findall(r"[A-Za-zÄÖÜäöüß]+", re.sub(r"\([^()]*\)", " ", reply["content"] or ""))
-    words = [w for w in words if w.lower() not in ("die", "plural", "der", "von", "lautet", "antwort", "answer", "ist")]
+    stem = item["sing"].split()[1]
+    words = [w for w in words if w.lower() not in ("die", "plural", "der", "das", "von", "lautet", "antwort", "answer", "ist", stem.lower())]
     v = words[0] if words else None
     ok = v == item["gold"]
-    stem = item["sing"].split()[1]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"s_plural": float(v in (stem + "s", stem + "e"))}}
 

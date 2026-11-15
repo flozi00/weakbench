@@ -8218,6 +8218,7 @@ def load_bus_meet(lang, n, seed):
 
 def score_bus_meet(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = fa.rsplit("=", 1)[-1]  # "6:42 + 15 = 6:57"
     m = re.search(r"(?<!\d)0?(\d{1,2})[:.h](\d{2})(?!\d)", fa)
     v = f"{int(m[1])}:{m[2]}" if m else None
     ok = v == item["gold"]

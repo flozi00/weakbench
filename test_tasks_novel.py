@@ -1314,7 +1314,7 @@ def test_weekday_calc():
     assert x["kind"] == "century"
     for x in xs:
         assert tn.score_weekday_calc(x, {"content": "Antwort: " + x["gold"]})["correct"]
-    assert tn.score_weekday_calc(xs[0], {"content": "Antwort: nicht Montag, sondern " + xs[0]["gold"]})["correct"]
+    assert not tn.score_weekday_calc(xs[0], {"content": "Antwort: Montag oder " + xs[0]["gold"]})["correct"]
 
 
 if __name__ == "__main__":

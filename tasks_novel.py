@@ -4409,14 +4409,14 @@ def score_interval_math(item, reply):
 
 # ---------------------------------------------------------------- count_mentions (counting in a long text)
 # A generated log of short entries mentioning several people. How many entries mention the exact name X? Look-alikes
-# (Anna vs Annabel vs Hanna, Tom vs Tomas) and the name inside a compound ("Annas" counts? no: we ask for entries
-# that mention X, and possessives do count) make it harder. Length 15 / 30 / 45 entries.
+# (Anna vs Annabel vs Hanna, Tom vs Tomas) and the name as the second person of an entry make it harder.
+# Length 15 / 30 / 45 entries.
 CM_SETS = [("Anna", ["Annabel", "Hanna", "Anne"]), ("Tom", ["Tomas", "Tim", "Thomas"]), ("Lena", ["Lea", "Helena", "Leni"]),
            ("Ben", ["Benno", "Bea", "Benedikt"])]
 CM_ACT = {"en": ["called the office", "sent a report", "booked a room", "fixed the printer", "ordered coffee",
                  "cancelled a meeting", "updated the plan", "asked about the budget"],
-          "de": ["rief im Büro an", "schickte einen Bericht", "buchte einen Raum", "reparierte den Drucker", "bestellte Kaffee",
-                 "sagte ein Meeting ab", "aktualisierte den Plan", "fragte nach dem Budget"]}
+          "de": ["rief{m} im Büro an", "schickte{m} einen Bericht", "buchte{m} einen Raum", "reparierte{m} den Drucker",
+                 "bestellte{m} Kaffee", "sagte{m} ein Meeting ab", "aktualisierte{m} den Plan", "fragte{m} nach dem Budget"]}
 
 
 def load_count_mentions(lang, n, seed):
@@ -4437,9 +4437,9 @@ def load_count_mentions(lang, n, seed):
                 who, hit = r.choice(others), False
             act = r.choice(CM_ACT[lang])
             if hit and r.random() < 0.3:  # the target as the second person in an entry
-                lines.append(f"{k + 1:02d}: {r.choice(others)} {act}" + (f" with {target}." if lang == "en" else f" mit {target}."))
+                lines.append(f"{k + 1:02d}: {r.choice(others)} " + (f"{act} with {target}." if lang == "en" else act.format(m=f" mit {target}") + "."))
             else:
-                lines.append(f"{k + 1:02d}: {who} {act}.")
+                lines.append(f"{k + 1:02d}: {who} {act.format(m='')}.")
             count += hit
         q = (f"In how many entries is {target} mentioned (exactly this name, not similar names)?" if lang == "en" else
              f"In wie vielen Einträgen wird {target} erwähnt (genau dieser Name, keine ähnlichen Namen)?")
@@ -4472,12 +4472,11 @@ def load_weekday_calc(lang, n, seed):
             year = r.choice([1900, 2000, 2100])
         else:
             year = r.choice([2023, 2025, 2026, 2027])
-        start = _dt.date(year, 2, r.randint(10, 27))  # every span crosses the end of February
-        days = r.randint(5, 40)
-        end = start + _dt.timedelta(days=days)
-        sd = start.strftime("%Y-%m-%d")
-        q = (f"{sd} was a {WD['en'][start.weekday()]}. Which weekday is {days} days later?" if lang == "en" else
-             f"Der {sd} war ein {WD['de'][start.weekday()]}. Welcher Wochentag ist {days} Tage später?")
+        start = _dt.date(year, 1, 1)  # the target lies after Feb 28, so the answer depends on the leap rule
+        end = _dt.date(year, r.randint(3, 6), r.randint(1, 28))
+        q = (f"January 1, {year} was a {WD['en'][start.weekday()]}. Which weekday is {end.isoformat()}? (Do not look it up, work it out.)"
+             if lang == "en" else
+             f"Der 1. Januar {year} war ein {WD['de'][start.weekday()]}. Welcher Wochentag ist der {end.isoformat()}? (Nicht nachschlagen, ausrechnen.)")
         items.append({"id": str(i), "lang": lang, "gold": WD[lang][end.weekday()], "kind": kind,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
@@ -4485,8 +4484,8 @@ def load_weekday_calc(lang, n, seed):
 
 def score_weekday_calc(item, reply):
     fa = (final_answer(reply["content"]) or "").lower()
-    hits = [(fa.rfind(w.lower()), k) for k, w in enumerate(WD[item["lang"]]) if w.lower() in fa]
-    v = max(hits)[1] if hits else None
+    hits = [k for k, w in enumerate(WD[item["lang"]]) if re.search(r"\b" + w.lower() + r"\b", fa)]
+    v = hits[0] if len(hits) == 1 else None  # a hedge or a "not X" naming two weekdays counts as no answer
     g = WD[item["lang"]].index(item["gold"])
     ok = v == g
     off = v is not None and (v - g) % 7 in (1, 6)

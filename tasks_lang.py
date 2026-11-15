@@ -2366,14 +2366,17 @@ def load_de_case_article(lang, n, seed):
     for i in range(min(n or 24, 24)):
         case, sent, nouns = CA_FRAMES[i % len(CA_FRAMES)]
         noun, g = nouns[(i // len(CA_FRAMES)) % len(nouns)]
-        items.append({"id": str(i), "lang": "de", "gold": CA_ART[case][g], "case": case,
+        items.append({"id": str(i), "lang": "de", "gold": CA_ART[case][g], "case": case, "pre": sent.split("___")[0].split()[-1],
                       "messages": [{"role": "user", "content": "Setze den passenden bestimmten Artikel in die Lücke ein (Standarddeutsch). "
                                     "Antworte nur mit dem Artikel.\n\n" + sent.format(n=noun)}]})
     return items
 
 
 def score_de_case_article(item, reply):
-    w = [x for x in re.findall(r"[a-zäöüß]+", (reply["content"] or "").lower()) if x in ("der", "die", "das", "den", "dem", "des")]
+    text = (reply["content"] or "").lower()
+    m = re.search(r"\b" + item["pre"].lower() + r"\s+([a-zäöüß]+)", text)  # the reply echoes the filled sentence
+    arts = [x for x in re.findall(r"[a-zäöüß]+", text) if x in ("der", "die", "das", "den", "dem", "des")]
+    w = [m.group(1)] if m else arts[-1:]  # "Die Antwort ist: des" -> the last article
     ok = w[:1] == [item["gold"]]
     d = {f"ok_{item['case']}": float(ok)}
     if item["case"] == "gen":

@@ -7587,8 +7587,10 @@ def load_nth_weekday(lang, n, seed):
 
 
 def score_nth_weekday(item, reply):
-    fa = final_answer(reply["content"]) or ""
-    nums = [int(x) for x in re.findall(r"\b(\d{1,2})\b(?!\d)", re.sub(r"\b(19|20)\d\d\b", " ", fa))]  # years ignored
+    fa = result_side(final_answer(reply["content"]) or "")
+    iso = re.search(r"\b(?:19|20)\d\d-\d{1,2}-(\d{1,2})\b", fa)  # 2026-11-12
+    fa = iso[1] if iso else fa
+    nums = [int(x) for x in re.findall(r"\b(\d{1,2})(?:st|nd|rd|th)?\b(?!\d)", re.sub(r"\b(19|20)\d\d\b", " ", fa))]  # years ignored
     v = nums[0] if nums else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],

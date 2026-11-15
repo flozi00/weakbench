@@ -3465,15 +3465,24 @@ VF_ITEMS = [("Anna fährt morgen mit dem Zug nach Hamburg.", "morgen", "fährt")
             ("Der Zug kommt wegen eines Unfalls später an.", "wegen eines Unfalls", "kommt")]
 
 
+def _vf_gold(sent, phr, verb):
+    """Phrase, finite verb, the old subject (everything before the verb), then the rest in its old order."""
+    body = sent.rstrip(".")
+    subj, rest = body.split(f" {verb} ", 1)
+    rest = re.sub(r"\s+", " ", (" " + rest + " ").replace(f" {phr} ", " ", 1)).strip()
+    subj = subj if subj.split()[0] in ("Anna",) else subj[0].lower() + subj[1:]
+    return f"{phr[0].upper()}{phr[1:]} {verb} {subj} {rest}."
+
+
 def load_de_vorfeld(lang, n, seed):
-    return [{"id": str(i), "lang": "de", "gold": f"{phr[0].upper() + phr[1:]} {verb} ...", "src": sent, "phrase": phr, "verb": verb,
+    return [{"id": str(i), "lang": "de", "gold": _vf_gold(sent, phr, verb), "src": sent, "phrase": phr, "verb": verb,
              "messages": [{"role": "user", "content": f"Stelle den Satz so um, dass „{phr}“ am Satzanfang steht. Verwende genau dieselben "
                            f"Wörter. Antworte nur mit dem Satz.\n\n{sent}"}]}
             for i, (sent, phr, verb) in enumerate(VF_ITEMS[:min(n or 20, 20)])]
 
 
 def score_de_vorfeld(item, reply):
-    words = lambda t: re.findall(r"[a-zäöüß]+", t.lower())  # noqa: E731
+    words = lambda t: re.findall(r"[a-zäöüß]+", re.sub(r"\([^()]*\)", " ", t).lower())  # noqa: E731
     lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
     want = sorted(words(item["src"]))
     line = next((x for x in lines if sorted(words(x)) == want), lines[0] if lines else "")
@@ -3482,7 +3491,7 @@ def score_de_vorfeld(item, reply):
     same = sorted(w) == want
     first = w[:len(pw)] == pw
     second = w[len(pw):len(pw) + 1] == [item["verb"]]
-    ok = same and first and second
+    ok = w == words(item["gold"])  # the whole standard order: subject right after the verb, the verb bracket kept
     return {"correct": ok, "score": float(ok), "pred": line[:100], "gold": item["gold"],
             "detail": {"same_words": float(same), "phrase_first": float(first), "verb_second": float(second)}}
 

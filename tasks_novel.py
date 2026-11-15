@@ -5729,7 +5729,7 @@ def score_train_connect(item, reply):
             h = int(h) % 12 + (12 if ap.lower().startswith("p") else 0) if ap else int(h)
             out.append(f"{h:02d}:{m}")
         return out
-    arr = re.search(r"(?:arriv\w*|ankunft|an(?:kommen|kunft)?|erreich\w*|in \w+ (?:at|um))\W+(?:at |um )?(.*)", fa, re.I)
+    arr = re.search(r"\b(?:arriv\w*|ankunft|ankomm\w*|erreich\w*|in \w+ (?:at|um))\b\W+(?:at |um )?(.*)", fa, re.I)
     found = times(arr[1])[:1] if arr and times(arr[1]) else times(fa)
     v = found[0] if len(set(found)) == 1 or (arr and found) else None  # one time, or the one after "arriving"
     ok = v == item["gold"]

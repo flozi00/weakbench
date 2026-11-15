@@ -4668,6 +4668,57 @@ def score_coin_change(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- alien_calendar (calendar arithmetic without memory)
+# Real calendar arithmetic can lean on memorised facts; here the months, their lengths and the week are invented.
+AC_MONTHS = ["Brin", "Calo", "Dresk", "Fenn", "Gollum", "Hirr"]
+AC_DAYS = ["Ash", "Bek", "Cor", "Dun", "Eff", "Fal", "Gim", "Hob", "Isk"]
+
+
+def load_alien_calendar(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("alien_calendar", i)
+        months = AC_MONTHS[:r.randint(4, 6)]
+        lens = [r.randint(17, 31) for _ in months]
+        week = AC_DAYS[:r.randint(5, 9)]
+        year_len = sum(lens)
+        m0, w0 = r.randrange(len(months)), r.randrange(len(week))
+        d0 = r.randint(1, lens[m0])
+        wrap = i % 2 == 0
+        to_year_end = sum(lens[m0:]) - d0
+        n_days = r.randint(to_year_end + 1, to_year_end + 40) if wrap else r.randint(5, max(6, to_year_end))
+        m, d = m0, d0 + n_days
+        while d > lens[m]:
+            d -= lens[m]
+            m = (m + 1) % len(months)
+        wd = week[(w0 + n_days) % len(week)]
+        cal = ", ".join(f"{nm} ({ln})" for nm, ln in zip(months, lens))
+        q = (f"On the planet Vex a year has these months in this order, with their number of days: {cal}. After the last month "
+             f"the next year starts with {months[0]}. The week has {len(week)} days: {', '.join(week)}, then it starts again.\n"
+             f"Today is {week[w0]}, day {d0} of {months[m0]}. Which date and weekday is it {n_days} days from today? "
+             f"Give it as: <weekday>, day <number> of <month>." if lang == "en" else
+             f"Auf dem Planeten Vex hat ein Jahr diese Monate in dieser Reihenfolge, mit ihrer Anzahl an Tagen: {cal}. Nach dem "
+             f"letzten Monat beginnt das nächste Jahr mit {months[0]}. Die Woche hat {len(week)} Tage: {', '.join(week)}, dann "
+             f"beginnt sie von vorn.\nHeute ist {week[w0]}, Tag {d0} des Monats {months[m0]}. Welches Datum und welcher Wochentag "
+             f"ist in {n_days} Tagen? Gib es so an: <Wochentag>, Tag <Zahl> des Monats <Monat>.")
+        items.append({"id": str(i), "lang": lang, "gold": f"{wd}, {d}, {months[m]}", "wd": wd, "day": d, "month": months[m],
+                      "wrap": wrap, "week": week, "months": months,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_alien_calendar(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    wds = [w for w in item["week"] if re.search(r"\b" + w + r"\b", fa)]
+    mos = [m for m in item["months"] if re.search(r"\b" + m + r"\b", fa)]
+    nums = re.findall(r"\d+", fa)
+    ok_w = wds == [item["wd"]]
+    ok_d = mos == [item["month"]] and nums == [str(item["day"])]
+    ok = ok_w and ok_d
+    return {"correct": ok, "score": float(ok), "pred": fa[:60], "gold": item["gold"],
+            "detail": {"ok_date": float(ok_d), "ok_weekday": float(ok_w), "ok_year_wrap" if item["wrap"] else "ok_in_year": float(ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6240,6 +6291,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "alien_calendar": task(load_alien_calendar, score_alien_calendar, 24, 120),
     "coin_change": task(load_coin_change, score_coin_change, 24, 120),
     "recipe_scale": task(load_recipe_scale, score_recipe_scale, 24, 120),
     "unit_price": task(load_unit_price, score_unit_price, 24, 120),

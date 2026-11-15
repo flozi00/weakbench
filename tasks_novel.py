@@ -5289,7 +5289,7 @@ def load_split_bill(lang, n, seed):
         grp = ", ".join(people[:-1]) + (" and " if lang == "en" else " und ") + people[-1]
         q = (f"{grp} went on a trip. Every expense is split equally among the people who share it.\n"
              + "\n".join(lines) + f"\nWhat is {who}'s balance after settling up? Answer with one number: positive if {who} "
-             "receives money, negative if {who} has to pay." if lang == "en" else
+             f"receives money, negative if {who} has to pay." if lang == "en" else
              f"{grp} waren zusammen verreist. Jede Ausgabe wird gleichmäßig auf die Personen verteilt, die sie teilen.\n"
              + "\n".join(lines) + f"\nWie hoch ist der Saldo von {who} nach der Abrechnung? Antworte mit einer Zahl: positiv, "
              f"wenn {who} Geld bekommt, negativ, wenn {who} zahlen muss.")

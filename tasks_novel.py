@@ -5886,6 +5886,53 @@ def score_tax_brackets(item, reply):
             "detail": {"took_flat_top_rate": float(v is not None and abs(v - item["flat"]) < 0.51 and not ok)}}
 
 
+# ---------------------------------------------------------------- overlap_count (inclusion-exclusion)
+OC_THINGS = {"en": ["tea", "coffee", "cocoa"], "de": ["Tee", "Kaffee", "Kakao"]}
+
+
+def load_overlap_count(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("overlap_count", i)
+        three = i % 2 == 1
+        ask_only = (i // 2) % 2 == 1  # ask "only the first thing" instead of the total
+        T = OC_THINGS[lang]
+        if not three:
+            ab, a_, b_, none = r.randint(3, 15), r.randint(5, 30), r.randint(5, 30), r.randint(0, 10)
+            A, B = a_ + ab, b_ + ab
+            total = a_ + b_ + ab + none
+            gold, naive = (total, A + B + none) if not ask_only else (a_, A)
+            facts = (f"{A} like {T[0]}, {B} like {T[1]}, {ab} of them like both, and {none} like neither." if lang == "en" else
+                     f"{A} mögen {T[0]}, {B} mögen {T[1]}, {ab} davon mögen beides, und {none} mögen keins von beiden.")
+        else:
+            abc = r.randint(2, 6)
+            ab, ac, bc = (r.randint(2, 8) for _ in range(3))  # exactly two
+            a_, b_, c_ = (r.randint(4, 20) for _ in range(3))  # exactly one
+            none = r.randint(0, 8)
+            A, B, C = a_ + ab + ac + abc, b_ + ab + bc + abc, c_ + ac + bc + abc
+            AB, AC, BC = ab + abc, ac + abc, bc + abc
+            total = a_ + b_ + c_ + ab + ac + bc + abc + none
+            gold, naive = (total, A + B + C + none) if not ask_only else (a_, A)
+            facts = (f"{A} like {T[0]}, {B} like {T[1]}, {C} like {T[2]}. {AB} like {T[0]} and {T[1]}, {AC} like {T[0]} and "
+                     f"{T[2]}, {BC} like {T[1]} and {T[2]} (these counts include the {abc} who like all three). {none} like none of them."
+                     if lang == "en" else
+                     f"{A} mögen {T[0]}, {B} mögen {T[1]}, {C} mögen {T[2]}. {AB} mögen {T[0]} und {T[1]}, {AC} mögen {T[0]} und "
+                     f"{T[2]}, {BC} mögen {T[1]} und {T[2]} (darin sind die {abc} enthalten, die alle drei mögen). {none} mögen keins davon.")
+        q = (f"In a survey: {facts} " + (f"How many people were asked?" if not ask_only else f"How many people like only {T[0]}?")
+             if lang == "en" else
+             f"In einer Umfrage: {facts} " + ("Wie viele Personen wurden befragt?" if not ask_only else f"Wie viele Personen mögen nur {T[0]}?"))
+        items.append({"id": str(i), "lang": lang, "gold": gold, "naive": naive, "three": three,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_overlap_count(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_three" if item["three"] else "ok_two": float(ok), "took_sum": float(v == item["naive"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7461,6 +7508,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "overlap_count": task(load_overlap_count, score_overlap_count, 24, 120),
     "tax_brackets": task(load_tax_brackets, score_tax_brackets, 24, 120),
     "weighted_mean": task(load_weighted_mean, score_weighted_mean, 24, 120),
     "date_locale": task(load_date_locale, score_date_locale, 24, 120),

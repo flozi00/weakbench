@@ -842,3 +842,19 @@ def test_de_vorfeld():
 
 if __name__ == "__main__":
     test_de_vorfeld()
+
+
+def test_en_perfect_past():
+    import tasks_lang as tl
+    xs = tl.load_en_perfect_past("en", None, 0)
+    for x in xs:
+        full = x["messages"][0]["content"].splitlines()[-1]
+        for part in x["gold"].split(" ... "):
+            full = full.replace("___", part, 1)
+        assert tl.score_en_perfect_past(x, {"content": x["gold"]})["correct"], x["gold"]
+        assert tl.score_en_perfect_past(x, {"content": full})["correct"], full
+        assert not tl.score_en_perfect_past(x, {"content": " or ".join(x["opts"])})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_perfect_past()

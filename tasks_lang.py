@@ -3339,6 +3339,49 @@ def score_de_wenn_als(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_perfect_past (present perfect vs past simple)
+PP_ITEMS = [("I ___ in Leeds since 2015, and I still love it.", "have lived", "lived"),
+            ("She ___ in Leeds from 2010 to 2015, then moved to York.", "lived", "have lived"),
+            ("We ___ the new museum last Saturday.", "visited", "have visited"),
+            ("I ___ this film three times so far.", "have seen", "saw"),
+            ("He ___ his keys yesterday and found them this morning.", "lost", "has lost"),
+            ("They ___ each other for twenty years and are still best friends.", "have known", "knew"),
+            ("When ___ you ___ to Canada? - In 2018.", "did ... move", "have ... moved"),
+            ("Mozart ___ more than 600 works.", "wrote", "has written"),
+            ("I ___ my homework yet, so I can't come out.", "haven't finished", "didn't finish"),
+            ("The shop ___ at 9 a.m. today, an hour late.", "opened", "has opened"),
+            ("Look! Someone ___ the window - there's glass everywhere.", "has broken", "broke"),
+            ("She ___ at the bank for five years before she became a teacher.", "worked", "has worked"),
+            ("___ you ever ___ sushi?", "have ... eaten", "did ... eat"),
+            ("Two days ago it ___ so hard that the streets flooded.", "rained", "has rained"),
+            ("This is the best book I ___ this year.", "have read", "read"),
+            ("In 1969 people ___ on the moon for the first time.", "landed", "have landed")]
+
+
+def load_en_perfect_past(lang, n, seed):
+    out = []
+    for i, (sent, g, other) in enumerate(PP_ITEMS[:min(n or 16, 16)]):
+        a, b = (g, other) if i % 2 else (other, g)
+        out.append({"id": str(i), "lang": "en", "gold": g, "opts": (a, b), "perfect": "have" in g or "has" in g,
+                    "messages": [{"role": "user", "content": f"Which verb form fills the gap: \"{a}\" or \"{b}\"? "
+                                  f"Answer with that form only (keep \"...\" if it has one).\n\n{sent}"}]})
+    return out
+
+
+def score_en_perfect_past(item, reply):
+    t = re.sub(r"\s+", " ", reply["content"].replace("’", "'").replace("…", "...").replace("\u2026", "...")).lower()
+    hits = []
+    for o in sorted(item["opts"], key=len, reverse=True):  # "have lived" first, then blank it so "lived" is not found inside
+        pat = r"\b" + re.escape(o.lower()).replace(r"\ \.\.\.\ ", r"\b.{0,30}?\b") + r"\b"
+        if re.search(pat, t):
+            hits.append(o)
+            t = re.sub(pat, " ", t)
+    v = hits[0] if len(hits) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_perfect" if item["perfect"] else "ok_past": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -3868,6 +3911,7 @@ TASKS = {
     "de_das_was": task(("de",), load_de_das_was, score_de_das_was, 16, 20, lang_check=False),
     "de_seit_vor": task(("de",), load_de_seit_vor, score_de_seit_vor, 16, 20, lang_check=False),
     "de_wenn_als": task(("de",), load_de_wenn_als, score_de_wenn_als, 20, 20, lang_check=False),
+    "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),
     "de_position_verbs": task(("de",), load_de_position_verbs, score_de_position_verbs, 16, 20, lang_check=False),

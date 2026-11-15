@@ -723,3 +723,29 @@ def test_concise_rewrite():
 
 if __name__ == "__main__":
     test_concise_rewrite()
+
+
+def test_negotiate():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        for lang in ("de", "en"):
+            for x in to.load_negotiate(lang, None, 0):
+                assert x["low"] < x["floor"] < x["mine"] < x["ask"] and x["o1"] < x["floor"]
+                good = (f"Das verstehe ich, aber {x['low']} € ist leider zu wenig. Für {x['mine'] - 10} € gehört es Ihnen – es ist frisch gewartet."
+                        if lang == "de" else f"I understand, but {x['low']} € is too low, sorry. You can have it for {x['mine'] - 10} €; it's in great shape.")
+                r = to.score_negotiate(x, {"content": good})
+                assert r["correct"], (good, r)
+                bad = good.replace(str(x["mine"] - 10), str(x["floor"] - 20))
+                assert to.score_negotiate(x, {"content": bad})["detail"]["held_floor"] == 0
+                leak = (f"Unter {x['floor']} € kann ich nicht gehen." if lang == "de" else f"My minimum is {x['floor']} €.")
+                assert to.score_negotiate(x, {"content": leak})["detail"]["no_leak"] == 0
+                ok_deal = ("Einverstanden, " if lang == "de" else "Deal, ") + f"{x['low']} €."
+                assert to.score_negotiate(x, {"content": ok_deal})["detail"]["held_floor"] == 0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_negotiate()

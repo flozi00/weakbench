@@ -2197,22 +2197,7 @@ def score_de_grammar_fix(item, reply):
 
 
 # ---------------------------------------------------------------- en_grammar_fix (one error, change nothing else)
-EG_ITEMS = [("agreement", "The list of names are on the desk.", "The list of names is on the desk.", []),
-            ("agreement", "Neither the manager nor her assistants was at the meeting.", "Neither the manager nor her assistants were at the meeting.", []),
-            ("agreement", "Each of the rooms have a balcony.", "Each of the rooms has a balcony.", []),
-            ("tense", "Yesterday we go to the cinema and watched a comedy.", "Yesterday we went to the cinema and watched a comedy.", []),
-            ("tense", "I have seen him last week at the station.", "I saw him last week at the station.", []),
-            ("tense", "By the time we arrived, the film already started.", "By the time we arrived, the film had already started.", []),
-            ("article", "She is engineer at a large company.", "She is an engineer at a large company.", []),
-            ("article", "She gave me a good advice about the flat.", "She gave me good advice about the flat.", ["She gave me a good piece of advice about the flat.", "She gave me some good advice about the flat."]),
-            ("preposition", "We arrived to the hotel late at night.", "We arrived at the hotel late at night.", []),
-            ("preposition", "She is married with a doctor from Leeds.", "She is married to a doctor from Leeds.", []),
-            ("preposition", "It depends of the weather tomorrow.", "It depends on the weather tomorrow.", []),
-            ("pronoun", "Me and my brother built the shed ourselves.", "My brother and I built the shed ourselves.", []),
-            ("pronoun", "The teacher gave the books to Anna and I.", "The teacher gave the books to Anna and me.", []),
-            ("word_order", "I don't know what is his name.", "I don't know what his name is.", []),
-            ("word_order", "She speaks very well English.", "She speaks English very well.", ["She speaks very good English."]),
-            ("comparative", "This box is more heavy than the other one.", "This box is heavier than the other one.", [])]
+EG_ITEMS = common.OwnSet("tasks_lang.EG_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_en_grammar_fix(lang, n, seed):
@@ -2428,34 +2413,7 @@ def score_de_case_article(item, reply):
 # ---------------------------------------------------------------- false_friends (translation traps)
 # Each sentence turns on a false friend. de items translate EN->DE, en items DE->EN. Correct = the right sense
 # appears and the look-alike word does not.
-FF = {"de": [("Eventually, she found the keys.", r"schließlich|letztendlich|endlich|am ende|zuletzt|irgendwann", r"eventuell"),
-             ("Actually, the meeting was cancelled.", r"eigentlich|tatsächlich|in wirklichkeit", r"aktuell"),
-             ("That is a sensible decision.", r"vernünftig|sinnvoll|klug", r"sensib"),
-             ("He brought her a small gift.", r"geschenk|präsent|mitbringsel", r"\bgift\b"),
-             ("The chef cooked a great dinner.", r"\bkoch\b|köchin|küchenchef|chefkoch", r"\bchef\b|\bchefin\b"),
-             ("The firefighter was very brave.", r"mutig|tapfer", r"\bbrav"),
-             ("I want to become a doctor.", r"\bwerden\b", r"bekomm"),
-             ("This tool is really handy.", r"praktisch|nützlich|handlich", r"\bhandy\b"),
-             ("We spend every summer at the lake.", r"verbring", r"spend"),
-             ("The fabric of this shirt is soft.", r"stoff|gewebe", r"fabrik"),
-             ("Our rent went up again.", r"miete", r"\brente"),
-             ("The city has two billion euros of debt.", r"milliarde", r"\bbillion"),
-             ("She was very sympathetic when I told her about my loss.", r"mitfühlend|verständnisvoll|mitgefühl|anteilnahme|verständnis|einfühlsam|teilnahmsvoll", r"sympathisch"),
-             ("The undertaker arrived at noon.", r"bestatter", r"unternehmer"),
-             ("The students met in the gymnasium.", r"turnhalle|sporthalle", r"gymnasium"),
-             ("I have a map of the city.", r"karte|stadtplan|plan der stadt", r"mappe")],
-      "en": [("Er ist sehr sensibel.", r"sensitive", r"sensible"),
-             ("Ich bekomme morgen ein Paket.", r"\bget|\bgetting|receiv|be delivered|arriv|is coming|will come", r"becom"),
-             ("Das ist eventuell möglich.", r"possibl|perhaps|maybe|might", r"eventual"),
-             ("Die aktuelle Lage ist ruhig.", r"current|present", r"actual"),
-             ("Mein Chef ist im Urlaub.", r"boss|manager|supervisor", r"\bchef"),
-             ("Das Kind war den ganzen Tag brav.", r"well[- ]behaved|behaved|\bgood\b(?! mood)", r"brave"),
-             ("Ich habe ein neues Handy.", r"phone|mobile", r"handy"),
-             ("Sie ist sehr sympathisch.", r"likeable|likable|nice|pleasant|friendly|lovely|personable|charming|sweet|kind|agreeable", r"sympathetic"),
-             ("Er arbeitet in einer Fabrik.", r"factory|plant|mill", r"fabric"),
-             ("Meine Oma bekommt eine kleine Rente.", r"pension", r"\brent\b"),
-             ("Dieser Pilz ist Gift.", r"poison|toxic", r"\bgift"),
-             ("Er hat eine Milliarde Euro.", r"\bbillion", r"milliard|trillion")]}
+FF = common.OwnSet("tasks_lang.FF")  # private: flozi00/weakbench-data
 
 
 def load_false_friends(lang, n, seed):
@@ -2518,16 +2476,7 @@ def score_quote_keep(item, reply):
 
 # ---------------------------------------------------------------- en_article_sound (a / an by sound)
 # (sentence, gold, spelling misleads). Half the items look like the other article by their first letter.
-AS_ITEMS = [("I waited for ___ hour.", "an", True), ("She is ___ honest person.", "an", True), ("He is ___ heir to the company.", "an", True),
-            ("She has ___ MBA from Mannheim.", "an", True), ("He was ___ FBI agent.", "an", True), ("The doctor ordered ___ X-ray.", "an", True),
-            ("We met ___ 8-year-old girl.", "an", True), ("It was ___ honour to meet you.", "an", True), ("We took ___ hourly bus.", "an", True),
-            ("She studies at ___ university.", "a", True), ("He is ___ European citizen.", "a", True), ("I bought ___ one-way ticket.", "a", True),
-            ("Send me ___ URL.", "a", True), ("It costs ___ euro.", "a", True),
-            ("That is ___ unique idea.", "a", True), ("She wore ___ uniform.", "a", True), ("It was ___ once-in-a-lifetime trip.", "a", True),
-            ("We stayed in ___ hotel.", "a", True), ("He found ___ umbrella.", "an", False), ("She ate ___ apple.", "an", False),
-            ("They own ___ house.", "a", False), ("He drove ___ old car.", "an", False), ("It is ___ useful tool.", "a", True),
-            ("We saw ___ elephant.", "an", False), ("She wrote ___ book.", "a", False), ("I need ___ hammer.", "a", False),
-            ("He is ___ engineer.", "an", False), ("Every user is ___ utility customer.", "a", True)]
+AS_ITEMS = common.OwnSet("tasks_lang.AS_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_en_article_sound(lang, n, seed):
@@ -2585,16 +2534,7 @@ def score_de_weil_denn(item, reply):
 
 # ---------------------------------------------------------------- de_capitals (Groß- und Kleinschreibung)
 # The sentence comes all lowercase; the model restores the capitals. Traps: nominalisations, time words, Sie / sie.
-DC_ITEMS = [("nominal", "Ich höre beim Laufen gern Musik."), ("nominal", "Wir wünschen der ganzen Familie alles Gute zum Geburtstag."),
-            ("nominal", "Im Allgemeinen ist das Wetter hier mild."), ("nominal", "Es gibt nichts Neues aus dem Büro."),
-            ("nominal", "Das Schöne an diesem Job ist die Freiheit."), ("nominal", "Er hat sich zum Lernen in die Bibliothek gesetzt."),
-            ("nominal", "Sie hat etwas Wichtiges vergessen."), ("nominal", "Das Rauchen ist hier verboten."),
-            ("time", "Wir treffen uns heute Abend am Bahnhof."), ("time", "Am Montagabend habe ich keine Zeit."),
-            ("time", "Ich gehe montags immer schwimmen."), ("time", "Er kommt am Dienstagmorgen mit dem Zug."),
-            ("time", "Gestern Mittag war es sehr heiß."), ("time", "Ich lese abends meistens ein Buch."),
-            ("address", "Können Sie mir bitte helfen, Frau Weber?"), ("address", "Ich habe Ihnen die Unterlagen geschickt."),
-            ("address", "Anna sagt, sie kommt später."), ("address", "Haben Sie Ihren Schlüssel gefunden?"),
-            ("nominal", "Er ist der Erste, der angekommen ist."), ("address", "Wir wünschen Ihnen und Ihrer Familie schöne Feiertage.")]
+DC_ITEMS = common.OwnSet("tasks_lang.DC_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_de_capitals(lang, n, seed):
@@ -2621,30 +2561,7 @@ def score_de_capitals(item, reply):
 
 # ---------------------------------------------------------------- en_conditionals (verb form in conditionals)
 # (type, sentence with the gap, verb, accepted forms). Contractions are expanded before comparing.
-EC_ITEMS = [("first", "If it rains tomorrow, we ___ at home.", "stay", ["will stay", "will be staying"]),
-            ("first", "If you heat ice, it ___.", "melt", ["melts", "will melt"]),
-            ("first", "Unless you hurry, you ___ the bus.", "miss", ["will miss"]),
-            ("first", "If she ___ early, she will catch the train.", "leave", ["leaves"]),
-            ("first", "We will start as soon as everyone ___.", "arrive", ["arrives", "has arrived"]),
-            ("second", "If I ___ you, I would take the job.", "be", ["were"]),
-            ("second", "If we had more time, we ___ the museum.", "visit", ["would visit"]),
-            ("second", "If he ___ the answer, he would tell us.", "know", ["knew"]),
-            ("second", "She would buy a house if she ___ enough money.", "have", ["had"]),
-            ("second", "What would you do if you ___ the lottery?", "win", ["won"]),
-            ("third", "If she had studied, she ___ the exam.", "pass", ["would have passed", "could have passed", "might have passed"]),
-            ("third", "If we ___ earlier, we would have caught the train.", "leave", ["had left"]),
-            ("third", "They would have come if you ___ them.", "invite", ["had invited"]),
-            ("third", "If it had not rained, the match ___ cancelled.", "not be", ["would not have been"]),
-            ("third", "If I ___ about the problem, I would have helped.", "know", ["had known"]),
-            ("mixed", "If I had taken that job, I ___ in Berlin now.", "live", ["would be living", "would live"]),
-            ("mixed", "If she were more careful, she ___ the mistake yesterday.", "not make", ["would not have made"]),
-            ("mixed", "If he had not missed the flight, he ___ here now.", "be", ["would be"]),
-            ("wish", "I wish I ___ taller.", "be", ["were"]),
-            ("wish", "I wish I ___ that email yesterday.", "not send", ["had not sent"]),
-            ("wish", "She wishes she ___ speak French.", "can", ["could"]),
-            ("wish", "If only we ___ more time last week.", "have", ["had had"]),
-            ("first", "If the alarm ___, leave the building.", "ring", ["rings"]),
-            ("second", "It would be easier if the instructions ___ clearer.", "be", ["were"])]
+EC_ITEMS = common.OwnSet("tasks_lang.EC_ITEMS")  # private: flozi00/weakbench-data
 EC_EXPAND = [(r"won't", "will not"), (r"wouldn't", "would not"), (r"hadn't", "had not"), (r"couldn't", "could not"),
              (r"didn't", "did not"), (r"'ve", " have"), (r"'d have", " would have"), (r"'ll", " will")]  # bare 'd: would or had
 
@@ -2716,30 +2633,7 @@ def score_de_passive(item, reply):
 
 
 # ---------------------------------------------------------------- en_usage (classic English usage traps, closed choice)
-EU_ITEMS = [("fewer_less", "There were ___ people at the meeting than last year.", ("fewer", "less"), "fewer"),
-            ("fewer_less", "We need ___ sugar in this recipe.", ("fewer", "less"), "less"),
-            ("fewer_less", "She made ___ mistakes in the second test.", ("fewer", "less"), "fewer"),
-            ("fewer_less", "She earns ___ money than her brother.", ("fewer", "less"), "less"),
-            ("who_whom", "To ___ should I send the invoice?", ("who", "whom"), "whom"),
-            ("who_whom", "The woman ___ called yesterday is my aunt.", ("who", "whom"), "who"),
-            ("who_whom", "The man ___ we met at the station was a doctor.", ("who", "whom"), "whom"),
-            ("who_whom", "___ do you think will win?", ("Who", "Whom"), "Who"),
-            ("lie_lay", "I am tired; I will ___ down for an hour.", ("lie", "lay"), "lie"),
-            ("lie_lay", "Please ___ the book on the table.", ("lie", "lay"), "lay"),
-            ("lie_lay", "Yesterday the dog ___ in the sun all afternoon.", ("lay", "laid"), "lay"),
-            ("lie_lay", "Yesterday she ___ the baby in the cot.", ("lay", "laid"), "laid"),
-            ("i_me", "Between you and ___, the plan will fail.", ("I", "me"), "me"),
-            ("i_me", "My sister and ___ went to the cinema.", ("I", "me"), "I"),
-            ("i_me", "The manager invited Tom and ___ to lunch.", ("I", "me"), "me"),
-            ("i_me", "Please send the photos to Anna and ___.", ("I", "me"), "me"),
-            ("agreement", "Each of the students ___ a laptop.", ("has", "have"), "has"),
-            ("agreement", "Every one of the windows ___ broken.", ("was", "were"), "was"),
-            ("agreement", "The list of items ___ on the desk.", ("is", "are"), "is"),
-            ("agreement", "The number of complaints ___ increased.", ("has", "have"), "has"),
-            ("agreement", "A number of complaints ___ been made.", ("has", "have"), "have"),
-            ("agreement", "Everyone in the two teams ___ ready.", ("is", "are"), "is"),
-            ("fewer_less", "There are ___ cars on the road on Sundays.", ("fewer", "less"), "fewer"),
-            ("who_whom", "She is the colleague ___ I trust most.", ("who", "whom"), "whom")]
+EU_ITEMS = common.OwnSet("tasks_lang.EU_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_en_usage(lang, n, seed):
@@ -2760,30 +2654,7 @@ def score_en_usage(item, reply):
 
 
 # ---------------------------------------------------------------- sentence_order (coherence from discourse cues)
-SO_TEXTS = {"en": [["A small bakery opened in our street last spring.", "Its owner, a former engineer, bakes everything himself.",
-                    "However, he refuses to sell white bread.", "Customers who ask for it get a rye loaf and a lecture instead.",
-                    "Surprisingly, most of them come back the next day."],
-                   ["Our town wanted a new bridge for years.", "The council finally approved one in March.",
-                    "The cheapest offer came from a company nobody knew.", "That company, it later turned out, had never built a bridge.",
-                    "The council therefore cancelled the contract and started again."],
-                   ["Mira found an old camera in her grandfather's attic.", "Inside it was a film that had never been developed.",
-                    "She took the film to the last photo shop in the city.", "The pictures showed her grandmother as a young woman.",
-                    "Mira had never seen her smile like that."],
-                   ["A storm hit the coast on Tuesday night.", "It knocked out power in three villages.",
-                    "Repair crews could not reach them because the road was flooded.", "They finally arrived by boat on Wednesday.",
-                    "By evening, the lights were on again."]],
-            "de": [["Im Frühjahr hat in unserer Straße eine kleine Bäckerei eröffnet.", "Ihr Besitzer, ein früherer Ingenieur, backt alles selbst.",
-                    "Weißbrot verkauft er allerdings nicht.", "Wer danach fragt, bekommt stattdessen ein Roggenbrot und einen Vortrag.",
-                    "Erstaunlicherweise kommen die meisten trotzdem am nächsten Tag wieder."],
-                   ["Unsere Stadt wollte seit Jahren eine neue Brücke.", "Im März genehmigte der Rat endlich eine.",
-                    "Das günstigste Angebot kam von einer Firma, die niemand kannte.", "Diese Firma hatte, wie sich später zeigte, noch nie eine Brücke gebaut.",
-                    "Der Rat kündigte deshalb den Vertrag und begann von vorn."],
-                   ["Mira fand auf dem Dachboden ihres Großvaters eine alte Kamera.", "Darin steckte ein Film, der nie entwickelt worden war.",
-                    "Sie brachte den Film in das letzte Fotogeschäft der Stadt.", "Die Bilder zeigten ihre Großmutter als junge Frau.",
-                    "So lächeln hatte Mira sie noch nie gesehen."],
-                   ["In der Nacht zum Mittwoch traf ein Sturm die Küste.", "Er legte in drei Dörfern den Strom lahm.",
-                    "Die Reparaturtrupps kamen nicht hin, weil die Straße überflutet war.", "Am Mittwoch erreichten sie die Dörfer schließlich mit einem Boot.",
-                    "Am Abend brannte das Licht wieder."]]}
+SO_TEXTS = common.OwnSet("tasks_lang.SO_TEXTS")  # private: flozi00/weakbench-data
 SO_LET = "ABCDE"
 
 
@@ -2816,20 +2687,7 @@ def score_sentence_order(item, reply):
 
 
 # ---------------------------------------------------------------- de_als_wie (als / wie after comparisons)
-AW_ITEMS = [("comparative", "Mein Bruder ist größer ___ ich.", "als"), ("comparative", "Heute ist es kälter ___ gestern.", "als"),
-            ("comparative", "Der Zug war schneller ___ das Auto.", "als"), ("comparative", "Sie verdient mehr ___ ihr Chef.", "als"),
-            ("comparative", "Das dauerte länger ___ geplant.", "als"), ("comparative", "Es kostet weniger ___ erwartet.", "als"),
-            ("comparative", "Er spielt besser Klavier ___ seine Lehrerin.", "als"),
-            ("equative", "Mein Bruder ist so groß ___ ich.", "wie"), ("equative", "Heute ist es genauso kalt ___ gestern.", "wie"),
-            ("equative", "Das Hotel war nicht so teuer ___ befürchtet.", "wie"), ("equative", "Sie läuft fast so schnell ___ ihr Trainer.", "wie"),
-            ("equative", "Die Wohnung ist doppelt so groß ___ unsere alte.", "wie"), ("equative", "Er ist ebenso müde ___ du.", "wie"),
-            ("other", "Das Ergebnis war anders ___ erwartet.", "als"), ("other", "Das ist nichts anderes ___ ein Trick.", "als"),
-            ("other", "Niemand ___ sie kennt die Antwort.", "als"), ("other", "Sie arbeitet ___ Ärztin in Köln.", "als"),
-            ("other", "Er singt ___ ein Profi.", "wie"), ("other", "Es kam ganz anders, ___ wir dachten.", "als"),
-            ("equative", "Der Film war nicht halb so gut ___ das Buch.", "wie"),
-            ("other", "Sie macht es genau so, ___ ihre Mutter es gemacht hat.", "wie"),
-            ("equative", "Der neue Laptop ist so leicht ___ ein Buch.", "wie"),
-            ("equative", "Sie ist genauso alt ___ ich.", "wie"), ("other", "Sie redet ___ ein Wasserfall.", "wie")]
+AW_ITEMS = common.OwnSet("tasks_lang.AW_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_de_als_wie(lang, n, seed):
@@ -2850,38 +2708,7 @@ def score_de_als_wie(item, reply):
 
 # ---------------------------------------------------------------- collocations (which verb goes with the noun)
 # (sentence with gap, options, gold, calque = the verb a literal translation from the other language suggests)
-CO_ITEMS = {"de": [("Wir müssen bis Freitag eine Entscheidung ___.", ("treffen", "machen", "nehmen"), "treffen", "machen"),
-                   ("Bitte ___ Rücksicht auf die Nachbarn.", ("nimm", "gib", "mach"), "nimm", "gib"),
-                   ("Die Opposition ___ scharfe Kritik an dem Plan.", ("übte", "machte", "gab"), "übte", "machte"),
-                   ("Darf ich Ihnen eine Frage ___?", ("stellen", "fragen", "machen"), "stellen", "fragen"),
-                   ("Er hat im Test viele Fehler ___.", ("gemacht", "getan", "gegeben"), "gemacht", "getan"),
-                   ("Sie ___ großen Wert auf Pünktlichkeit.", ("legt", "gibt", "macht"), "legt", "gibt"),
-                   ("Wir müssen das Risiko in Kauf ___.", ("nehmen", "geben", "machen"), "nehmen", "-"),
-                   ("Kannst du mir einen Gefallen ___?", ("tun", "machen", "geben"), "tun", "machen"),
-                   ("Der Minister hat eine Rede ___.", ("gehalten", "gegeben", "gemacht"), "gehalten", "gegeben"),
-                   ("Er ___ sich große Mühe mit dem Geschenk.", ("gab", "machte", "nahm"), "gab", "machte"),
-                   ("Die Polizei ___ den Verdächtigen fest.", ("nahm", "machte", "gab"), "nahm", "machte"),
-                   ("Wir sollten eine Pause ___.", ("machen", "nehmen", "halten"), "machen", "nehmen"),
-                   ("Sie hat die Prüfung ___ – sie war erfolgreich.", ("bestanden", "genommen", "gemacht"), "bestanden", "genommen"),
-                   ("Bitte ___ mir Bescheid, wenn du ankommst.", ("gib", "mach", "nimm"), "gib", "mach"),
-                   ("Er ___ einen Antrag auf Elterngeld.", ("stellte", "machte", "gab"), "stellte", "machte"),
-                   ("Sie musste eine schwere Krankheit ___.", ("durchmachen", "nehmen", "machen"), "durchmachen", "-")],
-            "en": [("We have to ___ a decision by Friday.", ("make", "meet", "do"), "make", "meet"),
-                   ("Did you ___ your homework?", ("do", "make", "take"), "do", "make"),
-                   ("Please ___ attention to the safety rules.", ("pay", "give", "make"), "pay", "give"),
-                   ("We ___ a meeting every Monday.", ("hold", "make", "do"), "hold", "make"),
-                   ("He ___ a lot of mistakes in the test.", ("made", "did", "took"), "made", "did"),
-                   ("Can you ___ me a favour?", ("do", "make", "give"), "do", "make"),
-                   ("They ___ a break after two hours.", ("took", "made", "did"), "took", "made"),
-                   ("She ___ the exam with excellent marks.", ("passed", "made", "took"), "passed", "made"),
-                   ("The police ___ the suspect into custody.", ("took", "made", "did"), "took", "made"),
-                   ("She ___ a promise to help us.", ("made", "gave", "did"), "made", "gave"),
-                   ("We need to ___ the risk.", ("take", "make", "do"), "take", "make"),
-                   ("I'd like to ___ a question.", ("ask", "make", "do"), "ask", "-"),
-                   ("She ___ a lot of effort into the gift.", ("put", "gave", "made"), "put", "gave"),
-                   ("Please ___ me know when you arrive.", ("let", "give", "make"), "let", "give"),
-                   ("The opposition ___ sharp criticism of the plan.", ("voiced", "practised", "did"), "voiced", "practised"),
-                   ("He ___ a photo of the bridge.", ("took", "made", "did"), "took", "made")]}
+CO_ITEMS = common.OwnSet("tasks_lang.CO_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_collocations(lang, n, seed):
@@ -2907,22 +2734,7 @@ def score_collocations(item, reply):
 
 # ---------------------------------------------------------------- de_umlaut_input (proper spelling despite a transliterated request)
 # The user types on a keyboard without umlauts. The reply should be correct German (ä, ö, ü, ß), not mirror "fuer".
-UI_REQ = ["Schreib mir bitte eine kurze Absage fuer das Treffen am Montag, ich kann leider nicht. Freundliche Gruesse waeren schoen.",
-          "Koenntest du mir in drei Saetzen erklaeren, warum Baeume im Herbst ihre Blaetter verlieren?",
-          "Ich moechte meiner Nachbarin fuer ihre Hilfe danken. Schreib mir zwei, drei Saetze, die herzlich klingen.",
-          "Was muss ich beachten, wenn ich im Winter mit dem Fahrrad zur Arbeit fahre? Bitte kurz und in ganzen Saetzen.",
-          "Formuliere eine hoefliche Nachricht an meinen Vermieter: Die Heizung in der Kueche funktioniert nicht.",
-          "Erklaer mir kurz den Unterschied zwischen Gruenkohl und Wirsing, ich koche heute zum ersten Mal.",
-          "Schreib eine kurze Einladung zu meinem Geburtstag naechsten Samstag, es gibt Kuchen und Getraenke.",
-          "Wie begruesse ich in einer E-Mail hoeflich jemanden, den ich nicht kenne? Gib mir zwei Beispiele.",
-          "Fasse in zwei Saetzen zusammen, warum regelmaessiger Schlaf fuer die Gesundheit wichtig ist.",
-          "Ich muss meinem Chef sagen, dass ich mich verspaete, weil die Strassenbahn ausgefallen ist. Schreib mir die Nachricht.",
-          "Gib mir drei Tipps, wie ich Muell in der Kueche besser trennen kann.",
-          "Schreib einen kurzen, freundlichen Text fuer einen Zettel an der Haustuer: Bitte die Tuer leise schliessen.",
-          "Erklaere einem Kind in zwei Saetzen, warum der Mond nicht immer gleich aussieht.",
-          "Formuliere eine kurze Entschuldigung, weil ich die Ruecksendung zu spaet abgeschickt habe.",
-          "Was sollte ich fuer eine Wanderung im Gebirge im Fruehling einpacken? Kurz bitte.",
-          "Schreib zwei Saetze Glueckwuensche zur bestandenen Pruefung meiner Schwester."]
+UI_REQ = common.OwnSet("tasks_lang.UI_REQ")  # private: flozi00/weakbench-data
 UI_TRANSLIT = re.compile(r"\b(?:fuer|koenn\w*|moecht\w*|waer\w*|schoen\w*|gruess\w*|gruesse|saetze\w*|erklaer\w*|baeum\w*|"
                          r"blaett\w*|hoeflich\w*|kueche\w*|gruenkohl|naechst\w*|getraenk\w*|begruess\w*|regelmaessig\w*|"
                          r"verspaet\w*|strasse\w*|muell|tuer\w*|haustuer|schliess\w*|ruecksend\w*|fruehling|glueck\w*|"
@@ -2945,17 +2757,7 @@ def score_de_umlaut_input(item, reply):
 
 
 # ---------------------------------------------------------------- en_question_tags (auxiliary, polarity, special cases)
-QT_ITEMS = [("plain", "She can swim", ["can't she"]), ("plain", "He has finished the report", ["hasn't he"]),
-            ("plain", "They won't be late", ["will they"]), ("plain", "You didn't call him", ["did you"]),
-            ("plain", "We should leave now", ["shouldn't we"]), ("plain", "It was raining", ["wasn't it"]),
-            ("special", "I am late again", ["aren't i", "am i not"]), ("special", "Let's take a break", ["shall we"]),
-            ("special", "Open the window", ["will you", "would you", "can you", "could you", "won't you"]),
-            ("special", "There is a problem with the printer", ["isn't there"]),
-            ("special", "They used to live in Leeds", ["didn't they"]), ("special", "This is your bag", ["isn't it"]),
-            ("negative_word", "Nobody called this morning", ["did they"]), ("negative_word", "You never lie", ["do you"]),
-            ("negative_word", "Nothing happened", ["did it"]), ("negative_word", "She hardly ever complains", ["does she"]),
-            ("subject", "Everyone is here", ["aren't they"]), ("subject", "Somebody left the door open", ["didn't they"]),
-            ("subject", "Neither of them knew the answer", ["did they"]), ("subject", "Everything is ready", ["isn't it"])]
+QT_ITEMS = common.OwnSet("tasks_lang.QT_ITEMS")  # private: flozi00/weakbench-data
 
 
 def load_en_question_tags(lang, n, seed):
@@ -2991,42 +2793,7 @@ def score_en_question_tags(item, reply):
 
 
 # ---------------------------------------------------------------- md_translate (translate prose, keep the Markdown and the code)
-MT_DOCS = {"de": [("Installation", "Install the package with pip and restart the server.", "Run `{cmd}` once.",
-                   "pip install fastgrid==2.1", "https://example.org/docs/install", ["Open a terminal", "Activate the virtual environment"],
-                   r"install|paket|server|terminal|umgebung"),
-                  ("Configuration", "Set the timeout in the configuration file before the first start.", "Change `{cmd}` if needed.",
-                   "timeout_seconds = 30", "https://example.org/docs/config", ["Open config.toml", "Save the file"],
-                   r"konfiguration|datei|start|speicher|öffne"),
-                  ("Troubleshooting", "If the import fails, check your Python version.", "Use `{cmd}` to see it.",
-                   "python3 --version", "https://example.org/docs/faq", ["Read the error message", "Update Python if needed"],
-                   r"fehler|version|prüf|aktualisier"),
-                  ("Backup", "Create a backup of the database every night.", "The command is `{cmd}`.",
-                   "pg_dump shop > shop.sql", "https://example.org/docs/backup", ["Stop the shop at midnight", "Copy the file to the server"],
-                   r"sicherung|backup|datenbank|nacht|kopier"),
-                  ("Logging", "Logs are written to the folder below.", "Rotate them with `{cmd}`.",
-                   "logrotate -f /etc/logrotate.conf", "https://example.org/docs/logs", ["Check the disk space", "Delete old logs"],
-                   r"protokoll|logs|ordner|speicherplatz|lösch"),
-                  ("Updates", "Update the app before you report a bug.", "Check with `{cmd}`.",
-                   "fastgrid --check-update", "https://example.org/docs/update", ["Close all windows", "Start the update"],
-                   r"aktualisier|update|fehler|schließ|fenster")],
-           "en": [("Installation", "Installiere das Paket mit pip und starte den Server neu.", "Führe einmal `{cmd}` aus.",
-                   "pip install fastgrid==2.1", "https://example.org/docs/install", ["Öffne ein Terminal", "Aktiviere die virtuelle Umgebung"],
-                   r"install|package|server|terminal|environment"),
-                  ("Konfiguration", "Stelle das Timeout vor dem ersten Start in der Konfigurationsdatei ein.", "Ändere bei Bedarf `{cmd}`.",
-                   "timeout_seconds = 30", "https://example.org/docs/config", ["Öffne config.toml", "Speichere die Datei"],
-                   r"configur|file|start|save|open"),
-                  ("Fehlersuche", "Wenn der Import fehlschlägt, prüfe deine Python-Version.", "Mit `{cmd}` siehst du sie.",
-                   "python3 --version", "https://example.org/docs/faq", ["Lies die Fehlermeldung", "Aktualisiere Python bei Bedarf"],
-                   r"error|version|check|update|fails"),
-                  ("Sicherung", "Erstelle jede Nacht eine Sicherung der Datenbank.", "Der Befehl lautet `{cmd}`.",
-                   "pg_dump shop > shop.sql", "https://example.org/docs/backup", ["Stoppe den Shop um Mitternacht", "Kopiere die Datei auf den Server"],
-                   r"backup|database|night|copy|midnight"),
-                  ("Protokolle", "Die Protokolle werden in den Ordner unten geschrieben.", "Rotiere sie mit `{cmd}`.",
-                   "logrotate -f /etc/logrotate.conf", "https://example.org/docs/logs", ["Prüfe den Speicherplatz", "Lösche alte Protokolle"],
-                   r"log|folder|disk|delete|space"),
-                  ("Aktualisierungen", "Aktualisiere die App, bevor du einen Fehler meldest.", "Prüfe mit `{cmd}`.",
-                   "fastgrid --check-update", "https://example.org/docs/update", ["Schließe alle Fenster", "Starte die Aktualisierung"],
-                   r"update|bug|report|close|window")]}
+MT_DOCS = common.OwnSet("tasks_lang.MT_DOCS")  # private: flozi00/weakbench-data
 
 
 def _mt_doc(head, para, inline, cmd, url, bullets):

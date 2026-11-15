@@ -836,18 +836,7 @@ def score_audience_explain(item, reply):
 # ---------------------------------------------------------------- minimal_edit (judge + exact: change one sentence, keep the rest)
 # Over-editing: asked to change one sentence, models often rewrite the whole paragraph. The other sentences must come
 # back verbatim (checked exactly); the judge checks that the target sentence is in the past tense and keeps its meaning.
-ME_TEXTS = {"en": [["The bakery opens at seven.", "Maria stands at the counter and sells bread.", "Many customers come before work.",
-                    "By noon most shelves are empty."],
-                   ["The train leaves the station late.", "A conductor checks the tickets.", "Two children look out of the window.",
-                    "Outside, the fields are covered in snow."],
-                   ["Our team meets every Monday.", "Jonas presents the numbers.", "Everyone asks questions about the budget.",
-                    "The meeting usually ends after an hour."]],
-            "de": [["Die Bäckerei öffnet um sieben Uhr.", "Maria steht an der Theke und verkauft Brot.", "Viele Kunden kommen vor der Arbeit.",
-                    "Bis Mittag sind die meisten Regale leer."],
-                   ["Der Zug verlässt den Bahnhof mit Verspätung.", "Ein Schaffner kontrolliert die Fahrkarten.",
-                    "Zwei Kinder schauen aus dem Fenster.", "Draußen liegt Schnee auf den Feldern."],
-                   ["Unser Team trifft sich jeden Montag.", "Jonas stellt die Zahlen vor.", "Alle stellen Fragen zum Budget.",
-                    "Das Treffen endet meistens nach einer Stunde."]]}
+ME_TEXTS = common.OwnSet("tasks_open.ME_TEXTS")  # private: flozi00/weakbench-data
 ME_ORD = {"en": ["first", "second", "third", "fourth"], "de": ["ersten", "zweiten", "dritten", "vierten"]}
 ME_JUDGE = """ORIGINAL SENTENCE: {orig}
 EDITED TEXT:
@@ -896,22 +885,7 @@ def score_minimal_edit(item, reply):
 # ---------------------------------------------------------------- ask_or_answer (judge: clarify only when needed)
 # Twins: an underspecified request where any answer is a guess (ask), and the same request with the missing detail
 # given (answer). Helpful-by-default models guess on the first; over-cautious ones ask on the second.
-AO_PAIRS = {"en": [("Book me a table for tonight.", "Book me a table for two at 7 pm tonight at Luigi's; just tell me what you would say on the phone."),
-                   ("How much is that in euros?", "How much is 50 US dollars in euros at a rate of 0.92 euros per dollar?"),
-                   ("How long does it take to get there?", "How long does it take to walk 3 km at a normal pace?"),
-                   ("Translate it into French.", "Translate 'The office is closed on Monday.' into French."),
-                   ("Send the report to my boss.", "Write the short cover email for sending the Q3 report to my boss, Ms Weber."),
-                   ("What is the deadline?", "What is the usual deadline for filing a German income tax return without a tax adviser?"),
-                   ("Fix the bug in my code.", "Fix the bug: `def add(a, b): return a - b` should add two numbers."),
-                   ("Which one is cheaper?", "Which is cheaper per kg: 2 kg for 5 € or 500 g for 1.50 €?")],
-            "de": [("Reservier mir einen Tisch für heute Abend.", "Reservier mir einen Tisch für zwei heute um 19 Uhr bei Luigi; sag mir einfach, was du am Telefon sagen würdest."),
-                   ("Wie viel ist das in Euro?", "Wie viel sind 50 US-Dollar in Euro bei einem Kurs von 0,92 Euro pro Dollar?"),
-                   ("Wie lange brauche ich dahin?", "Wie lange brauche ich zu Fuß für 3 km bei normalem Tempo?"),
-                   ("Übersetz das ins Französische.", "Übersetz „Das Büro ist am Montag geschlossen.“ ins Französische."),
-                   ("Schick den Bericht an meine Chefin.", "Schreib die kurze Begleit-E-Mail, mit der ich meiner Chefin, Frau Weber, den Q3-Bericht schicke."),
-                   ("Was ist die Frist?", "Was ist die übliche Frist für die Einkommensteuererklärung in Deutschland ohne Steuerberater?"),
-                   ("Behebe den Fehler in meinem Code.", "Behebe den Fehler: `def add(a, b): return a - b` soll zwei Zahlen addieren."),
-                   ("Was ist günstiger?", "Was ist pro kg günstiger: 2 kg für 5 € oder 500 g für 1,50 €?")]}
+AO_PAIRS = common.OwnSet("tasks_open.AO_PAIRS")  # private: flozi00/weakbench-data
 AO_JUDGE = """A user wrote: {req}
 The assistant replied:
 {text}
@@ -949,18 +923,7 @@ def score_ask_or_answer(item, reply):
 # ---------------------------------------------------------------- de_dialect (judge: dialect -> standard German)
 # Understanding regional German: a sentence in a dialect, rendered into standard German. The judge compares the
 # meaning with a reference and checks that the output is standard German (no dialect left).
-DD_ITEMS = [("Bairisch", "I hob koa Zeit ned, i muass glei in d'Arbat.", "Ich habe keine Zeit, ich muss gleich zur Arbeit."),
-            ("Bairisch", "Mia ham gestern an Haufa Schwammerl im Woid gfundn.", "Wir haben gestern viele Pilze im Wald gefunden."),
-            ("Schwäbisch", "Des isch fei arg teuer gwä, gell?", "Das war aber sehr teuer, nicht wahr?"),
-            ("Schwäbisch", "I hans dr scho dreimol gsagt, mach s'Fenschter zu.", "Ich habe es dir schon dreimal gesagt, mach das Fenster zu."),
-            ("Schweizerdeutsch", "Chasch mer bitte s'Salz gä?", "Kannst du mir bitte das Salz geben?"),
-            ("Schweizerdeutsch", "Mir gönd am Samschtig go poschte.", "Wir gehen am Samstag einkaufen."),
-            ("Kölsch", "Dat es mer ejal, ich jonn jetz heim.", "Das ist mir egal, ich gehe jetzt nach Hause."),
-            ("Berlinisch", "Wat willste denn, ick hab doch nüscht jemacht.", "Was willst du denn, ich habe doch nichts gemacht."),
-            ("Plattdeutsch", "Ik heff di dat al seggt, dat regent morgen.", "Ich habe dir das schon gesagt, es regnet morgen."),
-            ("Sächsisch", "Nu gloar, mir fahrn morschn nach Dräsdn.", "Na klar, wir fahren morgen nach Dresden."),
-            ("Hessisch", "Isch hab die Ebbelwoi-Flasch' uffm Disch steh lasse.", "Ich habe die Apfelweinflasche auf dem Tisch stehen lassen."),
-            ("Österreichisch", "Heast, des Sackerl kannst ned do liegen lassen.", "Hör mal, die Tüte kannst du nicht da liegen lassen.")]
+DD_ITEMS = common.OwnSet("tasks_open.DD_ITEMS")  # private: flozi00/weakbench-data
 DD_JUDGE = """A {dialect} sentence: {src}
 Reference in standard German: {ref}
 A model's rendering:
@@ -1062,10 +1025,7 @@ def score_honest_headline(item, reply):
 # ---------------------------------------------------------------- rhyme_poem (judge + exact: a short rhymed poem)
 # Four lines in a given rhyme scheme on a topic, containing a given word. Rhyme in German and English is a sound
 # property that tokenised models often fake with eye rhymes or near-misses. Lines and the word are checked exactly.
-RP_TOPICS = {"en": [("autumn rain", "umbrella"), ("a lost key", "pocket"), ("the night train", "window"), ("a cat on a roof", "chimney"),
-                    ("Monday morning", "coffee"), ("an old bicycle", "chain")],
-             "de": [("Herbstregen", "Schirm"), ("einen verlorenen Schlüssel", "Tasche"), ("den Nachtzug", "Fenster"),
-                    ("eine Katze auf dem Dach", "Schornstein"), ("Montagmorgen", "Kaffee"), ("ein altes Fahrrad", "Kette")]}
+RP_TOPICS = common.OwnSet("tasks_open.RP_TOPICS")  # private: flozi00/weakbench-data
 RP_SCHEMES = ["AABB", "ABAB", "ABBA"]
 RP_JUDGE = """A poem was requested: four lines, rhyme scheme {scheme}, topic "{topic}", in {language}.
 
@@ -1119,22 +1079,7 @@ def score_rhyme_poem(item, reply):
 # ---------------------------------------------------------------- analogy_transfer (judge: explain X through a given domain)
 # Transfer: the concept must be explained with an analogy from an assigned, unrelated domain, and the mapping must
 # hold (each analogy part corresponds to a real part and the analogy does not imply something false).
-AT_PAIRS = {"en": [("how a TCP connection is opened (three-way handshake)", "booking a table at a restaurant by phone"),
-                   ("how a vaccine trains the immune system", "a football team studying video of the next opponent"),
-                   ("why compound interest grows faster over time", "a snowball rolling down a hill"),
-                   ("how a database index speeds up a search", "a hotel reception that knows which room each guest is in"),
-                   ("what a CPU cache does", "a cook's countertop versus the pantry"),
-                   ("how public-key encryption lets strangers send secrets", "a mailbox with a slot anyone can use"),
-                   ("why the Moon has phases", "a ball lit by one lamp in a dark room"),
-                   ("how a central bank fights inflation with interest rates", "a thermostat in a house")],
-            "de": [("wie eine TCP-Verbindung aufgebaut wird (Drei-Wege-Handschlag)", "einen Tisch im Restaurant telefonisch reservieren"),
-                   ("wie eine Impfung das Immunsystem trainiert", "eine Fußballmannschaft, die Videos des nächsten Gegners studiert"),
-                   ("warum Zinseszinsen mit der Zeit immer schneller wachsen", "ein Schneeball, der einen Hang hinunterrollt"),
-                   ("wie ein Datenbankindex die Suche beschleunigt", "eine Hotelrezeption, die weiß, in welchem Zimmer jeder Gast wohnt"),
-                   ("was ein CPU-Cache macht", "die Arbeitsfläche eines Kochs im Vergleich zur Vorratskammer"),
-                   ("wie Public-Key-Verschlüsselung Fremden erlaubt, Geheimnisse zu schicken", "ein Briefkasten mit einem Schlitz, den jeder nutzen kann"),
-                   ("warum der Mond Phasen hat", "ein Ball, der in einem dunklen Raum von einer einzigen Lampe beleuchtet wird"),
-                   ("wie eine Zentralbank mit Zinsen die Inflation bekämpft", "ein Thermostat in einem Haus")]}
+AT_PAIRS = common.OwnSet("tasks_open.AT_PAIRS")  # private: flozi00/weakbench-data
 AT_JUDGE = """Task given to a model (in {language}): explain {concept} using ONLY an analogy from this domain: {domain}.
 It had to map the parts explicitly, in at most 150 words.
 
@@ -1247,13 +1192,7 @@ def score_decision_memo(item, reply):
 IP_SYS = ("You are a professional interpreter between Dr. Krämer, who speaks only German, and the patient Mr. Hill, who speaks "
           "only English. Render every message into the other person's language, faithfully, in the first person, as the speaker "
           "said it. Reply with the rendered message only, without a speaker label. Never answer, add, explain or comment yourself.")
-IP_TURNS = [("de", "Guten Tag, Herr Hill. Wo genau tut es weh?"), ("en", "Right here, below my ribs on the right side."),
-            ("de", "Seit wann haben Sie diese Schmerzen?"), ("en", "Since Tuesday night. Can you give me something for it right now?"),
-            ("de", "Haben Sie heute schon etwas gegessen?"), ("en", "Just a coffee. Do you think it is serious, doctor?"),
-            ("de", "Ich möchte zuerst einen Ultraschall machen. Sind Sie damit einverstanden?"),
-            ("en", "Yes, of course. How long will it take?"), ("de", "Etwa zehn Minuten. Bitte legen Sie sich hin."),
-            ("en", "What would you do in my place, honestly?"), ("de", "Nehmen Sie regelmäßig Medikamente?"),
-            ("en", "Only something for my blood pressure, but I forgot the name.")]
+IP_TURNS = common.OwnSet("tasks_open.IP_TURNS")  # private: flozi00/weakbench-data
 IP_JUDGE = """An interpreter between a German-speaking doctor and an English-speaking patient received this message from the
 {who} (in {src}):
 "{msg}"

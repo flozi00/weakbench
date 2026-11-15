@@ -371,6 +371,22 @@ def test_analogy_transfer():
         tasks_judge.configure(None, None, None)
 
 
+def test_decision_memo():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_decision_memo("de", None, 0)
+        assert len(it) == 16 and {x["gold"] for x in it} == {"A", "B"}
+        x = it[0]
+        assert to.score_decision_memo(x, {"content": f"Kurz gerechnet ...\nEmpfehlung: {x['gold']}"})["correct"]
+        other = "B" if x["gold"] == "A" else "A"
+        r = to.score_decision_memo(x, {"content": f"Kurz gerechnet ...\nEmpfehlung: Tarif {other}"})
+        assert not r["correct"] and r["detail"]["choice_ok"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -485,6 +501,7 @@ if __name__ == "__main__":
     test_honest_headline()
     test_rhyme_poem()
     test_analogy_transfer()
+    test_decision_memo()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

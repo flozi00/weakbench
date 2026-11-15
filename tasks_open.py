@@ -1176,6 +1176,66 @@ def score_analogy_transfer(item, reply):
                        "understandable": float(met[3]), "within_limit": float(met[4])}}
 
 
+# ---------------------------------------------------------------- decision_memo (judge + exact: a recommendation with the numbers right)
+# Two phone plans; which is cheaper depends on the stated usage. The recommended plan is checked exactly (computed);
+# the judge checks that the memo shows the comparison correctly and names the break-even point / when the answer flips.
+DM_JUDGE = """FACTS: plan A costs {fa} € per month and includes {ia} GB; each extra GB costs {ea} €. Plan B costs {fb} € per month and
+includes {ib} GB; each extra GB costs {eb} €. The user needs {u} GB per month. Monthly cost: A = {ca} €, B = {cb} €.
+
+MEMO:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Every cost figure in the memo is correct (no wrong arithmetic).
+2. The memo says under which usage the other plan would be the better choice (a break-even point or a clear condition),
+   and that statement is correct.
+3. The memo is clear and short enough for a non-expert (no padding, no hedging without reason)."""
+
+
+def load_decision_memo(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 16):
+        r = random.Random(f"decision_memo:{i}")
+        while True:
+            fa, ia, ea = r.randrange(10, 25), r.choice([5, 10, 15]), r.choice([2, 3, 4])
+            fb, ib, eb = fa + r.randrange(5, 15), ia + r.choice([10, 20, 30]), r.choice([1, 2])
+            u = r.randrange(ia + 1, ib + 15)
+            ca = fa + max(0, u - ia) * ea
+            cb = fb + max(0, u - ib) * eb
+            if ca != cb and (ca < cb) == (i % 2 == 0):
+                break
+        gold = "A" if ca < cb else "B"
+        req = (f"Help me choose a phone plan. Plan A: {fa} € per month, {ia} GB included, each extra GB {ea} €. Plan B: {fb} € per "
+               f"month, {ib} GB included, each extra GB {eb} €. I use about {u} GB per month. Write a short memo (at most 120 words) "
+               "with your recommendation and the numbers behind it, and end with a line \"Recommendation: A\" or \"Recommendation: B\"."
+               if lang == "en" else
+               f"Hilf mir bei der Wahl eines Handytarifs. Tarif A: {fa} € pro Monat, {ia} GB inklusive, jedes weitere GB {ea} €. "
+               f"Tarif B: {fb} € pro Monat, {ib} GB inklusive, jedes weitere GB {eb} €. Ich verbrauche etwa {u} GB pro Monat. "
+               "Schreib ein kurzes Memo (höchstens 120 Wörter) mit deiner Empfehlung und den Zahlen dahinter und schließe mit einer "
+               "Zeile „Empfehlung: A“ oder „Empfehlung: B“.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "facts": dict(fa=fa, ia=ia, ea=ea, fb=fb, ib=ib, eb=eb, u=u, ca=ca, cb=cb),
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_decision_memo(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    rec = re.findall(r"(?:Recommendation|Empfehlung)\W*:\W*(?:Plan |Tarif )?([AB])\b", text, re.I)
+    choice_ok = bool(rec) and rec[-1].upper() == item["gold"]
+    words = len([w for w in text.split() if re.search(r"\w", w)])
+    out = tasks_judge.judge("", DM_JUDGE.format(text=text or "(empty)", **item["facts"]), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable memo verdict {out[:120]!r}")
+    met = [choice_ok] + [_yes(x) for x in v] + [words <= 120]
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": (rec[-1] if rec else None), "gold": item["gold"],
+            "detail": {"choice_ok": float(met[0]), "numbers_ok": float(met[1]), "names_flip": float(met[2]),
+                       "clear": float(met[3]), "within_limit": float(met[4])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1572,6 +1632,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "memory_dialog": {"langs": ("de", "en"), "load": load_memory_dialog, "score": score_memory_dialog,
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
+                           "lang_check": True, "opt_in": True, "needs_judge": True},
+         "decision_memo": {"langs": ("de", "en"), "load": load_decision_memo, "score": score_decision_memo,
+                           "think": False, "max_tokens": 512,
+                           "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "analogy_transfer": {"langs": ("de", "en"), "load": load_analogy_transfer, "score": score_analogy_transfer,
                               "think": False, "max_tokens": 512,

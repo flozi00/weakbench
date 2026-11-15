@@ -5414,6 +5414,78 @@ def score_csv_field(item, reply):
             "detail": {"took_naive_split": float(any(norm(f) == norm(item["naive"]) for f in forms) and not ok)}}
 
 
+# ---------------------------------------------------------------- json_repair (fix syntax, keep every value)
+JR_KEYS = ["name", "city", "age", "active", "tags", "score", "note", "id", "email", "level"]
+
+
+def _jr_break(obj, r, faults):
+    """Serialise obj with the given syntax faults."""
+    def val(v):
+        if isinstance(v, bool):
+            return ("True" if v else "False") if "pybool" in faults else ("true" if v else "false")
+        if v is None:
+            return "None" if "pybool" in faults else "null"
+        if isinstance(v, str):
+            return f"'{v}'" if "single" in faults and "'" not in v else '"' + v.replace('"', '\\"') + '"'
+        if isinstance(v, list):
+            inner = ", ".join(val(x) for x in v)
+            return "[" + inner + (", " if "trailing" in faults else "") + "]"
+        return str(v)
+    parts = []
+    for j, (k, v) in enumerate(obj.items()):
+        key = k if "unquoted" in faults and j % 2 == 0 else f'"{k}"'
+        parts.append(f"  {key}: {val(v)}")
+    sep = [",\n"] * (len(parts) - 1)
+    if "missing" in faults and sep:
+        sep[r.randrange(len(sep))] = "\n"
+    body = "".join(p + s for p, s in zip(parts, sep + [""]))
+    if "comment" in faults:
+        body = "  // exported record\n" + body
+    return "{\n" + body + (",\n" if "trailing" in faults else "\n") + "}"
+
+
+def load_json_repair(lang, n, seed):
+    import json
+    items = []
+    all_faults = ["trailing", "single", "unquoted", "missing", "pybool", "comment"]
+    for i in range(n or 120):
+        r = rng_of("json_repair", i)
+        while True:  # every drawn fault must actually show up (no strings: "single" would be a no-op)
+            keys = r.sample(JR_KEYS, r.randint(5, 8))
+            obj = {}
+            for k in keys:
+                obj[k] = r.choice([r.randint(1, 999), round(r.uniform(0, 100), 1), r.choice([True, False, None]),
+                                   r.choice(["Ada", "Köln", "it's fine", "say \"hi\"", "a, b", "x: y"]),
+                                   [r.randint(1, 9) for _ in range(r.randint(1, 3))]])
+            faults = r.sample(all_faults, (2, 3, 4)[i % 3])
+            broken = _jr_break(obj, r, faults)
+            clean = _jr_break(obj, r, [])
+            shows = all(_jr_break(obj, random.Random(0), [f]) != clean for f in faults)
+            if shows and json.loads(clean) == obj:
+                break
+        q = ("This JSON object is broken. Repair the syntax so it is valid JSON, without changing any key or value. "
+             "Reply with the JSON only.\n\n" if lang == "en" else
+             "Dieses JSON-Objekt ist kaputt. Repariere die Syntax, sodass es gültiges JSON ist, ohne einen Schlüssel oder Wert zu "
+             "ändern. Antworte nur mit dem JSON.\n\n")
+        items.append({"id": str(i), "lang": lang, "gold": json.dumps(obj, ensure_ascii=False, sort_keys=True), "faults": faults,
+                      "messages": [{"role": "user", "content": q + broken}]})
+    return items
+
+
+def score_json_repair(item, reply):
+    import json
+    text = reply["content"] or ""
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S) or re.search(r"\{.*\}", text, re.S)
+    try:
+        got = json.loads(m[1] if m and m.re.groups else m[0]) if m else None
+    except ValueError:
+        got = None
+    want = json.loads(item["gold"])
+    ok = got == want
+    return {"correct": ok, "score": float(ok), "pred": json.dumps(got, ensure_ascii=False, sort_keys=True)[:200] if got else None,
+            "gold": item["gold"], "detail": {"valid_json": float(isinstance(got, dict)), "changed_value": float(isinstance(got, dict) and not ok)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6989,6 +7061,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "json_repair": task(load_json_repair, score_json_repair, 24, 120),
     "csv_field": task(load_csv_field, score_csv_field, 24, 120),
     "edit_rule": task(load_edit_rule, score_edit_rule, 24, 120),
     "split_bill": task(load_split_bill, score_split_bill, 24, 120),

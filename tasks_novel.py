@@ -6279,11 +6279,10 @@ def load_sql_result(lang, n, seed):
                 sql = "SELECT COUNT(*) FROM orders WHERE status <> 'paid';"
                 naive_sql = "SELECT COUNT(*) FROM orders WHERE status IS NOT 'paid';"
             else:
-                sql = "SELECT COUNT(*) FROM (SELECT region FROM orders GROUP BY region HAVING SUM(amount) > 100);"
-                naive_sql = "SELECT COUNT(*) FROM (SELECT region FROM orders GROUP BY region HAVING SUM(COALESCE(amount, 0)) > 100);"
+                sql = "SELECT COUNT(*) FROM (SELECT region FROM orders GROUP BY region HAVING AVG(amount) > 40);"
+                naive_sql = "SELECT COUNT(*) FROM (SELECT region FROM orders GROUP BY region HAVING AVG(COALESCE(amount, 0)) > 40);"
             gold, naive = db.execute(sql).fetchone()[0], db.execute(naive_sql).fetchone()[0]
-            if gold is not None and naive is not None and round(gold, 2) != round(naive, 2) and kind != "having" or \
-                    (kind == "having" and gold is not None and naive is not None and any(x[2] is None for x in rows)):
+            if gold is not None and naive is not None and round(gold, 2) != round(naive, 2):
                 break
         gold = round(gold, 2)
         table = "\n".join(f"| {a} | {b} | {'NULL' if c is None else c} | {'NULL' if d is None else d} |" for a, b, c, d in rows)

@@ -3736,6 +3736,46 @@ def load_novel_metaphor(lang, n, seed):
     return items if n is None else items[:n]
 
 
+# ---------------------------------------------------------------- en_indirect_q (embedded question word order)
+# "Can you tell me where the station is?" keeps statement order; German speakers (and models) carry over the direct
+# question order ("where is the station"). Half the items are direct questions as controls, where inversion is right.
+IQ_ITEMS = [("Can you tell me where ___?", "the station is", ("the station is", "is the station"), "embedded"),
+            ("Where ___?", "is the station", ("the station is", "is the station"), "direct"),
+            ("I wonder what time ___.", "the shop opens", ("the shop opens", "does the shop open"), "embedded"),
+            ("What time ___?", "does the shop open", ("the shop opens", "does the shop open"), "direct"),
+            ("Do you know how much ___?", "this jacket costs", ("this jacket costs", "does this jacket cost"), "embedded"),
+            ("How much ___?", "does this jacket cost", ("this jacket costs", "does this jacket cost"), "direct"),
+            ("She asked me why ___ so late.", "I was", ("I was", "was I"), "embedded"),
+            ("Why ___ so late?", "were you", ("you were", "were you"), "direct"),
+            ("Could you explain how ___?", "this machine works", ("this machine works", "does this machine work"), "embedded"),
+            ("How ___?", "does this machine work", ("this machine works", "does this machine work"), "direct"),
+            ("I don't remember where ___ my keys.", "I put", ("I put", "did I put"), "embedded"),
+            ("Where ___ my keys?", "did I put", ("I put", "did I put"), "direct"),
+            ("Nobody knows who ___ the window.", "broke", ("broke", "did break"), "embedded"),
+            ("He wanted to know if ___ coming.", "we were", ("we were", "were we"), "embedded"),
+            ("___ coming tonight?", "Are you", ("You are", "Are you"), "direct"),
+            ("Let me check when ___.", "the train leaves", ("the train leaves", "does the train leave"), "embedded")]
+
+
+def load_en_indirect_q(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": o, "kind": kind,
+             "messages": [{"role": "user", "content": f"Fill the gap with \"{o[i % 2]}\" or \"{o[1 - i % 2]}\". Answer with that "
+                           f"phrase only.\n\n{sent}"}]}
+            for i, (sent, g, o, kind) in enumerate(IQ_ITEMS[:min(n or 16, 16)])]
+
+
+def score_en_indirect_q(item, reply):
+    t = " ".join(re.findall(r"[a-z']+", re.sub(r"\([^()]*\)", " ", reply["content"] or "").lower()))
+    hits = []
+    for o in sorted(item["opts"], key=len, reverse=True):
+        if re.search(rf"\b{re.escape(o.lower())}\b", t):
+            hits.append(o)
+            t = re.sub(rf"\b{re.escape(o.lower())}\b", " ", t)
+    v = hits[0] if len(hits) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4274,6 +4314,7 @@ TASKS = {
     "de_austrian": task(("de",), load_de_austrian, score_de_austrian, 20, 20, lang_check=False),
     "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
     "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
+    "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

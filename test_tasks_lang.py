@@ -902,3 +902,18 @@ def test_novel_metaphor():
 
 if __name__ == "__main__":
     test_novel_metaphor()
+
+
+def test_en_indirect_q():
+    import tasks_lang as tl
+    for x in tl.load_en_indirect_q("en", None, 0):
+        sent = x["messages"][0]["content"].splitlines()[-1]
+        full = sent.replace("___", x["gold"])
+        for c in (x["gold"], full, f"\"{x['gold']}\""):
+            assert tl.score_en_indirect_q(x, {"content": c})["correct"], (c, x["gold"])
+        other = [o for o in x["opts"] if o != x["gold"]][0]
+        assert not tl.score_en_indirect_q(x, {"content": other})["correct"]
+
+
+if __name__ == "__main__":
+    test_en_indirect_q()

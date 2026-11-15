@@ -7528,7 +7528,7 @@ def load_count_range(lang, n, seed):
             if kind == "div_not":
                 k, m = r.sample([3, 4, 5, 6, 7, 9], 2)
                 pred = lambda x, k=k, m=m: x % k == 0 and x % m != 0  # noqa: E731
-                en, de = f"divisible by {k} but not by {m}", f"durch {k}, aber nicht durch {m} teilbar"
+                en, de = f"are divisible by {k} but not by {m}", f"sind durch {k}, aber nicht durch {m} teilbar"
             elif kind == "digit":
                 d = r.randint(1, 9)
                 pred = lambda x, d=d: str(d) in str(x)  # noqa: E731

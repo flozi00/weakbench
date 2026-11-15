@@ -2479,15 +2479,14 @@ def score_quote_keep(item, reply):
 # (sentence, gold, spelling misleads). Half the items look like the other article by their first letter.
 AS_ITEMS = [("I waited for ___ hour.", "an", True), ("She is ___ honest person.", "an", True), ("He is ___ heir to the company.", "an", True),
             ("She has ___ MBA from Mannheim.", "an", True), ("He was ___ FBI agent.", "an", True), ("The doctor ordered ___ X-ray.", "an", True),
-            ("We met ___ 8-year-old girl.", "an", True), ("It was ___ honour to meet you.", "an", True), ("I bought ___ hourly ticket.", "an", True),
+            ("We met ___ 8-year-old girl.", "an", True), ("It was ___ honour to meet you.", "an", True), ("We took ___ hourly bus.", "an", True),
             ("She studies at ___ university.", "a", True), ("He is ___ European citizen.", "a", True), ("I bought ___ one-way ticket.", "a", True),
-            ("Every ___ user needs a password.", None, None), ("Send me ___ URL.", "a", True), ("It costs ___ euro.", "a", True),
+            ("Send me ___ URL.", "a", True), ("It costs ___ euro.", "a", True),
             ("That is ___ unique idea.", "a", True), ("She wore ___ uniform.", "a", True), ("It was ___ once-in-a-lifetime trip.", "a", True),
             ("We stayed in ___ hotel.", "a", True), ("He found ___ umbrella.", "an", False), ("She ate ___ apple.", "an", False),
             ("They own ___ house.", "a", False), ("He drove ___ old car.", "an", False), ("It is ___ useful tool.", "a", True),
             ("We saw ___ elephant.", "an", False), ("She wrote ___ book.", "a", False), ("I need ___ hammer.", "a", False),
             ("He is ___ engineer.", "an", False), ("Every user is ___ utility customer.", "a", True)]
-AS_ITEMS = [x for x in AS_ITEMS if x[1]]  # "Every ___ user" has no article slot; dropped
 
 
 def load_en_article_sound(lang, n, seed):

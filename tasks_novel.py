@@ -6455,6 +6455,76 @@ def score_negated_filter(item, reply):
             "detail": {"jaccard": round(jac, 4), "took_scope_bait": float(got == item["bait"])}}
 
 
+# ---------------------------------------------------------------- claim_check (supported / contradicted / undecidable)
+CC_MONTHS = {"en": ["January", "February", "March", "April", "May", "June"], "de": ["Januar", "Februar", "März", "April", "Mai", "Juni"]}
+CC_LABELS = {"en": ("supported", "contradicted", "not decidable"), "de": ("belegt", "widerlegt", "nicht entscheidbar")}
+
+
+def load_claim_check(lang, n, seed):
+    items = []
+    M = CC_MONTHS[lang]
+    for i in range(n or 120):
+        r = rng_of("claim_check", i)
+        kind = ("rise", "best", "total", "undecidable")[i % 4]
+        want_true = (i // 4) % 2 == 0
+        while True:
+            vals = [r.randrange(20, 90) for _ in M]
+            if kind == "rise":
+                a = r.randrange(0, 4)
+                b = a + r.randint(2, 5 - a) if a < 4 else 5
+                claim = (f"Sales rose every month from {M[a]} to {M[b]}." if lang == "en" else
+                         f"Der Umsatz stieg von {M[a]} bis {M[b]} jeden Monat.")
+                truth = all(vals[k + 1] > vals[k] for k in range(a, b))
+                if want_true and not truth:
+                    for k in range(a + 1, b + 1):
+                        vals[k] = vals[k - 1] + r.randint(1, 8)
+                    truth = True
+            elif kind == "best":
+                m = r.randrange(6)
+                claim = (f"{M[m]} was the month with the highest sales." if lang == "en" else f"Im {M[m]} war der Umsatz am höchsten.")
+                truth = vals[m] == max(vals) and vals.count(max(vals)) == 1
+                if want_true and not truth:
+                    vals[m] = max(vals) + r.randint(1, 9)
+                    truth = True
+            elif kind == "total":
+                tot = sum(vals[:3])
+                shown = tot if want_true else tot + r.choice([-10, -5, 5, 10])
+                claim = (f"Sales in the first quarter (January to March) added up to {shown} thousand euros." if lang == "en" else
+                         f"Der Umsatz im ersten Quartal (Januar bis März) betrug zusammen {shown} Tausend Euro.")
+                truth = shown == tot
+            else:
+                claim = r.choice([("Sales will rise again in July.", "Im Juli wird der Umsatz wieder steigen."),
+                                  ("The rise in May was caused by the new advertising campaign.",
+                                   "Der Anstieg im Mai wurde durch die neue Werbekampagne verursacht."),
+                                  ("The shop in Hamburg sold more than this shop.", "Die Filiale in Hamburg hat mehr verkauft als diese Filiale.")])
+                claim = claim[0 if lang == "en" else 1]
+                truth = None
+            if kind == "undecidable" or truth == want_true:
+                break
+        gold = CC_LABELS[lang][2 if truth is None else 0 if truth else 1]
+        table = "\n".join(f"| {m} | {v} |" for m, v in zip(M, vals))
+        head = "| Month | Sales (thousand €) |" if lang == "en" else "| Monat | Umsatz (Tausend €) |"
+        L = CC_LABELS[lang]
+        q = (f"{head}\n|---|---|\n{table}\nClaim: {claim}\nBased only on this table, is the claim {L[0]}, {L[1]}, or {L[2]}?"
+             if lang == "en" else
+             f"{head}\n|---|---|\n{table}\nBehauptung: {claim}\nIst die Behauptung allein anhand dieser Tabelle {L[0]}, {L[1]} oder {L[2]}?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_claim_check(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower()
+    L = CC_LABELS[item["lang"]]
+    hits = [lab for lab in (L[2], L[0], L[1]) if lab in fa]  # "not decidable" first: it contains no other label
+    v = hits[0] if len(hits) == 1 else None
+    ok = v == item["gold"]
+    d = {f"ok_{item['kind']}": float(ok)}
+    if item["gold"] == L[2]:
+        d["overclaimed"] = float(v in (L[0], L[1]))
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8034,6 +8104,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "claim_check": task(load_claim_check, score_claim_check, 24, 120),
     "negated_filter": task(load_negated_filter, score_negated_filter, 24, 120),
     "regex_eval": task(load_regex_eval, score_regex_eval, 24, 120),
     "meet_time": task(load_meet_time, score_meet_time, 24, 120),

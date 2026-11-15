@@ -6637,6 +6637,49 @@ def score_temp_delta(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- org_chart (lowest common manager)
+OC_NAMES = ["Abel", "Bianca", "Cosima", "Dragan", "Edda", "Fritz", "Greta", "Hamid", "Ilka", "Jonte", "Kalle", "Lotte", "Mads", "Nele"]
+
+
+def load_org_chart(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("org_chart", i, att)
+        while True:
+            people = r.sample(OC_NAMES, r.randint(8, 12))
+            boss = {people[k]: people[r.randrange(max(0, k - 3), k)] for k in range(1, len(people))}  # a tree, root people[0]
+
+            def chain(p):
+                out = [p]
+                while out[-1] in boss:
+                    out.append(boss[out[-1]])
+                return out
+            a, b = r.sample(people[1:], 2)
+            ca, cb = chain(a), chain(b)
+            lca = next(x for x in ca if x in cb)
+            if lca not in (a, b) and lca != boss[a] or (lca not in (a, b) and lca != boss[b]):
+                if lca not in (a, b) and (boss[a] != lca or boss[b] != lca) and len(ca) + len(cb) >= 6:
+                    break
+        bait = boss[a] if boss[a] != lca else boss[b]
+        lines = [f"{p} reports to {q}." if lang == "en" else f"{p} berichtet an {q}." for p, q in boss.items()]
+        r.shuffle(lines)
+        q = (f"In a company:\n" + "\n".join(lines) + f"\n{people[0]} reports to nobody. Who is the lowest-ranking person that both "
+             f"{a} and {b} report to, directly or through others?" if lang == "en" else
+             f"In einer Firma:\n" + "\n".join(lines) + f"\n{people[0]} berichtet an niemanden. Wer ist die rangniedrigste Person, "
+             f"an die sowohl {a} als auch {b} berichten, direkt oder über andere?")
+        items.append({"id": str(i), "lang": lang, "gold": lca, "bait": bait, "names": people,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_org_chart(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    named = sorted((m.start(), x) for x in item["names"] for m in re.finditer(r"\b" + x + r"\b", fa))
+    v = named[0][1] if named else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_direct_manager": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8217,6 +8260,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "org_chart": task(load_org_chart, score_org_chart, 24, 120),
     "temp_delta": task(load_temp_delta, score_temp_delta, 24, 120),
     "board_moves": task(load_board_moves, score_board_moves, 24, 120),
     "claim_check": task(load_claim_check, score_claim_check, 24, 120),

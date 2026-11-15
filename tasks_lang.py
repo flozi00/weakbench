@@ -3178,6 +3178,56 @@ def score_en_relative_commas(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_one" if item["one"] else "ok_several": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_phrasal_sense (context decides the sense)
+# (verb, three senses, two contexts with the index of the right sense)
+PS_ITEMS = [("put off", ("postpone", "discourage / repel", "switch off"),
+             [("We had to put off the meeting until Friday.", 0), ("The smell of the fish put me off my dinner.", 1)]),
+            ("pick up", ("collect someone", "learn without studying", "improve"),
+             [("Can you pick me up from the station at six?", 0), ("She picked up some Spanish while working in Madrid.", 1)]),
+            ("turn down", ("refuse", "reduce the volume", "fold over"),
+             [("He turned down the job offer because of the salary.", 0), ("Please turn the radio down, the baby is asleep.", 1)]),
+            ("make out", ("manage to see or hear", "pretend / claim", "write a cheque"),
+             [("In the fog I could just make out the lighthouse.", 0), ("He made out that he had never met her.", 1)]),
+            ("take off", ("leave the ground", "remove clothing", "become successful quickly"),
+             [("Please take off your shoes before you come in.", 1), ("Her small online shop really took off last year.", 2)]),
+            ("look up", ("search for information", "improve", "admire"),
+             [("I looked the word up in the dictionary.", 0), ("After a bad winter, things are finally looking up.", 1)]),
+            ("go off", ("explode or ring", "stop liking", "become bad (food)"),
+             [("The alarm went off at five in the morning.", 0), ("Don't drink that milk, it has gone off.", 2)]),
+            ("come up", ("be mentioned", "rise (the sun)", "arrive at someone"),
+             [("Your name came up in the meeting today.", 0), ("We left the camp before the sun came up.", 1)]),
+            ("break down", ("stop working", "start crying", "divide into parts"),
+             [("Our car broke down on the motorway.", 0), ("When she heard the news, she broke down.", 1)]),
+            ("work out", ("do sport", "find a solution", "turn out well"),
+             [("I can't work out how to open this box.", 1), ("Don't worry, everything will work out in the end.", 2)])]
+
+
+def load_en_phrasal_sense(lang, n, seed):
+    items = []
+    for i in range(min(n or 20, 20)):
+        verb, senses, ctxs = PS_ITEMS[i // 2]
+        sent, k = ctxs[i % 2]
+        letters = "ABC"
+        opts = "\n".join(f"{letters[j]}: {s_}" for j, s_ in enumerate(senses))
+        items.append({"id": str(i), "lang": "en", "gold": letters[k],
+                      "messages": [{"role": "user", "content": f"What does \"{verb}\" mean in this sentence?\n\n{sent}\n\n{opts}\n\n"
+                                    "Answer with A, B or C only."}]})
+    return items
+
+
+def score_en_phrasal_sense(item, reply):
+    text = reply["content"] or ""
+    for pat in (r"Answer\W*:?\W*\b([ABC])\b", r"\A\W*([ABC])\b", r"\b(?:option|answer)\s+([ABC])\b"):
+        m = re.findall(pat, text, re.I)
+        if m:
+            break
+    else:
+        m = re.findall(r"\b([ABC])\b(?!\s+[a-z])", text)
+    v = m[-1].upper() if m and len({x.upper() for x in m}) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3505,6 +3555,7 @@ TASKS = {
     "en_dependent_preps": task(("en",), load_en_dependent_preps, score_en_dependent_preps, 16, 20, lang_check=False),
     "de_weak_nouns": task(("de",), load_de_weak_nouns, score_de_weak_nouns, 16, 40, lang_check=False),
     "en_relative_commas": task(("en",), load_en_relative_commas, score_en_relative_commas, 16, 16, lang_check=False),
+    "en_phrasal_sense": task(("en",), load_en_phrasal_sense, score_en_phrasal_sense, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

@@ -5548,6 +5548,48 @@ def score_exam_slots(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- cell_rule (execute a local update rule)
+def load_cell_rule(lang, n, seed):
+    import itertools
+    items = []
+    pats = ["".join(p) for p in itertools.product("#.", repeat=3)]
+    for i in range(n or 120):
+        r = rng_of("cell_rule", i)
+        steps = (1, 2, 3)[i % 3]
+        while True:
+            table = {p: r.choice("#.") for p in pats}
+            if 3 <= sum(v == "#" for v in table.values()) <= 5:
+                break
+        width = r.randint(8, 12)
+        row = "".join(r.choice("#.") for _ in range(width))
+        cur = row
+        for _ in range(steps):
+            cur = "".join(table[cur[k - 1] + cur[k] + cur[(k + 1) % width]] for k in range(width))
+        rules = "\n".join(f"{p} -> {table[p]}" for p in pats)
+        q = (f"A row of cells, each # or ., changes in steps. In each step every cell looks at itself and its left and right "
+             f"neighbour (the row wraps around: the first cell's left neighbour is the last cell, and the other way round) and "
+             f"becomes what this table says for the pattern left-self-right:\n{rules}\nAll cells change at the same time.\n"
+             f"Start: {row}\nWhat is the row after {steps} step{'s' if steps > 1 else ''}?" if lang == "en" else
+             f"Eine Reihe von Zellen, jede # oder ., ändert sich in Schritten. In jedem Schritt schaut jede Zelle auf sich selbst und "
+             f"ihren linken und rechten Nachbarn (die Reihe ist ringförmig: der linke Nachbar der ersten Zelle ist die letzte Zelle "
+             f"und umgekehrt) und wird zu dem, was diese Tabelle für das Muster links-selbst-rechts angibt:\n{rules}\n"
+             f"Alle Zellen ändern sich gleichzeitig.\nStart: {row}\nWie sieht die Reihe nach {steps} Schritt{'en' if steps > 1 else ''} aus?")
+        items.append({"id": str(i), "lang": lang, "gold": cur, "steps": steps,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cell_rule(item, reply):
+    lines = re.findall(r"(?:Answer|Antwort)\s*\**\s*:\s*(.+)", reply["content"] or "", re.I)  # raw: '#' and '...' survive
+    fa = lines[-1] if lines else ""
+    rows = re.findall(r"[#.]{%d,}" % max(4, len(item["gold"]) - 2), re.sub(r"[\s`*]", "", fa))
+    v = rows[-1] if rows else ""
+    ok = v == item["gold"]
+    right = sum(a == b for a, b in zip(v, item["gold"])) / len(item["gold"]) if len(v) == len(item["gold"]) else 0.0
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_steps{item['steps']}": float(ok), "cells_right": round(right, 4)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -7123,6 +7165,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "cell_rule": task(load_cell_rule, score_cell_rule, 24, 120),
     "exam_slots": task(load_exam_slots, score_exam_slots, 24, 120),
     "json_repair": task(load_json_repair, score_json_repair, 24, 120),
     "csv_field": task(load_csv_field, score_csv_field, 24, 120),

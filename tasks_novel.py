@@ -4338,6 +4338,67 @@ def score_dedup_records(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"naive": float(v == item["naive"])}}
 
 
+# ---------------------------------------------------------------- interval_math (bounds of a result from ranged inputs)
+# Two quantities known only as ranges ("between 40 and 60 kg"). The smallest and largest possible value of their
+# difference or quotient (or the sum as a control). Trap: pairing min with min and max with max for a difference or
+# quotient (naive).
+IM_KIND = ("diff", "quot", "sum")
+
+
+def load_interval_math(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i in range(n or 120):
+        r = rng_of("interval_math", i)
+        kind = IM_KIND[i % 3]
+        a1 = r.randint(40, 90)
+        a2 = a1 + r.randint(5, 30)
+        b1 = r.randint(5, 30)
+        b2 = b1 + r.randint(3, 15)
+        if kind == "diff":
+            lo, hi, nlo, nhi = a1 - b2, a2 - b1, a1 - b1, a2 - b2
+            what = ("the remaining amount (first minus second)", "die verbleibende Menge (erste minus zweite)")
+        elif kind == "quot":
+            lo, hi, nlo, nhi = F(a1, b2), F(a2, b1), F(a1, b1), F(a2, b2)
+            what = ("the ratio (first divided by second)", "das Verhältnis (erste geteilt durch zweite)")
+        else:
+            lo, hi, nlo, nhi = a1 + b1, a2 + b2, a1 + b1, a2 + b2
+            what = ("the total (first plus second)", "die Summe (erste plus zweite)")
+        q = (f"The first quantity is somewhere between {a1} and {a2}, the second between {b1} and {b2}. What are the "
+             f"smallest and the largest possible value of {what[0]}? Give both, as 'min / max' (fractions are fine)."
+             if lang == "en" else
+             f"Die erste Größe liegt irgendwo zwischen {a1} und {a2}, die zweite zwischen {b1} und {b2}. Was ist der kleinste "
+             f"und der größte mögliche Wert für {what[1]}? Gib beide an, als 'min / max' (Brüche sind in Ordnung).")
+        items.append({"id": str(i), "lang": lang, "kind": kind, "gold": f"{lo} / {hi}", "lo": str(lo), "hi": str(hi),
+                      "nlo": str(nlo), "nhi": str(nhi), "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def im_values(line):
+    from fractions import Fraction as F
+    out = []
+    for m in re.finditer(r"(-?\d+)\s*/\s*(\d+)(?!\s*/)|(-?\d+(?:[.,]\d+)?)", line):
+        if m.group(1):
+            out.append(F(int(m.group(1)), int(m.group(2))))
+        else:
+            out.append(F(m.group(3).replace(",", ".")))
+    return out
+
+
+def score_interval_math(item, reply):
+    from fractions import Fraction as F
+    line = final_answer(reply["content"]) or ""
+    parts = re.split(r"\s+/\s+|\s+(?:to|bis|und|and)\s+|\s*[–—]\s*|;", line)  # "min / max", "3 bis 8"
+    vals = [v for p in parts for v in im_values(p)[:1]]
+    lo, hi = F(item["lo"]), F(item["hi"])
+    close = lambda v, g: abs(v - g) <= max(F(1, 100), abs(g) / 500)  # noqa: E731 - decimals to ~3 places
+    ok = len(vals) >= 2 and close(min(vals[:2]), lo) and close(max(vals[:2]), hi)
+    nv = sorted([F(item["nlo"]), F(item["nhi"])])
+    naive = len(vals) >= 2 and close(min(vals[:2]), nv[0]) and close(max(vals[:2]), nv[1])
+    return {"correct": ok, "score": float(ok), "pred": line[:40], "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "naive": float(naive and item["kind"] != "sum")}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -5908,6 +5969,7 @@ TASKS = {
     "dim_analysis": task(load_dim_analysis, score_dim_analysis, 24, 120),
     "table_join": task(load_table_join, score_table_join, 24, 120),
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
+    "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "format_bait": {**task(load_format_bait, score_format_bait, 24, 150), "think": False, "max_tokens": 256, "lang_check": False},
     "revoked_rule": {**task(load_revoked_rule, score_revoked_rule, 24, 120), "think": False, "max_tokens": 256},
     "lookalike": task(load_lookalike, score_lookalike, 24, 200),

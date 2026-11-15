@@ -1277,7 +1277,22 @@ def test_dedup_records():
         assert tn.score_dedup_records(x, {"content": f"Antwort: {x['gold']}"})["correct"]
 
 
+
+def test_interval_math():
+    from fractions import Fraction as F
+    import tasks_novel as tn
+    for x in tn.load_interval_math("de", 9, 0):
+        assert tn.score_interval_math(x, {"content": f"Antwort: {x['lo']} / {x['hi']}"})["correct"], x["gold"]
+        if x["kind"] == "quot":
+            lo, hi = F(x["lo"]), F(x["hi"])
+            assert tn.score_interval_math(x, {"content": f"Antwort: {float(lo):.3f} bis {float(hi):.3f}".replace(".", ",")})["correct"]
+        if x["kind"] != "sum":
+            r = tn.score_interval_math(x, {"content": f"Antwort: {x['nlo']} / {x['nhi']}"})
+            assert not r["correct"] and r["detail"]["naive"] == 1.0
+
+
 if __name__ == "__main__":
+    test_interval_math()
     test_dedup_records()
     test_table_join()
     test_dim_analysis()

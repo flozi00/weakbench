@@ -6494,8 +6494,8 @@ def load_claim_check(lang, n, seed):
                 truth = shown == tot
             else:
                 claim = r.choice([("Sales will rise again in July.", "Im Juli wird der Umsatz wieder steigen."),
-                                  ("The rise in May was caused by the new advertising campaign.",
-                                   "Der Anstieg im Mai wurde durch die neue Werbekampagne verursacht."),
+                                  ("Most of the customers in June were students.",
+                                   "Die meisten Kundinnen und Kunden im Juni waren Studierende."),
                                   ("The shop in Hamburg sold more than this shop.", "Die Filiale in Hamburg hat mehr verkauft als diese Filiale.")])
                 claim = claim[0 if lang == "en" else 1]
                 truth = None

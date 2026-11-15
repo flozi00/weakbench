@@ -941,6 +941,53 @@ def score_ask_or_answer(item, reply):
             "detail": {k: float(ok), "guessed" if item["need_ask"] else "over_asked": float(not ok)}}
 
 
+# ---------------------------------------------------------------- de_dialect (judge: dialect -> standard German)
+# Understanding regional German: a sentence in a dialect, rendered into standard German. The judge compares the
+# meaning with a reference and checks that the output is standard German (no dialect left).
+DD_ITEMS = [("Bairisch", "I hob koa Zeit ned, i muass glei in d'Arbat.", "Ich habe keine Zeit, ich muss gleich zur Arbeit."),
+            ("Bairisch", "Mia ham gestern an Haufa Schwammerl im Woid gfundn.", "Wir haben gestern viele Pilze im Wald gefunden."),
+            ("Schwäbisch", "Des isch fei arg teuer gwä, gell?", "Das war aber sehr teuer, nicht wahr?"),
+            ("Schwäbisch", "I hans dr scho dreimol gsagt, mach s'Fenschter zu.", "Ich habe es dir schon dreimal gesagt, mach das Fenster zu."),
+            ("Schweizerdeutsch", "Chasch mer bitte s'Salz gä?", "Kannst du mir bitte das Salz geben?"),
+            ("Schweizerdeutsch", "Mir gönd am Samschtig go poschte.", "Wir gehen am Samstag einkaufen."),
+            ("Kölsch", "Dat es mer ejal, ich jonn jetz heim.", "Das ist mir egal, ich gehe jetzt nach Hause."),
+            ("Berlinisch", "Wat willste denn, ick hab doch nüscht jemacht.", "Was willst du denn, ich habe doch nichts gemacht."),
+            ("Plattdeutsch", "Ik heff di dat al seggt, dat regent morgen.", "Ich habe dir das schon gesagt, es regnet morgen."),
+            ("Sächsisch", "Nu gloar, mir fahrn morschn nach Dräsdn.", "Na klar, wir fahren morgen nach Dresden."),
+            ("Hessisch", "Isch hab die Ebbelwoi-Flasch' uffm Disch steh lasse.", "Ich habe die Apfelweinflasche auf dem Tisch stehen lassen."),
+            ("Österreichisch", "Heast, des Sackerl kannst ned do liegen lassen.", "Hör mal, die Tüte kannst du nicht da liegen lassen.")]
+DD_JUDGE = """A {dialect} sentence: {src}
+Reference in standard German: {ref}
+A model's rendering:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The rendering has the same meaning as the reference (no lost, added or changed fact; word choice may differ).
+2. The rendering is correct standard German (no dialect words or dialect grammar left, no spelling errors)."""
+
+
+def load_de_dialect(lang, n, seed):
+    tasks_judge.check_judge()
+    return [{"id": str(i), "lang": "de", "dialect": dia, "src": src, "ref": ref,
+             "messages": [{"role": "user", "content": f"Übertrage diesen Satz ({dia}) ins Standarddeutsche. Antworte nur mit dem Satz.\n\n{src}"}]}
+            for i, (dia, src, ref) in enumerate(DD_ITEMS[:min(n or len(DD_ITEMS), len(DD_ITEMS))])]
+
+
+def score_de_dialect(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    out = tasks_judge.judge("", DD_JUDGE.format(dialect=item["dialect"], src=item["src"], ref=item["ref"], text=text or "(empty)"),
+                            max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 2:
+        raise ValueError(f"unusable dialect verdict {out[:120]!r}")
+    meaning, standard = (str(x).strip().upper().startswith(("Y", "TRUE", "J")) for x in v)
+    ok = meaning and standard
+    return {"correct": ok, "score": float(ok), "pred": text[:120], "gold": item["ref"],
+            "detail": {"meaning": float(meaning), "standard": float(standard)}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1338,6 +1385,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "de_dialect": {"langs": ("de",), "load": load_de_dialect, "score": score_de_dialect,
+                        "think": False, "max_tokens": 256,
+                        "counts": {"quick": {"de": 12}, "full": {"de": None}},
+                        "lang_check": True, "opt_in": True, "needs_judge": True},
          "ask_or_answer": {"langs": ("de", "en"), "load": load_ask_or_answer, "score": score_ask_or_answer,
                            "think": False, "max_tokens": 512,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": None, "en": None}},

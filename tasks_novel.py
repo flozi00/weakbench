@@ -5515,8 +5515,9 @@ def load_exam_slots(lang, n, seed):
             m = r.randint(5, 7)
             courses = list(range(m))
             studs = []
+            size = (2, 3, 4)[(i // 2) % 3]  # spreads the answer over 2-5
             for s_ in ES_STUDENTS[:r.randint(4, 7)]:
-                studs.append((s_, sorted(r.sample(courses, r.randint(2, 3)))))
+                studs.append((s_, sorted(r.sample(courses, r.randint(2, size)))))
             edges = {(a, b) for _, cs in studs for a in cs for b in cs if a < b}
             used = sorted({c for _, cs in studs for c in cs})
             if len(used) < m:

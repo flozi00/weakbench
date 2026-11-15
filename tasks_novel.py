@@ -6595,6 +6595,45 @@ def score_board_moves(item, reply):
             "detail": {f"ok_{item['piece']}": float(ok), "took_textbook": float(v == item["textbook"])}}
 
 
+# ---------------------------------------------------------------- temp_delta (differences have no offset)
+def load_temp_delta(lang, n, seed):
+    items = []
+    for i in range(n or 120):
+        r = rng_of("temp_delta", i)
+        diff = i % 2 == 0
+        pair = (("C", "F"), ("F", "C"), ("C", "K"))[(i // 2) % 3]
+        if pair == ("C", "F"):
+            x = r.choice([5, 10, 15, 20, 25, 30])
+            slope, off = 9 / 5, 32
+        elif pair == ("F", "C"):
+            x = r.choice([9, 18, 27, 36, 45, 54])
+            slope, off = 5 / 9, -32 * 5 / 9
+        else:
+            x = r.choice([5, 10, 20, 30])
+            slope, off = 1, 273.15
+        gold = round(x * slope + (0 if diff else off), 2)
+        bait = round(x * slope + off, 2) if diff else round(x * slope, 2)
+        u = {"C": "°C", "F": "°F", "K": "K"}
+        if diff:
+            q = (f"During the afternoon the temperature rose by {x} {u[pair[0]]}. By how many {u[pair[1]]} did it rise?" if lang == "en" else
+                 f"Am Nachmittag stieg die Temperatur um {x} {u[pair[0]]}. Um wie viel {u[pair[1]]} ist sie gestiegen?")
+        else:
+            q = (f"The thermometer shows {x} {u[pair[0]]}. What is that in {u[pair[1]]}?" if lang == "en" else
+                 f"Das Thermometer zeigt {x} {u[pair[0]]}. Wie viel ist das in {u[pair[1]]}?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "diff": diff,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_temp_delta(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.1
+    d = {"ok_difference" if item["diff"] else "ok_absolute": float(ok)}
+    if item["diff"]:
+        d["took_offset"] = float(v is not None and abs(v - item["bait"]) <= 0.1)
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8174,6 +8213,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "temp_delta": task(load_temp_delta, score_temp_delta, 24, 120),
     "board_moves": task(load_board_moves, score_board_moves, 24, 120),
     "claim_check": task(load_claim_check, score_claim_check, 24, 120),
     "negated_filter": task(load_negated_filter, score_negated_filter, 24, 120),

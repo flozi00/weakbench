@@ -7218,9 +7218,10 @@ def load_counterexample(lang, n, seed):
 
 
 def score_counterexample(item, reply):
-    fa = (final_answer(reply["content"]) or "").lower()
-    says_true = bool(re.search(r"\b(true|wahr|stimmt|richtig)\b", fa)) and not re.search(r"\b(false|falsch|nicht wahr)\b", fa)
-    nums = [int(x) for x in re.findall(r"\b\d{1,3}\b", fa)]
+    fa = re.sub(r"\([^()]*\)", " ", (final_answer(reply["content"]) or "").lower())  # notes in brackets
+    neg = re.search(r"\b(false|falsch|not true|isn't true|is not true|nicht wahr|stimmt nicht|nicht richtig|not correct)\b", fa)
+    says_true = bool(re.search(r"\b(true|wahr|stimmt|richtig)\b", fa)) and not neg
+    nums = [int(x) for x in re.findall(r"\b\d{1,3}\b", fa)][:1]  # the first number is the counterexample
     p_ = item["par"]
     if item["kind"] == "div":
         pred = lambda m: not (m % p_["a"] == 0 and m % p_["b"] == 0) or m % (p_["a"] * p_["b"]) == 0  # noqa: E731

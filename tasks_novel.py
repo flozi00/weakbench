@@ -8483,6 +8483,44 @@ def score_chord_transpose(item, reply):
             "detail": {"right_but_flats": float(enh and not ok)}}
 
 
+# ---------------------------------------------------------------- nutrition_portion (per-100 g label to a real portion)
+NP_FOODS = {"en": ["muesli", "crackers", "yoghurt", "granola bar mix", "peanut butter"], "de": ["Müsli", "Cracker", "Joghurt", "Riegelmischung", "Erdnussbutter"]}
+
+
+def load_nutrition_portion(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("nutrition_portion", i, att)
+        food = r.choice(NP_FOODS[lang])
+        kcal, sugar = r.randrange(80, 601, 5), r.randrange(2, 41)
+        portion, k = r.choice([25, 30, 40, 45, 60, 75, 125, 150]), r.randint(1, 3)
+        kind = ("kcal", "sugar")[i % 2]
+        per = kcal if kind == "kcal" else sugar
+        gold = F(per * portion * k, 100)
+        if gold.denominator > 10:  # at most one decimal
+            gold = F(round(float(gold) * 10), 10)
+        bait = per * k  # the per-100 g value taken as the portion value
+        unit = "kcal" if kind == "kcal" else "g"
+        g = f"{float(gold):g}"
+        what = ({"kcal": "energy (kcal)", "sugar": "sugar (g)"} if lang == "en" else {"kcal": "Energie (kcal)", "sugar": "Zucker (g)"})[kind]
+        q = (f"The label of a pack of {food} says per 100 g: {kcal} kcal, {sugar} g sugar. One portion is {portion} g. How much "
+             f"{what} do {k} portion{'s' if k > 1 else ''} contain? Round to one decimal if needed." if lang == "en" else
+             f"Auf der Packung {food} steht pro 100 g: {kcal} kcal, {sugar} g Zucker. Eine Portion sind {portion} g. Wie viel "
+             f"{what} enthalten {k} Portion{'en' if k > 1 else ''}? Runde bei Bedarf auf eine Nachkommastelle.")
+        items.append({"id": str(i), "lang": lang, "gold": float(gold), "bait": float(bait), "kind": kind, "unit": unit,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_nutrition_portion(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    v = answer_value(fa, item["lang"])
+    ok = v is not None and abs(v - item["gold"]) <= 0.1 + 1e-9
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(ok), "per_100g_value": float(v is not None and abs(v - item["bait"]) < 1e-9 and item["bait"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -10082,6 +10120,7 @@ TASKS = {
     "fare_group": task(load_fare_group, score_fare_group, 24, 120),
     "tank_level": task(load_tank_level, score_tank_level, 24, 120),
     "chord_transpose": task(load_chord_transpose, score_chord_transpose, 24, 120),
+    "nutrition_portion": task(load_nutrition_portion, score_nutrition_portion, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

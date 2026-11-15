@@ -1763,3 +1763,17 @@ def test_chord_transpose():
 
 if __name__ == "__main__":
     test_chord_transpose()
+
+
+def test_nutrition_portion():
+    import tasks_novel as tn
+    xs = tn.load_nutrition_portion("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    g = f"{x['gold']:g}".replace(".", ",")
+    for c in (f"Antwort: {g} {x['unit']}", f"Antwort: 120 x 0,3 = {g} {x['unit']}"):
+        assert tn.score_nutrition_portion(x, {"content": c})["correct"], c
+
+
+if __name__ == "__main__":
+    test_nutrition_portion()

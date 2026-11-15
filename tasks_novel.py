@@ -8278,8 +8278,8 @@ def load_allergen_check(lang, n, seed):
 def score_allergen_check(item, reply):
     fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
     m = re.search(r"(?:answer|antwort)\s*:?\s*\n((?:\s*[-*•]\s*.+\n?)+)", reply["content"] or "", re.I)
-    if m and not any(re.search(re.escape(d), fa, re.I) for d in item["dishes"]):
-        fa = m[1]  # "Antwort:" followed by a bullet list
+    if m:
+        fa = m[1]  # "Antwort:" followed by a bullet list (final_answer keeps only its first line)
     got = sorted(d for d in item["dishes"] if re.search(rf"(?<![\w-]){re.escape(d)}(?![\w-])", fa, re.I))
     ok = got == sorted(item["gold"])
     return {"correct": ok, "score": float(ok), "pred": got, "gold": item["gold"],

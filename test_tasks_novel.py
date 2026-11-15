@@ -1691,6 +1691,7 @@ def test_allergen_check():
     assert all(x["gold"] != x["bait"] for x in xs)
     x = xs[0]
     assert tn.score_allergen_check(x, {"content": "Answer: " + ", ".join(x["gold"])})["correct"]
+    assert tn.score_allergen_check(x, {"content": "Answer:\n" + "\n".join("- " + d for d in x["gold"])})["correct"]
     r = tn.score_allergen_check(x, {"content": "Answer: " + ", ".join(x["bait"])})
     assert not r["correct"] and r["detail"]["missed_nesting"] == 1
 

@@ -7597,6 +7597,55 @@ def score_nth_weekday(item, reply):
             "detail": {"ok_last" if item["last"] else "ok_nth": float(ok), "took_week_off": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- risk_stats (absolute vs relative risk)
+def load_risk_stats(lang, n, seed):
+    import math
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("risk_stats", i, att)
+        kind = ("arr", "rrr", "nnt")[i % 3]
+        while True:
+            N = r.choice([200, 400, 500, 1000, 2000])
+            c = r.randint(N // 50, N // 6)
+            t = r.randint(max(1, c // 4), c - max(1, c // 10))
+            pc, pt = F(c, N), F(t, N)
+            arr = (pc - pt) * 100  # percentage points
+            rrr = (pc - pt) / pc * 100
+            if arr > 0 and abs(arr - rrr) > 2:
+                break
+        nnt = math.ceil(1 / (pc - pt))
+        if kind == "arr":
+            gold, bait = round(float(arr), 1), round(float(rrr), 1)
+            ask = ("By how many percentage points does the treatment lower the risk (absolute risk reduction)? Round to one decimal."
+                   if lang == "en" else "Um wie viele Prozentpunkte senkt die Behandlung das Risiko (absolute Risikoreduktion)? "
+                   "Runde auf eine Nachkommastelle.")
+        elif kind == "rrr":
+            gold, bait = round(float(rrr), 1), round(float(arr), 1)
+            ask = ("By how many percent does the treatment lower the risk relative to the control group (relative risk reduction)? "
+                   "Round to one decimal." if lang == "en" else "Um wie viel Prozent senkt die Behandlung das Risiko im Vergleich "
+                   "zur Kontrollgruppe (relative Risikoreduktion)? Runde auf eine Nachkommastelle.")
+        else:
+            gold, bait = nnt, math.ceil(100 / float(rrr)) if rrr else None
+            ask = ("How many people must be treated to prevent one event (number needed to treat, rounded up)?" if lang == "en" else
+                   "Wie viele Personen muss man behandeln, um ein Ereignis zu verhindern (Number Needed to Treat, aufgerundet)?")
+        q = (f"In a trial, {N} people took a new drug and {N} took a placebo. In the drug group {t} had a heart attack, in the placebo "
+             f"group {c}. " if lang == "en" else
+             f"In einer Studie nahmen {N} Personen ein neues Medikament und {N} ein Placebo. In der Medikamentengruppe hatten {t} einen "
+             f"Herzinfarkt, in der Placebogruppe {c}. ") + ask
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "kind": kind,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_risk_stats(item, reply):
+    v = answer_value(result_side(re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")), item["lang"])
+    tol = 0 if item["kind"] == "nnt" else 0.1
+    near = lambda x: v is not None and x is not None and abs(v - x) <= tol + 1e-9  # noqa: E731
+    return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['kind']}": float(near(item["gold"])), "took_other_measure": float(near(item["bait"]) and item["bait"] != item["gold"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9177,6 +9226,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "risk_stats": task(load_risk_stats, score_risk_stats, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

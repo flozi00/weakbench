@@ -6083,32 +6083,41 @@ def load_bin_pack(lang, n, seed):
     items = []
     for i in range(n or 120):
         r = rng_of("bin_pack", i)
-        ff_worse = i % 2 == 0
-        above_bound = (i // 2) % 2 == 0  # the answer exceeds ceil(total / capacity): the weight bound alone fails
+        kind = i % 4  # 0: even first-fit-decreasing misses the optimum; 1, 3: first fit in order misses it; 2: it does not
+        ff_worse = kind != 2
+        above_bound = (i // 4) % 2 == 0  # the answer exceeds ceil(total / capacity): the weight bound alone fails
         while True:
             cap = r.choice([10, 12, 15, 20])
             ws = [r.randint(2, cap - 1) for _ in range(r.randint(6, 9))]
-            g, ff = _bp_min(ws, cap), _bp_ff(ws, cap)
+            g, ff, ffd = _bp_min(ws, cap), _bp_ff(ws, cap), _bp_ff(sorted(ws, reverse=True), cap)
             bound = -(-sum(ws) // cap)
-            if (ff > g) == ff_worse and (g > bound) == above_bound:
+            if kind == 0:
+                if ffd > g:
+                    break
+            elif (ff > g) == ff_worse and ffd == g and (g > bound) == above_bound:
                 break
         q = (f"Parcels weighing {', '.join(map(str, ws))} kg must be packed into boxes that hold at most {cap} kg each. Parcels "
              "cannot be split. What is the smallest number of boxes needed?" if lang == "en" else
              f"Pakete mit {', '.join(map(str, ws))} kg sollen in Kisten verpackt werden, die jeweils höchstens {cap} kg tragen. "
              "Pakete lassen sich nicht teilen. Wie viele Kisten braucht man mindestens?")
-        items.append({"id": str(i), "lang": lang, "gold": g, "ff": ff, "ff_worse": ff_worse, "bound": bound,
+        items.append({"id": str(i), "lang": lang, "gold": g, "ff": ff, "ffd": ffd, "ff_worse": ff_worse, "bound": bound,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_bin_pack(item, reply):
-    fa = final_answer(reply["content"]) or ""
-    if re.search(r"\b(?:box|kiste)\s*\d", fa, re.I):  # "Box 1: 9+1, Box 2: ... -> 4": the last number
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")  # "4 (Box 1: 9+1, ...)"
+    m = re.search(r"(\d+)\s*(?:boxes|kisten)\b", fa, re.I)
+    if m:
+        v = int(m[1])
+    elif re.search(r"\b(?:box|kiste)\s*\d", fa, re.I):  # "Box 1: 9+1 | Box 2: ... -> 4": the last number
         v = last_int(fa)
     else:
         v = answer_value(fa, item["lang"])
     ok = v == item["gold"]
     d = {"ok_ff_worse" if item["ff_worse"] else "ok_ff_optimal": float(ok)}
+    if item["ffd"] != item["gold"]:
+        d["took_ffd"] = float(v == item["ffd"])
     if item["ff_worse"]:
         d["took_first_fit"] = float(v == item["ff"])
     if item["bound"] != item["gold"]:
@@ -6144,7 +6153,9 @@ def load_dose_calc(lang, n, seed):
 
 
 def score_dose_calc(item, reply):
-    v = answer_value(final_answer(reply["content"]), item["lang"])
+    fa = final_answer(reply["content"]) or ""
+    m = re.findall(r"(\d+(?:[.,]\d+)?)\s*ml\b", fa, re.I)
+    v = float(m[-1].replace(",", ".")) if m else answer_value(fa, item["lang"])  # "500 mg, that is 25 ml" -> 25
     ok = v is not None and abs(v - item["gold"]) <= 0.1
     d = {"ok_capped" if item["capped"] else "ok_uncapped": float(ok), "took_mg": float(v == item["mg"])}
     if item["capped"]:

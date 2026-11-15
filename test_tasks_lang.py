@@ -1159,6 +1159,8 @@ def test_en_reflexive():
         assert not tl.score_en_reflexive(x, {"content": "nothing" if other == "—" else other})["correct"]
     r = next(x for x in xs if "relax" in x["messages"][0]["content"])
     assert tl.score_en_reflexive(r, {"content": "Nothing - 'relax' is not reflexive in English."})["correct"]
+    assert tl.score_en_reflexive(r, {"content": "No pronoun needed."})["correct"]
+    assert tl.score_en_reflexive(r, {"content": "After work, she likes to relax."})["correct"]
 
 
 if __name__ == "__main__":

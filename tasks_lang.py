@@ -4524,8 +4524,8 @@ ERF_ITEMS = [("He cut ___ while he was cooking.", "himself", ("himself", "him"))
              ("I remember ___ that day very well.", "—", ("myself", "—")),
              ("We met ___ at the station at six.", "—", ("ourselves", "—")),
              ("She was so happy that she hugged ___ the dog.", "—", ("herself", "—")),
-             ("Sit ___ down and have a coffee.", "—", ("yourself", "—")),
-             ("The machine switches ___ off after an hour.", "itself", ("itself", "—")),
+             ("I can't concentrate ___ in this noise.", "—", ("myself", "—")),
+             ("She introduced ___ to the new boss.", "herself", ("herself", "—")),
              ("They blamed ___ for the accident.", "themselves", ("themselves", "—"))]
 
 
@@ -4542,13 +4542,16 @@ def load_en_reflexive(lang, n, seed):
 
 def score_en_reflexive(item, reply):
     t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"])).lower()
-    t = re.sub(r"\b(?:not|no)\s+\w+", " ", t) if not re.match(r"\W*(?:nothing|no word|none|empty|—|-)\W*$", t) else t
+    t = re.sub(r"\b(?:not|no)\s+(?!pronoun\b|word\b)\w+", " ", t)  # "Nothing - not herself"; "no pronoun" stays
     pron = [o for o in item["opts"] if o != "—"]
     said = [p for p in pron if re.search(rf"\b{p}\b", t)]
     nothing = bool(re.search(r"\b(?:nothing|no word|none|empty|leave it empty|no pronoun)\b|^\W*[—-]\W*$", t))
+    gap = item["messages"][0]["content"].splitlines()[-1].lower()
+    pre, post = (re.findall(r"[a-z']+", p) for p in gap.split("___"))
+    tail = (r"\W+" + post[0] + r"\b") if post else r"\s*[.!?]?\s*$"  # the gap at the end: "she likes to relax."
+    if not said and pre and re.search(r"\b" + r"\W+".join(pre[-2:]) + tail, t):
+        nothing = True  # the sentence repeated with the gap left empty
     v = said[0] if len(said) == 1 and not nothing else "—" if nothing and not said else None
-    if v is None and len(said) == 2:  # "himself" contains no "him" as a word, so two hits are a real hedge
-        v = None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ok_none" if item["gold"] == "—" else "ok_pronoun": float(ok)}}

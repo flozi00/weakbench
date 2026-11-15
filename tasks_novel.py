@@ -8714,10 +8714,14 @@ def load_coupon_best(lang, n, seed):
 
 
 def score_coupon_best(item, reply):
-    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    raw = final_answer(reply["content"]) or ""
+    fa = re.sub(r"\([^()]*\)", " ", raw)
     m = re.search(r"(?<![A-Za-z])([ABC])(?![A-Za-z])", fa)
     letter = m[1] if m else None
-    v = answer_value(fa[m.end():] if m else fa, item["lang"])
+    m2 = re.search(rf"(?<![A-Za-z]){letter}(?![A-Za-z])", raw) if letter else None
+    v = answer_value(raw[m2.end():], item["lang"]) if m2 else None  # the price after the letter (brackets kept: "A (160.65 €)")
+    if v is None:
+        v = answer_value(raw, item["lang"])  # "160.65 € with coupon A"
     ok_l, ok_p = letter == item["letter"], v is not None and abs(v - item["price"]) < 0.006
     return {"correct": ok_l and ok_p, "score": (ok_l + ok_p) / 2, "pred": f"{letter}, {v}", "gold": item["gold"],
             "detail": {"letter_ok": float(ok_l), "price_ok": float(ok_p), "bigger_number": float(letter == item["bait"])}}

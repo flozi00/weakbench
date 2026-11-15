@@ -1864,6 +1864,9 @@ def test_coupon_best():
     x = xs[0]
     for c in (f"Antwort: {x['gold']}", f"Antwort: Gutschein {x['letter']}, ich zahle {x['gold'].split(', ')[1]}"):
         assert tn.score_coupon_best(x, {"content": c})["correct"], c
+    p = x["gold"].split(", ")[1]
+    for c in (f"Antwort: {p} mit Gutschein {x['letter']}", f"Antwort: {x['letter']} ({p})", f"Antwort: {x['letter']} (15 %), {p}"):
+        assert tn.score_coupon_best(x, {"content": c})["correct"], c
 
 
 if __name__ == "__main__":

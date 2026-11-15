@@ -3320,7 +3320,7 @@ WA_ITEMS = [("___ ich gestern nach Hause kam, war die Tür offen.", "als"),
             ("___ ich im Sommer Urlaub habe, fahre ich ans Meer.", "wenn"),
             ("Weißt du, ___ der Zug abfährt?", "wann"),
             ("Ich habe vergessen, ___ das Konzert beginnt.", "wann"),
-            ("Sag mir bitte, ___ du heute nach Hause kommst.", "wann"),
+            ("Ich weiß nicht, ___ er Geburtstag hat.", "wann"),
             ("Niemand wusste, ___ die Lieferung ankommen würde.", "wann"),
             ("Er fragte mich, ___ ich zuletzt beim Zahnarzt war.", "wann"),
             ("Bis ___ musst du den Antrag abgeben?", "wann"),
@@ -3348,11 +3348,11 @@ PP_ITEMS = [("I ___ in Leeds since 2015, and I still love it.", "have lived", "l
             ("They ___ each other for twenty years and are still best friends.", "have known", "knew"),
             ("When ___ you ___ to Canada? - In 2018.", "did ... move", "have ... moved"),
             ("Mozart ___ more than 600 works.", "wrote", "has written"),
-            ("I ___ my homework yet, so I can't come out.", "haven't finished", "didn't finish"),
+            ("We ___ here for ten years now and don't want to move.", "have lived", "lived"),
             ("The shop ___ at 9 a.m. today, an hour late.", "opened", "has opened"),
-            ("Look! Someone ___ the window - there's glass everywhere.", "has broken", "broke"),
+            ("It ___ since Monday, so the ground is soaked.", "has rained", "rained"),
             ("Last summer she ___ at a bank for three months.", "worked", "has worked"),
-            ("___ you ever ___ sushi?", "have ... eaten", "did ... eat"),
+            ("How long ___ you ___ your car? - Since 2020.", "have ... had", "did ... have"),
             ("Two days ago it ___ so hard that the streets flooded.", "rained", "has rained"),
             ("This is the best book I ___ so far this year.", "have read", "read"),
             ("In 1969 people ___ on the moon for the first time.", "landed", "have landed")]
@@ -3369,14 +3369,17 @@ def load_en_perfect_past(lang, n, seed):
 
 
 def score_en_perfect_past(item, reply):
-    t = re.sub(r"\s+", " ", reply["content"].replace("’", "'").replace("…", "...").replace("\u2026", "...")).lower()
+    t = re.sub(r"\s+", " ", re.sub(r"\([^()]*\)", " ", reply["content"]).replace("’", "'").replace("…", "...")).lower()
+    t = re.sub(r"\b(i|you|we|they)'ve\b", r"\1 have", t)
+    t = re.sub(r"\b(he|she|it|someone)'s (?=\w+(?:ed|en|ad|wn)\b)", r"\1 has ", t)  # "she's lived" = has, not is
+    lead = next((o for o in sorted(item["opts"], key=len, reverse=True) if re.match(r"\W*(?:answer:\s*)?" + re.escape(o.lower()) + r"\b(?!\s+\w)", t)), None)
     hits = []
     for o in sorted(item["opts"], key=len, reverse=True):  # "have lived" first, then blank it so "lived" is not found inside
         pat = r"\b" + re.escape(o.lower()).replace(r"\ \.\.\.\ ", r"\b.{0,30}?\b") + r"\b"
         if re.search(pat, t):
             hits.append(o)
             t = re.sub(pat, " ", t)
-    v = hits[0] if len(hits) == 1 else None
+    v = lead or (hits[0] if len(hits) == 1 else None)  # "have lived - not lived, because ...": the form it leads with
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ok_perfect" if item["perfect"] else "ok_past": float(ok)}}

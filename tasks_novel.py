@@ -6525,6 +6525,69 @@ def score_claim_check(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": d}
 
 
+# ---------------------------------------------------------------- board_moves (geometry at the edges)
+BM_PIECES = {"en": {"knight": "knight", "king": "king", "rook": "rook"}, "de": {"knight": "Springer", "king": "König", "rook": "Turm"}}
+BM_TEXTBOOK = {"knight": 8, "king": 8, "rook": 14}
+
+
+def _bm_count(piece, f, rk, blockers):
+    if piece == "knight":
+        steps = [(1, 2), (2, 1), (-1, 2), (-2, 1), (1, -2), (2, -1), (-1, -2), (-2, -1)]
+        return sum(0 <= f + a < 8 and 0 <= rk + b < 8 and (f + a, rk + b) not in blockers for a, b in steps)
+    if piece == "king":
+        return sum(0 <= f + a < 8 and 0 <= rk + b < 8 and (f + a, rk + b) not in blockers
+                   for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0))
+    n = 0
+    for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        x, y = f + a, rk + b
+        while 0 <= x < 8 and 0 <= y < 8 and (x, y) not in blockers:  # blockers are own pieces: the rook stops before them
+            n += 1
+            x, y = x + a, y + b
+    return n
+
+
+def load_board_moves(lang, n, seed):
+    items = []
+    sq = lambda f, rk: "abcdefgh"[f] + str(rk + 1)  # noqa: E731
+    for i in range(n or 120):
+        r = rng_of("board_moves", i)
+        piece = ("knight", "king", "rook")[i % 3]
+        with_block = piece == "rook" or (i // 3) % 2 == 1  # an unblocked rook always reaches 14
+        while True:
+            f, rk = r.randrange(8), r.randrange(8)
+            blockers = set()
+            if with_block:
+                while len(blockers) < r.randint(1, 3):
+                    b = (r.randrange(8), r.randrange(8))
+                    if b != (f, rk):
+                        blockers.add(b)
+            gold = _bm_count(piece, f, rk, blockers)
+            if gold != BM_TEXTBOOK[piece] and (not with_block or gold != _bm_count(piece, f, rk, set())):
+                break
+        name = BM_PIECES[lang][piece]
+        bl = ", ".join(sq(*b) for b in sorted(blockers))
+        q = (f"On a standard 8x8 chessboard a {name} stands on {sq(f, rk)}."
+             + (f" The player's own pieces stand on {bl}; the {name} cannot move onto "
+                + ("them (it jumps over pieces)." if piece == "knight" else "or past them.") if blockers else
+                " No other pieces are on the board.")
+             + f" How many different squares can the {name} reach in exactly one move?" if lang == "en" else
+             f"Auf einem normalen 8x8-Schachbrett steht ein {name} auf {sq(f, rk)}."
+             + (f" Eigene Figuren stehen auf {bl}; der {name} kann " + ("nicht auf diese Felder ziehen (er springt über Figuren)."
+                if piece == "knight" else "weder auf diese Felder ziehen noch über sie hinweg.") if blockers else
+                " Sonst stehen keine Figuren auf dem Brett.")
+             + f" Wie viele verschiedene Felder kann der {name} mit genau einem Zug erreichen?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "piece": piece, "textbook": BM_TEXTBOOK[piece],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_board_moves(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['piece']}": float(ok), "took_textbook": float(v == item["textbook"])}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -8104,6 +8167,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "board_moves": task(load_board_moves, score_board_moves, 24, 120),
     "claim_check": task(load_claim_check, score_claim_check, 24, 120),
     "negated_filter": task(load_negated_filter, score_negated_filter, 24, 120),
     "regex_eval": task(load_regex_eval, score_regex_eval, 24, 120),

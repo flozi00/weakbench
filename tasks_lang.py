@@ -3607,10 +3607,10 @@ AT_ITEMS = [("Kannst du beim Markt noch ein Kilo Paradeiser mitnehmen?", "Parade
             ("Die Marillenmarmelade meiner Oma ist die beste.", "Marille", ["Aprikose", "Aprikosen"]),
             ("Im Jänner fahren wir Ski.", "Jänner", ["Januar"]),
             ("Für den Kuchen brauche ich 500 Gramm Topfen.", "Topfen", ["Quark"]),
-            ("Brauchen Sie ein Sackerl?", "Sackerl", ["Tüte", "Plastiktüte", "Tragetasche", "Beutel"]),
+            ("Brauchen Sie ein Sackerl?", "Sackerl", ["Tüte", "Tasche", "Beutel"]),
             ("Bitte noch einen Kaffee mit Schlagobers.", "Schlagobers", ["Schlagsahne", "Sahne"]),
             ("Heute gibt es Karfiol mit Butterbröseln.", "Karfiol", ["Blumenkohl"]),
-            ("Die Fisolen müssen noch geputzt werden.", "Fisolen", ["grüne Bohnen", "Bohnen", "Brechbohnen", "Prinzessbohnen"]),
+            ("Die Fisolen müssen noch geputzt werden.", "Fisolen", ["Bohnen"]),
             ("Zum Tafelspitz gehört frisch geriebener Kren.", "Kren", ["Meerrettich"]),
             ("Der Kuchen ist mit roten Ribiseln belegt.", "Ribiseln", ["Johannisbeeren", "Johannisbeere"]),
             ("Ich hole uns noch zwei Semmeln vom Bäcker.", "Semmel", ["Brötchen", "Schrippe", "Wecken"]),
@@ -3619,9 +3619,9 @@ AT_ITEMS = [("Kannst du beim Markt noch ein Kilo Paradeiser mitnehmen?", "Parade
             ("Er liegt seit Montag im Spital.", "Spital", ["Krankenhaus", "Klinik"]),
             ("Die Zeitung kaufe ich immer in der Trafik.", "Trafik", ["Kiosk", "Tabakladen", "Tabakwarenladen", "Zeitungskiosk"]),
             ("Die Melanzani schneidest du in dünne Scheiben.", "Melanzani", ["Auberginen", "Aubergine"]),
-            ("Leg das Polster aufs Sofa.", "Polster", ["Kissen", "Sofakissen"]),
+            ("Leg den Polster aufs Sofa.", "Polster", ["Kissen"]),
             ("Die Stiege in den Keller ist steil.", "Stiege", ["Treppe"]),
-            ("Wir treffen uns um halb drei beim Eingang vom Beisl.", "Beisl", ["Kneipe", "Gaststätte", "Wirtshaus", "Lokal", "Gasthaus"])]
+            ("Wir treffen uns um halb drei beim Eingang vom Beisl.", "Beisl", ["Kneipe", "Gaststätte", "Wirtshaus", "Lokal", "Gasthaus", "Gastwirtschaft"])]
 
 
 def load_de_austrian(lang, n, seed):
@@ -3633,7 +3633,7 @@ def load_de_austrian(lang, n, seed):
 
 def score_de_austrian(item, reply):
     t = re.sub(r"\([^()]*\)", " ", reply["content"] or "").lower()
-    hit = any(re.search(rf"(?<![a-zäöüß]){re.escape(g.lower())}", t) for g in item["gold"])
+    hit = any(re.search(re.escape(g.lower()), t) for g in item["gold"])  # compounds count: Papiertüte, Stangenbohnen, Kopfkissen
     ok = bool(hit)
     return {"correct": ok, "score": float(ok), "pred": t.strip()[:40], "gold": item["gold"][0], "detail": {}}
 

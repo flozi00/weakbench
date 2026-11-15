@@ -6262,7 +6262,7 @@ def _pb_exact_fit(packs, need):
 
 def score_pack_buy(item, reply):
     fa = final_answer(reply["content"]) or ""
-    eur = re.findall(r"(\d+(?:[.,]\d+)?)\s*(?:€|euro|eur)\b|€\s*(\d+(?:[.,]\d+)?)", fa, re.I)  # "2×10 + 1×5 (21 €)"
+    eur = re.findall(r"(\d+(?:[.,]\d+)?)\s*(?:€|\beuros?\b|\beur\b)|€\s*(\d+(?:[.,]\d+)?)", fa, re.I)  # "2×10 + 1×5 (21 €)"
     v = parse_number((eur[-1][0] or eur[-1][1]), item["lang"]) if eur else answer_value(fa, item["lang"])
     ok = v is not None and abs(v - item["gold"]) < 0.006
     d = {"ok_greedy_fails" if item["fails"] else "ok_greedy_works": float(ok)}

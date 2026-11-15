@@ -325,6 +325,20 @@ def test_de_dialect():
         tasks_judge.configure(None, None, None)
 
 
+def test_honest_headline():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "1. YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_honest_headline("de", None, 0)
+        assert len(it) == 24 and len({x["text"] for x in it}) == 24
+        assert to.score_honest_headline(it[0], {"content": "Busfahrgäste in Bielefeld: leichtes Plus"})["correct"]
+        r = to.score_honest_headline(it[0], {"content": "Wort " * 12})
+        assert not r["correct"] and r["score"] == 0.75
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -436,6 +450,7 @@ if __name__ == "__main__":
     test_minimal_edit()
     test_ask_or_answer()
     test_de_dialect()
+    test_honest_headline()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

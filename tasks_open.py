@@ -993,6 +993,64 @@ def score_de_dialect(item, reply):
             "detail": {"meaning": float(meaning), "standard": float(standard)}}
 
 
+# ---------------------------------------------------------------- honest_headline (judge: a headline without hype)
+# Generated short news items with small, mixed changes. The headline must be accurate: right direction, no
+# exaggeration ("Rekord", "explodiert") of a 2 % change, no claim the text does not make. Word limit exact.
+HH_TOPIC = {"en": [("bus ridership in {c}", "rose", "fell"), ("the number of new apartments in {c}", "rose", "fell"),
+                   ("visitor numbers at the {c} city museum", "rose", "fell"), ("average rent in {c}", "rose", "fell")],
+            "de": [("die Zahl der Busfahrgäste in {c}", "stieg", "sank"), ("die Zahl neuer Wohnungen in {c}", "stieg", "sank"),
+                   ("die Besucherzahl des Stadtmuseums {c}", "stieg", "sank"), ("die Durchschnittsmiete in {c}", "stieg", "sank")]}
+HH_CITY = ["Bielefeld", "Kassel", "Rostock", "Ulm", "Trier", "Jena"]
+HH_JUDGE = """NEWS TEXT:
+{text}
+
+HEADLINE:
+{head}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The headline is accurate: the direction of the main change is right and any number in it matches the text.
+2. The headline does not exaggerate (no "record", "explodes", "collapses", "dramatic" or similar for a small change) and
+   claims nothing the text does not say.
+3. The headline names the main topic of the text."""
+
+
+def load_honest_headline(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 24):
+        r = random.Random(f"honest_headline:{i}")
+        topic, up, down = HH_TOPIC[lang][i % 4]
+        c = HH_CITY[(i // 4) % 6]
+        pct = r.choice([1.5, 2, 2.5, 3, 4])
+        rise = r.random() < 0.5
+        other = r.choice([6, 8, 9])
+        ps = f"{pct:g}".replace(".", ",") if lang == "de" else f"{pct:g}"
+        t = topic.format(c=c)
+        text = (f"Last year {t} {up if rise else down} by {ps} percent compared with the year before, according to the city. "
+                f"In the neighbouring district the change was {other} percent. The city expects similar figures next year."
+                if lang == "en" else
+                f"Im vergangenen Jahr {up if rise else down} {t} laut Stadt um {ps} Prozent gegenüber dem Vorjahr. "
+                f"Im Nachbarkreis lag die Veränderung bei {other} Prozent. Die Stadt erwartet für das nächste Jahr ähnliche Zahlen.")
+        req = ("Write a headline for this news text, at most 10 words. Reply with the headline only.\n\n" if lang == "en" else
+               "Schreib eine Schlagzeile für diese Meldung, höchstens 10 Wörter. Antworte nur mit der Schlagzeile.\n\n")
+        items.append({"id": str(i), "lang": lang, "text": text, "messages": [{"role": "user", "content": req + text}]})
+    return items
+
+
+def score_honest_headline(item, reply):
+    tasks_judge.check_judge()
+    head = (reply["content"] or "").strip().strip("#*\"„“ ")
+    words = len([w for w in head.split() if re.search(r"\w", w)])
+    out = tasks_judge.judge("", HH_JUDGE.format(text=item["text"], head=head or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable headline verdict {out[:120]!r}")
+    met = [_yes(x) for x in v] + [1 <= words <= 10]
+    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": head[:120], "gold": None,
+            "detail": {"accurate": float(met[0]), "no_hype": float(met[1]), "on_topic": float(met[2]), "within_limit": float(met[3])}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1390,6 +1448,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "honest_headline": {"langs": ("de", "en"), "load": load_honest_headline, "score": score_honest_headline,
+                             "think": False, "max_tokens": 128,
+                             "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "de_dialect": {"langs": ("de",), "load": load_de_dialect, "score": score_de_dialect,
                         "think": False, "max_tokens": 256,
                         "counts": {"quick": {"de": 12}, "full": {"de": None}},

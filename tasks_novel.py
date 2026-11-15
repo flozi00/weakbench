@@ -4719,6 +4719,41 @@ def score_alien_calendar(item, reply):
             "detail": {"ok_date": float(ok_d), "ok_weekday": float(ok_w), "ok_year_wrap" if item["wrap"] else "ok_in_year": float(ok)}}
 
 
+# ---------------------------------------------------------------- median_traps (median of an unsorted list)
+def load_median_traps(lang, n, seed):
+    import statistics
+    items = []
+    for i in range(n or 120):
+        r = rng_of("median_traps", i)
+        k = r.choice([7, 9, 11]) if i % 2 == 0 else r.choice([8, 10, 12])
+        for _ in range(1000):
+            xs = [r.randint(1, 60) for _ in range(k)]
+            if i % 3 == 0:
+                xs[r.randrange(k)] = r.randint(400, 900)  # an outlier pulls the mean away
+            med = statistics.median(xs)
+            mid = xs[k // 2] if k % 2 else (xs[k // 2 - 1] + xs[k // 2]) / 2
+            mean = sum(xs) / k
+            if mid != med and abs(mean - med) > 1 and med == int(med) * 1.0 or (mid != med and abs(mean - med) > 1 and k % 2 == 0):
+                break
+        else:
+            raise RuntimeError(f"median_traps: no list for item {i}")
+        med = int(med) if med == int(med) else med
+        q = (f"Numbers: {', '.join(map(str, xs))}\nWhat is the median?" if lang == "en" else
+             f"Zahlen: {', '.join(map(str, xs))}\nWie lautet der Median?")
+        items.append({"id": str(i), "lang": lang, "gold": med, "odd": k % 2 == 1, "mid": mid, "mean": mean,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_median_traps(item, reply):
+    v = answer_value(final_answer(reply["content"]), item["lang"])
+    ok = v is not None and abs(v - item["gold"]) < 1e-6
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_odd" if item["odd"] else "ok_even": float(ok),
+                       "took_unsorted_middle": float(v is not None and abs(v - item["mid"]) < 1e-6),
+                       "took_mean": float(v is not None and abs(v - item["mean"]) < 0.051)}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -6291,6 +6326,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "median_traps": task(load_median_traps, score_median_traps, 24, 120),
     "alien_calendar": task(load_alien_calendar, score_alien_calendar, 24, 120),
     "coin_change": task(load_coin_change, score_coin_change, 24, 120),
     "recipe_scale": task(load_recipe_scale, score_recipe_scale, 24, 120),

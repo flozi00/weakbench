@@ -7468,6 +7468,51 @@ def score_vat_calc(item, reply):
             "detail": {f"ok_{item['kind']}": float(near(item["gold"])), "took_percent_of_gross": float(near(item["bait"]))}}
 
 
+# ---------------------------------------------------------------- dilution (amount added, not the total)
+def load_dilution(lang, n, seed):
+    from fractions import Fraction as F
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("dilution", i, att)
+        water = i % 2 == 0
+        while True:
+            v = r.randint(1, 30)
+            if water:
+                p, q = r.choice([(20, 5), (30, 10), (40, 8), (25, 5), (60, 15), (50, 20), (12, 4), (36, 9)])
+                total = F(v * p, q)
+                gold = total - v
+            else:
+                p, q = r.choice([(10, 20), (20, 50), (5, 24), (10, 40), (25, 40), (40, 70)])  # add pure substance (100 %)
+                gold = F(v * (q - p), 100 - q)
+                total = v + gold
+            if gold.denominator in (1, 2, 4, 5, 10):
+                break
+        ps, qs = (f"{p}", f"{q}")
+        vs = f"{v}"
+        if water:
+            q_ = (f"You have {vs} litres of a juice concentrate with {ps} % fruit content. How many litres of water must you add to get "
+                  f"a drink with {qs} % fruit content?" if lang == "en" else
+                  f"Du hast {vs} Liter Saftkonzentrat mit {ps} % Fruchtanteil. Wie viele Liter Wasser musst du hinzufügen, damit ein "
+                  f"Getränk mit {qs} % Fruchtanteil entsteht?")
+        else:
+            q_ = (f"You have {vs} litres of a cleaning solution with {ps} % vinegar. How many litres of pure vinegar must you add to get "
+                  f"{qs} % vinegar?" if lang == "en" else
+                  f"Du hast {vs} Liter Reinigungslösung mit {ps} % Essig. Wie viele Liter reinen Essig musst du hinzufügen, damit "
+                  f"die Lösung {qs} % Essig enthält?")
+        items.append({"id": str(i), "lang": lang, "gold": float(gold), "bait": float(total), "water": water,
+                      "messages": [{"role": "user", "content": q_ + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_dilution(item, reply):
+    fa = result_side(final_answer(reply["content"]) or "")
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:l|litres?|liters?|liter)\b", fa, re.I)
+    v = float(m[1].replace(",", ".")) if m else answer_value(fa, item["lang"])
+    near = lambda x: v is not None and abs(v - x) <= 0.01  # noqa: E731
+    return {"correct": near(item["gold"]), "score": float(near(item["gold"])), "pred": v, "gold": item["gold"],
+            "detail": {"ok_water" if item["water"] else "ok_concentrate": float(near(item["gold"])), "took_total": float(near(item["bait"]))}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9048,6 +9093,7 @@ TASKS = {
     "dedup_records": task(load_dedup_records, score_dedup_records, 24, 120),
     "interval_math": task(load_interval_math, score_interval_math, 24, 120),
     "weekday_calc": task(load_weekday_calc, score_weekday_calc, 24, 120),
+    "dilution": task(load_dilution, score_dilution, 24, 120),
     "vat_calc": task(load_vat_calc, score_vat_calc, 24, 120),
     "dark_patterns": task(load_dark_patterns, score_dark_patterns, 24, 120),
     "ledger_balance": task(load_ledger_balance, score_ledger_balance, 24, 120),

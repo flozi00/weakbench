@@ -400,6 +400,22 @@ def test_interpreter():
         tasks_judge.configure(None, None, None)
 
 
+def test_conflict_summary():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        it = to.load_conflict_summary("de", None, 0)
+        assert len(it) == 24
+        x = it[0]
+        good = f"Laut Stadt kamen {x['fa']}, laut Veranstaltern {x['fb']} Menschen. Es gab keine Zwischenfälle."
+        assert to.score_conflict_summary(x, {"content": good})["correct"]
+        r = to.score_conflict_summary(x, {"content": f"Es kamen {x['fa']} Menschen."})
+        assert not r["correct"] and r["detail"]["both_figures"] == 0.0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
 def test_argument_essay():
     url, stop = mock_server.serve(lambda path, body: {"content": json.dumps({"verdicts": ["YES"] * 6, "errors": ["Wort Wort", "nicht da"]}),
                                                       "finish_reason": "stop"})
@@ -516,6 +532,7 @@ if __name__ == "__main__":
     test_analogy_transfer()
     test_decision_memo()
     test_interpreter()
+    test_conflict_summary()
     test_memory_dialog()
     test_constrained_plan()
     test_human_persona_and_self_model()

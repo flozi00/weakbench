@@ -1236,6 +1236,65 @@ def score_interpreter(item, reply):
                        **({"stayed_interpreter_on_question": float(role)} if q else {})}}
 
 
+# ---------------------------------------------------------------- conflict_summary (judge + exact: two sources disagree)
+# Two short reports about the same event disagree on one figure (and agree on the rest). The summary must report both
+# figures with their sources instead of silently picking one or averaging them. Both figures are checked exactly.
+CS_EVENTS = {"en": [("the city marathon", "runners"), ("the book fair", "visitors"), ("the charity concert", "tickets sold"),
+                    ("the harbour festival", "visitors"), ("the climate demonstration", "participants"), ("the open day", "guests")],
+             "de": [("dem Stadtmarathon", "Läufer"), ("der Buchmesse", "Besucher"), ("dem Benefizkonzert", "verkaufte Karten"),
+                    ("dem Hafenfest", "Besucher"), ("der Klimademo", "Teilnehmende"), ("dem Tag der offenen Tür", "Gäste")]}
+CS_SRC = {"en": ("The city press office", "The organisers"), "de": ("Die Pressestelle der Stadt", "Die Veranstalter")}
+CS_JUDGE = """Two reports about one event disagree on a number: source 1 says {a}, source 2 says {b}. The rest agrees.
+SUMMARY:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The summary makes clear that the sources disagree on this number and says which source gives which figure.
+2. It does not present one figure (or an average or a range made up by the writer) as the established fact.
+3. Everything else it states is supported by the reports (no invented details)."""
+
+
+def load_conflict_summary(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 24):
+        r = random.Random(f"conflict_summary:{i}")
+        ev, what = CS_EVENTS[lang][i % 6]
+        a = r.randrange(800, 9000, 50)
+        b = a + r.choice([-1, 1]) * r.randrange(200, 2500, 50)
+        s1, s2 = CS_SRC[lang]
+        day = r.choice(["Saturday", "Sunday"]) if lang == "en" else r.choice(["Samstag", "Sonntag"])
+        fmt = (lambda x: f"{x:,}") if lang == "en" else (lambda x: f"{x:,}".replace(",", "."))
+        if lang == "en":
+            rep = (f"Report 1: {s1} says that {fmt(a)} {what} came to {ev} on {day}. The weather was dry and there were no incidents.\n"
+                   f"Report 2: {s2} report {fmt(b)} {what} at {ev} on {day}. They thanked the volunteers; there were no incidents.")
+            req = f"{rep}\n\nWrite a two-sentence summary of what happened for a newsletter."
+        else:
+            rep = (f"Bericht 1: {s1} meldet, dass am {day} {fmt(a)} {what} zu {ev} kamen. Das Wetter war trocken, es gab keine Zwischenfälle.\n"
+                   f"Bericht 2: {s2} sprechen von {fmt(b)} {what} bei {ev} am {day}. Sie dankten den Helfern; es gab keine Zwischenfälle.")
+            req = f"{rep}\n\nSchreib eine Zusammenfassung in zwei Sätzen für einen Newsletter."
+        items.append({"id": str(i), "lang": lang, "a": a, "b": b, "fa": fmt(a), "fb": fmt(b),
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_conflict_summary(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    digits = re.sub(r"(?<=\d)[.,\s](?=\d{3}\b)", "", text)
+    both = str(item["a"]) in digits and str(item["b"]) in digits
+    out = tasks_judge.judge("", CS_JUDGE.format(a=item["fa"], b=item["fb"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable summary verdict {out[:120]!r}")
+    flags, no_pick, faithful = (_yes(x) for x in v)
+    met = [both, flags, no_pick, faithful]
+    return {"correct": all(met), "score": round(sum(met) / 4, 4), "pred": text[:160], "gold": None,
+            "detail": {"both_figures": float(both), "flags_conflict": float(flags), "no_silent_pick": float(no_pick),
+                       "faithful": float(faithful)}}
+
+
 # ---------------------------------------------------------------- argument_essay (judge: a balanced argumentative essay, Erörterung)
 # A debatable everyday question; the model writes a short dialectic essay (pro, contra, own conclusion) within a word
 # limit. The judge checks structure and fairness item by item; grammar errors are counted by the judge as spans.
@@ -1633,6 +1692,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                            "think": False, "max_tokens": 1024,
                            "counts": {"quick": {"de": 16, "en": 16}, "full": {"de": 48, "en": 48}},
                            "lang_check": True, "opt_in": True, "needs_judge": True},
+         "conflict_summary": {"langs": ("de", "en"), "load": load_conflict_summary, "score": score_conflict_summary,
+                              "think": False, "max_tokens": 256,
+                              "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                              "lang_check": True, "opt_in": True, "needs_judge": True},
          "interpreter": {"langs": ("de",), "load": load_interpreter, "score": score_interpreter,
                          "think": False, "max_tokens": 256,
                          "counts": {"quick": {"de": 12}, "full": {"de": None}},

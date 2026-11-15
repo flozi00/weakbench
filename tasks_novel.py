@@ -10213,7 +10213,7 @@ def score_hanoi_state(item, reply):
 
 # ---------------------------------------------------------------- toy_machine
 # A made-up register machine (instruction names nobody has seen: put / grow / shrink / twice / hop / stop) with a
-# counted loop; what is in a register when it stops? Reading a new spec and executing it for 15-60 steps. Bait: the
+# counted loop; what is in a register when it stops? Reading a new spec and executing it for 40-160 steps. Bait: the
 # loop body run once (the jump ignored). `ok_loops<n>`, `no_loop_bait`.
 TM_SPEC = {"en": "A machine has registers A, B and C (all 0 at the start) and runs a numbered program from line 1:\n"
                  "- put X n: set X to n\n- grow X Y: add the value of Y to X\n- shrink X n: subtract n from X\n"
@@ -10259,17 +10259,17 @@ def load_toy_machine(lang, n, seed):
         r = rng_of("toy_machine", i, att)
         while True:
             cnt, x, y = r.sample("ABC", 3)
-            loops = r.randint(3, 6)
+            loops = r.randint(5, 12)
             prog = [("put", cnt, loops), ("put", x, r.randint(1, 5)), ("put", y, r.randint(0, 4))]
             start = len(prog) + 1
             body = [r.choice([("grow", y, x), ("grow", x, y), ("twice", x), ("shrink", y, r.randint(1, 3)), ("grow", y, cnt)])
-                    for _ in range(r.randint(2, 3))]
+                    for _ in range(r.randint(3, 4))]
             prog += body + [("shrink", cnt, 1), ("hop", start, cnt)]
             prog += [r.choice([("grow", x, y), ("shrink", x, r.randint(1, 4)), ("twice", y)]), ("stop",)]
             reg, steps = tm_run(prog)
             once, _ = tm_run([op for op in prog if op[0] != "hop"])
             ask = r.choice([x, y])
-            if reg and 15 <= steps <= 60 and abs(reg[ask]) < 10000 and once[ask] != reg[ask] and reg[ask] not in (0,):
+            if reg and 40 <= steps <= 160 and abs(reg[ask]) < 100000 and once[ask] != reg[ask] and reg[ask] not in (0,):
                 break
         listing = "\n".join(f"{k + 1}: {tm_text(op)}" for k, op in enumerate(prog))
         q = (f"{TM_SPEC[lang]}\n\nProgram:\n{listing}\n\n" +

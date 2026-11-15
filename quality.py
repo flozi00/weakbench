@@ -1376,7 +1376,16 @@ GROUPS = {
                  "code_comments_lang", "i18n_strings"],
     "judge": ["open_checklist", "tutor_feedback", "persona_guard", "human_persona", "self_model", "memory_dialog",
               "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor", "neutral_summary", "triage_advice", "howto_steps", "tactful_message"],
+    "knowledge": ["geo_coords", "geo_locate", "town_country", "country_facts", "element_facts", "lang_id"],
+    "grammar_analysis": ["de_case_identify", "de_tense_identify", "de_das_function", "en_tense_identify", "en_that_function"],
 }
+# whole modules as groups, so every new task is reachable without editing a list: "--tasks lang_all,judge_all"
+GROUPS["lang_all"] = sorted(tasks_lang.TASKS)
+GROUPS["novel_all"] = sorted(tasks_novel.TASKS)
+GROUPS["judge_all"] = sorted(n for n, t in tasks_open.TASKS.items() if t.get("needs_judge"))
+GROUPS["de_grammar"] += sorted(n for n in tasks_lang.TASKS if n.startswith("de_") and n not in GROUPS["de_grammar"]
+                               and n not in ("de_austrian", "de_creative", "de_dialect", "de_variety", "de_no_anglicisms", "de_address"))
+GROUPS["en_grammar"] = sorted(n for n in tasks_lang.TASKS if n.startswith("en_") and n not in ("en_variety",))
 
 
 def main(argv=None):

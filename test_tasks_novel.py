@@ -1698,3 +1698,21 @@ def test_allergen_check():
 
 if __name__ == "__main__":
     test_allergen_check()
+
+
+def test_workday_deadline():
+    import tasks_novel as tn
+    xs = tn.load_workday_deadline("de", None, 0)
+    assert len({x["messages"][0]["content"] for x in xs}) == 120
+    x = xs[0]
+    mo, d = x["date"]
+    mn = tn.WDL_MONTHS["de"][mo - 1]
+    for c in (f"Antwort: {d}. {mn}", f"Antwort: Freitag, {d}. {mn} 2027", f"Antwort: {d:02d}.{mo:02d}.2027"):
+        assert tn.score_workday_deadline(x, {"content": c})["correct"], c
+    e = tn.load_workday_deadline("en", None, 0)[0]
+    mo, d = e["date"]
+    assert tn.score_workday_deadline(e, {"content": f"Answer: {tn.WDL_MONTHS['en'][mo - 1]} {d}, 2027"})["correct"]
+
+
+if __name__ == "__main__":
+    test_workday_deadline()

@@ -8287,6 +8287,72 @@ def score_allergen_check(item, reply):
                        "unsafe_listed": float(bool(set(got) - set(item["gold"])))}}
 
 
+# ---------------------------------------------------------------- workday_deadline (n working days after a date)
+WDL_MONTHS = {"en": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+              "de": ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]}
+WDL_DAYS = {"en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+            "de": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]}
+
+
+def load_workday_deadline(lang, n, seed):
+    import datetime as dt
+    items = []
+    for i, att in common.redraws(n or 120, items):
+        r = rng_of("workday_deadline", i, att)
+        while True:
+            start = dt.date(2027, 1, 1) + dt.timedelta(days=r.randrange(0, 330))
+            if start.weekday() >= 5:
+                continue
+            k = r.randint(5, 15)
+            hol = start + dt.timedelta(days=r.randint(2, k + 3))
+            if hol.weekday() >= 5:
+                continue
+            d, left = start, k
+            while left:
+                d += dt.timedelta(days=1)
+                if d.weekday() < 5 and d != hol:
+                    left -= 1
+            naive = start + dt.timedelta(days=k)  # calendar days
+            no_hol, left = start, k
+            while left:
+                no_hol += dt.timedelta(days=1)
+                if no_hol.weekday() < 5:
+                    left -= 1
+            if hol < d and naive != d and no_hol != d:
+                break
+        M, D = WDL_MONTHS[lang], WDL_DAYS[lang]
+        f = (lambda x: f"{D[x.weekday()]}, {M[x.month - 1]} {x.day}") if lang == "en" else (lambda x: f"{D[x.weekday()]}, {x.day}. {M[x.month - 1]}")
+        q = (f"An invoice was received on {f(start)} 2027. Payment is due {k} working days later (Monday to Friday; the day of "
+             f"receipt does not count). {f(hol)} is a public holiday and does not count as a working day. On which date is the "
+             f"payment due?" if lang == "en" else
+             f"Eine Rechnung ist am {f(start)} 2027 eingegangen. Sie ist {k} Arbeitstage später fällig (Montag bis Freitag; der "
+             f"Eingangstag zählt nicht mit). {f(hol)} ist ein Feiertag und zählt nicht als Arbeitstag. An welchem Datum ist die "
+             f"Zahlung fällig?")
+        items.append({"id": str(i), "lang": lang, "gold": (f"{M[d.month - 1]} {d.day}" if lang == "en" else f"{d.day}. {M[d.month - 1]}"),
+                      "date": (d.month, d.day), "naive": (naive.month, naive.day),
+                      "no_hol": (no_hol.month, no_hol.day), "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_workday_deadline(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    fa = fa.rsplit("=", 1)[-1]
+    v = None
+    names = WDL_MONTHS[item["lang"]]
+    m = re.search(r"(?<!\d)(\d{1,2})\.\s*(\d{1,2})\.", fa)  # 12.03.
+    if m:
+        v = (int(m[2]), int(m[1]))
+    else:
+        for k, nm in enumerate(names):
+            mm = re.search(rf"(?<!\d)(\d{{1,2}})(?:\.|st|nd|rd|th)?\s*(?:of\s+)?{nm}|{nm}\s+(\d{{1,2}})(?!\d)", fa, re.I)
+            if mm:
+                v = (k + 1, int(mm[1] or mm[2]))
+                break
+    ok = v == tuple(item["date"])
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"calendar_days": float(v == tuple(item["naive"])), "forgot_holiday": float(v == tuple(item["no_hol"]))}}
+
+
 # ---------------------------------------------------------------- table_qa
 TQ_PRODUCTS = ["Lamp", "Desk", "Chair", "Shelf", "Sofa", "Rug", "Mirror", "Clock"]
 TQ_DE = dict(zip(TQ_PRODUCTS, ["Lampe", "Schreibtisch", "Stuhl", "Regal", "Sofa", "Teppich", "Spiegel", "Uhr"]))
@@ -9882,6 +9948,7 @@ TASKS = {
     "multikey_rank": task(load_multikey_rank, score_multikey_rank, 24, 120),
     "bus_meet": task(load_bus_meet, score_bus_meet, 24, 120),
     "allergen_check": task(load_allergen_check, score_allergen_check, 24, 120),
+    "workday_deadline": task(load_workday_deadline, score_workday_deadline, 24, 120),
     "nth_weekday": task(load_nth_weekday, score_nth_weekday, 24, 120),
     "count_range": task(load_count_range, score_count_range, 24, 120),
     "dilution": task(load_dilution, score_dilution, 24, 120),

@@ -3054,7 +3054,7 @@ DP_ITEMS2 = [("She is very interested ___ modern art.", "in", "for", "on"), ("It
              ("He apologised ___ the delay.", "for", "about", "of"), ("This book is different ___ the film.", "from", "of", "as"),
              ("They are waiting ___ the bus.", "for", "on", "of"), ("I am looking forward ___ the holidays.", "to", "on", "for"),
              ("She congratulated him ___ his new job.", "on", "to", "for"), ("He suffers ___ hay fever.", "from", "under", "of"),
-             ("We are aware ___ the risks.", "of", "about", "over"), ("The price includes breakfast; it is similar ___ last year's.", "to", "with", "as"),
+             ("We are aware ___ the risks.", "of", "about", "over"), ("Her new car is very similar ___ mine.", "to", "with", "as"),
              ("She specialises ___ tax law.", "in", "on", "at"), ("Don't laugh ___ him.", "at", "about", "over")]
 
 

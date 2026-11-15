@@ -3669,6 +3669,73 @@ def score_en_comparison(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
 
 
+# ---------------------------------------------------------------- novel_metaphor (fresh metaphors, not idioms)
+# Metaphors written for this suite, so no model has seen them as fixed phrases: understanding must come from mapping
+# the image onto the situation. Option order: (intended, literal, two plausible wrong readings), shuffled per item.
+NM_ITEMS = {"de": [("Nach der Fusion war die Abteilung ein Orchester ohne Noten: alle spielten, keiner wusste was.",
+                    "Alle arbeiteten, aber ohne gemeinsamen Plan.", "Die Abteilung machte nach der Fusion Musik.",
+                    "Die Abteilung war besonders kreativ.", "In der Abteilung gab es zu wenige Leute."),
+                   ("Ihr Lebenslauf ist ein Bahnhof, an dem nie ein Zug lange hält.",
+                    "Sie hat oft und nach kurzer Zeit die Stelle gewechselt.", "Sie hat bei der Bahn gearbeitet.",
+                    "Sie reist beruflich sehr viel.", "Ihr Lebenslauf ist schlecht formatiert."),
+                   ("Das neue Gesetz ist ein Regenschirm mit Löchern.",
+                    "Es soll schützen, schützt aber nur unvollständig.", "Das Gesetz regelt den Verkauf von Schirmen.",
+                    "Das Gesetz gilt nur bei schlechtem Wetter.", "Das Gesetz ist zu streng."),
+                   ("Sein Postfach ist ein Komposthaufen: unten verrottet, was oben nicht beantwortet wird.",
+                    "Unbeantwortete E-Mails geraten unter neuen in Vergessenheit.", "Er sammelt Gartenabfälle.",
+                    "Er löscht alle alten E-Mails.", "Sein Postfach riecht schlecht."),
+                   ("Die Besprechung war ein Karussell: viel Bewegung, am Ende stand man wieder am Anfang.",
+                    "Man diskutierte lange, kam aber zu keinem Ergebnis.", "Die Besprechung fand auf dem Jahrmarkt statt.",
+                    "Die Besprechung war unterhaltsam und kurz.", "Alle wechselten ständig die Plätze."),
+                   ("Ihre Geduld ist ein Gummiband, das man nicht noch einmal dehnen sollte.",
+                    "Sie ist kurz davor, die Geduld zu verlieren.", "Sie bastelt gern mit Gummibändern.",
+                    "Sie ist sehr geduldig und flexibel.", "Sie hat keine Geduld mehr übrig und ist schon wütend geworden."),
+                   ("Das Projekt ist ein Haus, bei dem man zuerst das Dach gedeckt hat.",
+                    "Es wurde in der falschen Reihenfolge angegangen, ohne Grundlage.", "Das Projekt ist ein Hausbau.",
+                    "Das Projekt ist besonders gut geschützt.", "Das Projekt ist fast fertig."),
+                   ("Der Kredit war für die Firma ein Rettungsring aus Blei.",
+                    "Die Hilfe verschlimmerte die Lage, statt sie zu retten.", "Die Firma kaufte Rettungsringe.",
+                    "Der Kredit hat die Firma gerettet.", "Der Kredit war sehr klein.")],
+            "en": [("After the merger the department was an orchestra without sheet music: everyone played, nobody knew what.",
+                    "Everyone was working, but without a shared plan.", "The department made music after the merger.",
+                    "The department was especially creative.", "The department had too few people."),
+                   ("Her CV is a station where no train stops for long.",
+                    "She has changed jobs often, after short stays.", "She has worked for the railway.",
+                    "She travels a lot for work.", "Her CV is badly formatted."),
+                   ("The new law is an umbrella full of holes.",
+                    "It is meant to protect but does so only partly.", "The law regulates the sale of umbrellas.",
+                    "The law only applies in bad weather.", "The law is too strict."),
+                   ("His inbox is a compost heap: what is not answered on top rots at the bottom.",
+                    "Unanswered emails get buried under new ones and forgotten.", "He collects garden waste.",
+                    "He deletes all old emails.", "His inbox smells bad."),
+                   ("The meeting was a merry-go-round: lots of movement, and we ended up where we started.",
+                    "There was long discussion but no result.", "The meeting was held at a fair.",
+                    "The meeting was fun and short.", "Everyone kept changing seats."),
+                   ("Her patience is a rubber band you should not stretch again.",
+                    "She is close to losing her patience.", "She likes crafting with rubber bands.",
+                    "She is very patient and flexible.", "She has already lost her patience and become angry."),
+                   ("The project is a house where they put the roof on first.",
+                    "It was tackled in the wrong order, without a foundation.", "The project is building a house.",
+                    "The project is especially well protected.", "The project is almost finished."),
+                   ("For the company, the loan was a lifebuoy made of lead.",
+                    "The help made things worse instead of saving it.", "The company bought lifebuoys.",
+                    "The loan saved the company.", "The loan was very small.")]}
+NM_ASK = {"de": "Was ist mit dem Bild in diesem Satz gemeint?\n\n{s}\n\n{opts}\n\nAntworte mit einer Zeile \"Antwort: X\".",
+          "en": "What does the image in this sentence mean?\n\n{s}\n\n{opts}\n\nReply with a line \"Answer: X\"."}
+
+
+def load_novel_metaphor(lang, n, seed):
+    items = []
+    for k, (sent, right, *wrong) in enumerate(NM_ITEMS[lang]):
+        rest = list(wrong)
+        random.Random(f"novel_metaphor:{lang}:{k}").shuffle(rest)
+        opts = rest[:k % 4] + [right] + rest[k % 4:]  # gold position balanced: twice each of A-D
+        items.append({"id": f"{lang}{k}", "lang": lang, "gold": "ABCD"[k % 4], "literal": "ABCD"[opts.index(wrong[0])],
+                      "messages": [{"role": "user", "content": NM_ASK[lang].format(
+                          s=sent, opts="\n".join(f"{c}. {o}" for c, o in zip("ABCD", opts)))}]})
+    return items if n is None else items[:n]
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4206,6 +4273,7 @@ TASKS = {
     "en_zero_article": task(("en",), load_en_zero_article, score_en_zero_article, 20, 20, lang_check=False),
     "de_austrian": task(("de",), load_de_austrian, score_de_austrian, 20, 20, lang_check=False),
     "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
+    "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

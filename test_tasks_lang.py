@@ -887,3 +887,18 @@ def test_de_austrian():
 
 if __name__ == "__main__":
     test_de_austrian()
+
+
+def test_novel_metaphor():
+    import tasks_lang as tl
+    from collections import Counter
+    for lang in ("de", "en"):
+        xs = tl.load_novel_metaphor(lang, None, 0)
+        assert len(xs) == 8 and max(Counter(x["gold"] for x in xs).values()) <= 4
+        for x in xs:
+            assert tl.score_idioms(x, {"content": f"Antwort: {x['gold']}"})["correct"]
+            assert tl.score_idioms(x, {"content": f"Answer: {x['literal']}"})["detail"]["literal"] == 1
+
+
+if __name__ == "__main__":
+    test_novel_metaphor()

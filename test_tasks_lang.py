@@ -1022,3 +1022,17 @@ def test_denglisch_spot():
 
 if __name__ == "__main__":
     test_denglisch_spot()
+
+
+def test_de_case_identify():
+    import tasks_lang as tl
+    xs = tl.load_de_case_identify("de", None, 0)
+    assert len(xs) == 48 and len({x["messages"][0]["content"] for x in xs}) == 48
+    x = xs[0]
+    for c in (x["gold"], f"Antwort: {x['gold']}", f"{x['gold']} (Wer wartet?)", f"{x['gold'][:3]}."):
+        assert tl.score_de_case_identify(x, {"content": c})["correct"], c
+    assert not tl.score_de_case_identify(x, {"content": "Nominativ oder Akkusativ"})["correct"]
+
+
+if __name__ == "__main__":
+    test_de_case_identify()

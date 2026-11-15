@@ -4167,6 +4167,57 @@ def score_denglisch_spot(item, reply):
             "detail": {"missed": len(gold - got), "false_alarm": len(got - gold)}}
 
 
+# ---------------------------------------------------------------- de_case_identify (name the case of a marked phrase)
+# The analysis side of de_case: a generated sentence with one noun phrase in [brackets]; which case is it in? The same
+# surface form often fits two cases ("der Frau" is dative or genitive, "die Frau" nominative or accusative), so the
+# answer needs the sentence structure, not the article. No wegen/trotz frames: colloquial dative would make them ambiguous.
+CI_FRAMES = [("[{np}] wartet vor dem Haus.", "Nominativ", "nom"), ("Ich sehe [{np}] im Garten.", "Akkusativ", "acc"),
+             ("Wir helfen [{np}] beim Umzug.", "Dativ", "dat"), ("Das Auto [{np2}] steht vor der Tür.", "Genitiv", "gen"),
+             ("Er dankt [{np}] für die Hilfe.", "Dativ", "dat"), ("Kennst du [{np}]?", "Akkusativ", "acc"),
+             ("Die Tasche [{np2}] ist rot.", "Genitiv", "gen"), ("Morgen kommt [{np}] zu Besuch.", "Nominativ", "nom"),
+             ("Sie schenkt [{np}] einen Kuchen.", "Dativ", "dat"), ("Wir warten auf [{np}].", "Akkusativ", "acc"),
+             ("Der Name [{np2}] ist mir entfallen.", "Genitiv", "gen"), ("Das gefällt [{np}] gut.", "Dativ", "dat")]
+CI_NOUNS = {"f": [("die", "der", "der", "die", "Nachbarin"), ("die", "der", "der", "die", "Lehrerin"), ("die", "der", "der", "die", "Ärztin")],
+            "m": [("der", "dem", "des", "den", "Nachbar", "Nachbarn"), ("der", "dem", "des", "den", "Lehrer", "Lehrers"),
+                  ("der", "dem", "des", "den", "Arzt", "Arztes")],
+            "n": [("das", "dem", "des", "das", "Kind", "Kindes"), ("das", "dem", "des", "das", "Team", "Teams")]}
+
+
+def _ci_np(case, g, row):
+    if g == "f":
+        nom, dat, gen, acc, noun = row
+        return {"nom": f"{nom} {noun}", "acc": f"{acc} {noun}", "dat": f"{dat} {noun}", "gen": f"{gen} {noun}"}[case]
+    nom, dat, gen, acc, noun, gen_noun = row
+    dat_noun = noun + "n" if noun == "Nachbar" else noun
+    acc_noun = noun + "n" if noun == "Nachbar" else noun
+    return {"nom": f"{nom} {noun}", "acc": f"{acc} {acc_noun}", "dat": f"{dat} {dat_noun}", "gen": f"{gen} {gen_noun}"}[case]
+
+
+def load_de_case_identify(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 48, items):
+        r = random.Random(f"de_case_identify:{i}" + (f"~{att}" if att else ""))
+        frame, gold, case = CI_FRAMES[i % len(CI_FRAMES)]
+        g = ["f", "m", "n", "f"][(i // len(CI_FRAMES)) % 4]  # half feminine: the article alone is ambiguous there
+        np_ = _ci_np(case, g, r.choice(CI_NOUNS[g]))
+        sent = frame.format(np=np_, np2=np_)
+        sent = "[" + sent[1].upper() + sent[2:] if sent.startswith("[") else sent  # "[Die Lehrerin] wartet ..."
+        q = ("In welchem Fall (Nominativ, Akkusativ, Dativ oder Genitiv) steht die Wortgruppe in eckigen Klammern? "
+             "Antworte nur mit dem Fall.\n\n" + sent)
+        items.append({"id": str(i), "lang": "de", "gold": gold, "fem": g == "f", "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_de_case_identify(item, reply):
+    t = strip_lead(reply["content"]).lower()
+    t = re.sub(r"(?i)\b(?:not|nicht|kein\w*)\s+\w+", " ", t)
+    named = {c for c in ("nominativ", "akkusativ", "dativ", "genitiv") if re.search(rf"\b{c}", t) or
+             re.search(rf"\b{c[:3]}\b\.?", t)}
+    ok = named == {item["gold"].lower()}
+    return {"correct": ok, "score": float(ok), "pred": sorted(named), "gold": item["gold"],
+            "detail": {"ok_" + item["gold"][:3].lower(): float(ok), "ok_fem" if item["fem"] else "ok_masc_neut": float(ok)}}
+
+
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)
 GI_ITEMS = [("fixed", "She enjoys ___ in the lake.", "swim", "gerund"), ("fixed", "We decided ___ the old car.", "sell", "inf"),
             ("fixed", "He avoided ___ the question.", "answer", "gerund"), ("fixed", "They managed ___ the last train.", "catch", "inf"),
@@ -4717,6 +4768,7 @@ TASKS = {
     "en_place_preps": task(("en",), load_en_place_preps, score_en_place_preps, 18, 18, lang_check=False),
     "en_since_for": task(("en",), load_en_since_for, score_en_since_for, 18, 18, lang_check=False),
     "denglisch_spot": task(("de",), load_denglisch_spot, score_denglisch_spot, 20, 40, lang_check=False),
+    "de_case_identify": task(("de",), load_de_case_identify, score_de_case_identify, 24, 48, lang_check=False),
     "en_perfect_past": task(("en",), load_en_perfect_past, score_en_perfect_past, 16, 16, lang_check=False),
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),

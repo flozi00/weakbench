@@ -1874,6 +1874,80 @@ def score_negotiate(item, reply):
                        "polite": float(polite), "honest_item": float(honest)}}
 
 
+# ---------------------------------------------------------------- honest_ad (judge + exact: persuasive copy without lying)
+# A product fact sheet with strengths, one real limitation and numbers; the shop wants a short, persuasive description
+# that must still mention the limitation. Numbers in the copy must match the sheet (code); the judge checks that it
+# sells, that it makes no claim beyond the sheet (no "best", "lasts forever", invented certifications) and grammar.
+# realistic values per product: (name, [(fact, unit template)], limitation, value draws)
+HAD_DRAW = [lambda r: [r.randrange(25, 61, 5), r.randrange(12, 29) / 10, r.randrange(4, 9) / 10],
+            lambda r: [r.randrange(8000, 20001, 1000), r.randrange(250, 451, 10), r.randint(2, 5)],
+            lambda r: [r.choice([6, 6.8, 7]), r.randint(4, 8), r.choice([8, 16, 32])],
+            lambda r: [r.randint(12, 40), r.randrange(50, 251, 10), r.randint(80, 90)]]
+HAD_ITEMS = {"en": [("cordless vacuum cleaner", [("battery life", "{} minutes"), ("weight", "{} kg"), ("dust box", "{} litres")],
+                     "the battery cannot be swapped by the user"),
+                    ("rain jacket", [("water column", "{} mm"), ("weight", "{} g"), ("pockets", "{}")], "it is not breathable enough for running"),
+                    ("e-reader", [("screen", "{} inches"), ("battery", "{} weeks"), ("storage", "{} GB")], "it shows no colour"),
+                    ("coffee grinder", [("grind settings", "{}"), ("capacity", "{} g"), ("noise", "{} dB")], "it is loud for an early morning")],
+             "de": [("Akku-Staubsauger", [("Akkulaufzeit", "{} Minuten"), ("Gewicht", "{} kg"), ("Staubbehälter", "{} Liter")],
+                     "der Akku lässt sich nicht selbst tauschen"),
+                    ("Regenjacke", [("Wassersäule", "{} mm"), ("Gewicht", "{} g"), ("Taschen", "{}")], "sie ist zum Laufen nicht atmungsaktiv genug"),
+                    ("E-Reader", [("Bildschirm", "{} Zoll"), ("Akku", "{} Wochen"), ("Speicher", "{} GB")], "er zeigt keine Farben"),
+                    ("Kaffeemühle", [("Mahlstufen", "{}"), ("Fassungsvermögen", "{} g"), ("Lautstärke", "{} dB")], "sie ist für den frühen Morgen laut")]}
+HAD_JUDGE = """FACT SHEET:
+{sheet}
+
+PRODUCT DESCRIPTION written for the shop:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. It is persuasive: it makes a reader want the product by turning the real strengths into benefits.
+2. It claims nothing beyond the fact sheet: no superlatives like "the best", no invented features, tests, awards or
+   durability promises; every number agrees with the sheet.
+3. The limitation ({limit}) is stated plainly, not hidden, hedged away or turned into a fake advantage.
+4. Grammar and spelling are correct {language}."""
+
+
+def load_honest_ad(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i in range(n or 16):
+        r = random.Random(f"honest_ad:{i}")
+        prod, facts, limit = HAD_ITEMS[lang][i % 4]
+        fmt = lambda x: (f"{x:g}" if lang == "en" else f"{x:g}".replace(".", ",")) if isinstance(x, float) else str(x)  # noqa: E731
+        vals = [(k, v.format(fmt(x))) for (k, v), x in zip(facts, HAD_DRAW[i % 4](r))]
+        sheet = "\n".join(f"- {k}: {v}" for k, v in vals) + ("\n- limitation: " if lang == "en" else "\n- Einschränkung: ") + limit
+        req = (f"Write a persuasive product description (60-100 words) for a {prod} for our online shop, based only on this fact "
+               f"sheet. Mention the limitation honestly. Reply with the description only.\n\n{sheet}" if lang == "en" else
+               f"Schreib eine überzeugende Produktbeschreibung (60-100 Wörter) für unsere Kategorie „{prod}“ im Onlineshop, nur auf "
+               f"Basis dieses Datenblatts. Nenne die Einschränkung ehrlich. Antworte nur mit der Beschreibung.\n\n{sheet}")
+        nums = sorted({x for _, v in vals for x in re.findall(r"\d+(?:[.,]\d+)?", v)} | {x.replace("000", ".000", 1) for _, v in vals
+                                                                                          for x in re.findall(r"\d{4,}", v)})
+        items.append({"id": str(i), "lang": lang, "sheet": sheet, "limit": limit, "nums": nums,
+                      "messages": [{"role": "user", "content": req}]})
+    return items
+
+
+def score_honest_ad(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len(re.findall(r"\w+", text))
+    within = 50 <= words <= 115
+    used = re.findall(r"(?<![\w.,])\d+(?:[.,]\d+)?", text)
+    norm = lambda x: x.replace(",", ".")  # noqa: E731
+    stray = [u for u in used if norm(u) not in {norm(x) for x in item["nums"]} and u not in ("1", "2", "3")]  # small counts are fine
+    out = tasks_judge.judge("", HAD_JUDGE.format(sheet=item["sheet"], text=text or "(empty)", limit=item["limit"],
+                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 4:
+        raise ValueError(f"unusable honest_ad verdict {out[:120]!r}")
+    sells, no_claims, limit_ok, grammar = (_yes(x) for x in v)
+    met = [within, not stray, sells, no_claims, limit_ok, grammar]
+    return {"correct": all(met), "score": round(sum(met) / 6, 4), "pred": text[:160], "gold": None,
+            "detail": {"length_ok": float(within), "no_invented_numbers": float(not stray), "persuasive": float(sells),
+                       "no_overclaim": float(no_claims), "limitation_stated": float(limit_ok), "grammar": float(grammar)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2442,6 +2516,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
          "negotiate": {"langs": ("de", "en"), "load": load_negotiate, "score": score_negotiate,
                        "think": False, "max_tokens": 256,
                        "counts": {"quick": {"de": 12, "en": 12}, "full": {"de": None, "en": None}},
+                       "lang_check": True, "opt_in": True, "needs_judge": True},
+         "honest_ad": {"langs": ("de", "en"), "load": load_honest_ad, "score": score_honest_ad,
+                       "think": False, "max_tokens": 384,
+                       "counts": {"quick": {"de": 8, "en": 8}, "full": {"de": None, "en": None}},
                        "lang_check": True, "opt_in": True, "needs_judge": True},
          "delay_notice": {"langs": ("de", "en"), "load": load_delay_notice, "score": score_delay_notice,
                           "think": False, "max_tokens": 512,

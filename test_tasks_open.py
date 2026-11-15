@@ -752,3 +752,23 @@ def test_negotiate():
 
 if __name__ == "__main__":
     test_negotiate()
+
+
+def test_honest_ad():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_honest_ad("en", None, 0)[0]
+        n = x["nums"]
+        good = (f"Clean the whole flat in one go: {n[0]} and {n[1]} say it all. " + "Light, quick and easy to empty. " * 6 +
+                "One honest note: the battery cannot be swapped by the user.")
+        r = to.score_honest_ad(x, {"content": good})
+        assert r["correct"], r
+        assert to.score_honest_ad(x, {"content": good.replace(n[0], "99")})["detail"]["no_invented_numbers"] == 0
+    finally:
+        stop()
+        tasks_judge.configure(None, None, None)
+
+
+if __name__ == "__main__":
+    test_honest_ad()

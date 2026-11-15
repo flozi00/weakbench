@@ -1376,8 +1376,9 @@ GROUPS = {
                  "code_comments_lang", "i18n_strings"],
     "judge": ["open_checklist", "tutor_feedback", "persona_guard", "human_persona", "self_model", "memory_dialog",
               "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor", "neutral_summary", "triage_advice", "howto_steps", "tactful_message"],
-    "knowledge": ["geo_coords", "geo_locate", "town_country", "country_facts", "element_facts", "lang_id"],
-    "grammar_analysis": ["de_case_identify", "de_tense_identify", "de_das_function", "en_tense_identify", "en_that_function"],
+    "knowledge": ["geo_coords", "geo_locate", "town_country", "country_facts", "country_currency", "element_facts", "lang_id"],
+    "grammar_analysis": ["de_case_identify", "de_tense_identify", "de_das_function", "en_tense_identify", "en_that_function",
+                         "antonym_context"],
 }
 # whole modules as groups, so every new task is reachable without editing a list: "--tasks lang_all,judge_all"
 GROUPS["lang_all"] = sorted(tasks_lang.TASKS)

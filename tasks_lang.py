@@ -3557,7 +3557,8 @@ def load_de_nominal_adj(lang, n, seed):
 def score_de_nominal_adj(item, reply):
     v = gap_pick(item, reply, item["opts"])
     ok = v is not None and v == item["gold"].lower()
-    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {}}
+    cap = bool(re.search(rf"(?<![\w]){re.escape(item['gold'])}(?![\w])", reply["content"] or ""))  # "neuem" is a spelling error
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"capitalised": float(ok and cap)}}
 
 
 # ---------------------------------------------------------------- en_gerund_inf (verb patterns)

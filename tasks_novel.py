@@ -8118,6 +8118,8 @@ def load_parcel_price(lang, n, seed):
             tiers = [(2, 5), (5, 8), (10, 12), (20, 18), (31.5, 25)]
             price = lambda kg: next(p for lim, p in tiers if kg <= lim)  # noqa: E731
             bill = max(actual, vol)
+            if any(abs(bill - lim) < 0.05 for lim, _ in tiers):  # exactly on a limit: "bis 5 kg" inclusive is fair but avoidable
+                continue
             gold, bait = price(bill), price(actual)
             want = [8, 12, 18, 25][(i // 2) % 4] if bulky else [5, 8, 12, 18, 25][(i // 2) % 5]  # prices balanced
             if (gold != bait or not bulky) and gold == want:

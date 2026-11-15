@@ -4049,6 +4049,38 @@ def score_en_modal_perfect(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_modal_perfect": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_adj_order (opinion-size-age-shape-colour-origin-material-purpose)
+# Natives feel the order without knowing the rule; learners and models with weak English swap it. Two orders of the
+# same words, so length cannot help; only the order differs.
+EAO_ITEMS = [("a beautiful old Italian car", "an old beautiful Italian car"), ("a small round wooden table", "a round small wooden table"),
+             ("a lovely little white cottage", "a little lovely white cottage"), ("a big black leather bag", "a black big leather bag"),
+             ("an expensive new German camera", "a new expensive German camera"), ("a long red silk dress", "a red long silk dress"),
+             ("a tiny old Japanese teapot", "an old tiny Japanese teapot"), ("a nice square glass vase", "a square nice glass vase"),
+             ("a huge grey stone wall", "a grey huge stone wall"), ("an ugly brown plastic chair", "a brown ugly plastic chair"),
+             ("a young French chef", "a French young chef"), ("a comfortable old sleeping bag", "an old comfortable sleeping bag"),
+             ("a thin blue cotton shirt", "a blue thin cotton shirt"), ("a strange green metal box", "a green strange metal box"),
+             ("a large Chinese porcelain bowl", "a Chinese large porcelain bowl"), ("a charming small Spanish village", "a small charming Spanish village")]
+
+
+def load_en_adj_order(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Which phrase sounds natural to a native speaker of English?\n"
+                           f"1) {two_opts(i, g, (g, w))[0]}\n2) {two_opts(i, g, (g, w))[1]}\nReply with the phrase only."}]}
+            for i, (g, w) in enumerate(EAO_ITEMS[:n or len(EAO_ITEMS)])]
+
+
+def score_en_adj_order(item, reply):
+    t = re.sub(r"\s+", " ", re.sub(r"[*\"“”.]", " ", strip_lead(reply["content"] or "")).lower())
+    found = [o for o in item["opts"] if o.lower() in t]
+    if not found:  # "1" / "2)" names the shown position
+        m = re.fullmatch(r"\s*\(?([12])\)?\s*", t)
+        shown = two_opts(int(item["id"]), item["gold"], item["opts"])
+        found = [shown[int(m[1]) - 1]] if m else []
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_adj_order": float(ok)}}
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5350,6 +5382,7 @@ TASKS = {
     "en_agreement_quant": task(("en",), load_en_agreement_quant, score_en_agreement_quant, 16, None, lang_check=False),
     "de_adj_endings": task(("de",), load_de_adj_endings, score_de_adj_endings, 16, None, lang_check=False),
     "en_modal_perfect": task(("en",), load_en_modal_perfect, score_en_modal_perfect, 16, None, lang_check=False),
+    "en_adj_order": task(("en",), load_en_adj_order, score_en_adj_order, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

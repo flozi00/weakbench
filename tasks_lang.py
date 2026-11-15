@@ -2833,13 +2833,13 @@ CO_ITEMS = {"de": [("Wir müssen bis Freitag eine Entscheidung ___.", ("treffen"
                    ("Can you ___ me a favour?", ("do", "make", "give"), "do", "make"),
                    ("They ___ a break after two hours.", ("took", "made", "did"), "took", "made"),
                    ("She ___ the exam with excellent marks.", ("passed", "made", "took"), "passed", "made"),
-                   ("The police ___ the suspect.", ("arrested", "took fixed", "made fixed"), "arrested", "took fixed"),
-                   ("He ___ an application for the job.", ("submitted", "put", "made"), "submitted", "put"),
+                   ("The police ___ the suspect into custody.", ("took", "made", "did"), "took", "made"),
+                   ("She ___ a promise to help us.", ("made", "gave", "did"), "made", "gave"),
                    ("We need to ___ the risk.", ("take", "make", "do"), "take", "make"),
-                   ("I'd like to ___ a question.", ("ask", "put up", "make"), "ask", "put up"),
+                   ("I'd like to ___ a question.", ("ask", "make", "do"), "ask", "make"),
                    ("She ___ a lot of effort into the gift.", ("put", "gave", "made"), "put", "gave"),
                    ("Please ___ me know when you arrive.", ("let", "give", "make"), "let", "give"),
-                   ("The opposition ___ the plan sharply.", ("criticised", "practised critic on", "made critic on"), "criticised", "made critic on"),
+                   ("The opposition ___ sharp criticism of the plan.", ("voiced", "practised", "did"), "voiced", "practised"),
                    ("He ___ a photo of the bridge.", ("took", "made", "did"), "took", "made")]}
 
 

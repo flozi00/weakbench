@@ -7837,6 +7837,8 @@ def load_access_rules(lang, n, seed):
     for i, att in common.redraws(n or 120, items):
         r = rng_of("access_rules", i, att)
         want_yes = i % 2 == 0
+        k = (i // 2) % 3  # the tie-rule shortcut can only be wrong when the answer is no (a yes has no DENY at the top)
+        k = (i // 6) % 2 if want_yes and k == 2 else k
         while True:
             rules = [(r.choice(["allow", "deny"]), r.choice(AR_ROLES), r.choice(AR_DIRS)) for _ in range(r.randint(4, 6))]
             if len(set(rules)) < len(rules):
@@ -7849,7 +7851,13 @@ def load_access_rules(lang, n, seed):
             top = max(len(d) for _, _, d in match)
             gold = "deny" not in [e for e, _, d in match if len(d) == top]
             first, last = match[0][0] == "allow", match[-1][0] == "allow"
-            if gold == want_yes and (first != gold or last != gold) and len(match) >= 2:
+            anyrole = [(e, d) for e, _, d in rules if path.startswith(d + "/")]
+            top_any = max(len(d) for _, d in anyrole)
+            shortcut = [  # each item defeats one partial reading, in rotation
+                "deny" not in [e for e, d in anyrole if len(d) == top_any],  # ignoring whose role a rule is for
+                any(e == "allow" and path.rsplit("/", 1)[0] == d for e, _, d in match),  # only the file's own folder counts
+                [e for e, _, d in match if len(d) == top][0] == "allow"]  # no deny-wins tie rule: list order decides
+            if gold == want_yes and (first != gold or last != gold) and len(match) >= 2 and shortcut[k] != gold:
                 break
         yes, no = ("yes", "no") if lang == "en" else ("ja", "nein")
         verb = {"allow": ("ALLOW", "ERLAUBEN"), "deny": ("DENY", "VERBIETEN")}
@@ -7870,8 +7878,12 @@ def load_access_rules(lang, n, seed):
 
 
 def score_access_rules(item, reply):
-    yn = [w for w in re.findall(r"[a-z]+", (final_answer(reply["content"]) or "").lower()) if w in ("yes", "no", "ja", "nein")]
-    v = yn[0] if yn else None
+    fa = (final_answer(reply["content"]) or "").lower()
+    fa = re.sub(r"\b(?:not allowed|denied|nicht erlaubt|verboten)\b", " no ", fa)  # "Answer: not allowed"
+    fa = re.sub(r"\b(?:allowed|erlaubt)\b", " yes ", fa)
+    yn = [w for w in re.findall(r"[a-z]+", fa) if w in ("yes", "no", "ja", "nein")]
+    de = item["gold"] in ("ja", "nein")
+    v = ({"yes": "ja", "no": "nein"} if de else {"ja": "yes", "nein": "no"}).get(yn[0], yn[0]) if yn else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {f"ok_{'allowed' if item['gold'] in ('yes', 'ja') else 'denied'}": float(ok),

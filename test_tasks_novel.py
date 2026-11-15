@@ -1557,6 +1557,7 @@ def test_access_rules():
         assert x["first_match"] != x["gold"] or x["last_match"] != x["gold"]
     x = xs[0]
     assert tn.score_access_rules(x, {"content": f"Answer: {x['gold'].capitalize()}, rule 3 is more specific."})["correct"]
+    assert tn.score_access_rules(x, {"content": "Answer: " + ("allowed" if x["gold"] == "yes" else "not allowed")})["correct"]
 
 
 if __name__ == "__main__":

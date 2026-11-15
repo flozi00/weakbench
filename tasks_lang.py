@@ -2690,9 +2690,9 @@ EU_ITEMS = [("fewer_less", "There were ___ people at the meeting than last year.
             ("i_me", "Between you and ___, the plan will fail.", ("I", "me"), "me"),
             ("i_me", "My sister and ___ went to the cinema.", ("I", "me"), "I"),
             ("i_me", "The manager invited Tom and ___ to lunch.", ("I", "me"), "me"),
-            ("i_me", "She is taller than ___ am.", ("I", "me"), "I"),
+            ("i_me", "Please send the photos to Anna and ___.", ("I", "me"), "me"),
             ("agreement", "Each of the students ___ a laptop.", ("has", "have"), "has"),
-            ("agreement", "Neither of the answers ___ correct.", ("is", "are"), "is"),
+            ("agreement", "Every one of the windows ___ broken.", ("was", "were"), "was"),
             ("agreement", "The list of items ___ on the desk.", ("is", "are"), "is"),
             ("agreement", "The number of complaints ___ increased.", ("has", "have"), "has"),
             ("agreement", "A number of complaints ___ been made.", ("has", "have"), "have"),
@@ -2703,6 +2703,8 @@ EU_ITEMS = [("fewer_less", "There were ___ people at the meeting than last year.
 
 def load_en_usage(lang, n, seed):
     rows = EU_ITEMS[:min(n or len(EU_ITEMS), len(EU_ITEMS))]
+    # the gold option comes first in every other item, so "always the first" scores 50 %
+    rows = [(k, sent, opts if (opts[0] == g) == (i % 2 == 0) else opts[::-1], g) for i, (k, sent, opts, g) in enumerate(rows)]
     return [{"id": str(i), "lang": "en", "gold": g, "opts": opts, "kind": k,
              "messages": [{"role": "user", "content": f"Fill the gap with {opts[0]} or {opts[1]} (formal written English). "
                            f"Answer with that word only.\n\n{sent}"}]}

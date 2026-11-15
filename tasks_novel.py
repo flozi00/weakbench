@@ -5079,11 +5079,13 @@ PW_SPLIT = {"en": ["{k} painters paint a fence in {t} minutes. How many minutes 
                    "{k} Umzugshelfer räumen eine Wohnung in {t} Minuten leer. Wie viele Minuten brauchen {m} gleich schnelle Helfer für dieselbe Wohnung?"]}
 PW_FIXED = {"en": ["{k} shirts hung side by side on a long line dry in the sun in {t} minutes. How many minutes do {m} shirts take, "
                    "also side by side on the same long line?",
-                   "{k} eggs boil hard in one large pot in {t} minutes. How many minutes do {m} eggs take in the same pot, all at once?",
+                   "{k} eggs boil hard in one large pot of boiling water in {t} minutes. How many minutes do {m} eggs take in the same pot, "
+                   "all at once, with the water kept boiling?",
                    "A band of {k} musicians plays a song in {t} minutes. How many minutes does a band of {m} musicians take for the same song?"],
             "de": ["{k} Hemden, nebeneinander auf einer langen Leine, trocknen in der Sonne in {t} Minuten. Wie viele Minuten brauchen "
                    "{m} Hemden, ebenfalls nebeneinander auf derselben langen Leine?",
-                   "{k} Eier werden in einem großen Topf in {t} Minuten hart. Wie viele Minuten brauchen {m} Eier im selben Topf, alle gleichzeitig?",
+                   "{k} Eier werden in einem großen Topf mit kochendem Wasser in {t} Minuten hart. Wie viele Minuten brauchen {m} Eier im "
+                   "selben Topf, alle gleichzeitig, wenn das Wasser weiter kocht?",
                    "Eine Band aus {k} Musikern spielt ein Lied in {t} Minuten. Wie viele Minuten braucht eine Band aus {m} Musikern für dasselbe Lied?"]}
 
 
@@ -5093,11 +5095,13 @@ def load_parallel_work(lang, n, seed):
         r = rng_of("parallel_work", i)
         split = i % 2 == 0
         k, m = r.sample([2, 3, 4, 5, 6, 8], 2)
-        t = k * m * r.choice([2, 3, 5])  # t*k/m stays whole
-        tpl = (PW_SPLIT if split else PW_FIXED)[lang][(i // 2) % 3]
-        prop = t * k // m
-        gold = prop if split else t
-        bait = t * m // k if split else prop  # split: the direct (not inverse) proportion; fixed: the proportional answer
+        j = (i // 2) % 3
+        # split: t*k/m stays whole; fixed: a realistic duration per template (shirts, eggs, a song)
+        t = k * m * r.choice([2, 3, 5]) if split else [r.randrange(60, 181, 10), r.randint(8, 12), r.randint(3, 6)][j]
+        tpl = (PW_SPLIT if split else PW_FIXED)[lang][j]
+        prop = t * k / m
+        gold = int(prop) if split else t
+        bait = t * m / k if split else prop  # split: the direct (not inverse) proportion; fixed: the proportional answer
         items.append({"id": str(i), "lang": lang, "gold": gold, "split": split, "bait": bait,
                       "messages": [{"role": "user", "content": tpl.format(k=k, t=t, m=m) + "\n" + ASK[lang]}]})
     return items
@@ -5107,7 +5111,9 @@ def score_parallel_work(item, reply):
     v = answer_value(final_answer(reply["content"]), item["lang"])
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
-            "detail": {"ok_split" if item["split"] else "ok_fixed": float(ok), "took_proportion": float(v == item["bait"])}}
+            "detail": {"ok_split" if item["split"] else "ok_fixed": float(ok),
+                       "took_direct" if item["split"] else "took_proportion":
+                           float(v is not None and abs(v - item["bait"]) < 0.51)}}
 
 
 # ---------------------------------------------------------------- table_qa

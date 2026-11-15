@@ -6375,8 +6375,13 @@ def load_regex_eval(lang, n, seed):
     for i in range(n or 120):
         r = rng_of("regex_eval", i)
         pat = RE_PATTERNS[i % len(RE_PATTERNS)]
+        lit = set(re.sub(r"\\[dwbs]|[^a-z0-9@.!-]", "", pat.lower()))
+        pool = sorted(set(RE_POOL))
+        near = [c for c in pool if len(set(c.lower()) & lit) >= 2 or (lit <= {"."} and len(c) <= 4)]  # look-alikes of the pattern
         while True:
-            cands = r.sample(sorted(set(RE_POOL)), 6)
+            cands = r.sample(near, min(5, len(near))) if len(near) >= 5 else list(near)
+            cands += r.sample([c for c in pool if c not in cands], 6 - len(cands))
+            r.shuffle(cands)
             hits = [c for c in cands if re.search(pat, c)]
             if 1 <= len(hits) <= 4:
                 break

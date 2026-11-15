@@ -3044,6 +3044,38 @@ def score_de_direct_speech(item, reply):
             "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_dependent_preps (preposition after a verb/adjective)
+# (sentence, gold, German calque, other wrong option). German learners say "interested for", "depend from", "proud on".
+DP_ITEMS2 = [("She is very interested ___ modern art.", "in", "for", "on"), ("It all depends ___ the weather.", "on", "from", "of"),
+             ("He is proud ___ his daughter.", "of", "on", "for"), ("The team consists ___ five engineers.", "of", "from", "in"),
+             ("She insisted ___ paying the bill.", "on", "for", "at"), ("Who is responsible ___ this project?", "for", "of", "to"),
+             ("My brother is good ___ chess.", "at", "in", "on"), ("She is married ___ a doctor.", "to", "with", "by"),
+             ("I am afraid ___ spiders.", "of", "from", "for"), ("We arrived ___ the airport at noon.", "at", "on", "to"),
+             ("He apologised ___ the delay.", "for", "about", "of"), ("This book is different ___ the film.", "from", "of", "as"),
+             ("They are waiting ___ the bus.", "for", "on", "of"), ("I am looking forward ___ the holidays.", "to", "on", "for"),
+             ("She congratulated him ___ his new job.", "on", "to", "for"), ("He suffers ___ hay fever.", "from", "under", "of"),
+             ("We are aware ___ the risks.", "of", "about", "over"), ("The price includes breakfast; it is similar ___ last year's.", "to", "with", "as"),
+             ("She specialises ___ tax law.", "in", "on", "at"), ("Don't laugh ___ him.", "at", "about", "over")]
+
+
+def load_en_dependent_preps(lang, n, seed):
+    out = []
+    for i, (sent, gold, calque, other) in enumerate(DP_ITEMS2[:min(n or 20, 20)]):
+        opts = [gold, calque, other]
+        random.Random(f"en_dependent_preps:{i}").shuffle(opts)
+        out.append({"id": str(i), "lang": "en", "gold": gold, "calque": calque, "opts": opts,
+                    "messages": [{"role": "user", "content": f"Fill the gap with {', '.join(opts[:-1])} or {opts[-1]} (standard English). "
+                                  f"Answer with that word only.\n\n{sent}"}]})
+    return out
+
+
+def score_en_dependent_preps(item, reply):
+    w = [x for x in re.findall(r"[a-z]+", (reply["content"] or "").lower()) if x in item["opts"]]
+    v = w[0] if len(set(w)) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"took_calque": float(v == item["calque"])}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3368,6 +3400,7 @@ TASKS = {
     "de_ersatzinfinitiv": task(("de",), load_de_ersatzinfinitiv, score_de_ersatzinfinitiv, 96, 20, lang_check=False),
     "en_irregular": task(("en",), load_en_irregular, score_en_irregular, 16, 32, lang_check=False),
     "de_direct_speech": task(("de",), load_de_direct_speech, score_de_direct_speech, 64, 16, lang_check=False),
+    "en_dependent_preps": task(("en",), load_en_dependent_preps, score_en_dependent_preps, 16, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

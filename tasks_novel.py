@@ -5321,7 +5321,7 @@ def score_split_bill(item, reply):
 ER_LINES = {"en": ["In {y} the club had {a} members.", "The library bought {a} new books in {y}.", "Since {y}, {a} trees were planted.",
                    "The bakery sold {a} loaves on the day it opened in {y}.", "In {y}, {a} people visited the fair."],
             "de": ["Im Jahr {y} hatte der Verein {a} Mitglieder.", "Die Bibliothek kaufte im Jahr {y} insgesamt {a} neue Bücher.",
-                   "Seit {y} wurden {a} Bäume gepflanzt.", "Die Bäckerei verkaufte {a} Brote, als sie {y} eröffnete.",
+                   "Seit {y} wurden {a} Bäume gepflanzt.", "Die Bäckerei verkaufte am Tag ihrer Eröffnung im Jahr {y} genau {a} Brote.",
                    "Im Jahr {y} besuchten {a} Menschen die Messe."]}
 ER_RULE = {"double": ("Double every number in this text, but leave years unchanged.", "Verdopple jede Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a * 2),
            "plus": ("Add 15 to every number in this text, but leave years unchanged.", "Addiere 15 zu jeder Zahl in diesem Text, aber lass Jahreszahlen unverändert.", lambda a: a + 15),
@@ -5354,9 +5354,12 @@ def load_edit_rule(lang, n, seed):
 
 def score_edit_rule(item, reply):
     body = re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", reply["content"] or "")  # 1.732 / 1,732
-    got = [int(x) for x in re.findall(r"\d+", body)]
-    got = got[-len(item["nums"]):] if len(got) >= len(item["nums"]) else got
-    ok = got == item["nums"]
+    body = re.sub(r"(?<!\d)(\d)[\u202f\u00a0 ](?=\d{3}\b)", r"\1", body)  # 1 732 (amounts stay below 10 000)
+    allnums = [int(x) for x in re.findall(r"\d+", body)]
+    want, k = item["nums"], len(item["nums"])
+    runs = [allnums[j:j + k] for j in range(len(allnums) - k + 1)]
+    ok = want in runs  # the rewritten text anywhere in the reply; a preface or a closing note with numbers is fine
+    got = want if ok else allnums[-k:]
     broke = any(y not in got for y in item["years"])
     return {"correct": ok, "score": float(ok), "pred": " ".join(map(str, got)), "gold": item["gold"],
             "detail": {f"ok_rule_{item['rule']}": float(ok), "broke_exception": float(broke)}}
@@ -5381,7 +5384,7 @@ def load_csv_field(lang, n, seed):
             csv.writer(buf, lineterminator="\n").writerows([head] + rows)
             text = buf.getvalue()
             k = r.randrange(4)
-            col = r.choice([2, 3, 4])  # after the note column the naive split shifts
+            col = r.choice([3, 4])  # the note and what follows it: there the naive split shifts
             line = text.splitlines()[k + 1]
             naive = line.split(",")
             gold = rows[k][col]
@@ -5399,8 +5402,9 @@ def load_csv_field(lang, n, seed):
 
 
 def score_csv_field(item, reply):
-    lines = re.findall(r"(?:Answer|Antwort)\s*\**\s*:\s*(.+)", reply["content"] or "")  # raw: final_answer strips quotes
+    lines = re.findall(r"(?:Answer|Antwort)\s*\**\s*[:\-–]\s*(.+)", reply["content"] or "", re.I)  # raw: final_answer strips quotes
     v = re.sub(r"^\**|\**$", "", lines[-1].strip()).strip().strip("`").strip() if lines else ""
+    v = re.sub(r"(?<=[\w\"”])\.$", "", v)  # "Answer: 344."
     norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()  # noqa: E731
     forms = {v}
     if len(v) >= 2 and v[0] in '"“„' and v[-1] in '"“”':

@@ -3441,6 +3441,52 @@ def score_de_position_verbs(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_vorfeld (verb second after a fronted phrase)
+# (sentence, phrase to put first, finite verb). English speakers and many models write "Morgen Anna fährt ...".
+VF_ITEMS = [("Anna fährt morgen mit dem Zug nach Hamburg.", "morgen", "fährt"),
+            ("Anna fährt morgen mit dem Zug nach Hamburg.", "mit dem Zug", "fährt"),
+            ("Wir haben das Problem gestern endlich gelöst.", "gestern", "haben"),
+            ("Wir haben das Problem gestern endlich gelöst.", "das Problem", "haben"),
+            ("Der Techniker repariert die Heizung am Montag.", "am Montag", "repariert"),
+            ("Der Techniker repariert die Heizung am Montag.", "die Heizung", "repariert"),
+            ("Meine Schwester kann leider nicht kommen.", "leider", "kann"),
+            ("Die Kinder spielen nach der Schule im Park.", "nach der Schule", "spielen"),
+            ("Die Kinder spielen nach der Schule im Park.", "im Park", "spielen"),
+            ("Ich habe den Brief schon vor einer Woche abgeschickt.", "vor einer Woche", "habe"),
+            ("Der Chef will das Projekt wegen der Kosten verschieben.", "wegen der Kosten", "will"),
+            ("Das Restaurant öffnet um sieben Uhr seine Türen.", "um sieben Uhr", "öffnet"),
+            ("Er hat seinem Bruder zum Geburtstag ein Fahrrad geschenkt.", "seinem Bruder", "hat"),
+            ("Er hat seinem Bruder zum Geburtstag ein Fahrrad geschenkt.", "zum Geburtstag", "hat"),
+            ("Sie liest abends gern Krimis.", "abends", "liest"),
+            ("Wir müssen trotz des Regens zur Arbeit fahren.", "trotz des Regens", "müssen"),
+            ("Die Stadt baut im nächsten Jahr eine neue Brücke.", "im nächsten Jahr", "baut"),
+            ("Mein Vater trinkt jeden Morgen zwei Tassen Kaffee.", "jeden Morgen", "trinkt"),
+            ("Ihr könnt die Fahrräder in den Hof stellen.", "in den Hof", "könnt"),
+            ("Der Zug kommt wegen eines Unfalls später an.", "wegen eines Unfalls", "kommt")]
+
+
+def load_de_vorfeld(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": f"{phr[0].upper() + phr[1:]} {verb} ...", "src": sent, "phrase": phr, "verb": verb,
+             "messages": [{"role": "user", "content": f"Stelle den Satz so um, dass „{phr}“ am Satzanfang steht. Verwende genau dieselben "
+                           f"Wörter. Antworte nur mit dem Satz.\n\n{sent}"}]}
+            for i, (sent, phr, verb) in enumerate(VF_ITEMS[:min(n or 20, 20)])]
+
+
+def score_de_vorfeld(item, reply):
+    words = lambda t: re.findall(r"[a-zäöüß]+", t.lower())  # noqa: E731
+    lines = [x for x in (reply["content"] or "").splitlines() if x.strip()]
+    want = sorted(words(item["src"]))
+    line = next((x for x in lines if sorted(words(x)) == want), lines[0] if lines else "")
+    w = words(line)
+    pw = words(item["phrase"])
+    same = sorted(w) == want
+    first = w[:len(pw)] == pw
+    second = w[len(pw):len(pw) + 1] == [item["verb"]]
+    ok = same and first and second
+    return {"correct": ok, "score": float(ok), "pred": line[:100], "gold": item["gold"],
+            "detail": {"same_words": float(same), "phrase_first": float(first), "verb_second": float(second)}}
+
+
 # ---------------------------------------------------------------- en_reported (reported speech with backshift)
 # "Anna said: 'I am tired.'" -> "Anna said (that) she was tired." Present -> past, will -> would, can -> could,
 # present perfect -> past perfect, past -> past perfect; first person -> third. Scored on the backshifted verb.
@@ -3774,6 +3820,7 @@ TASKS = {
     "en_gerund_inf": task(("en",), load_en_gerund_inf, score_en_gerund_inf, 16, 20, lang_check=False),
     "mirror_language": task(("de", "en"), load_mirror_language, score_mirror_language, 256, 20, lang_check=False),
     "de_position_verbs": task(("de",), load_de_position_verbs, score_de_position_verbs, 16, 20, lang_check=False),
+    "de_vorfeld": task(("de",), load_de_vorfeld, score_de_vorfeld, 96, 20, lang_check=False),
     "time_prep": task(("de", "en"), load_time_prep, score_time_prep, 16, 40, lang_check=False),
     "en_reported": task(("en",), load_en_reported, score_en_reported, 128, 32, lang_check=False),
     "de_plural_adj": task(("de",), load_de_plural_adj, score_de_plural_adj, 16, 40, lang_check=False),

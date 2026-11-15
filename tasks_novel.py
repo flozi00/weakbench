@@ -6559,7 +6559,11 @@ def load_board_moves(lang, n, seed):
         while True:
             f, rk = r.randrange(8), r.randrange(8)
             blockers = set()
-            if with_block:
+            if with_block and piece == "king":  # neighbours: one far-away piece would leave 7 most of the time
+                around = [(f + a, rk + b) for a in (-1, 0, 1) for b in (-1, 0, 1) if (a, b) != (0, 0)
+                          and 0 <= f + a < 8 and 0 <= rk + b < 8]
+                blockers = set(r.sample(around, min(len(around), r.randint(1, 4))))
+            elif with_block:
                 while len(blockers) < r.randint(1, 3):
                     b = (r.randrange(8), r.randrange(8))
                     if b != (f, rk):

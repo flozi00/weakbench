@@ -716,6 +716,7 @@ def test_i18n_strings():
     good = "\n".join(gold[s] for s in x["src"])
     assert tl.score_i18n_strings(x, {"content": good})["correct"]
     broken = tl.I18N_TOKEN.sub("", good, count=1)  # one placeholder or tag lost
+    assert tl.score_i18n_strings(x, {"content": "Hier die Übersetzung:\n" + good})["correct"]
     assert not tl.score_i18n_strings(x, {"content": broken})["correct"]
 
 

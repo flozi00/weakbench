@@ -2556,7 +2556,15 @@ I18N = [("Welcome back, {name}! You have {count} new messages.", "Willkommen zur
         ("{user} shared {count} photos with you.", "{user} hat {count} Fotos mit dir geteilt."),
         ("Could not connect to %s. Retrying in %d seconds.", "Keine Verbindung zu %s. Neuer Versuch in %d Sekunden."),
         ("<b>Warning:</b> {file} is larger than {limit} MB.", "<b>Warnung:</b> {file} ist größer als {limit} MB."),
-        ("Last login: {date} from {ip}.", "Letzte Anmeldung: {date} von {ip}.")]
+        ("Last login: {date} from {ip}.", "Letzte Anmeldung: {date} von {ip}."),
+        ("{count} items in your <b>cart</b>.", "{count} Artikel in deinem <b>Warenkorb</b>."),
+        ("Saved %s at %s.", "%s um %s gespeichert."),
+        ("Hi {name}, your password expires in {days} days.", "Hallo {name}, dein Passwort läuft in {days} Tagen ab."),
+        ("Use <kbd>Ctrl</kbd> + <kbd>S</kbd> to save.", "Mit <kbd>Ctrl</kbd> + <kbd>S</kbd> speicherst du."),
+        ("Uploading %d of %d files...", "Lade %d von %d Dateien hoch ..."),
+        ("<i>{author}</i> commented on your post.", "<i>{author}</i> hat deinen Beitrag kommentiert."),
+        ("Order #{id} has shipped.", "Bestellung #{id} wurde versendet."),
+        ("No results for <b>{query}</b>.", "Keine Ergebnisse für <b>{query}</b>.")]
 I18N_TOKEN = re.compile(r"\{\w+\}|%[ds]|</?\w+(?:\s+[^>]*)?>")
 
 
@@ -2580,9 +2588,11 @@ def score_i18n_strings(item, reply):
     import collections as _c
     text = re.sub(r"^```\w*\s*|```\s*$", "", (reply["content"] or "").strip(), flags=re.M)
     lines = [re.sub(r"^\s*(?:\d+[.)]|[-*])\s*", "", x).strip() for x in text.splitlines() if x.strip()]
+    lines = [x for x in lines if I18N_TOKEN.search(x)]  # every source string has a token: drops "Hier die Übersetzung:"
     tok_ok = len(lines) >= len(item["src"]) and all(
         _c.Counter(I18N_TOKEN.findall(out)) == _c.Counter(I18N_TOKEN.findall(src)) for out, src in zip(lines, item["src"]))
-    kbd_ok = all(("Enter" in out) == ("Enter" in src) for out, src in zip(lines, item["src"]))
+    kbd_ok = all(bool(re.search(r"\bEnter\b", out)) == bool(re.search(r"\bEnter\b", src))
+                 for out, src in zip(lines, item["src"]))
     plain = I18N_TOKEN.sub(" ", " ".join(lines))
     lang_ok = common.lang_ok(plain, item["lang"], min_words=8) is not False
     ok = tok_ok and kbd_ok and lang_ok

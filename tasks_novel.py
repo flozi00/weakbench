@@ -4351,7 +4351,7 @@ def load_interval_math(lang, n, seed):
     for i in range(n or 120):
         r = rng_of("interval_math", i)
         kind = IM_KIND[i % 3]
-        a1 = r.randint(40, 90)
+        a1 = r.randint(5, 90) if i % 4 == 0 else r.randint(40, 90)  # every fourth item can go negative
         a2 = a1 + r.randint(5, 30)
         b1 = r.randint(5, 30)
         b2 = b1 + r.randint(3, 15)
@@ -4387,7 +4387,13 @@ def im_values(line):
 
 def score_interval_math(item, reply):
     from fractions import Fraction as F
-    line = final_answer(reply["content"]) or ""
+    line = (final_answer(reply["content"]) or "").replace("−", "-")
+    lab = re.search(r"min\w*\s*[:=]?\s*(-?[\d/.,]+).*?max\w*\s*[:=]?\s*(-?[\d/.,]+)", line, re.I)
+    if lab:  # "min = 7/3 ≈ 2.33, max = 9/2": the first value after each label
+        line = f"{lab.group(1)} / {lab.group(2)}"
+    single = re.fullmatch(r"\s*(-?\d+)/(-?\d+)\s*\.?", line)
+    if single:  # "22/50" without spaces is min/max, not a fraction
+        line = f"{single.group(1)} / {single.group(2)}"
     parts = re.split(r"\s+/\s+|\s+(?:to|bis|und|and)\s+|\s*[–—]\s*|;", line)  # "min / max", "3 bis 8"
     vals = [v for p in parts for v in im_values(p)[:1]]
     if len(vals) < 2:  # "min 22, max 50": no separator, take the numbers in order

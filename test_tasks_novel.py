@@ -1285,6 +1285,8 @@ def test_interval_math():
         assert tn.score_interval_math(x, {"content": f"Antwort: {x['lo']} / {x['hi']}"})["correct"], x["gold"]
         if x["kind"] != "quot":
             assert tn.score_interval_math(x, {"content": f"Antwort: min {x['lo']}, max {x['hi']}"})["correct"]
+        if x["kind"] != "quot":
+            assert tn.score_interval_math(x, {"content": f"Antwort: {x['lo']}/{x['hi']}".replace("-", "−")})["correct"]
         if x["kind"] == "quot":
             lo, hi = F(x["lo"]), F(x["hi"])
             assert tn.score_interval_math(x, {"content": f"Antwort: {float(lo):.3f} bis {float(hi):.3f}".replace(".", ",")})["correct"]

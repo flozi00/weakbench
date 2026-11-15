@@ -829,3 +829,16 @@ def test_mirror_language():
 
 if __name__ == "__main__":
     test_mirror_language()
+
+
+def test_de_vorfeld():
+    import tasks_lang as tl
+    xs = tl.load_de_vorfeld("de", None, 0)
+    ok = lambda i, t: tl.score_de_vorfeld(xs[i], {"content": t})["correct"]  # noqa: E731
+    assert ok(0, "Morgen fährt Anna mit dem Zug nach Hamburg.") and not ok(0, "Morgen Anna fährt mit dem Zug nach Hamburg.")
+    assert ok(6, "Leider kann meine Schwester nicht kommen.") and not ok(6, "Leider meine Schwester kann nicht kommen.")
+    assert not ok(0, "Morgen fährt Anna nach Hamburg.")  # a word dropped
+
+
+if __name__ == "__main__":
+    test_de_vorfeld()

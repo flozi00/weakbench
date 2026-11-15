@@ -9305,7 +9305,10 @@ def load_grid_paths(lang, n, seed):
 
 
 def score_grid_paths(item, reply):
-    v = stated_int(reply, r"(?:paths?|wege?|ways?|möglichkeit)")
+    unit = r"(?:paths?|wege?|ways?|möglichkeit)"
+    fa = re.sub(r"\d+\s*[x×]\s*\d+", " ", final_answer(reply["content"]) or "")  # "in a 3 × 5 grid": dimensions are no answer
+    m = re.search(rf"(\d+)\s*(?:different\s+|verschiedene\s+)?{unit}", fa, re.I)
+    v = int(m[1]) if m else stated_int({**reply, "content": "Answer: " + fa}, unit)
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ignored_blocks": float(v == item["bait"])}}
 

@@ -1366,7 +1366,7 @@ GROUPS = {
               "prob_fallacies", "sunk_cost", "regression_mean"],
     "generalization": ["rule_induction", "invented_ops", "mini_language", "arith_length", "nesting_depth", "grid_transform",
                        "blocks_plan", "regex_synth", "unit_chain", "cipher", "prop_logic", "causal_graph", "knapsack",
-                       "maze_path", "reversal", "char_ops", "off_by_one", "rephrase_consistency", "continuity_error",
+                       "maze_path", "reversal", "char_ops", "off_by_one", "rephrase_consistency", "continuity_error", "grid_paths",
                        "alien_sort"],
     "de_grammar": ["de_case", "de_verbs", "de_commas", "de_homophones", "de_reported", "de_separable", "de_compound_gender",
                    "de_relative", "de_grammar_fix", "agreement_attractor", "wug", "time_prep", "tense_order",

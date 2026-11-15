@@ -2095,6 +2095,7 @@ def test_grid_paths():
             cnt += ok
         assert cnt == x["gold"], (cnt, x["gold"])
     assert tn.score_grid_paths(xs[0], {"content": f"Answer: {xs[0]['gold']} paths"})["correct"]
+    assert tn.score_grid_paths(xs[0], {"content": f"Answer: In a 3 × 5 grid, {xs[0]['gold']} paths"})["correct"]
 
 
 if __name__ == "__main__":

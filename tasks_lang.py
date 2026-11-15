@@ -2549,11 +2549,11 @@ DC_ITEMS = [("nominal", "Beim Laufen höre ich gern Musik."), ("nominal", "Wir w
             ("nominal", "Das Schöne an diesem Job ist die Freiheit."), ("nominal", "Er hat sich zum Lernen in die Bibliothek gesetzt."),
             ("nominal", "Sie hat etwas Wichtiges vergessen."), ("nominal", "Das Rauchen ist hier verboten."),
             ("time", "Wir treffen uns heute Abend am Bahnhof."), ("time", "Am Montagabend habe ich keine Zeit."),
-            ("time", "Montags gehe ich immer schwimmen."), ("time", "Er kommt morgen früh mit dem Zug."),
+            ("time", "Montags gehe ich immer schwimmen."), ("time", "Er kommt am Dienstagmorgen mit dem Zug."),
             ("time", "Gestern Mittag war es sehr heiß."), ("time", "Abends lese ich meistens ein Buch."),
             ("address", "Können Sie mir bitte helfen, Frau Weber?"), ("address", "Ich habe Ihnen die Unterlagen geschickt."),
             ("address", "Anna sagt, sie kommt später."), ("address", "Haben Sie Ihren Schlüssel gefunden?"),
-            ("nominal", "Er ist der Erste, der angekommen ist."), ("time", "Seit Langem habe ich nicht mehr so gelacht.")]
+            ("nominal", "Er ist der Erste, der angekommen ist."), ("address", "Wir wünschen Ihnen und Ihrer Familie schöne Feiertage.")]
 
 
 def load_de_capitals(lang, n, seed):

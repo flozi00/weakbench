@@ -8914,11 +8914,12 @@ def load_geo_coords(lang, n, seed):
                           "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
         else:  # city
             cc = r.choice(sorted({c[2] for c in g["big_cities"]}))  # a country first: big cities are mostly Chinese and Indian
-            la, lo, cc, _, names = r.choice([c for c in g["big_cities"] if c[2] == cc])
+            la, lo, cc, _, names, near, de_name = r.choice([c for c in g["big_cities"] if c[2] == cc])
+            names = names + [de_name] + near  # a big neighbour within 30 km counts too (Soweto -> Johannesburg)
             coord = _geo_fmt(la, lo, r.randrange(3))
             q = (f"Which city lies at these coordinates (latitude, longitude)? Name the city.\n{coord}" if lang == "en" else
                  f"Welche Stadt liegt bei diesen Koordinaten (Breite, Länge)? Nenne die Stadt.\n{coord}")
-            items.append({"id": str(i), "lang": lang, "kind": "city", "gold": names[0], "names": names, "cc": cc,
+            items.append({"id": str(i), "lang": lang, "kind": "city", "gold": de_name if lang == "de" else names[0], "names": names, "cc": cc,
                           "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
@@ -8964,7 +8965,8 @@ def load_geo_locate(lang, n, seed):
             b = r.choice(by_cc[r.choice([c for c in ccs if c != a[2]])])
             if (kind != "distance" or _km(a, b) >= 300) and (kind != "north" or abs(a[0] - b[0]) >= 3):
                 break
-        A, B = f"{a[4][0]} ({names(a[2])})", f"{b[4][0]} ({names(b[2])})"
+        disp = lambda c: c[6] if lang == "de" else c[4][0]  # noqa: E731  German exonyms (Kairo, Peking) in the de cell
+        A, B = f"{disp(a)} ({names(a[2])})", f"{disp(b)} ({names(b[2])})"
         if kind == "coords":
             q = (f"Give the approximate coordinates of {A} as decimal latitude and longitude, e.g. \"48.1, 11.6\" (south and west "
                  f"negative)." if lang == "en" else
@@ -8978,32 +8980,45 @@ def load_geo_locate(lang, n, seed):
         else:
             q = (f"Which city lies further north: {A} or {B}?" if lang == "en" else
                  f"Welche Stadt liegt weiter nördlich: {A} oder {B}?")
-            gold = (a if a[0] > b[0] else b)[4][0]
+            gold = disp(a if a[0] > b[0] else b)
         items.append({"id": str(i), "lang": lang, "kind": kind, "gold": gold, "a": list(a[:2]), "b": list(b[:2]),
-                      "na": a[4], "nb": b[4], "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+                      "na": a[4] + [a[6]], "nb": b[4] + [b[6]], "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_geo_locate(item, reply):
-    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    raw = final_answer(reply["content"]) or ""
+    fa = re.sub(r"\([^()]*\)", " ", raw)
     if item["kind"] == "coords":
+        fa = fa if re.search(r"\d", fa) else raw  # "(30.04, 31.24)"
+        fa = re.sub(r"(\d+)\s*°\s*(\d+)\s*['′](?:\s*(\d+(?:[.,]\d+)?)\s*[\"″])?",  # DMS -> decimal degrees
+                    lambda m: f"{int(m[1]) + int(m[2]) / 60 + float((m[3] or '0').replace(',', '.')) / 3600:.4f}°", fa)
         vals = [(float(m.group(1).replace(",", ".").replace("−", "-")), m.group(2)) for m in
                 re.finditer(r"([-−]?\d+(?:[.,]\d+)?)\s*°?\s*([NSOWE])?\b", fa)][:2]
         if len(vals) < 2:
             return {"correct": False, "score": 0.0, "pred": fa[:40], "gold": item["gold"], "detail": {"ok_coords": 0.0, "km_off": None}}
+        if vals[0][1] in ("E", "O", "W") and vals[1][1] in ("N", "S"):
+            vals = vals[::-1]  # "31.24 E, 30.04 N"
         (la, h1), (lo, h2) = vals
         la, lo = (-abs(la) if h1 == "S" else la), (-abs(lo) if h2 == "W" else lo)
         d = _km(item["a"], (la, lo))
         sc = 1.0 if d <= 50 else 0.5 if d <= 200 else 0.0
         return {"correct": sc == 1.0, "score": sc, "pred": f"{la}, {lo}", "gold": item["gold"], "detail": {"ok_coords": sc, "km_off": round(d)}}
     if item["kind"] == "distance":
-        v = answer_value(re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", fa), item["lang"])
+        t = re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", fa)
+        m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:km|kilomet)", re.sub(r"(?<=\d)[.,](?=\d{3}\b)", "", raw), re.I)  # "1,550 miles (2,500 km)"
+        v = answer_value(m[1], item["lang"]) if m else answer_value(t, item["lang"])
         ok = v is not None and abs(v - item["gold"]) <= 0.1 * item["gold"]
         return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_distance": float(ok)}}
     has = lambda ns: any(re.search(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I) for x in ns)  # noqa: E731
-    hits = [ns[0] for ns in (item["na"], item["nb"]) if has(ns)]
-    ok = hits == [item["gold"]]
-    return {"correct": ok, "score": float(ok), "pred": hits, "gold": item["gold"], "detail": {"ok_north": float(ok)}}
+    pos = {ns[-1]: min(m.start() for x in ns for m in re.finditer(rf"(?<!\w){re.escape(x)}(?!\w)", fa, re.I))
+           for ns in (item["na"], item["nb"]) if has(ns)}
+    pick = min(pos, key=pos.get) if pos else None  # "Berlin lies further north than Lima": the first named
+    if len(pos) == 2 and re.search(r"(?i)south|süd", fa):
+        pick = max(pos, key=pos.get)  # "Lima liegt südlicher als Berlin"
+    gold_set = item["na"] if item["gold"] in item["na"] else item["nb"]
+    ok = pick == gold_set[-1]
+    return {"correct": ok, "score": float(ok), "pred": pick, "gold": item["gold"], "detail": {"ok_north": float(ok)}}
 
 
 # ---------------------------------------------------------------- table_qa

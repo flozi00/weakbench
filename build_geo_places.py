@@ -39,16 +39,35 @@ pool_country = []
 for cc, lst in sorted(towns.items()):
     lst = sorted(lst, key=lambda x: (x[0], x[1]))
     pool_country += [(la, lo, c, p) for la, lo, c, p, _ in r.sample(lst, min(8, len(lst)))]
-big = sorted([x for x in rows if x[3] >= 1_500_000], key=lambda x: -x[3])
+GEO_DE = {"Cairo": "Kairo", "Moscow": "Moskau", "Beijing": "Peking", "Tokyo": "Tokio", "Mexico City": "Mexiko-Stadt",
+          "Cape Town": "Kapstadt", "Tehran": "Teheran", "Riyadh": "Riad", "Kyiv": "Kiew", "Bucharest": "Bukarest", "Warsaw": "Warschau",
+          "Vienna": "Wien", "Saint Petersburg": "Sankt Petersburg", "Addis Ababa": "Addis Abeba", "Rome": "Rom", "Milan": "Mailand",
+          "Munich": "München", "Cologne": "Köln", "Lisbon": "Lissabon", "Athens": "Athen", "Brussels": "Brüssel", "Prague": "Prag",
+          "Copenhagen": "Kopenhagen", "Seoul": "Seoul", "New Delhi": "Neu-Delhi", "Bogotá": "Bogotá", "Havana": "Havanna"}
 import math
 def km(a, b):
     return 6371 * math.acos(min(1, math.sin(math.radians(a[0])) * math.sin(math.radians(b[0])) +
                                 math.cos(math.radians(a[0])) * math.cos(math.radians(b[0])) * math.cos(math.radians(a[1] - b[1]))))
+# well-known big cities: 1.5M+ with many names (fame), and a capital or a top-3 city of its country; no duplicates
+feat = {}
+for ln in open("geo_dl/cities15000.txt", encoding="utf-8"):
+    f = ln.split("\t")
+    feat[(round(float(f[4]), 3), round(float(f[5]), 3))] = f[7]
+cand = sorted([x for x in rows if x[3] >= 1_500_000 and len(x[4]) >= 20], key=lambda x: -x[3])
+rank = {}
+big, seen = [], set()
+for x in cand:
+    rank[x[2]] = rank.get(x[2], 0) + 1
+    if (rank[x[2]] <= 3 or feat.get(x[:2]) == "PPLC") and x[4][0] not in seen and x[4][0] not in ("Brooklyn", "Queens"):
+        seen.add(x[4][0])
+        big.append(x)
+primaries = {x[4][0].lower() for x in rows if x[3] >= 300_000}
 large = [x for x in rows if x[3] >= 300_000]
 pool_city = []
-for la, lo, c, p, nm in big:  # a neighbouring big city within 30 km counts too (Soweto -> Johannesburg)
-    near = [y for y in large if y[4][0] != nm[0] and km((la, lo), y[:2]) <= 30]
-    pool_city.append((la, lo, c, p, nm[:1] + [n for n in nm[1:]] + [n for y in near for n in y[4][:2]]))
+for la, lo, c, p, nm in big:
+    names = [nm[0]] + [n for n in nm[1:] if n.lower() not in primaries]  # no other city as an alias (Giza is not Cairo)
+    near = [y[4][0] for y in large if y[4][0] != nm[0] and km((la, lo), y[:2]) <= 30]  # accepted for geo_coords only
+    pool_city.append((la, lo, c, p, names, near, GEO_DE.get(nm[0], nm[0])))
 out = {"countries": C, "decoys": DECOYS, "country_points": pool_country, "big_cities": pool_city}
 s = repr(out)
 open("wbdata/sets/tasks_novel.GEO_PLACES.py", "w", encoding="utf-8").write(s)

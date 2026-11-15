@@ -1962,6 +1962,15 @@ def test_geo_locate():
     assert tn.score_geo_locate(d, {"content": f"Answer: about {round(d['gold'] * 1.05):,} km"})["correct"]
     nth = next(x for x in xs if x["kind"] == "north")
     assert tn.score_geo_locate(nth, {"content": f"Answer: {nth['gold']}"})["correct"]
+    other = (nth["nb"] if nth["gold"] in nth["na"] else nth["na"])[0]
+    assert tn.score_geo_locate(nth, {"content": f"Answer: {nth['gold']} lies further north than {other}"})["correct"]
+    assert tn.score_geo_locate(nth, {"content": f"Answer: {other} lies further south than {nth['gold']}"})["correct"]
+    assert tn.score_geo_locate(c, {"content": f"Answer: ({la:.2f}, {lo:.2f})"})["score"] == 1.0
+    dm = lambda v: f"{int(abs(v))}°{int(abs(v) * 60 % 60):02d}′"  # noqa: E731
+    assert tn.score_geo_locate(c, {"content": f"Answer: {dm(la)}{'N' if la >= 0 else 'S'} {dm(lo)}{'E' if lo >= 0 else 'W'}"})["score"] == 1.0
+    assert tn.score_geo_locate(d, {"content": f"Answer: 99 miles ({d['gold']} km)"})["correct"]
+    de = [x for x in tn.load_geo_locate("de", None, 0)]
+    assert not any("Cairo" in x["messages"][0]["content"] for x in de)
 
 
 if __name__ == "__main__":

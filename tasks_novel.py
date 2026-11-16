@@ -10613,7 +10613,7 @@ def score_lights_out(item, reply):
 
 
 # ---------------------------------------------------------------- paper_punch
-# A square sheet marked as a 4x4 grid (columns A-D left to right, rows 1-4 top to bottom) is folded in half 2-3 times
+# A square sheet marked as a 4x4 grid (columns A-D left to right, rows 1-4 top to bottom) is folded in half 1-3 times
 # (left onto right, top onto bottom, ...), a hole is punched through all layers at one square, and the sheet is
 # unfolded. Which squares have holes? Mental folding with mirror images. Bait: the mirror of the last fold only.
 # `ok_f<folds>`, `last_fold_bait`.
@@ -10647,7 +10647,7 @@ def load_paper_punch(lang, n, seed):
     lab = lambda c: "ABCD"[c[0]] + str(c[1] + 1)  # noqa: E731
     for i, att in common.redraws(n or 96, items):
         r = rng_of("paper_punch", i, att)
-        k = 2 + i % 2
+        k = 1 + i % 3  # 1-3 folds in equal parts: a gradient, not only a floor
         while True:
             cols, rows = [0, 1, 2, 3], [0, 1, 2, 3]
             stack = {(c, w): [(c, w)] for c in cols for w in rows}
@@ -10660,7 +10660,7 @@ def load_paper_punch(lang, n, seed):
                 folds.append(f)
             at = (r.choice(cols), r.choice(rows))
             gold = sorted(lab(c) for c in stack[at])
-            if len(set(folds)) > 1 or k == 2:
+            if len(set(folds)) > 1 or k < 3:
                 break
         # bait: only the last fold mirrored (the punched square and its image in the last fold)
         ps, pc, pr = last_before

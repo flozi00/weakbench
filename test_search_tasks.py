@@ -210,6 +210,28 @@ def test_word_ladder():  # layered expansion with set ops over the listed words
             assert layer, q
         assert d == it["gold"], q
 
+
+def test_diff_apply():  # apply the printed hunks by their headers, bottom-up so earlier offsets do not move
+    for it in prompts(tn.load_diff_apply):
+        q = it["messages"][0]["content"]
+        blocks = re.findall(r"```\n(.*?)\n```", q, re.S)
+        lines, patch = blocks[0].split("\n"), blocks[1].split("\n")
+        hunks, cur = [], None
+        for ln in patch:
+            m = re.match(r"@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@", ln)
+            if m:
+                cur = [int(m[1]), int(m[2] or 1), []]
+                hunks.append(cur)
+            else:
+                cur[2].append(ln)
+        for start, length, body in reversed(hunks):
+            old = [ln[1:] for ln in body if ln[0] in " -"]
+            new = [ln[1:] for ln in body if ln[0] in " +"]
+            assert lines[start - 1:start - 1 + length] == old, q
+            lines[start - 1:start - 1 + length] = new
+        k = int(re.search(r"What is line (\d+)", q)[1])
+        assert lines[k - 1] == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

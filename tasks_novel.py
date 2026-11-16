@@ -10878,6 +10878,63 @@ def score_word_ladder(item, reply):
             "detail": {f"ok_{item['gold']}": float(ok), "hamming_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- diff_apply
+# A short config-like file (10-14 lines) and a unified diff (difflib, 1 line of context, 2-3 hunks with insertions and
+# deletions); what is line k of the patched file? k sits after an earlier hunk changed the line count, so the offsets
+# must be applied. Bait: line k of the original. `ok`, `original_bait`.
+DA_LINES = ["name = shop", "port = 8080", "debug = false", "workers = 4", "timeout = 30", "retries = 3", "cache = on",
+            "region = eu", "log = info", "theme = dark", "lang = de", "backup = daily", "mail = off", "limit = 100",
+            "queue = 20", "tls = on", "proxy = none", "zone = utc"]
+
+
+def load_diff_apply(lang, n, seed):
+    import difflib
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("diff_apply", i, att)
+        while True:
+            orig = r.sample(DA_LINES, r.randint(10, 14))
+            new = list(orig)
+            spare = [x for x in DA_LINES if x not in orig]
+            for _ in range(r.randint(2, 3)):
+                op, j = r.choice(["ins", "del", "mod"]), r.randrange(1, len(new) - 1)
+                if op == "ins" and spare:
+                    new.insert(j, spare.pop(r.randrange(len(spare))))
+                elif op == "del":
+                    del new[j]
+                else:
+                    key = new[j].split(" = ")[0]
+                    new[j] = f"{key} = {r.choice(['1', '7', 'yes', 'no', 'auto', 'max'])}"
+            diff = list(difflib.unified_diff(orig, new, "a/app.conf", "b/app.conf", n=1, lineterm=""))
+            hunks = sum(ln.startswith("@@") for ln in diff)
+            if not 2 <= hunks <= 3 or len(new) == len(orig):
+                continue
+            # first position where the old and new numbering differ, then any later line
+            shift = next((j for j in range(min(len(orig), len(new))) if orig[j] != new[j]), None)
+            cand = [k for k in range(len(new)) if shift is not None and k > shift + 1 and (k >= len(orig) or orig[k] != new[k])]
+            if cand:
+                k = r.choice(cand)
+                break
+        listing = "\n".join(orig)
+        q = (f"File app.conf:\n```\n{listing}\n```\n\nThis patch (unified diff) is applied to it:\n```\n" + "\n".join(diff[2:]) +
+             f"\n```\n\nWhat is line {k + 1} of the patched file (counting from 1)? Give the line exactly." if lang == "en" else
+             f"Datei app.conf:\n```\n{listing}\n```\n\nDieser Patch (Unified Diff) wird darauf angewendet:\n```\n" + "\n".join(diff[2:]) +
+             f"\n```\n\nWie lautet Zeile {k + 1} der gepatchten Datei (ab 1 gezählt)? Gib die Zeile genau an.")
+        items.append({"id": str(i), "lang": lang, "gold": new[k], "bait": orig[k] if k < len(orig) else None,
+                      "lines": sorted(set(orig) | set(new)), "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_diff_apply(item, reply):
+    fa = re.sub(r"[`*\"„“]", "", final_answer(reply["content"]) or "").strip()
+    fa = re.sub(r"^\s*(?:line|zeile)\s*\d+\s*[:=-]\s*", "", fa, flags=re.I)
+    found = [ln for ln in item["lines"] if re.search(rf"(?<![\w]){re.escape(ln)}(?![\w])", fa)]
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"original_bait": float(item["bait"] is not None and v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11986,6 +12043,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "diff_apply": task(load_diff_apply, score_diff_apply, 24, 96),
     "word_ladder": task(load_word_ladder, score_word_ladder, 24, 96),
     "nonogram": task(load_nonogram, score_nonogram, 24, 72),
     "view_side": task(load_view_side, score_view_side, 24, 96),

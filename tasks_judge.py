@@ -42,7 +42,9 @@ def judge(system, prompt, max_tokens=512):
     body = {"model": SETUP["model"], "messages": msgs, "max_tokens": max_tokens, "temperature": 0,
             "chat_template_kwargs": dict(THINK_OFF)}
     msg = common.request(SETUP["url"], "/v1/chat/completions", body, timeout=SETUP["timeout"])["choices"][0]["message"]
-    return re.sub(r"(?s)<think>.*?</think>", "", msg.get("content") or "").strip()
+    text = msg.get("content") or ""
+    # a judge that reasons despite THINK_OFF may open no <think> and close with </think> (LFM2.5): the verdict follows it
+    return (text.rpartition("</think>")[2] if "</think>" in text else re.sub(r"(?s)<think>.*", "", text)).strip()
 
 
 def pick(ids, n, seed):

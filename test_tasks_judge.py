@@ -188,7 +188,20 @@ def test_eqbench_cw_prompts_and_parser():
     assert tj.parse_cw_scores("no scores here")[1] == 0
 
 
+
+def test_judge_strips_unopened_think():
+    """LFM2.5-style output: reasoning, then </think>, then the verdict; also a balanced block and none."""
+    for content, want in [("We need to check the answer. It matches.</think>A", "A"), ("<think>hm</think> B", "B"), ("C", "C"),
+                          ("<think>cut off before the end", "")]:
+        url, stop = mock_server.serve(lambda path, body, c=content: {"content": c, "finish_reason": "stop"})
+        try:
+            tj.configure(url, "mock", 32768)
+            assert tj.judge("", "x") == want, (content, tj.judge("", "x"))
+        finally:
+            stop()
+
 if __name__ == "__main__":
+    test_judge_strips_unopened_think()
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
             fn()

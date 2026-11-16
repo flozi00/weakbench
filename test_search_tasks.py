@@ -353,6 +353,22 @@ def test_painted_cube():  # count by the number of painted faces each unit cube 
         cnt = sum(sum(c[planes[f][0]] == planes[f][1] for f in painted) == k for c in itertools.product(range(n), repeat=3))
         assert cnt == it["gold"] and set(painted) <= set(names), q
 
+
+def test_cube_turns():  # face-name cycles (where each face's letter goes), read from the printed step text
+    cycles = {"forward": ["top", "front", "bottom", "back"], "backward": ["top", "back", "bottom", "front"],
+              "to the left": ["top", "left", "bottom", "right"], "to the right": ["top", "right", "bottom", "left"],
+              "quarter to the left": ["front", "left", "back", "right"], "quarter to the right": ["front", "right", "back", "left"]}
+    for it in prompts(tn.load_cube_turns):
+        q = it["messages"][0]["content"]
+        face = dict(re.findall(r"(top|bottom|front|back|left|right): ([A-Z])", q.split("\n")[0]))
+        for step in re.findall(r"^\d+\. (.+)$", q, re.M):
+            key = next(k for k in ("quarter to the left", "quarter to the right", "forward", "backward", "to the left",
+                                   "to the right") if k in step)
+            c = cycles[key]
+            face = {**face, **{c[(j + 1) % 4]: face[c[j]] for j in range(4)}}
+        ask = re.search(r"on the (\w+) face at the end", q)[1]
+        assert face[ask] == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

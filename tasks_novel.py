@@ -11301,6 +11301,69 @@ def score_painted_cube(item, reply):
             "detail": {f"ok_k{item['k']}": float(ok), "all_faces_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- cube_turns
+# A cube with a different letter on each face (all six given), turned 3-6 times: tipped forward/backward/left/right or
+# turned a quarter to the left/right about the vertical axis; which letter faces the asked direction at the end
+# (top, front or right)? Mixes axes, unlike dice_roll. Bait: the letter that faced that way at the start.
+# `ok_<asked>`, `start_bait`.
+CT2_DIRS = {"top": (0, 0, 1), "bottom": (0, 0, -1), "front": (0, -1, 0), "back": (0, 1, 0), "left": (-1, 0, 0), "right": (1, 0, 0)}
+CT2_NAMES = {"en": {"top": "top", "bottom": "bottom", "front": "front", "back": "back", "left": "left", "right": "right"},
+             "de": {"top": "oben", "bottom": "unten", "front": "vorne", "back": "hinten", "left": "links", "right": "rechts"}}
+CT2_MOVES = {"en": {"F": "tip it forward (the top goes to the front)", "B": "tip it backward (the top goes to the back)",
+                    "L": "tip it to the left (the top goes to the left)", "R": "tip it to the right (the top goes to the right)",
+                    "TL": "turn it a quarter to the left (seen from above, counter-clockwise: the front goes to the left)",
+                    "TR": "turn it a quarter to the right (seen from above, clockwise: the front goes to the right)"},
+             "de": {"F": "nach vorne kippen (die Oberseite kommt nach vorne)", "B": "nach hinten kippen (die Oberseite kommt nach hinten)",
+                    "L": "nach links kippen (die Oberseite kommt nach links)", "R": "nach rechts kippen (die Oberseite kommt nach rechts)",
+                    "TL": "eine Vierteldrehung nach links (von oben gesehen gegen den Uhrzeigersinn: vorne kommt nach links)",
+                    "TR": "eine Vierteldrehung nach rechts (von oben gesehen im Uhrzeigersinn: vorne kommt nach rechts)"}}
+
+
+def ct2_move(face_at, m):
+    """face_at: {direction vector: letter}; returns it after move m."""
+    def rot(v):
+        x, y, z = v
+        return {"F": (x, -z, y), "B": (x, z, -y), "L": (-z, y, x), "R": (z, y, -x), "TL": (y, -x, z), "TR": (-y, x, z)}[m]
+    return {rot(v): c for v, c in face_at.items()}
+
+
+def load_cube_turns(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("cube_turns", i, att)
+        ask = ["top", "front", "right"][i % 3]
+        while True:
+            letters = r.sample("ABCDEFGHKMPRT", 6)
+            start = dict(zip(CT2_DIRS.values(), letters))
+            moves = [r.choice(list(CT2_MOVES["en"])) for _ in range(r.randint(3, 6))]
+            if not any(mv in ("TL", "TR") for mv in moves) or not any(mv in "FBLR" for mv in moves):
+                continue
+            end = dict(start)
+            for mv in moves:
+                end = ct2_move(end, mv)
+            if end[CT2_DIRS[ask]] != start[CT2_DIRS[ask]]:
+                break
+        N = CT2_NAMES[lang]
+        faces = ", ".join(f"{N[d]}: {start[v]}" for d, v in CT2_DIRS.items())
+        steps = "\n".join(f"{j + 1}. {CT2_MOVES[lang][mv]}" for j, mv in enumerate(moves))
+        q = (f"A cube lies on a table in front of you with a letter on each face: {faces}.\nYou move it, step by step:\n{steps}"
+             f"\n\nWhich letter is on the {N[ask]} face at the end?" if lang == "en" else
+             f"Ein Würfel liegt vor dir auf dem Tisch, auf jeder Seite steht ein Buchstabe: {faces}.\nDu bewegst ihn Schritt für "
+             f"Schritt:\n{steps}\n\nWelcher Buchstabe ist am Ende {N[ask]}?")
+        items.append({"id": str(i), "lang": lang, "gold": end[CT2_DIRS[ask]], "bait": start[CT2_DIRS[ask]], "ask": ask,
+                      "letters": letters, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cube_turns(item, reply):
+    fa = re.sub(r"\([^()]*\)", " ", final_answer(reply["content"]) or "")
+    found = {x for x in re.findall(r"\b([A-Z])\b", fa) if x in item["letters"]}
+    v = found.pop() if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['ask']}": float(ok), "start_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12409,6 +12472,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "cube_turns": task(load_cube_turns, score_cube_turns, 24, 96),
     "painted_cube": task(load_painted_cube, score_painted_cube, 24, 96),
     "piece_fit": task(load_piece_fit, score_piece_fit, 24, 96),
     "seat_count": task(load_seat_count, score_seat_count, 24, 96),

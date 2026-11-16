@@ -4292,6 +4292,29 @@ def load_de_colon_case(lang, n, seed):
     return items
 
 
+# ---------------------------------------------------------------- en_common_misspell (words natives often misspell)
+# separate/seperate, definitely/definately, accommodate/accomodate ...: the correct spelling against the frequent wrong
+# one (US and UK agree on all of them). Dropped and doubled letters both occur, so length does not give it away.
+EMS_ITEMS = [("separate", "seperate"), ("definitely", "definately"), ("accommodate", "accomodate"), ("occurrence", "occurence"),
+             ("embarrass", "embarass"), ("receive", "recieve"), ("millennium", "millenium"), ("privilege", "priviledge"),
+             ("harass", "harrass"), ("liaison", "liason"), ("questionnaire", "questionaire"), ("threshold", "threshhold"),
+             ("weird", "wierd"), ("until", "untill"), ("tomorrow", "tommorow"), ("necessary", "neccessary"),
+             ("independent", "independant"), ("conscience", "concience"), ("publicly", "publically"), ("argument", "arguement")]
+
+
+def load_en_common_misspell(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Which spelling is correct: \"{two_opts(i, g, (g, w))[0]}\" or "
+                           f"\"{two_opts(i, g, (g, w))[1]}\"? Reply with the word only."}]}
+            for i, (g, w) in enumerate(EMS_ITEMS[:n or len(EMS_ITEMS)])]
+
+
+def score_en_common_misspell(item, reply):
+    r = score_de_eszett(item, {"content": strip_lead(reply["content"] or "")})  # one offered word, word-bounded
+    r["detail"] = {"ok_spelling": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5697,6 +5720,7 @@ TASKS = {
     "de_common_misspell": task(("de",), load_de_common_misspell, score_de_common_misspell, 16, None, lang_check=False),
     "de_comma_pairs": task(("de",), load_de_comma_pairs, score_idioms, 16, None, lang_check=False),
     "de_colon_case": task(("de",), load_de_colon_case, score_idioms, 16, None, lang_check=False),
+    "en_common_misspell": task(("en",), load_en_common_misspell, score_en_common_misspell, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

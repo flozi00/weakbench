@@ -4164,6 +4164,32 @@ def score_de_syllables(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_syllables": float(ok)}}
 
 
+# ---------------------------------------------------------------- de_dative_plural (Dativ Plural -n, and only there)
+# "mit den Kindern" takes the -n, "Ich sehe die Kinder" does not; dropping it in the dative and adding it elsewhere are
+# both common. Dative gold in half the items (the longer form), non-dative in the other half (the shorter one).
+DDP_ITEMS = [("Wir spielen mit den ___.", "Kindern", "Kinder"), ("Ich sehe die ___ im Garten.", "Kinder", "Kindern"),
+             ("Sie hilft ihren ___.", "Freunden", "Freunde"), ("Die ___ kommen heute.", "Freunde", "Freunden"),
+             ("Er sitzt zwischen den ___.", "Fenstern", "Fenster"), ("Die ___ sind offen.", "Fenster", "Fenstern"),
+             ("Wir danken allen ___.", "Lehrern", "Lehrer"), ("Alle ___ waren pünktlich.", "Lehrer", "Lehrern"),
+             ("Sie spricht mit den ___.", "Nachbarn", "Nachbar"), ("Ich kenne die ___ nicht.", "Tage", "Tagen"),
+             ("Nach drei ___ war er wieder gesund.", "Tagen", "Tage"), ("Die ___ blühen schon.", "Bäume", "Bäumen"),
+             ("Unter den ___ ist es kühl.", "Bäumen", "Bäume"), ("Wir kaufen neue ___.", "Stühle", "Stühlen"),
+             ("Er steht auf den ___.", "Stühlen", "Stühle"), ("Sie schreibt den ___ eine Karte.", "Großeltern", "Großelterns")]
+
+
+def load_de_dative_plural(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Form ist richtig: „{two_opts(i, g, (g, w))[0]}“ oder "
+                           f"„{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(DDP_ITEMS[:n or len(DDP_ITEMS)])]
+
+
+def score_de_dative_plural(item, reply):
+    r = score_de_eszett(item, {"content": strip_lead(reply["content"] or "")})  # one offered word, word-bounded
+    r["detail"] = {"ok_add_n" if len(item["gold"]) > len(item["opts"][1]) else "ok_no_extra_n": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5523,6 +5549,7 @@ TASKS = {
     "en_adj_order": task(("en",), load_en_adj_order, score_en_adj_order, 16, None, lang_check=False),
     "de_linking": task(("de",), load_de_linking, score_de_linking, 16, None, lang_check=False),
     "de_syllables": task(("de",), load_de_syllables, score_de_syllables, 16, None, lang_check=False),
+    "de_dative_plural": task(("de",), load_de_dative_plural, score_de_dative_plural, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

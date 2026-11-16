@@ -1103,6 +1103,7 @@ def score_if_gen(item, reply):
 
 
 # ---------------------------------------------------------------- logic_grid
+import functools  # noqa: E402
 import itertools  # noqa: E402
 
 LG_ATTR = {"name": ["Anna", "Ben", "Clara", "David"],
@@ -9563,16 +9564,23 @@ SEQ_TEXT = {"en": "What is the next number in this sequence? {s}, ...", "de": "W
             "dieser Folge? {s}, ..."}
 
 
-def seq_ambiguous(shown, nxt):
-    """Another family with small parameters that reproduces the 7 shown terms but continues differently."""
+@functools.lru_cache(maxsize=1)
+def seq_continuations():
+    """{first 7 terms: set of 8th terms} over every family with small parameters, built once (was rebuilt per item:
+    55 s per load)."""
+    table = {}
     for fam in SEQ_FAMS:
         for a in range(-20, 31):
             for b in range(-7, 14):
                 for c in ((0,) if fam in ("arith", "geom") else range(-5, 61) if fam == "inter" else range(-5, 10)):
                     s_ = seq_family(fam, (a, b, c))
-                    if s_[:7] == shown and s_[7] != nxt:
-                        return True
-    return False
+                    table.setdefault(tuple(s_[:7]), set()).add(s_[7])
+    return table
+
+
+def seq_ambiguous(shown, nxt):
+    """Another family with small parameters that reproduces the 7 shown terms but continues differently."""
+    return bool(seq_continuations().get(tuple(shown), set()) - {nxt})
 
 
 def load_seq_induction(lang, n, seed):
@@ -11970,6 +11978,70 @@ def score_verify_solution(item, reply):
                                              "accepted_wrong": float(item["broken"] is not None and val)}}
 
 
+# ---------------------------------------------------------------- ice_slide
+# A ball on an icy 6x6 / 7x7 board: each tilt (up/down/left/right) sends it sliding until a wall (#) or the edge
+# stops it; it cannot stop in between. The fewest tilts to make it stop on the goal (G)? BFS over stop positions.
+# Moving and searching at once; the straight-line distance is useless because the ball cannot stop mid-way.
+# `ok`, `manhattan_bait`.
+def is_slide(grid, pos, d):
+    h, w = len(grid), len(grid[0])
+    y, x = pos
+    dy, dx = {"U": (-1, 0), "D": (1, 0), "L": (0, -1), "R": (0, 1)}[d]
+    while 0 <= y + dy < h and 0 <= x + dx < w and grid[y + dy][x + dx] != "#":
+        y, x = y + dy, x + dx
+    return (y, x)
+
+
+def is_tilts(grid, start, goal):
+    from collections import deque
+    seen, dq = {start: 0}, deque([start])
+    while dq:
+        p = dq.popleft()
+        if p == goal:
+            return seen[p]
+        for d in "UDLR":
+            q = is_slide(grid, p, d)
+            if q not in seen:
+                seen[q] = seen[p] + 1
+                dq.append(q)
+    return None
+
+
+def load_ice_slide(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("ice_slide", i, att)
+        while True:
+            size = r.choice([6, 7])
+            grid = [["#" if r.random() < 0.15 else "." for _ in range(size)] for _ in range(size)]
+            free = [(y, x) for y in range(size) for x in range(size) if grid[y][x] == "."]
+            S, G = r.sample(free, 2)
+            gold = is_tilts(grid, S, G)
+            man = abs(S[0] - G[0]) + abs(S[1] - G[1])
+            if gold and 3 <= gold <= 8 and gold != man and sum(it["gold"] == gold for it in items) < len(items) // 4 + 2:
+                break
+        show = [row[:] for row in grid]
+        show[S[0]][S[1]], show[G[0]][G[1]] = "B", "G"
+        text = "\n".join(" ".join(row) for row in show)
+        q = (f"An icy board (# wall, . ice, B ball, G goal):\n{text}\n\nEach move tilts the board up, down, left or right, and "
+             f"the ball slides in that direction until a wall or the edge of the board stops it; it cannot stop on the way. "
+             f"What is the smallest number of moves after which the ball stops on G? (Sliding over G does not count.)"
+             if lang == "en" else
+             f"Ein vereistes Spielbrett (# Wand, . Eis, B Kugel, G Ziel):\n{text}\n\nJeder Zug kippt das Brett nach oben, unten, "
+             f"links oder rechts, und die Kugel rutscht in diese Richtung, bis eine Wand oder der Rand sie stoppt; unterwegs "
+             f"kann sie nicht anhalten. Nach wie vielen Zügen bleibt die Kugel frühestens auf G liegen? (Über G hinwegrutschen "
+             f"zählt nicht.)")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": man,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_ice_slide(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"manhattan_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -13078,6 +13150,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "ice_slide": task(load_ice_slide, score_ice_slide, 24, 96),
     "verify_solution": task(load_verify_solution, score_verify_solution, 24, 96),
     "list_diff": task(load_list_diff, score_list_diff, 24, 96),
     "flashback_order": task(load_flashback_order, score_flashback_order, 24, 96),

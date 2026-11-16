@@ -4218,6 +4218,38 @@ def score_de_common_misspell(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- de_comma_pairs (comma rules de_commas does not cover)
+# Two versions of one sentence differing only in commas; which is correct? Appositions, a date with weekday, address
+# and interjection, trailing explanations ("und zwar", "vor allem"), lists with "sowie"/"und"/"oder" (no comma), and
+# comparisons with "als"/"wie" without a verb (no comma). The version with fewer commas is gold in half the items.
+CP_ITEMS = [("Mein Kollege, ein erfahrener Koch, hat das Menü geplant.", "Mein Kollege ein erfahrener Koch, hat das Menü geplant."),
+            ("Wir treffen uns am Montag, dem 5. Mai, im Büro.", "Wir treffen uns am Montag dem 5. Mai im Büro."),
+            ("Anna, kannst du mir helfen?", "Anna kannst du mir helfen?"),
+            ("Ach, das habe ich vergessen.", "Ach das habe ich vergessen."),
+            ("Er kauft Brot, Käse und Wein.", "Er kauft Brot, Käse, und Wein."),
+            ("Sie spricht Deutsch sowie Französisch.", "Sie spricht Deutsch, sowie Französisch."),
+            ("Willst du Tee oder Kaffee?", "Willst du Tee, oder Kaffee?"),
+            ("Er ist größer als sein Bruder.", "Er ist größer, als sein Bruder."),
+            ("Sie singt so schön wie ihre Mutter.", "Sie singt so schön, wie ihre Mutter."),
+            ("Ich mag Obst, vor allem Äpfel.", "Ich mag Obst vor allem Äpfel."),
+            ("Wir fahren in Urlaub, und zwar nach Italien.", "Wir fahren in Urlaub und zwar nach Italien."),
+            ("Herr Weber, unser neuer Chef, kommt morgen.", "Herr Weber unser neuer Chef kommt morgen."),
+            ("Am Dienstag fahren wir los.", "Am Dienstag, fahren wir los."),
+            ("Das Buch liegt auf dem Tisch im Wohnzimmer.", "Das Buch liegt auf dem Tisch, im Wohnzimmer."),
+            ("Leider konnte ich nicht kommen.", "Leider, konnte ich nicht kommen."),
+            ("Sie hat mehr Zeit als ich.", "Sie hat mehr Zeit, als ich.")]
+
+
+def load_de_comma_pairs(lang, n, seed):
+    items = []
+    for i, (g, w) in enumerate(CP_ITEMS[:n or len(CP_ITEMS)]):
+        a, b = two_opts(i, g, (g, w))
+        items.append({"id": str(i), "lang": "de", "gold": "A" if a == g else "B", "literal": "B" if a == g else "A",
+                      "messages": [{"role": "user", "content": "Welcher Satz ist nach den deutschen Kommaregeln richtig "
+                                    f"gesetzt?\nA. {a}\nB. {b}\nAntworte mit einer Zeile \"Antwort: A\" oder \"Antwort: B\"."}]})
+    return items
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5621,6 +5653,7 @@ TASKS = {
     "de_syllables": task(("de",), load_de_syllables, score_de_syllables, 16, None, lang_check=False),
     "de_dative_plural": task(("de",), load_de_dative_plural, score_de_dative_plural, 16, None, lang_check=False),
     "de_common_misspell": task(("de",), load_de_common_misspell, score_de_common_misspell, 16, None, lang_check=False),
+    "de_comma_pairs": task(("de",), load_de_comma_pairs, score_idioms, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

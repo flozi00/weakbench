@@ -11605,6 +11605,60 @@ def score_seesaw_balance(item, reply):
             "detail": {"wrong_side_bait": float(v is not None and abs(v + item["x"]) < 1e-9)}}
 
 
+# ---------------------------------------------------------------- sun_relative
+# Where is the sun relative to a person: in front, behind, to the left or to the right? Given the time (sunrise,
+# midday, sunset), the hemisphere (at midday the sun is due south in the northern mid-latitudes, due north in the
+# southern) and the way the person faces, after one or two turns. Knowledge plus a change of frame. Gold balanced over
+# the four answers. `ok_<hemisphere>`, `compass_bait` (named the compass direction instead of a side).
+SR_TIME = {"en": {"E": "at sunrise", "S_N": "at midday", "W": "at sunset"}, "de": {"E": "bei Sonnenaufgang", "S_N": "mittags", "W": "bei Sonnenuntergang"}}
+SR_REL = {"en": ["in front of her", "to her right", "behind her", "to her left"], "de": ["vor ihr", "rechts von ihr", "hinter ihr", "links von ihr"]}
+SR_DIR = {"en": ["north", "east", "south", "west"], "de": ["Norden", "Osten", "Süden", "Westen"]}
+SR_TURN = {"en": {1: "turns right (a quarter turn)", -1: "turns left (a quarter turn)", 2: "turns around"},
+           "de": {1: "dreht sie sich nach rechts (eine Vierteldrehung)", -1: "dreht sie sich nach links (eine Vierteldrehung)",
+                  2: "dreht sie sich um"}}
+
+
+def load_sun_relative(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("sun_relative", i, att)
+        while True:
+            hemi = r.choice(["north", "south"])
+            when = r.choice(["E", "S_N", "W"])
+            sun = {"E": 1, "W": 3, "S_N": 2 if hemi == "north" else 0}[when]  # compass index of the sun: 0 N, 1 E, 2 S, 3 W
+            face0 = r.randrange(4)
+            turns = [r.choice([1, -1, 2]) for _ in range(r.randint(1, 2))]
+            face = (face0 + sum(turns)) % 4
+            rel = (sun - face) % 4  # 0 front, 1 right, 2 behind, 3 left
+            if rel == i % 4:
+                break
+        H = {"en": {"north": "in Germany (northern hemisphere)", "south": "in New Zealand (southern hemisphere)"},
+             "de": {"north": "in Deutschland (Nordhalbkugel)", "south": "in Neuseeland (Südhalbkugel)"}}[lang][hemi]
+        steps = (" Then she " if lang == "en" else " Dann ") + (" and then " if lang == "en" else " und danach ").join(
+            SR_TURN[lang][t] for t in turns) + "."
+        q = (f"Mia stands in an open field {H} {SR_TIME[lang][when]} on a clear day, facing {SR_DIR[lang][face0]}.{steps} "
+             f"Where is the sun now from Mia's point of view: in front of her, behind her, to her left or to her right?"
+             if lang == "en" else
+             f"Mia steht an einem klaren Tag {SR_TIME[lang][when]} auf einem offenen Feld {H} und schaut nach "
+             f"{SR_DIR[lang][face0]}.{steps} Wo steht die Sonne jetzt aus Mias Sicht: vor ihr, hinter ihr, links oder rechts "
+             f"von ihr?")
+        items.append({"id": str(i), "lang": lang, "gold": SR_REL[lang][rel], "rel": rel, "hemi": hemi,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_sun_relative(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower()
+    keys = {"en": [r"\bin front\b|\bahead\b", r"\bright\b", r"\bbehind\b", r"\bleft\b"],
+            "de": [r"\bvor\b|\bvorne\b", r"\brechts\b", r"\bhinter\b|\bhinten\b", r"\blinks\b"]}[item["lang"]]
+    hits = [k for k, pat in enumerate(keys) if re.search(pat, fa)]
+    v = hits[0] if len(hits) == 1 else None
+    ok = v == item["rel"]
+    compass = bool(re.search(r"\b(?:north|south|east|west|norden|süden|osten|westen)\b", fa)) and v is None
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['hemi']}": float(ok), "compass_bait": float(compass)}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12713,6 +12767,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "sun_relative": task(load_sun_relative, score_sun_relative, 24, 96),
     "seesaw_balance": task(load_seesaw_balance, score_seesaw_balance, 24, 96),
     "bridge_torch": task(load_bridge_torch, score_bridge_torch, 24, 96),
     "box_push": task(load_box_push, score_box_push, 24, 96),

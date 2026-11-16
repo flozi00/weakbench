@@ -463,6 +463,19 @@ def test_seesaw_balance():  # moments from the printed seats; the answer seat is
                 and abs(sum(w * p for w, p in kids) + new_w * x / 2) < 1e-9]
         assert fits == [it["x"]], (q, fits)
 
+
+def test_sun_relative():  # bearings in degrees: sun bearing minus facing bearing -> side
+    for it in prompts(tn.load_sun_relative):
+        q = it["messages"][0]["content"]
+        bearing = {"north": 0, "east": 90, "south": 180, "west": 270}
+        south = "southern hemisphere" in q
+        sun = 90 if "sunrise" in q else 270 if "sunset" in q else (0 if south else 180)
+        face = bearing[re.search(r"facing (\w+)\.", q)[1]]
+        for turn in re.findall(r"turns (right|left|around)", q):
+            face = (face + {"right": 90, "left": -90, "around": 180}[turn]) % 360
+        side = {0: "in front of her", 90: "to her right", 180: "behind her", 270: "to her left"}[(sun - face) % 360]
+        assert side == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

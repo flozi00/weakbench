@@ -15,7 +15,7 @@ Any OpenAI-compatible chat server works:
 uv run quality.py --url http://host:8000 --arm mymodel --tier quick
 uv run quality.py --url ... --arm mymodel --tasks rule_induction,coref --langs de,en
 uv run quality.py --url ... --arm mymodel --tasks traps,de_grammar   # named groups: traps, generalization,
-                                                   # de_grammar, en_grammar, grammar_analysis, language, knowledge,
+                                                   # de_grammar, en_grammar, grammar_analysis, language, knowledge, search_state,
                                                    # judge, and whole modules lang_all, novel_all, judge_all
 ```
 

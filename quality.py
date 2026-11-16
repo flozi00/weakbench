@@ -1377,6 +1377,8 @@ GROUPS = {
     "judge": ["open_checklist", "tutor_feedback", "persona_guard", "human_persona", "self_model", "memory_dialog",
               "constrained_plan", "audience_explain", "argument_essay", "socratic_tutor", "neutral_summary", "triage_advice", "howto_steps", "tactful_message"],
     "knowledge": ["geo_coords", "geo_locate", "town_country", "country_facts", "country_currency", "element_facts", "lang_id"],
+    "search_state": ["merge_conflict", "dice_roll", "hanoi_state", "cube_net", "knight_moves", "river_crossing", "lights_out",
+                     "paper_punch", "view_side", "sliding_puzzle", "toy_machine", "lru_cache"],
     "grammar_analysis": ["de_case_identify", "de_tense_identify", "de_das_function", "en_tense_identify", "en_that_function",
                          "antonym_context"],
 }

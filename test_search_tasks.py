@@ -525,10 +525,9 @@ def test_unsat_detect():  # rules re-read from the text; brute force decides pos
 def test_flashback_order():  # offsets re-read from the English text and chained in telling order
     for it in prompts(tn.load_flashback_order):
         q = it["messages"][0]["content"]
-        day, cur = {"A": 0}, 0
-        for letter, n_, rel in re.findall(r"\(([B-E])\) (\d+) days? (before|after) that", q):
-            cur += int(n_) * (-1 if rel == "before" else 1)
-            day[letter] = cur
+        day = {"A": 0}
+        for letter, n_, rel, ref in re.findall(r"\(([B-E])\) (\d+) days? (before|after) event ([A-E])", q):
+            day[letter] = day[ref] + int(n_) * (-1 if rel == "before" else 1)
         assert "".join(sorted(day, key=day.get)) == it["gold"], q
 
 

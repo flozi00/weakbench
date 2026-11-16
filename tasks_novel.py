@@ -11793,8 +11793,9 @@ def score_unsat_detect(item, reply):
 
 
 # ---------------------------------------------------------------- flashback_order
-# A short narrative told out of order: each sentence dates its event relative to the one told just before ("2 days
-# before that, she had ...", "3 days after that, she ..."), so the chain of offsets and the tenses must be followed.
+# A short narrative told out of order: each sentence dates its event relative to the one told just before, named by
+# its letter ("2 days before event B, she had ...") — "before that" was read as "before the first event" by LFM2.5,
+# a fair reading, so the anchor is explicit; the chain of offsets and the tenses must still be followed.
 # Five events, each with a letter; give their chronological order. Bait: the order of mention. `ok`, `text_order_bait`.
 FB_EVENTS = {"en": [("bought a train ticket", "had bought a train ticket"), ("packed her suitcase", "had packed her suitcase"),
                     ("called her sister", "had called her sister"), ("lost her keys", "had lost her keys"),
@@ -11830,10 +11831,10 @@ def load_flashback_order(lang, n, seed):
             delta = days[idx] - prev  # relative to the event told just before: the chain must be followed
             n_ = abs(delta)
             if lang == "en":
-                when = f"{n_} day{'s' if n_ != 1 else ''} " + ("before that" if delta < 0 else "after that")
-                sents.append(f"({letters[k]}) {when.capitalize()}, she {e_plup if delta < 0 else e_simple}.")
+                when = f"{n_} day{'s' if n_ != 1 else ''} " + ("before" if delta < 0 else "after") + f" event {letters[k - 1]}"
+                sents.append(f"({letters[k]}) {when[0].upper() + when[1:]}, she {e_plup if delta < 0 else e_simple}.")
             else:
-                when = f"{n_} Tag{'e' if n_ != 1 else ''} " + ("davor" if delta < 0 else "danach")
+                when = f"{n_} Tag{'e' if n_ != 1 else ''} " + ("vor" if delta < 0 else "nach") + f" Ereignis {letters[k - 1]}"
                 v, rest = (e_plup if delta < 0 else e_simple).split(" ", 1)
                 sents.append(f"({letters[k]}) {when} {v} sie {rest}.")
             prev = days[idx]

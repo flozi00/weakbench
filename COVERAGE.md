@@ -127,6 +127,15 @@ topic word). At n = 3 these were at 100 % on that model and are ceiling suspects
 `game_theory`, `syllogism`, `schedule`, `rulebook`, `knights_knaves`, `table_qa`, `seq_induction`, `error_spot`,
 `code_bug`, `linalg`, `extract`, `calib_math` — `quality.py` names every cell at >= 95 % after a run.
 
+**Search vs. given steps (2026-11-16, `--tasks search_state`).** On LFM2.5-24B-A2B (quick tier, 24 items per cell)
+the same puzzle splits cleanly by whether the steps are given or must be found. Given steps are near ceiling:
+`sliding_puzzle` 0.92-1.00, `toy_machine` 0.88-0.92, `diff_apply` 0.96-1.00, `lru_cache` 0.92-1.00. Searching for the
+steps, or folding space mentally, falls to chance: `puzzle8_min` 0.13-0.17 (chance 0.17), `river_crossing` 0.25-0.33,
+`cube_net` 0.29-0.33 (bent opposites 0.08-0.17), `hanoi_state` 0.29-0.46, `paper_punch` 1 fold 0.88-1.00, 2-3 folds
+0.00-0.13. Most failures run to the 12k-token cap without an answer. These tasks keep headroom that a static set
+loses once trained on, and every gold is re-solved from the prompt text by an independent solver in
+`test_search_tasks.py`.
+
 **Next candidates** (not built yet): argument/debate quality by pairwise judge, and a German HLE-style hard set
 once someone with access unlocks `cais/hle-diamond`.
 

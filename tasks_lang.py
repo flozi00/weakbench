@@ -4250,6 +4250,38 @@ def load_de_comma_pairs(lang, n, seed):
     return items
 
 
+# ---------------------------------------------------------------- de_colon_case (capital or small letter after a colon)
+# After a colon a full sentence starts with a capital letter, anything else (a list of non-nouns, a fragment, an
+# adjective) keeps its normal case. Two versions differ only in the first letter after the colon; lower-case gold in
+# half (nouns after the colon are capitalised anyway and are left out).
+CC_ITEMS = [("Er sagte nur eins: Er komme morgen nicht.", "Er sagte nur eins: er komme morgen nicht."),
+            ("Das Ergebnis war klar: wir hatten verloren.", "Das Ergebnis war klar: Wir hatten verloren."),
+            ("Die Regel ist einfach: Wer zuerst kommt, mahlt zuerst.", "Die Regel ist einfach: wer zuerst kommt, mahlt zuerst."),
+            ("Das Wetter war: kalt, nass und windig.", "Das Wetter war: Kalt, nass und windig."),
+            ("Sie hatte nur einen Wunsch: endlich schlafen.", "Sie hatte nur einen Wunsch: Endlich schlafen."),
+            ("Beachten Sie bitte: Der Eingang ist hinten.", "Beachten Sie bitte: der Eingang ist hinten."),
+            ("Seine Antwort: vielleicht.", "Seine Antwort: Vielleicht."),
+            ("Achtung: Die Treppe ist frisch gestrichen.", "Achtung: die Treppe ist frisch gestrichen."),
+            ("Er hatte nur ein Ziel: gewinnen.", "Er hatte nur ein Ziel: Gewinnen."),
+            ("Eines ist sicher: Morgen wird es regnen.", "Eines ist sicher: morgen wird es regnen."),
+            ("Das Gemüse dort ist: frisch, regional und günstig.", "Das Gemüse dort ist: Frisch, regional und günstig."),
+            ("Mein Tipp: Fangen Sie früh an.", "Mein Tipp: fangen Sie früh an."),
+            ("Ihre Laune: ausgezeichnet.", "Ihre Laune: Ausgezeichnet."),
+            ("Er wusste es genau: Sie hatte gelogen.", "Er wusste es genau: sie hatte gelogen."),
+            ("Öffnungszeiten: täglich ab neun Uhr.", "Öffnungszeiten: Täglich ab neun Uhr."),
+            ("Die Frage bleibt: Wer hat das Fenster offen gelassen?", "Die Frage bleibt: wer hat das Fenster offen gelassen?")]
+
+
+def load_de_colon_case(lang, n, seed):
+    items = []
+    for i, (g, w) in enumerate(CC_ITEMS[:n or len(CC_ITEMS)]):
+        a, b = two_opts(i, g, (g, w))
+        items.append({"id": str(i), "lang": "de", "gold": "A" if a == g else "B", "literal": "B" if a == g else "A",
+                      "messages": [{"role": "user", "content": "Welcher Satz ist nach der deutschen Rechtschreibung richtig "
+                                    f"geschrieben?\nA. {a}\nB. {b}\nAntworte mit einer Zeile \"Antwort: A\" oder \"Antwort: B\"."}]})
+    return items
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5654,6 +5686,7 @@ TASKS = {
     "de_dative_plural": task(("de",), load_de_dative_plural, score_de_dative_plural, 16, None, lang_check=False),
     "de_common_misspell": task(("de",), load_de_common_misspell, score_de_common_misspell, 16, None, lang_check=False),
     "de_comma_pairs": task(("de",), load_de_comma_pairs, score_idioms, 16, None, lang_check=False),
+    "de_colon_case": task(("de",), load_de_colon_case, score_idioms, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

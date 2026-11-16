@@ -11212,6 +11212,47 @@ def score_seat_count(item, reply):
             "detail": {f"ok_c{item['nrules']}": float(ok), "first_rule_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- piece_fit
+# A 4x4 or 4x5 board with 3-6 blocked squares and an L-shaped piece of three squares (a 2x2 square with one corner
+# missing) in any of its four turns (a flip equals a turn for this piece); in how many positions can it be placed on
+# free squares? Spatial counting. Bait: the count on the empty board. `ok`, `empty_board_bait`.
+PF_SHAPES = [((0, 0), (1, 0), (0, 1)), ((0, 0), (0, 1), (1, 1)), ((0, 0), (1, 0), (1, 1)), ((1, 0), (0, 1), (1, 1))]
+
+
+def pf_count(h, w, blocked):
+    return sum(all(0 <= y + dy < h and 0 <= x + dx < w and (y + dy, x + dx) not in blocked for dy, dx in sh)
+               for sh in PF_SHAPES for y in range(h) for x in range(w))
+
+
+def load_piece_fit(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("piece_fit", i, att)
+        while True:
+            h, w = 4, r.choice([4, 5])
+            blocked = set(r.sample([(y, x) for y in range(h) for x in range(w)], r.randint(3, 6)))
+            gold = pf_count(h, w, blocked)
+            if gold >= 3 and sum(it["gold"] == gold for it in items) < len(items) // 8 + 2:
+                break
+        grid = "\n".join(" ".join("#" if (y, x) in blocked else "." for x in range(w)) for y in range(h))
+        q = (f"A board ({h} rows, {w} columns; # blocked, . free):\n{grid}\n\nAn L-shaped piece covers three squares: a 2x2 "
+             f"square with one corner missing. It may be turned (all four ways) and must lie exactly on free squares. In "
+             f"how many different positions can it be placed?" if lang == "en" else
+             f"Ein Spielbrett ({h} Zeilen, {w} Spalten; # gesperrt, . frei):\n{grid}\n\nEin L-förmiges Teil bedeckt drei "
+             f"Felder: ein 2x2-Quadrat, dem eine Ecke fehlt. Es darf gedreht werden (alle vier Richtungen) und muss genau "
+             f"auf freien Feldern liegen. In wie vielen verschiedenen Lagen kann man es platzieren?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": pf_count(h, w, set()),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_piece_fit(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"empty_board_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12320,6 +12361,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "piece_fit": task(load_piece_fit, score_piece_fit, 24, 96),
     "seat_count": task(load_seat_count, score_seat_count, 24, 96),
     "job_assign": task(load_job_assign, score_job_assign, 24, 96),
     "cable_network": task(load_cable_network, score_cable_network, 24, 96),

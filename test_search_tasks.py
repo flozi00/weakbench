@@ -328,6 +328,19 @@ def test_seat_count():  # rules re-read from the English text, positions checked
             count += ok
         assert count == it["gold"], q
 
+
+def test_piece_fit():  # every 2x2 window: with f free squares it holds C(f, 3) L-pieces (each 3 of 4 squares is one L)
+    for it in prompts(tn.load_piece_fit):
+        q = it["messages"][0]["content"]
+        grid = [ln.split() for ln in re.findall(r"^((?:[#.] )+[#.])$", q, re.M)]
+        h, w = len(grid), len(grid[0])
+        total = 0
+        for y in range(h - 1):
+            for x in range(w - 1):
+                f = sum(grid[y + a][x + b] == "." for a in (0, 1) for b in (0, 1))
+                total += {4: 4, 3: 1}.get(f, 0)
+        assert total == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

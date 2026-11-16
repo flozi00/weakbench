@@ -4194,6 +4194,30 @@ def score_de_dative_plural(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- de_common_misspell (words natives often misspell)
+# Standard/Standart, Rhythmus/Rythmus, Widerspruch/Wiederspruch, Terrasse/Terasse ...: the correct spelling against
+# the frequent wrong one, which web text repeats; only words with one Duden spelling (no Portmonee-style variants).
+MISSP_ITEMS = [("Standard", "Standart"), ("Rhythmus", "Rythmus"), ("Billard", "Billiard"), ("Widerspruch", "Wiederspruch"),
+             ("Reparatur", "Reperatur"), ("nämlich", "nähmlich"), ("Lizenz", "Lizens"), ("Paket", "Packet"),
+             ("Atmosphäre", "Athmosphäre"), ("Maschine", "Maschiene"), ("tolerant", "tollerant"), ("Gelatine", "Gelantine"),
+             ("Entschädigung", "Endschädigung"), ("Satellit", "Sattelit"), ("Lexikon", "Lexicon"), ("Brillant", "Brilliant"),
+             ("Terrasse", "Terasse"), ("Karussell", "Karusell"), ("Zigarette", "Zigarrette"), ("Ingenieur", "Ingeneur")]
+
+
+def load_de_common_misspell(lang, n, seed):
+    items = MISSP_ITEMS
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Schreibweise ist richtig: „{two_opts(i, g, (g, w))[0]}“ oder "
+                           f"„{two_opts(i, g, (g, w))[1]}“? Antworte nur mit dem Wort."}]}
+            for i, (g, w) in enumerate(items[:n or len(items)])]
+
+
+def score_de_common_misspell(item, reply):
+    r = score_de_eszett(item, {"content": strip_lead(reply["content"] or "")})  # one offered word, word-bounded
+    r["detail"] = {"ok_spelling": r["score"]}
+    return r
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5596,6 +5620,7 @@ TASKS = {
     "de_linking": task(("de",), load_de_linking, score_de_linking, 16, None, lang_check=False),
     "de_syllables": task(("de",), load_de_syllables, score_de_syllables, 16, None, lang_check=False),
     "de_dative_plural": task(("de",), load_de_dative_plural, score_de_dative_plural, 16, None, lang_check=False),
+    "de_common_misspell": task(("de",), load_de_common_misspell, score_de_common_misspell, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

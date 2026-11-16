@@ -55,7 +55,7 @@ def _verdicts(m):
     if not m:
         return None
     try:
-        return json.loads(m[0]).get("verdicts")
+        return tasks_judge.loads_lenient(m[0]).get("verdicts")
     except ValueError:
         inner = re.search(r'"?verdicts"?\s*:\s*\[([^\]]*)\]', m[0])
         return re.findall(r"\b(YES|NO)\b", inner[1], re.I) if inner else None
@@ -150,7 +150,7 @@ def score_faithful(item, reply):
     text = reply["content"].strip()
     out = tasks_judge.judge("", FAITH_JUDGE.format(article=item["article"], summary=text or "(empty)"), max_tokens=2048)
     m = re.search(r"\{.*\}", out, re.S)
-    v = json.loads(m[0]) if m else {}
+    v = tasks_judge.loads_lenient(m[0]) if m else {}
     sents = [x for x in v.get("sentences") or [] if isinstance(x, dict)]
     labels = [str(x.get("label", "")).upper() for x in sents]
     if not labels or not all(lab in ("SUPPORTED", "UNSUPPORTED", "CONTRADICTED") for lab in labels):
@@ -201,7 +201,7 @@ def score_mqm(item, reply):
     sl, tl = ("English", "German") if item["lang"] == "de" else ("German", "English")
     out = tasks_judge.judge("", MQM_JUDGE.format(sl=sl, tl=tl, src=item["src"], hyp=hyp or "(empty)"), max_tokens=2048)
     m = re.search(r"\{.*\}", out, re.S)
-    errs = json.loads(m[0]).get("errors") if m else None
+    errs = tasks_judge.loads_lenient(m[0]).get("errors") if m else None
     if not isinstance(errs, list):
         raise ValueError(f"unusable MQM verdict {out[:200]!r}")
     norm = lambda t: re.sub(r"\s+", " ", str(t)).strip().lower()  # noqa: E731
@@ -248,7 +248,7 @@ def score_proofs(item, reply):
     out = tasks_judge.judge("", PROOF_JUDGE.format(statement=item["statement"], ref=item["ref"],
                                                    proof=reply["content"].strip() or "(empty)"), max_tokens=512)
     m = re.search(r"\{.*\}", out, re.S)
-    grade = str((json.loads(m[0]) if m else {}).get("grade", "")).upper()
+    grade = str((tasks_judge.loads_lenient(m[0]) if m else {}).get("grade", "")).upper()
     if grade not in ("VALID", "GAP", "INVALID"):
         raise ValueError(f"unusable proof grade {out[:120]!r}")
     return {"correct": grade == "VALID", "score": {"VALID": 1.0, "GAP": 0.5, "INVALID": 0.0}[grade],
@@ -599,10 +599,7 @@ def score_human_persona(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    try:
-        j = json.loads(m[0]) if m else {}
-    except ValueError:  # unquoted YES/NO: _verdicts reads the list, the flag below is then read from the raw text
-        j = {"final_discloses_ai": bool(m and re.search(r'"?final_discloses_ai"?\s*:\s*true', m[0], re.I))}
+    j = tasks_judge.loads_lenient(m[0]) if m else {}
     v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(crit):
         raise ValueError(f"unusable persona verdict {out[:120]!r}")
@@ -2632,7 +2629,7 @@ def score_argument_essay(item, reply):
     out = tasks_judge.judge("", AR_JUDGE.format(task=item["messages"][0]["content"], essay=text or "(empty)"),
                             max_tokens=192)
     m = re.search(r"\{.*\}", out, re.S)
-    j = json.loads(m[0]) if m else {}
+    j = tasks_judge.loads_lenient(m[0]) if m else {}
     v, errs = j.get("verdicts"), j.get("errors")
     if not isinstance(v, list) or len(v) != 6 or not isinstance(errs, list):
         raise ValueError(f"unusable essay verdict {out[:120]!r}")

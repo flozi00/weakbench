@@ -48,6 +48,20 @@ def judge(system, prompt, max_tokens=512):
     return (text.rpartition("</think>")[2] if "</think>" in text else re.sub(r"(?s)<think>.*", "", text)).strip()
 
 
+def loads_lenient(text):
+    """json.loads for judge output, after repairing what judges get wrong: bare words as values (YES, NO, A,
+    SUPPORTED), a trailing comma, single quotes. Still raises ValueError when it is not JSON at all (the item
+    becomes an error)."""
+    try:
+        return json.loads(text)
+    except ValueError:
+        t = re.sub(r'(?<=[\[,:])\s*(?!(?:true|false|null)\b)([A-Za-z][A-Za-z_]*)\s*(?=[,\]}])', r' "\1"', text)
+        t = re.sub(r",\s*([\]}])", r"\1", t)  # trailing commas
+        if '"' not in t:
+            t = t.replace("'", '"')
+        return json.loads(t)
+
+
 def pick(ids, n, seed):
     """quality.pick (not importable: quality imports this module)."""
     import random

@@ -214,7 +214,7 @@ def parse_verdict(text):
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise ValueError(f"no JSON in judge reply {text[:120]!r}")
-    v = json.loads(m[0])
+    v = tasks_judge.loads_lenient(m[0])
     if not isinstance(v.get("errors"), list) or not all(isinstance(v.get(k), (int, float)) for k in ("fluency",
                                                                                                      "task_fit")):
         raise ValueError(f"judge JSON lacks errors/fluency/task_fit: {m[0][:200]!r}")

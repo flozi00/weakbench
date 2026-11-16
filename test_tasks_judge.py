@@ -211,7 +211,23 @@ def test_judge_strips_unopened_think():
         stop()
 
 
+
+def test_loads_lenient():
+    """Judge JSON with bare labels, trailing commas or single quotes is repaired; non-JSON still raises."""
+    assert tj.loads_lenient('{"verdicts": [YES, NO]}') == {"verdicts": ["YES", "NO"]}
+    assert tj.loads_lenient('{"grade": A}') == {"grade": "A"}
+    assert tj.loads_lenient('{"sentences": [{"label": SUPPORTED},]}') == {"sentences": [{"label": "SUPPORTED"}]}
+    assert tj.loads_lenient("{'errors': []}") == {"errors": []}
+    assert tj.loads_lenient('{"ok": true, "n": null}') == {"ok": True, "n": None}
+    try:
+        tj.loads_lenient("no json here")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("non-JSON must raise")
+
 if __name__ == "__main__":
+    test_loads_lenient()
     test_judge_strips_unopened_think()
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

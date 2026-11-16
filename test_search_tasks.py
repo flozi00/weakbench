@@ -577,6 +577,29 @@ def test_ice_slide():  # layered search over stop cells, sliding re-implemented 
             assert layer, q
         assert d == it["gold"], q
 
+
+def test_robot_turns():  # Dijkstra-free layered search over (row, col, heading) re-read from the printed grid
+    names = {"north": 0, "east": 1, "south": 2, "west": 3}
+    for it in prompts(tn.load_robot_turns):
+        q = it["messages"][0]["content"]
+        grid = [ln.split() for ln in re.findall(r"^((?:[#.RG] )+[#.RG])$", q, re.M)]
+        find = lambda c: next((y, x) for y, row in enumerate(grid) for x, v in enumerate(row) if v == c)  # noqa: E731
+        start, goal = find("R"), find("G")
+        head = names[re.search(r"The robot faces (\w+)\.", q)[1]]
+        step = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}
+        layer, seen, d = {(start, head)}, {(start, head)}, 0
+        while not any(p == goal for p, _ in layer):
+            nxt = set()
+            for p, hd in layer:
+                y, x = p[0] + step[hd][0], p[1] + step[hd][1]
+                if 0 <= y < len(grid) and 0 <= x < len(grid[0]) and grid[y][x] != "#":
+                    nxt.add(((y, x), hd))
+                nxt |= {(p, (hd + 1) % 4), (p, (hd + 3) % 4)}
+            layer = nxt - seen
+            seen |= layer
+            d += 1
+        assert d == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

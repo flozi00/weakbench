@@ -12042,6 +12042,78 @@ def score_ice_slide(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"manhattan_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- robot_turns
+# A robot on a 5x5 / 6x6 grid with walls, facing a compass direction; its only actions are "forward one square",
+# "turn left 90°" and "turn right 90°", each counting one step. The fewest steps to reach the goal square (any facing)?
+# BFS over (cell, heading): turning costs as much as moving, so the shortest path in squares is not the answer.
+# `ok`, `squares_only_bait` (the path length ignoring turns).
+RT_HEAD = {"en": ["north", "east", "south", "west"], "de": ["Norden", "Osten", "Süden", "Westen"]}
+
+
+def rt_steps(grid, start, head, goal, turns=True):
+    from collections import deque
+    h, w = len(grid), len(grid[0])
+    vec = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+    s0 = (start, head if turns else 0)
+    seen, dq = {s0: 0}, deque([s0])
+    while dq:
+        (p, d) = st = dq.popleft()
+        if p == goal:
+            return seen[st]
+        nxt = []
+        if turns:
+            ny, nx = p[0] + vec[d][0], p[1] + vec[d][1]
+            if 0 <= ny < h and 0 <= nx < w and grid[ny][nx] != "#":
+                nxt.append(((ny, nx), d))
+            nxt += [(p, (d + 1) % 4), (p, (d - 1) % 4)]
+        else:
+            for dy, dx in vec:
+                ny, nx = p[0] + dy, p[1] + dx
+                if 0 <= ny < h and 0 <= nx < w and grid[ny][nx] != "#":
+                    nxt.append(((ny, nx), 0))
+        for ns in nxt:
+            if ns not in seen:
+                seen[ns] = seen[st] + 1
+                dq.append(ns)
+    return None
+
+
+def load_robot_turns(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("robot_turns", i, att)
+        while True:
+            size = r.choice([5, 6])
+            grid = [["#" if r.random() < 0.2 else "." for _ in range(size)] for _ in range(size)]
+            free = [(y, x) for y in range(size) for x in range(size) if grid[y][x] == "."]
+            S, G = r.sample(free, 2)
+            head = r.randrange(4)
+            gold, sq = rt_steps(grid, S, head, G), rt_steps(grid, S, head, G, turns=False)
+            if gold and sq and gold >= sq + 2 and gold <= 16 and sum(it["gold"] == gold for it in items) < len(items) // 6 + 2:
+                break
+        show = [row[:] for row in grid]
+        show[S[0]][S[1]], show[G[0]][G[1]] = "R", "G"
+        text = "\n".join(" ".join(row) for row in show)
+        H = RT_HEAD[lang]
+        q = (f"A grid (# wall, . floor, R robot, G goal; north is up):\n{text}\n\nThe robot faces {H[head]}. Its only actions are: "
+             f"move forward one square (in the direction it faces, not into a wall or off the grid), turn left 90°, turn right "
+             f"90°. Each action counts as one step. What is the smallest number of steps to reach G (facing any direction)?"
+             if lang == "en" else
+             f"Ein Raster (# Wand, . Boden, R Roboter, G Ziel; Norden ist oben):\n{text}\n\nDer Roboter schaut nach {H[head]}. Er "
+             f"kann nur: ein Feld vorwärts fahren (in Blickrichtung, nicht in eine Wand oder über den Rand), sich um 90° nach "
+             f"links drehen, sich um 90° nach rechts drehen. Jede Aktion zählt als ein Schritt. Wie viele Schritte braucht er "
+             f"mindestens bis G (Blickrichtung egal)?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": sq,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_robot_turns(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"squares_only_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -13150,6 +13222,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "robot_turns": task(load_robot_turns, score_robot_turns, 24, 96),
     "ice_slide": task(load_ice_slide, score_ice_slide, 24, 96),
     "verify_solution": task(load_verify_solution, score_verify_solution, 24, 96),
     "list_diff": task(load_list_diff, score_list_diff, 24, 96),

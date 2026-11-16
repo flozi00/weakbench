@@ -10543,6 +10543,61 @@ def score_river_crossing(item, reply):
             "detail": {f"ok_cap{item['cap']}": float(ok), "no_conflict_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- lights_out
+# A 3x3 panel of lamps (1 on, 0 off); pressing a lamp flips it and its up/down/left/right neighbours. The fewest
+# presses that turn every lamp off? Search over press sets (order does not matter; pressing twice undoes); gold from all
+# 512 sets. Bait: the number of lamps that are on. Gold balanced over 2-5. `ok_<gold>`, `lamp_count_bait`.
+def lo_press(state, k):
+    s = list(state)
+    for j in [k] + [k + d for d in (-3, 3) if 0 <= k + d < 9] + [k + d for d in (-1, 1) if (k + d) // 3 == k // 3 and 0 <= k + d < 9]:
+        s[j] ^= 1
+    return s
+
+
+def lo_min(state):
+    best = None
+    for mask in range(512):
+        s = list(state)
+        for k in range(9):
+            if mask >> k & 1:
+                s = lo_press(s, k)
+        if not any(s):
+            c = bin(mask).count("1")
+            best = c if best is None else min(best, c)
+    return best
+
+
+def load_lights_out(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("lights_out", i, att)
+        want = i % 4 + 2
+        while True:
+            state = [0] * 9
+            for k in r.sample(range(9), want):  # pressing `want` lamps from all-off gives a solvable board
+                state = lo_press(state, k)
+            gold = lo_min(state)
+            if gold == want and sum(state) != gold:
+                break
+        grid = "\n".join(" ".join(map(str, state[j:j + 3])) for j in (0, 3, 6))
+        q = (f"A 3x3 panel of lamps (1 = on, 0 = off):\n{grid}\n\nPressing a lamp switches it and the lamps directly above, "
+             f"below, left and right of it (on becomes off, off becomes on). What is the smallest number of presses that turns "
+             f"all lamps off?" if lang == "en" else
+             f"Ein 3x3-Feld aus Lampen (1 = an, 0 = aus):\n{grid}\n\nEin Druck auf eine Lampe schaltet sie und die Lampen direkt "
+             f"darüber, darunter, links und rechts davon um (an wird aus, aus wird an). Wie viele Drücke braucht man mindestens, "
+             f"bis alle Lampen aus sind?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": sum(state),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_lights_out(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['gold']}": float(ok), "lamp_count_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11651,6 +11706,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "lights_out": task(load_lights_out, score_lights_out, 24, 96),
     "river_crossing": task(load_river_crossing, score_river_crossing, 24, 96),
     "knight_moves": task(load_knight_moves, score_knight_moves, 24, 96),
     "cube_net": task(load_cube_net, score_cube_net, 24, 96),

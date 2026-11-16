@@ -11419,6 +11419,79 @@ def score_toy_machine_inverse(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"final_value_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- box_push
+# A one-box Sokoban on a 5x5 / 6x6 grid: the worker (P) can walk on floor and push the box (B) one square by walking
+# into it (never pull); fewest pushes to get the box onto the target (T)? BFS over (box, worker) with pushes as the
+# cost (0-1 BFS). Walls make some pushes impossible (corners trap the box). Bait: the box's plain grid distance to
+# the target, which is never the gold. `ok`, `manhattan_bait`.
+def bp_pushes(grid, P, B, T):
+    from collections import deque
+    h, w = len(grid), len(grid[0])
+    free = lambda y, x: 0 <= y < h and 0 <= x < w and grid[y][x] != "#"  # noqa: E731
+    start = (B, P)
+    dist, dq = {start: 0}, deque([start])
+    while dq:
+        st = dq.popleft()
+        (by, bx), (py, px) = st
+        if (by, bx) == T:
+            return dist[st]
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = py + dy, px + dx
+            if not free(ny, nx):
+                continue
+            if (ny, nx) == (by, bx):  # a push
+                ty, tx = by + dy, bx + dx
+                if free(ty, tx):
+                    ns, c = ((ty, tx), (by, bx)), dist[st] + 1
+                    if c < dist.get(ns, 10 ** 9):
+                        dist[ns] = c
+                        dq.append(ns)
+            else:  # a walk costs no push
+                ns = ((by, bx), (ny, nx))
+                if dist[st] < dist.get(ns, 10 ** 9):
+                    dist[ns] = dist[st]
+                    dq.appendleft(ns)
+    return None
+
+
+def load_box_push(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("box_push", i, att)
+        while True:
+            size = r.choice([5, 6])
+            grid = [["#" if r.random() < 0.22 else "." for _ in range(size)] for _ in range(size)]
+            cells = [(y, x) for y in range(size) for x in range(size) if grid[y][x] == "."]
+            if len(cells) < 6:
+                continue
+            P, B, T = r.sample(cells, 3)
+            gold = bp_pushes(grid, P, B, T)
+            man = abs(B[0] - T[0]) + abs(B[1] - T[1])
+            if gold and gold != man and gold >= 3 and sum(it["gold"] == gold for it in items) < len(items) // 5 + 2:
+                break
+        show = [row[:] for row in grid]
+        for (y, x), c in ((P, "P"), (B, "B"), (T, "T")):
+            show[y][x] = c
+        text = "\n".join(" ".join(row) for row in show)
+        q = (f"A warehouse grid (# wall, . floor, P worker, B box, T target square):\n{text}\n\nThe worker walks one square up, "
+             f"down, left or right at a time and can only push the box: walking into the box moves it one square further in "
+             f"the same direction, if that square is floor. The box can never be pulled. What is the smallest number of "
+             f"pushes needed to get the box onto T?" if lang == "en" else
+             f"Ein Lagerraster (# Wand, . Boden, P Arbeiter, B Kiste, T Zielfeld):\n{text}\n\nDer Arbeiter geht jeweils ein Feld "
+             f"nach oben, unten, links oder rechts und kann die Kiste nur schieben: Läuft er in die Kiste, rutscht sie ein "
+             f"Feld weiter in dieselbe Richtung, wenn dort Boden ist. Ziehen geht nie. Wie viele Schübe braucht man "
+             f"mindestens, bis die Kiste auf T steht?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": man,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_box_push(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"manhattan_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12527,6 +12600,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "box_push": task(load_box_push, score_box_push, 24, 96),
     "toy_machine_inverse": task(load_toy_machine_inverse, score_toy_machine_inverse, 24, 96),
     "cube_turns": task(load_cube_turns, score_cube_turns, 24, 96),
     "painted_cube": task(load_painted_cube, score_painted_cube, 24, 96),

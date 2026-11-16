@@ -400,6 +400,42 @@ def test_toy_machine_inverse():  # substitute 1-9 into the listing and run the t
                 fits.append(v)
         assert fits == [it["gold"]], (q, fits)
 
+
+def test_box_push():  # iterative deepening over pushes: from each state, every box position reachable by walking
+    for it in prompts(tn.load_box_push, 48):
+        q = it["messages"][0]["content"]
+        grid = [ln.split() for ln in re.findall(r"^((?:[#.PBT] )+[#.PBT])$", q, re.M)]
+        h, w = len(grid), len(grid[0])
+        find = lambda c: next((y, x) for y, row in enumerate(grid) for x, v in enumerate(row) if v == c)  # noqa: E731
+        P, B, T = find("P"), find("B"), find("T")
+        free = lambda y, x: 0 <= y < h and 0 <= x < w and grid[y][x] != "#"  # noqa: E731
+
+        def walk(p, box):  # cells the worker reaches without pushing
+            seen, todo = {p}, [p]
+            while todo:
+                y, x = todo.pop()
+                for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    c = (y + dy, x + dx)
+                    if free(*c) and c != box and c not in seen:
+                        seen.add(c)
+                        todo.append(c)
+            return seen
+        layer, seen, d = {(B, P)}, {(B, P)}, 0
+        while not any(b == T for b, _ in layer):
+            nxt = set()
+            for box, p in layer:
+                reach = walk(p, box)
+                for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    stand, to = (box[0] - dy, box[1] - dx), (box[0] + dy, box[1] + dx)
+                    if stand in reach and free(*to):
+                        st = (to, box)
+                        if st not in seen:
+                            seen.add(st)
+                            nxt.add(st)
+            layer, d = nxt, d + 1
+            assert layer, q
+        assert d == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

@@ -170,7 +170,7 @@ citation_check  Four generated sources about invented companies and an answer of
                 source). Name the claim number. `wrong_pos` in detail.
 
 Self-built state and search (the model must generate the steps itself or picture space; given step lists are
-easy for 24B models, these are not; each gold is checked by an independent solver in its own test run):
+easy for 24B models, these are not; each gold was cross-checked once by an independently written solver):
 merge_conflict  3-way merge of a config file, which lines conflict (both changed, differently). `one_side_flagged`.
 dice_roll       A die tipped 4-8 times over its edges, which number is on top.
 hanoi_state     Tower of Hanoi (4-6 disks, optimal), which disks lie on a peg after move m.

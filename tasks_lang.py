@@ -4315,6 +4315,38 @@ def score_en_common_misspell(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- de_verb_cluster (verb order at the end of a subordinate clause)
+# Passive and modal clusters: "dass das Problem gelöst werden kann", "obwohl die Tür repariert worden ist", "weil er
+# den Bus verpasst haben muss". The wrong version permutes the same verbs (no Ersatzinfinitiv: de_ersatzinfinitiv
+# covers it), so length cannot help; gold position balanced.
+VCL_ITEMS = [("Ich glaube, dass das Problem gelöst werden kann.", "Ich glaube, dass das Problem gelöst kann werden."),
+             ("Sie sagt, dass die Tür repariert worden ist.", "Sie sagt, dass die Tür repariert ist worden."),
+             ("Er kommt zu spät, weil er den Bus verpasst haben muss.", "Er kommt zu spät, weil er den Bus verpasst muss haben."),
+             ("Wir wissen, dass der Brief geschrieben werden soll.", "Wir wissen, dass der Brief geschrieben soll werden."),
+             ("Es ist klar, dass das Haus verkauft worden war.", "Es ist klar, dass das Haus worden verkauft war."),
+             ("Ich hoffe, dass die Rechnung bezahlt worden ist.", "Ich hoffe, dass die Rechnung bezahlt ist worden."),
+             ("Er fragt, ob die Arbeit bis Freitag erledigt werden muss.", "Er fragt, ob die Arbeit bis Freitag erledigt muss werden."),
+             ("Sie meint, dass er das gewusst haben könnte.", "Sie meint, dass er das gewusst könnte haben."),
+             ("Wir glauben, dass der Fehler gefunden worden sein muss.", "Wir glauben, dass der Fehler gefunden sein worden muss."),
+             ("Ich weiß, dass die Fenster geputzt werden müssen.", "Ich weiß, dass die Fenster geputzt müssen werden."),
+             ("Es scheint, dass der Zug angekommen sein muss.", "Es scheint, dass der Zug angekommen muss sein."),
+             ("Sie erzählt, dass das Auto gestohlen worden ist.", "Sie erzählt, dass das Auto worden gestohlen ist."),
+             ("Ich denke, dass die Datei gelöscht worden sein könnte.", "Ich denke, dass die Datei gelöscht sein worden könnte."),
+             ("Er sagt, dass der Kuchen gegessen werden darf.", "Er sagt, dass der Kuchen gegessen darf werden."),
+             ("Wir hören, dass die Straße gesperrt werden wird.", "Wir hören, dass die Straße gesperrt wird werden."),
+             ("Sie vermutet, dass er krank gewesen sein muss.", "Sie vermutet, dass er krank sein gewesen muss.")]
+
+
+def load_de_verb_cluster(lang, n, seed):
+    items = []
+    for i, (g, w) in enumerate(VCL_ITEMS[:n or len(VCL_ITEMS)]):
+        a, b = two_opts(i, g, (g, w))
+        items.append({"id": str(i), "lang": "de", "gold": "A" if a == g else "B", "literal": "B" if a == g else "A",
+                      "messages": [{"role": "user", "content": "Welcher Satz hat die richtige Wortstellung?\n"
+                                    f"A. {a}\nB. {b}\nAntworte mit einer Zeile \"Antwort: A\" oder \"Antwort: B\"."}]})
+    return items
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5737,6 +5769,7 @@ TASKS = {
     "de_common_misspell": task(("de",), load_de_common_misspell, score_de_common_misspell, 16, None, lang_check=False),
     "de_comma_pairs": task(("de",), load_de_comma_pairs, score_idioms, 16, None, lang_check=False),
     "de_colon_case": task(("de",), load_de_colon_case, score_idioms, 16, None, lang_check=False),
+    "de_verb_cluster": task(("de",), load_de_verb_cluster, score_idioms, 16, None, lang_check=False),
     "en_common_misspell": task(("en",), load_en_common_misspell, score_en_common_misspell, 16, None, lang_check=False),
     "en_time_preps": task(("en",), load_en_time_preps, score_en_place_preps, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),

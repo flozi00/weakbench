@@ -906,7 +906,17 @@ def test_leichte_sprache():
     finally:
         stop()
 
+
+def test_verdicts_unquoted():
+    """A judge writing {"verdicts": [YES, NO]} (LFM2.5 as judge did) is read, not an item error."""
+    import re
+    m = re.search(r"\{.*\}", 'ok {"verdicts": [YES, NO, YES]}', re.S)
+    assert to._verdicts(m) == ["YES", "NO", "YES"]
+    assert to._verdicts(re.search(r"\{.*\}", '{"verdicts": ["YES"]}')) == ["YES"]
+    assert to._verdicts(None) is None
+
 if __name__ == "__main__":
+    test_verdicts_unquoted()
     test_leichte_sprache()
     test_story_continue()
     test_subtitle_mt()

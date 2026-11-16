@@ -49,6 +49,18 @@ import tasks_lang
 import tasks_text
 
 
+def _verdicts(m):
+    """The "verdicts" list from a judge reply's {...} match; a judge that writes unquoted YES/NO (LFM2.5 did:
+    {"verdicts": [YES, NO]}) is read token by token instead of failing the item."""
+    if not m:
+        return None
+    try:
+        return json.loads(m[0]).get("verdicts")
+    except ValueError:
+        inner = re.search(r'"?verdicts"?\s*:\s*\[([^\]]*)\]', m[0])
+        return re.findall(r"\b(YES|NO)\b", inner[1], re.I) if inner else None
+
+
 def _yes(x):
     """A judge verdict: YES / TRUE / JA, also numbered like "1. YES"."""
     return x is True or bool(re.match(r"\s*(?:\d+[.):]\s*)?(?:Y|TRUE|J)", str(x), re.I))
@@ -282,7 +294,7 @@ def score_roleplay(item, reply):
                                                   crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(ROLE_CHECK))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(ROLE_CHECK):
         raise ValueError(f"unusable roleplay verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -425,7 +437,7 @@ def score_tutor_feedback(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(crit):
         raise ValueError(f"unusable tutor verdict {out[:120]!r}")
     met = [str(x).strip().upper().startswith("Y") for x in v]
@@ -488,7 +500,7 @@ def score_persona_guard(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(PG_CHECK))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(PG_CHECK):
         raise ValueError(f"unusable persona verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -642,7 +654,7 @@ def score_self_model(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(SM_CHECK))),
                             max_tokens=192)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(SM_CHECK):
         raise ValueError(f"unusable self-model verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -699,7 +711,7 @@ def score_constrained_plan(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(item["criteria"]))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(item["criteria"]):
         raise ValueError(f"unusable plan verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -762,7 +774,7 @@ def score_memory_dialog(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(item["criteria"]))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(item["criteria"]):
         raise ValueError(f"unusable memory verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -824,7 +836,7 @@ def score_audience_explain(item, reply):
     out = tasks_judge.judge("", AE_JUDGE.format(req=item["messages"][0]["content"], text=text or "(empty)",
                                                 fit=AE_CHECK[item["audience"]]), max_tokens=128)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable explain verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [words <= item["limit"]]
@@ -874,7 +886,7 @@ def score_minimal_edit(item, reply):
     out = tasks_judge.judge("", ME_JUDGE.format(orig=item["sents"][item["k"]], text=text or "(empty)",
                                                 tense="Präteritum" if item["lang"] == "de" else "simple past"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable edit verdict {out[:120]!r}")
     edit = all(_yes(x) for x in v) and not target_unchanged
@@ -948,7 +960,7 @@ def score_de_dialect(item, reply):
     out = tasks_judge.judge("", DD_JUDGE.format(dialect=item["dialect"], src=item["src"], ref=item["ref"], text=text or "(empty)"),
                             max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable dialect verdict {out[:120]!r}")
     meaning, standard = (_yes(x) for x in v)
@@ -1014,7 +1026,7 @@ def score_honest_headline(item, reply):
     out = tasks_judge.judge("", HH_JUDGE.format(text=item["text"], head=head or "(empty)", main=item["main"],
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 4:
         raise ValueError(f"unusable headline verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [1 <= words <= 10 and len(lines) == 1]  # extra lines (a self-justification) break the limit
@@ -1068,7 +1080,7 @@ def score_rhyme_poem(item, reply):
     out = tasks_judge.judge("", RP_JUDGE.format(scheme=item["scheme"], topic=item["topic"], text="\n".join(lines) or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable poem verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [len(lines) == 4, has_word]
@@ -1113,7 +1125,7 @@ def score_analogy_transfer(item, reply):
     out = tasks_judge.judge("", AT_JUDGE.format(concept=item["concept"], domain=item["domain"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 4:
         raise ValueError(f"unusable analogy verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [words <= 150]
@@ -1177,7 +1189,7 @@ def score_decision_memo(item, reply):
     words = len([w for w in text.split() if re.search(r"\w", w)])
     out = tasks_judge.judge("", DM_JUDGE.format(text=text or "(empty)", **item["facts"]), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable memo verdict {out[:120]!r}")
     met = [choice_ok] + [_yes(x) for x in v] + [words <= 120]
@@ -1226,7 +1238,7 @@ def score_interpreter(item, reply):
     out = tasks_judge.judge("", IP_JUDGE.format(who="doctor" if item["src_lang"] == "de" else "patient", src=names[item["src_lang"]],
                                                 msg=item["msg"], tgt=names[item["tgt"]], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable interpreter verdict {out[:120]!r}")
     faithful, role = (_yes(x) for x in v)
@@ -1297,7 +1309,7 @@ def score_conflict_summary(item, reply):
     both = has(item["a"]) and has(item["b"])
     out = tasks_judge.judge("", CS_JUDGE.format(a=item["fa"], b=item["fb"], reports=item["reports"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable summary verdict {out[:120]!r}")
     flags, no_pick, faithful = (_yes(x) for x in v)
@@ -1342,7 +1354,7 @@ def score_concept_contrast(item, reply):
     words = len([w for w in text.split() if re.search(r"\w", w)])
     out = tasks_judge.judge("", CC_JUDGE.format(a=item["a"], b=item["b"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable contrast verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [words <= 120 and reply.get("finish_reason") != "length"]  # a cut-off answer is not within
@@ -1399,7 +1411,7 @@ def score_de_creative(item, reply):
     out = tasks_judge.judge("", DCW_JUDGE.format(persp=item["persp"], tense=item["tense"], motif=item["motif"], sit=item["sit"],
                                                  text=text or "(empty)"), max_tokens=96)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable story verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [230 <= words <= 420 and reply.get("finish_reason") != "length"]
@@ -1475,7 +1487,7 @@ def score_de_learner_feedback(item, reply):
     out = tasks_judge.judge("", LF_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
                             max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable feedback verdict {out[:120]!r}")
     met = [corrected] + [_yes(x) for x in v]
@@ -1522,7 +1534,7 @@ def score_en_learner_feedback(item, reply):
     out = tasks_judge.judge("", LFE_JUDGE.format(bad=item["bad"], good=item["good"], topic=item["topic"], text=text or "(empty)"),
                             max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable feedback verdict {out[:120]!r}")
     met = [corrected] + [_yes(x) for x in v]
@@ -1602,7 +1614,7 @@ def score_de_gender_fair(item, reply):
     left = [w for w in item["masc"] if re.search(rf"\b{_gf_forms(w)[0]}\b", rest)]
     out = tasks_judge.judge("", GF_JUDGE.format(src=item["src"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 4:
         raise ValueError(f"unusable de_gender_fair verdict {out[:120]!r}")
     facts, neutral, grammar, natural = (_yes(x) for x in v)
@@ -1663,7 +1675,7 @@ def score_double_meaning(item, reply):
     out = tasks_judge.judge("", DBL_JUDGE.format(language="German" if item["lang"] == "de" else "English", word=item["word"],
                                                 m1=item["m1"], m2=item["m2"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable double_meaning verdict {out[:120]!r}")
     both, joke, lang_ok = (_yes(x) for x in v)
@@ -1770,7 +1782,7 @@ def score_concise_rewrite(item, reply):
     out = tasks_judge.judge("", CR_JUDGE.format(src=item["src"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable concise_rewrite verdict {out[:120]!r}")
     faithful, reads, grammar = (_yes(x) for x in v)
@@ -1865,7 +1877,7 @@ def score_negotiate(item, reply):
     out = tasks_judge.judge("", NG_JUDGE.format(item=item["item"], ask=item["ask"], floor=item["floor"], push=item["push"],
                                                 desc=item["desc"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable negotiate verdict {out[:120]!r}")
     closes, polite, honest = (_yes(x) for x in v)
@@ -1942,7 +1954,7 @@ def score_honest_ad(item, reply):
     out = tasks_judge.judge("", HAD_JUDGE.format(sheet=item["sheet"], text=text or "(empty)", limit=item["limit"],
                                                  language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 4:
         raise ValueError(f"unusable honest_ad verdict {out[:120]!r}")
     sells, no_claims, limit_ok, grammar = (_yes(x) for x in v)
@@ -2032,7 +2044,7 @@ def score_vegan_adapt(item, reply):
     out = tasks_judge.judge("", VA_JUDGE.format(q=item["q"], orig=item["orig"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable vegan_adapt verdict {out[:120]!r}")
     subs, method, grammar = (_yes(x) for x in v)
@@ -2164,7 +2176,7 @@ def score_transcript_clean(item, reply):
     out = tasks_judge.judge("", TCL_JUDGE.format(src=item["src"], text=text or "(empty)",
                                                  language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable transcript_clean verdict {out[:120]!r}")
     faithful, written, grammar = (_yes(x) for x in v)
@@ -2230,7 +2242,7 @@ def score_subtitle_mt(item, reply):
     out = tasks_judge.judge("", SUB_JUDGE.format(src_lang=names["en" if item["lang"] == "de" else "de"], tgt_lang=names[item["lang"]],
                                                  src=item["src"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable subtitle_mt verdict {out[:120]!r}")
     meaning, natural, grammar = (_yes(x) for x in v)
@@ -2279,7 +2291,7 @@ def score_steelman(item, reply):
     name = {"de": "German", "en": "English"}[item["lang"]]
     out = tasks_judge.judge("", STM_JUDGE.format(view=item["view"], lang=name, text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 4:
         raise ValueError(f"unusable steelman verdict {out[:120]!r}")
     against, strong, no_undercut, grammar = (_yes(x) for x in v)
@@ -2349,7 +2361,7 @@ def score_story_continue(item, reply):
     out = tasks_judge.judge("", STC_JUDGE.format(lang={"de": "German", "en": "English"}[item["lang"]],
                                                  opening=item["opening"], text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable story_continue verdict {out[:120]!r}")
     consistent, continues, style = (_yes(x) for x in v)
@@ -2415,7 +2427,7 @@ def score_leichte_sprache(item, reply):
     no_gen = not re.search(r"\bdes\b", text, re.I)
     out = tasks_judge.judge("", LS_JUDGE.format(src=item["src"], text=text or "(leer)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable leichte_sprache verdict {out[:120]!r}")
     facts, easy, one_thing = (_yes(x) for x in v)
@@ -2500,7 +2512,7 @@ def score_delay_notice(item, reply):
     out = tasks_judge.judge("", DN_JUDGE.format(note=item["note"], text=text or "(empty)",
                                                 language="German" if item["lang"] == "de" else "English"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable delay_notice verdict {out[:120]!r}")
     no_extra, no_blame, tone, clear, grammar = (_yes(x) for x in v)
@@ -2569,7 +2581,7 @@ def score_risk_explain(item, reply):
     out = tasks_judge.judge("", RX_JUDGE.format(N=item["N"], t=item["t"], c=item["c"], arr_txt=arr_txt, rrr=item["rrr"],
                                                 text=text or "(empty)"), max_tokens=64)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable risk verdict {out[:120]!r}")
     met = [absolute] + [_yes(x) for x in v]
@@ -2683,7 +2695,7 @@ def score_socratic_tutor(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(ST_CHECK))),
                             max_tokens=192)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(ST_CHECK):
         raise ValueError(f"unusable tutor verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -2745,7 +2757,7 @@ def score_neutral_summary(item, reply):
     out = tasks_judge.judge("", NS_JUDGE.format(pa=item["pa"], pb=item["pb"], sa=item["sa"], sb=item["sb"],
                                                 summary=text or "(empty)"), max_tokens=128)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable neutral verdict {out[:120]!r}")
     words = len([w for w in text.split() if re.search(r"\w", w)])
@@ -2807,7 +2819,7 @@ def score_triage_advice(item, reply):
     out = tasks_judge.judge("", TA_JUDGE.format(kind=item["kind"].upper(), msg=item["messages"][0]["content"],
                                                 reply=text or "(empty)"), max_tokens=96)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 3:
         raise ValueError(f"unusable triage verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [exact_ok]
@@ -2848,7 +2860,7 @@ def score_howto_steps(item, reply):
     out = tasks_judge.judge("", HS_JUDGE.format(task=item["messages"][0]["content"], reply=text or "(empty)",
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))), max_tokens=192)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(crit):
         raise ValueError(f"unusable howto verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -2936,7 +2948,7 @@ def score_tactful_message(item, reply):
     facts_ok = all(re.search(f, text, re.I) for f in item["facts"]) and words <= item["limit"]
     out = tasks_judge.judge("", TM_JUDGE.format(task=item["messages"][0]["content"], reply=text or "(empty)"), max_tokens=96)
     m = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != 5:
         raise ValueError(f"unusable tactful verdict {out[:120]!r}")
     met = [_yes(x) for x in v] + [facts_ok]

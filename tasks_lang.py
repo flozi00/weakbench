@@ -4955,6 +4955,47 @@ def score_en_gerund_inf(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['kind']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- switch_plan (follow a sentence-by-sentence language plan)
+# Six numbered sentences on a topic, each in the language the plan names (a random DE/EN pattern, not simple
+# alternation); every sentence must continue the text. Language per line by function words (_de_en). Models drift into
+# the language of the previous line or of the instruction. score = share of lines right; correct = all six and no extra.
+SWP_TOPICS = {"en": ["how to make good coffee", "why trains are late in winter", "a walk along a river", "learning to ride a bike",
+                     "how a library works", "packing for a camping trip"],
+              "de": ["wie man guten Kaffee kocht", "warum Züge im Winter Verspätung haben", "ein Spaziergang am Fluss",
+                     "Fahrradfahren lernen", "wie eine Bibliothek funktioniert", "Packen für einen Campingausflug"]}
+
+
+def load_switch_plan(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 24, items):
+        r = random.Random(f"switch_plan:{lang}:{i}" + (f"~{att}" if att else ""))
+        while True:
+            plan = [r.choice("DE") for _ in range(6)]
+            if 2 <= plan.count("D") <= 4 and any(plan[j] == plan[j + 1] for j in range(5)) and any(plan[j] != plan[j + 1] for j in range(5)):
+                break
+        topic = r.choice(SWP_TOPICS[lang])
+        names = {"en": {"D": "German", "E": "English"}, "de": {"D": "Deutsch", "E": "Englisch"}}[lang]
+        pl = ", ".join(f"{j + 1}: {names[c]}" for j, c in enumerate(plan))
+        q = (f"Write a short text of exactly six numbered sentences about {topic}. Each sentence must be in the language given "
+             f"by this plan, and the sentences must form one connected text: {pl}. Write only the six numbered sentences."
+             if lang == "en" else
+             f"Schreibe einen kurzen Text aus genau sechs nummerierten Sätzen über das Thema „{topic}“. Jeder Satz muss in der "
+             f"Sprache stehen, die dieser Plan vorgibt, und die Sätze müssen einen zusammenhängenden Text bilden: {pl}. "
+             f"Schreibe nur die sechs nummerierten Sätze.")
+        items.append({"id": str(i), "lang": lang, "plan": "".join(plan), "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_switch_plan(item, reply):
+    rows = re.findall(r"^\s*\**\s*\d+\s*[.):]\s*\**\s*(.+)$", reply["content"] or "", re.M)
+    want = ["de" if c == "D" else "en" for c in item["plan"]]
+    got = [_de_en(t) for t in rows[:6]]
+    hits = sum(g == w for g, w in zip(got, want))
+    ok = len(rows) == 6 and hits == 6
+    return {"correct": ok, "score": round(hits / 6, 4), "pred": "".join({"de": "D", "en": "E"}.get(g, "?") for g in got),
+            "gold": item["plan"], "detail": {"six_lines": float(len(rows) == 6), "line_lang": hits / 6}}
+
+
 # ---------------------------------------------------------------- mirror_language (reply in the customer's language)
 ML_MSGS = {"fr": ["Bonjour, ma commande n'est pas encore arrivée. Pouvez-vous me dire où elle se trouve ? Merci.",
                   "Bonjour, je voudrais changer l'adresse de livraison de ma commande. Est-ce que c'est encore possible ?",
@@ -5456,6 +5497,7 @@ TASKS = {
     "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
     "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
     "rhyme_pick": task(("de", "en"), load_rhyme_pick, score_idioms, 16, 16, lang_check=False),
+    "switch_plan": task(("de", "en"), load_switch_plan, score_switch_plan, 12, 24, lang_check=False),
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),

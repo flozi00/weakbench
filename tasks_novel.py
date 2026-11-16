@@ -10689,6 +10689,65 @@ def score_paper_punch(item, reply):
             "detail": {f"ok_f{item['folds']}": float(ok), "last_fold_bait": float(v == item["bait"] and v != item["gold"])}}
 
 
+# ---------------------------------------------------------------- view_side
+# Nine market stalls in a 3x3 block, given as a map (north at the top). A visitor stands at one side of the block,
+# facing it; which stall is at a position named from the visitor's view ("front left", "back right", ...)?
+# Perspective taking; the four sides in equal parts. Bait: reading the position off the map as if standing south.
+# `ok_<side>`, `map_bait`.
+VS_STALLS = {"en": ["bakery", "florist", "cheese", "fish", "fruit", "honey", "olives", "spices", "coffee", "books", "toys", "soap"],
+             "de": ["Bäcker", "Blumen", "Käse", "Fisch", "Obst", "Honig", "Oliven", "Gewürze", "Kaffee", "Bücher", "Spielzeug", "Seife"]}
+VS_POS = {"en": {(0, 0): "front left", (0, 1): "front middle", (0, 2): "front right", (1, 0): "middle left",
+                 (1, 1): "centre", (1, 2): "middle right", (2, 0): "back left", (2, 1): "back middle", (2, 2): "back right"},
+          "de": {(0, 0): "vorne links", (0, 1): "vorne in der Mitte", (0, 2): "vorne rechts", (1, 0): "in der Mitte links",
+                 (1, 1): "genau in der Mitte", (1, 2): "in der Mitte rechts", (2, 0): "hinten links", (2, 1): "hinten in der Mitte",
+                 (2, 2): "hinten rechts"}}
+VS_SIDE = {"en": {"S": "south", "N": "north", "E": "east", "W": "west"}, "de": {"S": "Süd", "N": "Nord", "E": "Ost", "W": "West"}}
+
+
+def vs_cell(side, depth, lr):
+    """Map cell (row from north, col from west) at depth 0-2 (front to back) and lr 0-2 (left to right) for a viewer
+    standing on `side` and facing the block."""
+    return {"S": (2 - depth, lr), "N": (depth, 2 - lr), "E": (2 - lr, 2 - depth), "W": (lr, depth)}[side]
+
+
+def load_view_side(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("view_side", i, att)
+        side = "NEWS"[i % 4]
+        while True:
+            pick = r.sample(range(len(VS_STALLS["en"])), 9)
+            grid = [pick[j:j + 3] for j in (0, 3, 6)]
+            depth, lr = r.randrange(3), r.randrange(3)
+            if (depth, lr) == (1, 1):
+                continue
+            row, col = vs_cell(side, depth, lr)
+            mrow, mcol = vs_cell("S", depth, lr)
+            if side == "S" or grid[row][col] != grid[mrow][mcol]:
+                break
+        S = VS_STALLS[lang]
+        w = max(len(x) for x in S)
+        rows = "\n".join("  ".join(S[x].ljust(w) for x in g).rstrip() for g in grid)
+        q = (f"Nine market stalls stand in a 3x3 block. Map (north at the top, west on the left):\n{rows}\n\nA visitor stands on "
+             f"the {VS_SIDE['en'][side]} side of the block and faces it. Which stall is {VS_POS['en'][(depth, lr)]} from the "
+             f"visitor's point of view?" if lang == "en" else
+             f"Neun Marktstände bilden einen 3x3-Block. Karte (Norden oben, Westen links):\n{rows}\n\nEine Besucherin steht an "
+             f"der {VS_SIDE['de'][side]}seite des Blocks und schaut auf ihn. Welcher Stand ist aus ihrer Sicht "
+             f"{VS_POS['de'][(depth, lr)]}?")
+        items.append({"id": str(i), "lang": lang, "gold": S[grid[row][col]], "bait": S[grid[mrow][mcol]], "side": side,
+                      "names": [S[x] for x in pick], "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_view_side(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower()
+    found = [nm for nm in item["names"] if re.search(rf"\b{re.escape(nm.lower())}\b", fa)]
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['side']}": float(ok), "map_bait": float(item["side"] != "S" and v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11797,6 +11856,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "view_side": task(load_view_side, score_view_side, 24, 96),
     "paper_punch": task(load_paper_punch, score_paper_punch, 24, 96),
     "lights_out": task(load_lights_out, score_lights_out, 24, 96),
     "river_crossing": task(load_river_crossing, score_river_crossing, 24, 96),

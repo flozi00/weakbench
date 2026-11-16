@@ -169,6 +169,19 @@ def test_paper_punch():  # move every original square through the folds as a poi
                     holes.append("ABCD"[c] + str(w + 1))
         assert sorted(holes) == it["gold"], q
 
+
+def test_view_side():  # rotate the map until the visitor's side is at the bottom, then read it like the map
+    pos = {v: k for k, v in tn.VS_POS["en"].items()}
+    turns = {"south": 0, "east": 1, "north": 2, "west": 3}  # clockwise quarter turns that bring that side to the bottom
+    for it in prompts(tn.load_view_side):
+        q = it["messages"][0]["content"]
+        grid = [ln.split() for ln in q.split("\n\n")[0].split("\n")[1:]]
+        side, where = re.search(r"on the (\w+) side .* Which stall is (.+) from", q, re.S).groups()
+        for _ in range(turns[side]):
+            grid = [list(row) for row in zip(*grid[::-1])]  # rotate clockwise
+        depth, lr = pos[where]
+        assert grid[2 - depth][lr] == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

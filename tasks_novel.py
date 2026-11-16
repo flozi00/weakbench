@@ -10994,6 +10994,68 @@ def score_puzzle8_min(item, reply):
             "detail": {f"ok_{item['gold']}": float(ok), "misplaced_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- key_door_maze
+# A 5x5 to 6x6 text maze with a locked door D on every route from S to G and a key K elsewhere; the fewest steps
+# (up/down/left/right) from S to G, picking up the key first. BFS over (cell, has key). The detour to the key
+# changes the answer on every item. `ok`, `door_open_bait` (the shortest path as if the door were open).
+def kd_bfs(grid, start, goal, need_key=True):
+    from collections import deque
+    h, w = len(grid), len(grid[0])
+    s0 = (start, False)
+    seen, dq = {s0: 0}, deque([s0])
+    while dq:
+        (y, x), key = st = dq.popleft()
+        if (y, x) == goal:
+            return seen[st]
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if not (0 <= ny < h and 0 <= nx < w) or grid[ny][nx] == "#":
+                continue
+            if grid[ny][nx] == "D" and need_key and not key:
+                continue
+            ns = ((ny, nx), key or grid[ny][nx] == "K")
+            if ns not in seen:
+                seen[ns] = seen[st] + 1
+                dq.append(ns)
+    return None
+
+
+def load_key_door_maze(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("key_door_maze", i, att)
+        while True:
+            h, w = r.choice([5, 6]), r.choice([5, 6])
+            grid = [["#" if r.random() < 0.3 else "." for _ in range(w)] for _ in range(h)]
+            cells = [(y, x) for y in range(h) for x in range(w)]
+            S, G, K, D = r.sample(cells, 4)
+            for (y, x), c in ((S, "S"), (G, "G"), (K, "K"), (D, "D")):
+                grid[y][x] = c
+            gold = kd_bfs(grid, S, G)
+            free = kd_bfs(grid, S, G, need_key=False)
+            blocked = [row[:] for row in grid]
+            blocked[D[0]][D[1]] = "#"
+            if gold and free and gold != free and kd_bfs(blocked, S, G) is None and gold >= 8:
+                break
+        text = "\n".join(" ".join(row) for row in grid)
+        q = (f"A maze (S start, G goal, # wall, . floor, K key, D locked door):\n{text}\n\nYou move one square up, down, left "
+             f"or right per step. The door can only be passed after you have picked up the key (step onto K). What is the "
+             f"smallest number of steps from S to G?" if lang == "en" else
+             f"Ein Labyrinth (S Start, G Ziel, # Wand, . Boden, K Schlüssel, D verschlossene Tür):\n{text}\n\nPro Schritt "
+             f"geht man ein Feld nach oben, unten, links oder rechts. Die Tür lässt sich erst passieren, wenn man den "
+             f"Schlüssel aufgehoben hat (auf K treten). Wie viele Schritte braucht man mindestens von S nach G?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": free,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_key_door_maze(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"door_open_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12102,6 +12164,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "key_door_maze": task(load_key_door_maze, score_key_door_maze, 24, 96),
     "puzzle8_min": task(load_puzzle8_min, score_puzzle8_min, 24, 96),
     "diff_apply": task(load_diff_apply, score_diff_apply, 24, 96),
     "word_ladder": task(load_word_ladder, score_word_ladder, 24, 96),

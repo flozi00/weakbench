@@ -255,6 +255,26 @@ def test_puzzle8_min():  # iterative deepening DFS instead of BFS
             return False
         assert next(d for d in range(15) if dfs(st, d, -1)) == it["gold"], q
 
+
+def test_key_door_maze():  # two plain BFS legs: S -> K (door shut), then K -> G (door open)
+    def bfs(grid, a, b, door_ok):
+        front, seen, d = {a}, {a}, 0
+        while front and b not in front:
+            front = {(y + dy, x + dx) for y, x in front for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                     if 0 <= y + dy < len(grid) and 0 <= x + dx < len(grid[0]) and grid[y + dy][x + dx] != "#"
+                     and (door_ok or grid[y + dy][x + dx] != "D")} - seen
+            seen |= front
+            d += 1
+        return d if b in front else None
+    for it in prompts(tn.load_key_door_maze):
+        q = it["messages"][0]["content"]
+        grid = [ln.split() for ln in re.findall(r"^((?:[SGK#.D] )+[SGK#.D])$", q, re.M)]
+        find = lambda c: next((y, x) for y, row in enumerate(grid) for x, v in enumerate(row) if v == c)  # noqa: E731
+        s_, g, k = find("S"), find("G"), find("K")
+        direct = bfs(grid, s_, g, False)
+        via = (bfs(grid, s_, k, False) or 10 ** 6) + (bfs(grid, k, g, True) or 10 ** 6)
+        assert min(x for x in (direct, via) if x) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

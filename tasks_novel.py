@@ -11492,6 +11492,68 @@ def score_box_push(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"manhattan_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- bridge_torch
+# The bridge-and-torch puzzle with generated crossing times for 4-5 people: at most two cross at once at the slower
+# one's pace, the single torch must go along every time; the shortest total time (Dijkstra over states). With 5 people
+# no memorised 4-person formula fits. Bait: the "fastest escorts everyone" plan. `ok_p<people>`, `escort_bait`.
+def bt_best(times):
+    import heapq
+    n = len(times)
+    full = (1 << n) - 1
+    start = (full, 0)  # (people on the near side as a bitmask, torch side 0 = near)
+    dist, pq = {start: 0}, [(0, full, 0)]
+    while pq:
+        d, near, side = heapq.heappop(pq)
+        if d > dist.get((near, side), 10 ** 9):
+            continue
+        if near == 0:
+            return d
+        here = near if side == 0 else full & ~near
+        ppl = [j for j in range(n) if here >> j & 1]
+        groups = [(a,) for a in ppl] + list(itertools.combinations(ppl, 2))
+        for g in groups:  # one or two cross, at the slower pace
+            mask = sum(1 << j for j in g)
+            nn = near & ~mask if side == 0 else near | mask
+            nd = d + max(times[j] for j in g)
+            if nd < dist.get((nn, 1 - side), 10 ** 9):
+                dist[(nn, 1 - side)] = nd
+                heapq.heappush(pq, (nd, nn, 1 - side))
+    return None
+
+
+def load_bridge_torch(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("bridge_torch", i, att)
+        while True:
+            k = 4 if i % 2 == 0 else 5
+            times = sorted(r.sample(range(1, 21), k))
+            gold = bt_best(times)
+            a = times[0]
+            escort = sum(times[1:]) + a * (k - 2)  # the fastest walks everyone over and comes back each time
+            if gold != escort and sum(it["gold"] == gold for it in items) < len(items) // 8 + 2:
+                break
+        names = ["Ana", "Ben", "Cem", "Dora", "Eli"][:k]
+        r.shuffle(names)
+        who = ", ".join(f"{nm} {t} min" for nm, t in zip(names, times))
+        q = (f"{k} people must cross a narrow bridge at night. At most two can be on the bridge at once, and a pair walks at "
+             f"the slower one's pace. They have one torch, which must be carried on every crossing (no throwing). Crossing "
+             f"times: {who}. What is the shortest total time for everyone to get across?" if lang == "en" else
+             f"{k} Personen müssen nachts über eine schmale Brücke. Höchstens zwei dürfen gleichzeitig auf der Brücke sein, "
+             f"und ein Paar geht im Tempo des Langsameren. Sie haben eine Taschenlampe, die bei jeder Überquerung mitgenommen "
+             f"werden muss (kein Werfen). Gehzeiten: {who}. Wie lange dauert es mindestens, bis alle drüben sind?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": escort, "k": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_bridge_torch(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_p{item['k']}": float(ok), "escort_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12600,6 +12662,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "bridge_torch": task(load_bridge_torch, score_bridge_torch, 24, 96),
     "box_push": task(load_box_push, score_box_push, 24, 96),
     "toy_machine_inverse": task(load_toy_machine_inverse, score_toy_machine_inverse, 24, 96),
     "cube_turns": task(load_cube_turns, score_cube_turns, 24, 96),

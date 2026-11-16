@@ -436,6 +436,21 @@ def test_box_push():  # iterative deepening over pushes: from each state, every 
             assert layer, q
         assert d == it["gold"], q
 
+
+def test_bridge_torch():  # the proven greedy recursion (Rote 2002): send the two slowest by the cheaper of two patterns
+    def best(t):
+        t = sorted(t)
+        if len(t) <= 2:
+            return t[-1]
+        if len(t) == 3:
+            return sum(t)
+        a, b, y, z = t[0], t[1], t[-2], t[-1]
+        return min(a + 2 * b + z, 2 * a + y + z) + best(t[:-2])
+    for it in prompts(tn.load_bridge_torch):
+        q = it["messages"][0]["content"]
+        times = [int(x) for x in re.findall(r"\b[A-Z][a-z]+ (\d+) min", q)]
+        assert best(times) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

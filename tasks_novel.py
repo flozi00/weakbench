@@ -11304,8 +11304,9 @@ def score_painted_cube(item, reply):
 # ---------------------------------------------------------------- cube_turns
 # A cube with a different letter on each face (all six given), turned 3-6 times: tipped forward/backward/left/right or
 # turned a quarter to the left/right about the vertical axis; which letter faces the asked direction at the end
-# (top, front or right)? Mixes axes, unlike dice_roll. Bait: the letter that faced that way at the start.
-# `ok_<asked>`, `start_bait`.
+# (top, front or right)? Mixes axes, unlike dice_roll. Even items spell out where the top/front goes ("hinted"), odd
+# items name the move only ("bare"): `ok_hinted` vs `ok_bare` is the cost of resolving a move mentally. Bait: the
+# letter that faced that way at the start. `ok_<asked>`, `start_bait`.
 CT2_DIRS = {"top": (0, 0, 1), "bottom": (0, 0, -1), "front": (0, -1, 0), "back": (0, 1, 0), "left": (-1, 0, 0), "right": (1, 0, 0)}
 CT2_NAMES = {"en": {"top": "top", "bottom": "bottom", "front": "front", "back": "back", "left": "left", "right": "right"},
              "de": {"top": "oben", "bottom": "unten", "front": "vorne", "back": "hinten", "left": "links", "right": "rechts"}}
@@ -11317,6 +11318,14 @@ CT2_MOVES = {"en": {"F": "tip it forward (the top goes to the front)", "B": "tip
                     "L": "nach links kippen (die Oberseite kommt nach links)", "R": "nach rechts kippen (die Oberseite kommt nach rechts)",
                     "TL": "eine Vierteldrehung nach links (von oben gesehen gegen den Uhrzeigersinn: vorne kommt nach links)",
                     "TR": "eine Vierteldrehung nach rechts (von oben gesehen im Uhrzeigersinn: vorne kommt nach rechts)"}}
+
+
+CT2_BARE = {"en": {"F": "tip it forward (toward you)", "B": "tip it backward (away from you)", "L": "tip it over to the left",
+                    "R": "tip it over to the right", "TL": "turn it a quarter counter-clockwise (seen from above)",
+                    "TR": "turn it a quarter clockwise (seen from above)"},
+            "de": {"F": "nach vorne kippen (zu dir hin)", "B": "nach hinten kippen (von dir weg)", "L": "nach links umkippen",
+                   "R": "nach rechts umkippen", "TL": "eine Vierteldrehung gegen den Uhrzeigersinn (von oben gesehen)",
+                   "TR": "eine Vierteldrehung im Uhrzeigersinn (von oben gesehen)"}}
 
 
 def ct2_move(face_at, m):
@@ -11345,12 +11354,13 @@ def load_cube_turns(lang, n, seed):
                 break
         N = CT2_NAMES[lang]
         faces = ", ".join(f"{N[d]}: {start[v]}" for d, v in CT2_DIRS.items())
-        steps = "\n".join(f"{j + 1}. {CT2_MOVES[lang][mv]}" for j, mv in enumerate(moves))
+        hinted = i % 2 == 0  # odd items: the move only, the model must work out where each face goes
+        steps = "\n".join(f"{j + 1}. {(CT2_MOVES if hinted else CT2_BARE)[lang][mv]}" for j, mv in enumerate(moves))
         q = (f"A cube lies on a table in front of you with a letter on each face: {faces}.\nYou move it, step by step:\n{steps}"
              f"\n\nWhich letter is on the {N[ask]} face at the end?" if lang == "en" else
              f"Ein Würfel liegt vor dir auf dem Tisch, auf jeder Seite steht ein Buchstabe: {faces}.\nDu bewegst ihn Schritt für "
              f"Schritt:\n{steps}\n\nWelcher Buchstabe ist am Ende {N[ask]}?")
-        items.append({"id": str(i), "lang": lang, "gold": end[CT2_DIRS[ask]], "bait": start[CT2_DIRS[ask]], "ask": ask,
+        items.append({"id": str(i), "lang": lang, "gold": end[CT2_DIRS[ask]], "bait": start[CT2_DIRS[ask]], "ask": ask, "hinted": hinted,
                       "letters": letters, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
@@ -11361,7 +11371,8 @@ def score_cube_turns(item, reply):
     v = found.pop() if len(found) == 1 else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
-            "detail": {f"ok_{item['ask']}": float(ok), "start_bait": float(v == item["bait"])}}
+            "detail": {f"ok_{item['ask']}": float(ok), "ok_hinted" if item.get("hinted") else "ok_bare": float(ok),
+                       "start_bait": float(v == item["bait"])}}
 
 
 # ---------------------------------------------------------------- event_order

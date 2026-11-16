@@ -362,8 +362,9 @@ def test_cube_turns():  # face-name cycles (where each face's letter goes), read
         q = it["messages"][0]["content"]
         face = dict(re.findall(r"(top|bottom|front|back|left|right): ([A-Z])", q.split("\n")[0]))
         for step in re.findall(r"^\d+\. (.+)$", q, re.M):
-            key = next(k for k in ("quarter to the left", "quarter to the right", "forward", "backward", "to the left",
-                                   "to the right") if k in step)
+            key = next(k for k in ("quarter to the left", "quarter to the right", "counter-clockwise", "clockwise", "forward",
+                                   "backward", "to the left", "to the right") if k in step)
+            key = {"counter-clockwise": "quarter to the left", "clockwise": "quarter to the right"}.get(key, key)
             c = cycles[key]
             face = {**face, **{c[(j + 1) % 4]: face[c[j]] for j in range(4)}}
         ask = re.search(r"on the (\w+) face at the end", q)[1]

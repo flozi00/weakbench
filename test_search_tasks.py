@@ -600,6 +600,19 @@ def test_robot_turns():  # Dijkstra-free layered search over (row, col, heading)
             d += 1
         assert d == it["gold"], q
 
+
+def test_pancake_flips():  # iterative deepening over prefix reversals, from the printed stack
+    for it in prompts(tn.load_pancake_flips):
+        q = it["messages"][0]["content"]
+        stack = [int(x) for x in re.search(r"top to bottom: ([\d, ]+) \(", q)[1].split(", ")]
+        goal = sorted(stack)
+
+        def dfs(s_, depth):
+            if s_ == goal:
+                return True
+            return depth > 0 and any(dfs(s_[:k][::-1] + s_[k:], depth - 1) for k in range(2, len(s_) + 1))
+        assert next(d for d in range(10) if dfs(stack, d)) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

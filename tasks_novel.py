@@ -12114,6 +12114,57 @@ def score_robot_turns(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"squares_only_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- pancake_flips
+# A stack of 5-6 pancakes of different sizes (listed top to bottom); one flip reverses the top k pancakes. The fewest
+# flips to sort the stack, smallest on top (BFS over permutations: no formula gives the optimum). Gold 3-6 balanced;
+# the count of out-of-place pancakes is never the gold. `ok_<gold>`, `misplaced_bait`.
+def pf_flips(stack):
+    from collections import deque
+    goal = tuple(sorted(stack))
+    seen, dq = {tuple(stack): 0}, deque([tuple(stack)])
+    while dq:
+        s_ = dq.popleft()
+        if s_ == goal:
+            return seen[s_]
+        for k in range(2, len(s_) + 1):
+            t = s_[:k][::-1] + s_[k:]
+            if t not in seen:
+                seen[t] = seen[s_] + 1
+                dq.append(t)
+    return None
+
+
+def load_pancake_flips(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("pancake_flips", i, att)
+        want = i % 4 + 3
+        while True:
+            k = r.choice([5, 6])
+            stack = r.sample(range(1, k + 1), k)
+            mis = sum(a != b for a, b in zip(stack, sorted(stack)))
+            if pf_flips(stack) == want and mis != want:
+                break
+        q = (f"A stack of {k} pancakes, sizes from top to bottom: {', '.join(map(str, stack))} (1 is the smallest). One flip "
+             f"puts the spatula under some pancake and turns over everything above it, so the top k pancakes come back in "
+             f"reverse order. What is the smallest number of flips that sorts the stack with the smallest pancake on top "
+             f"and the largest at the bottom?" if lang == "en" else
+             f"Ein Stapel aus {k} Pfannkuchen, Größen von oben nach unten: {', '.join(map(str, stack))} (1 ist der kleinste). "
+             f"Bei einem Wenden schiebt man den Pfannenwender unter einen Pfannkuchen und dreht alles darüber um, die oberen k "
+             f"Pfannkuchen liegen danach in umgekehrter Reihenfolge. Wie oft muss man mindestens wenden, bis der kleinste oben "
+             f"und der größte unten liegt?")
+        items.append({"id": str(i), "lang": lang, "gold": want, "bait": mis,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_pancake_flips(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['gold']}": float(ok), "misplaced_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -13222,6 +13273,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "pancake_flips": task(load_pancake_flips, score_pancake_flips, 24, 96),
     "robot_turns": task(load_robot_turns, score_robot_turns, 24, 96),
     "ice_slide": task(load_ice_slide, score_ice_slide, 24, 96),
     "verify_solution": task(load_verify_solution, score_verify_solution, 24, 96),

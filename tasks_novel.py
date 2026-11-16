@@ -10824,6 +10824,60 @@ def score_nonogram(item, reply):
                                               ng_clue([c == "#" for c in item["gold"]]))}}
 
 
+# ---------------------------------------------------------------- word_ladder
+# A word list (14-20 four-letter English words, also used in the German cell: the words are tokens, not vocabulary)
+# and two of them; the fewest steps from one to the other, changing one letter per step and using only listed words.
+# BFS gold 3-6 in equal parts; the letter-difference count is never the gold (a detour is forced). `ok_<gold>`,
+# `hamming_bait`.
+WL_WORDS = ("cold cord card ward warm word worm wore core care cart part pert port post most mist mast mass pass "
+            "past fast fist list lint line lane land band bend bond bold bald ball bell belt melt malt male mole "
+            "hole hold gold golf wolf wool pool poll pole pale page cage cake lake like bike bite kite site sire").split()
+
+
+def wl_dist(words, a, b):
+    from collections import deque
+    seen, dq = {a: 0}, deque([a])
+    while dq:
+        w = dq.popleft()
+        if w == b:
+            return seen[w]
+        for v in words:
+            if v not in seen and sum(x != y for x, y in zip(v, w)) == 1:
+                seen[v] = seen[w] + 1
+                dq.append(v)
+    return None
+
+
+def load_word_ladder(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("word_ladder", i, att)
+        want = i % 4 + 3
+        while True:
+            words = sorted(r.sample(WL_WORDS, r.randint(14, 20)))
+            a, b = r.sample(words, 2)
+            d = wl_dist(words, a, b)
+            ham = sum(x != y for x, y in zip(a, b))
+            if d == want and ham != d:
+                break
+        q = (f"Word list: {', '.join(words)}.\nGo from \"{a}\" to \"{b}\" by changing exactly one letter per step (no "
+             f"adding, removing or reordering letters); every word on the way must be in the list. What is the smallest "
+             f"number of steps?" if lang == "en" else
+             f"Wortliste (englische Wörter): {', '.join(words)}.\nGehe von „{a}“ zu „{b}“, indem du pro Schritt genau einen "
+             f"Buchstaben änderst (nichts hinzufügen, weglassen oder umstellen); jedes Wort unterwegs muss in der Liste "
+             f"stehen. Wie viele Schritte braucht man mindestens?")
+        items.append({"id": str(i), "lang": lang, "gold": d, "bait": ham,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_word_ladder(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['gold']}": float(ok), "hamming_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11932,6 +11986,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "word_ladder": task(load_word_ladder, score_word_ladder, 24, 96),
     "nonogram": task(load_nonogram, score_nonogram, 24, 72),
     "view_side": task(load_view_side, score_view_side, 24, 96),
     "paper_punch": task(load_paper_punch, score_paper_punch, 24, 96),

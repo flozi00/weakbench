@@ -196,6 +196,20 @@ def test_nonogram():  # brute force over all 2^25 grids is too slow: column-wise
         ask = int(re.search(r"What is row (\d)", q)[1]) - 1
         assert "".join("#" if col[ask] else "-" for col in sols[0]) == it["gold"], q
 
+
+def test_word_ladder():  # layered expansion with set ops over the listed words
+    for it in prompts(tn.load_word_ladder):
+        q = it["messages"][0]["content"]
+        words = set(re.search(r"Word list: ([a-z, ]+)\.", q)[1].split(", "))
+        a, b = re.search(r'Go from "(\w+)" to "(\w+)"', q).groups()
+        layer, seen, d = {a}, {a}, 0
+        while b not in layer:
+            layer = {v for v in words - seen for w in layer if sum(x != y for x, y in zip(v, w)) == 1}
+            seen |= layer
+            d += 1
+            assert layer, q
+        assert d == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

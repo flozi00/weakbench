@@ -3521,13 +3521,23 @@ PA_ITEMS = [("Er ist ___ krank: Er hustet und hat Fieber, der Arzt hat ihn krank
             ("Die Bibliothek hat alle Exemplare schon ___; keins ist mehr im Regal.", "verliehen", ("geliehen", "verliehen")),
             ("Der Zug hatte zehn Minuten Verspätung, ___ haben wir den Anschluss verpasst.", "deshalb", ("deshalb", "weil")),
             ("Wir haben den Anschluss verpasst, ___ der Zug zehn Minuten Verspätung hatte.", "weil", ("deshalb", "weil")),
-            ("Das Ergebnis der Wahl ist jetzt ___: Alle Stimmen sind ausgezählt.", "endgültig", ("endgültig", "entgültig"))]
+            ("Das Ergebnis der Wahl ist jetzt ___: Alle Stimmen sind ausgezählt.", "endgültig", ("endgültig", "entgültig")),
+            # -lich / -isch / -ig on the same stem: the suffix carries the meaning (ids 16+ keep the first 16 unchanged)
+            ("Die beiden Termine liegen ___ zu nah beieinander; zwischen ihnen ist nur eine Stunde.", "zeitlich", ("zeitig", "zeitlich")),
+            ("Das Kind hat eine ___ Freude an jedem Schmetterling.", "kindliche", ("kindliche", "kindische")),
+            ("Hör auf, dich so ___ zu benehmen, du bist dreißig!", "kindisch", ("kindlich", "kindisch")),
+            ("Nach dem Unfall war er körperlich verletzt, aber ___ ganz klar.", "geistig", ("geistig", "geistlich")),
+            ("Der Pfarrer trägt bei der Messe ein ___ Gewand.", "geistliches", ("geistiges", "geistliches")),
+            ("Was für ein ___ Sommertag, nicht eine Wolke am Himmel!", "herrlicher", ("herrlicher", "herrischer")),
+            ("Der Chef spricht in einem ___ Ton, als wären alle seine Diener.", "herrischen", ("herrlichen", "herrischen")),
+            ("Morgens ist er ___ und schlecht gelaunt, abends wieder fröhlich.", "launisch", ("launig", "launisch")),
+            ("Er hielt eine ___ Rede, alle haben viel gelacht.", "launige", ("launige", "launische"))]
 
 
 def load_de_paronyms(lang, n, seed):
     return [{"id": str(i), "lang": "de", "gold": g, "opts": o,
              "messages": [{"role": "user", "content": f"Setze „{two_opts(i, g, o)[0]}“ oder „{two_opts(i, g, o)[1]}“ ein. Antworte nur mit dem Wort.\n\n{sent}"}]}
-            for i, (sent, g, o) in enumerate(PA_ITEMS[:min(n or 16, 16)])]
+            for i, (sent, g, o) in enumerate(PA_ITEMS[:n or len(PA_ITEMS)])]
 
 
 def score_de_paronyms(item, reply):

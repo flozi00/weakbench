@@ -5034,6 +5034,47 @@ def score_switch_plan(item, reply):
             "gold": item["plan"], "detail": {"six_lines": float(len(rows) == 6), "line_lang": hits / 6}}
 
 
+# ---------------------------------------------------------------- think_language (reason in the language you are told)
+# A small word problem with an explicit split: think in one language, give the final answer line in the other (both
+# directions, the instruction in the cell language). The reasoning (the think block, else the reply minus its last
+# line) must be in the asked language by function words; the number must be right. Models reason in their training
+# language whatever the user asks (LFM2.5 thinks in English on German tasks). `think_lang`, `answer_ok`.
+TL_ITEMS = [(3, 12, 5), (4, 9, 7), (6, 8, 3), (5, 15, 4), (7, 6, 9), (2, 25, 8), (8, 7, 6), (9, 4, 11),
+            (3, 17, 6), (6, 12, 10), (4, 22, 5), (5, 9, 13)]
+
+
+def load_think_language(lang, n, seed):
+    items = []
+    for i, (boxes, per, eaten) in enumerate(TL_ITEMS[:n or len(TL_ITEMS)]):
+        think_in = ["de", "en"][i % 2]
+        gold = boxes * per - eaten
+        L = {"en": {"de": "German", "en": "English"}, "de": {"de": "Deutsch", "en": "Englisch"}}[lang]
+        other = "en" if think_in == "de" else "de"
+        q = (f"Ella buys {boxes} boxes with {per} biscuits each. Her children eat {eaten} biscuits. How many are left?\n"
+             f"Think through the problem step by step in {L[think_in]}, then give the final line in {L[other]} in the "
+             f"form \"{'Antwort' if other == 'de' else 'Answer'}: <number>\"." if lang == "en" else
+             f"Ella kauft {boxes} Schachteln mit je {per} Keksen. Ihre Kinder essen {eaten} Kekse. Wie viele sind übrig?\n"
+             f"Denke die Aufgabe Schritt für Schritt auf {L[think_in]} durch und schreibe dann die letzte Zeile auf "
+             f"{L[other]} in der Form \"{'Antwort' if other == 'de' else 'Answer'}: <Zahl>\".")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "think_in": think_in,
+                      "messages": [{"role": "user", "content": q}]})
+    return items
+
+
+def score_think_language(item, reply):
+    content = reply["content"] or ""
+    thought = reply.get("reasoning") or ""
+    if len(thought.split()) < 15:  # no think block: the visible working is the reasoning
+        lines = [ln for ln in content.strip().splitlines() if ln.strip()]
+        thought = "\n".join(lines[:-1])
+    got = common.lang_ok(thought, item["think_in"], min_words=12)
+    v = tasks_novel.last_int(tasks_novel.final_answer(content) or "")
+    ans = v == item["gold"]
+    ok = bool(got) and ans
+    return {"correct": ok, "score": (float(bool(got)) + float(ans)) / 2, "pred": v, "gold": item["gold"],
+            "detail": {"think_lang": float(bool(got)), "answer_ok": float(ans)}}
+
+
 # ---------------------------------------------------------------- mirror_language (reply in the customer's language)
 ML_MSGS = {"fr": ["Bonjour, ma commande n'est pas encore arrivée. Pouvez-vous me dire où elle se trouve ? Merci.",
                   "Bonjour, je voudrais changer l'adresse de livraison de ma commande. Est-ce que c'est encore possible ?",
@@ -5535,7 +5576,8 @@ TASKS = {
     "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
     "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
     "rhyme_pick": task(("de", "en"), load_rhyme_pick, score_idioms, 16, 16, lang_check=False),
-    "switch_plan": task(("de", "en"), load_switch_plan, score_switch_plan, 12, 24, lang_check=False),
+    "switch_plan": task(("de", "en"), load_switch_plan, score_switch_plan, 1024, 12, lang_check=False),
+    "think_language": task(("de", "en"), load_think_language, score_think_language, 2048, 12, lang_check=False),
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),

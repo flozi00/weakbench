@@ -1206,6 +1206,20 @@ def test_switch_plan():
     assert tl.score_switch_plan(it, {"content": good})["correct"]
     assert not tl.score_switch_plan(it, {"content": good + "\n7. One more sentence about it."})["correct"]
 
+
+def test_think_language():
+    it = tl.load_think_language("en", 12, 0)[0]  # think in German, answer line in English
+    assert it["think_in"] == "de" and it["gold"] == 31
+    de = "Ella kauft drei Schachteln mit je zwölf Keksen, das sind sechsunddreißig. Die Kinder essen fünf davon, also bleiben einunddreißig übrig."
+    en = "Ella buys three boxes with twelve biscuits each, that is thirty-six. The children eat five of them, so thirty-one are left."
+    assert tl.score_think_language(it, {"content": de + "\nAnswer: 31", "reasoning": ""})["correct"]
+    assert tl.score_think_language(it, {"content": "Answer: 31", "reasoning": de})["correct"]
+    r = tl.score_think_language(it, {"content": "Answer: 31", "reasoning": en})
+    assert not r["correct"] and r["detail"] == {"think_lang": 0.0, "answer_ok": 1.0}
+    assert tl.score_think_language(it, {"content": de + "\nAnswer: 30", "reasoning": ""})["detail"]["answer_ok"] == 0
+    assert tl.TASKS["switch_plan"]["max_tokens"] >= 512  # six sentences: not a one-word budget
+
 if __name__ == "__main__":
+    test_think_language()
     test_switch_plan()
     test_de_passive_kind()

@@ -1194,5 +1194,18 @@ def test_de_passive_kind():
     assert not tl.score_de_passive_kind(p, {"content": "Plusquamperfekt"})["correct"]
 
 
+
+def test_switch_plan():
+    # short lines without a tuned function word (seen in LFM replies) still get their language
+    assert tl._swp_lang("These conditions together make train schedules unreliable during cold months.") == "en"
+    assert tl._swp_lang("Passengers should expect longer travel times in winter.") == "en"
+    assert tl._swp_lang("Organiziere alles in einem Rucksack, damit du leicht zugreifen kannst.") == "de"
+    it = tl.load_switch_plan("en", 12, 0)[0]
+    s = {"D": "Der Kaffee ist für mich wichtig, und ich koche ihn jeden Morgen.", "E": "The water should be hot, and you should use fresh beans."}
+    good = "\n".join(f"{j + 1}. {s[c]}" for j, c in enumerate(it["plan"]))
+    assert tl.score_switch_plan(it, {"content": good})["correct"]
+    assert not tl.score_switch_plan(it, {"content": good + "\n7. One more sentence about it."})["correct"]
+
 if __name__ == "__main__":
+    test_switch_plan()
     test_de_passive_kind()

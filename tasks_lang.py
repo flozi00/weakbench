@@ -4986,10 +4986,22 @@ def load_switch_plan(lang, n, seed):
     return items
 
 
+def _swp_lang(text):
+    """_de_en, then the broader common word lists, then umlauts/ß: a short sentence may carry no tuned function word
+    ("These conditions make schedules unreliable.", "Organiziere alles in einem Rucksack.")."""
+    got = _de_en(text)
+    if got:
+        return got
+    words = re.findall(r"[a-zäöüß']+", text.lower())
+    de = sum(w in common.DE_WORDS for w in words) + (2 if re.search(r"[äöüß]", text.lower()) else 0)
+    en = sum(w in common.EN_WORDS for w in words)
+    return "de" if de > en else "en" if en > de else None
+
+
 def score_switch_plan(item, reply):
     rows = re.findall(r"^\s*\**\s*\d+\s*[.):]\s*\**\s*(.+)$", reply["content"] or "", re.M)
     want = ["de" if c == "D" else "en" for c in item["plan"]]
-    got = [_de_en(t) for t in rows[:6]]
+    got = [_swp_lang(t) for t in rows[:6]]
     hits = sum(g == w for g, w in zip(got, want))
     ok = len(rows) == 6 and hits == 6
     return {"correct": ok, "score": round(hits / 6, 4), "pred": "".join({"de": "D", "en": "E"}.get(g, "?") for g in got),

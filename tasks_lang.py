@@ -5252,7 +5252,8 @@ def score_think_language(item, reply):
 # ---------------------------------------------------------------- xl_negation (is the translation faithful? negation flips)
 # A sentence in one language and a candidate translation in the cell language; in half the items the candidate drops,
 # adds or weakens a negation ("no longer" -> "still", "hardly" -> "often", "not yet" -> "already"). Fluent either way,
-# the meaning flips: a translation check must read, not skim. xl_faithful does the same with changed numbers.
+# the meaning flips: a translation check must read, not skim. Four sentences per item, one or none flipped.
+# xl_faithful does the same with changed numbers.
 # Tuples: (en, de, en with the meaning flipped, de with the meaning flipped).
 XN_ITEMS = [("The museum is no longer open on Mondays.", "Das Museum ist montags nicht mehr geöffnet.",
              "The museum is still open on Mondays.", "Das Museum ist montags immer noch geöffnet."),
@@ -5281,24 +5282,32 @@ XN_ITEMS = [("The museum is no longer open on Mondays.", "Das Museum ist montags
 
 
 def load_xl_negation(lang, n, seed):
+    """Four numbered sentences per item (a single pair was too easy: LFM2.5 1.00); in half the items one candidate
+    sentence has its meaning flipped. Answer the number of the unfaithful sentence, or 0 when all four are faithful."""
     items = []
-    for i, (en, de, en_x, de_x) in enumerate(XN_ITEMS[:n or len(XN_ITEMS)]):
-        changed = i % 2 == 1
-        src, cand = (en, de_x if changed else de) if lang == "de" else (de, en_x if changed else en)
-        q = (f"Original (German): {src}\nTranslation (English): {cand}\n\nDoes the translation say the same as the original? "
-             f"Answer with a line \"Answer: yes\" or \"Answer: no\"." if lang == "en" else
-             f"Original (Englisch): {src}\nÜbersetzung (Deutsch): {cand}\n\nSagt die Übersetzung dasselbe wie das Original? "
-             f"Antworte mit einer Zeile \"Antwort: ja\" oder \"Antwort: nein\".")
-        items.append({"id": str(i), "lang": lang, "changed": changed,
-                      "gold": ("no" if lang == "en" else "nein") if changed else ("yes" if lang == "en" else "ja"),
-                      "messages": [{"role": "user", "content": q}]})
+    for i, att in common.redraws(n or 24, items):
+        r = random.Random(f"xl_negation:{i}" + (f"~{att}" if att else ""))  # same sentences in both cells
+        pick = r.sample(range(len(XN_ITEMS)), 4)
+        bad = (i // 2) % 4 if i % 2 == 1 else None  # the flipped sentence balanced over positions 1-4
+        src, cand = [], []
+        for k, idx in enumerate(pick):
+            en, de, en_x, de_x = XN_ITEMS[idx]
+            src.append(en if lang == "de" else de)
+            cand.append((de_x if k == bad else de) if lang == "de" else (en_x if k == bad else en))
+        s_txt = "\n".join(f"{k + 1}. {x}" for k, x in enumerate(src))
+        c_txt = "\n".join(f"{k + 1}. {x}" for k, x in enumerate(cand))
+        q = (f"Original (German):\n{s_txt}\n\nTranslation (English):\n{c_txt}\n\nIs every sentence translated faithfully? "
+             f"If one sentence says something different from its original, give its number; if all four are faithful, "
+             f"answer 0." if lang == "en" else
+             f"Original (Englisch):\n{s_txt}\n\nÜbersetzung (Deutsch):\n{c_txt}\n\nIst jeder Satz treu übersetzt? Wenn ein "
+             f"Satz etwas anderes sagt als sein Original, nenne seine Nummer; wenn alle vier treu sind, antworte 0.")
+        items.append({"id": str(i), "lang": lang, "changed": bad is not None, "gold": 0 if bad is None else bad + 1,
+                      "messages": [{"role": "user", "content": q + "\n" + tasks_novel.ASK[lang]}]})
     return items
 
 
 def score_xl_negation(item, reply):
-    fa = (tasks_novel.final_answer(reply["content"]) or "").lower()
-    yn = [w for w in re.findall(r"[a-z]+", fa) if w in ("yes", "no", "ja", "nein")]
-    v = ({"yes": "ja", "no": "nein"} if item["lang"] == "de" else {"ja": "yes", "nein": "no"}).get(yn[0], yn[0]) if yn else None
+    v = tasks_novel.last_int(tasks_novel.final_answer(reply["content"]) or "")
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"ok_flipped" if item["changed"] else "ok_faithful": float(ok)}}
@@ -5807,7 +5816,7 @@ TASKS = {
     "rhyme_pick": task(("de", "en"), load_rhyme_pick, score_idioms, 16, 16, lang_check=False),
     "switch_plan": task(("de", "en"), load_switch_plan, score_switch_plan, 1024, 12, lang_check=False),
     "think_language": task(("de", "en"), load_think_language, score_think_language, 2048, 12, lang_check=False),
-    "xl_negation": task(("de", "en"), load_xl_negation, score_xl_negation, 16, 12, lang_check=False),
+    "xl_negation": {**task(("de", "en"), load_xl_negation, score_xl_negation, 4096, 24, lang_check=False), "think": True},
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),

@@ -538,6 +538,23 @@ def test_list_diff():  # set difference of the printed lists
         b = set(re.search(r"List B:\n(.+)", q)[1].split(", "))
         assert ", ".join(sorted(a - b)) == it["gold"], q
 
+
+def test_verify_solution():  # each printed rule checked against the printed order; the broken one is the gold
+    for it in prompts(tn.load_verify_solution):
+        q = it["messages"][0]["content"]
+        order = re.search(r"Proposed order, left to right: (.+)\.\n", q)[1].split(", ")
+        pos = {p: j for j, p in enumerate(order)}
+        broken = []
+        for k, ru in re.findall(r"^(\d)\. (.+)$", q, re.M):
+            w = ru.rstrip(".").split()
+            a, b = w[0], w[-1]
+            ok = (pos[a] == 2 if "middle seat" in ru else pos[a] in (0, 4) if "ends" in ru else
+                  abs(pos[a] - pos[b]) != 1 if "not sit directly" in ru else abs(pos[a] - pos[b]) == 1 if "directly next" in ru
+                  else pos[a] < pos[b])
+            if not ok:
+                broken.append(int(k))
+        assert broken == ([] if it["broken"] is None else [it["broken"]]), q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

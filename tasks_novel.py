@@ -11739,6 +11739,12 @@ UD_RULES = {"en": {"next": "{a} sits directly next to {b}.", "apart": "{a} does 
                    "middle": "{a} sitzt auf dem mittleren Platz."}}
 
 
+def ud_key(rule):
+    """A rule's identity: "next"/"apart" are symmetric, so (next, A, B) and (next, B, A) are one rule."""
+    kind, a, b = rule
+    return (kind, frozenset((a, b))) if kind in ("next", "apart") else rule
+
+
 def ud_ok(order, rule):
     kind, a, b = rule
     if kind == "middle":
@@ -11758,7 +11764,7 @@ def load_unsat_detect(lang, n, seed):
                 kind = r.choice(["next", "apart", "end", "left", "middle"])
                 a, b = r.sample(ppl, 2)
                 rules.append((kind, a, None if kind in ("end", "middle") else b))
-            if len(set(rules)) < len(rules):
+            if len({ud_key(ru) for ru in rules}) < len(rules):
                 continue
             sols = [o for o in itertools.permutations(ppl) if all(ud_ok(o, ru) for ru in rules)]
             # each rule alone is satisfiable, so the clash only shows in combination
@@ -11902,6 +11908,66 @@ def score_list_diff(item, reply):
     ok = got == want
     return {"correct": ok, "score": float(ok), "pred": ", ".join(got) or None, "gold": item["gold"],
             "detail": {"missed_twin": float(bool(set(want) - set(got))), "extra": float(bool(set(got) - set(want)))}}
+
+
+# ---------------------------------------------------------------- verify_solution
+# A seating puzzle (5 people, 4-6 rules) and a proposed order; is it valid, and if not, which rule does it break?
+# Half the proposals are valid, half break exactly one rule (an order one swap away from a valid one). Checking is
+# not the same skill as solving: models wave a plausible order through. `ok_valid`, `ok_invalid`, `accepted_wrong`.
+def load_verify_solution(lang, n, seed):
+    items = []
+    ppl = SEATC_PEOPLE[:5]
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("verify_solution", i, att)
+        valid = i % 2 == 0
+        while True:
+            rules = []
+            for _ in range(r.randint(4, 6)):
+                kind = r.choice(["next", "apart", "end", "left", "middle"])
+                a, b = r.sample(ppl, 2)
+                rules.append((kind, a, None if kind in ("end", "middle") else b))
+            if len({ud_key(ru) for ru in rules}) < len(rules):
+                continue
+            sols = [o for o in itertools.permutations(ppl) if all(ud_ok(o, ru) for ru in rules)]
+            if not sols:
+                continue
+            base = r.choice(sols)
+            if valid:
+                prop, broken = base, None
+                break
+            x, y = r.sample(range(5), 2)
+            o = list(base)
+            o[x], o[y] = o[y], o[x]
+            bad = [k for k, ru in enumerate(rules) if not ud_ok(tuple(o), ru)]
+            if len(bad) == 1:
+                prop, broken = tuple(o), bad[0] + 1
+                break
+        T = UD_RULES[lang]
+        rl = "\n".join(f"{k + 1}. " + T[kind].format(a=a, b=b) for k, (kind, a, b) in enumerate(rules))
+        q = (f"{', '.join(ppl)} sit on a bench with 5 seats in a row. The rules:\n{rl}\n\nProposed order, left to right: "
+             f"{', '.join(prop)}.\nDoes this order satisfy every rule? Answer \"valid\", or \"invalid: <number of the "
+             f"broken rule>\"." if lang == "en" else
+             f"{', '.join(ppl)} sitzen auf einer Bank mit 5 Plätzen nebeneinander. Die Regeln:\n{rl}\n\nVorgeschlagene "
+             f"Reihenfolge von links nach rechts: {', '.join(prop)}.\nErfüllt diese Reihenfolge jede Regel? Antworte "
+             f"\"gültig\" oder \"ungültig: <Nummer der verletzten Regel>\".")
+        items.append({"id": str(i), "lang": lang, "gold": ("valid" if lang == "en" else "gültig") if valid else
+                      (f"invalid: {broken}" if lang == "en" else f"ungültig: {broken}"), "broken": broken,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_verify_solution(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower()
+    inv = bool(re.search(r"\b(?:invalid|ungültig|not valid|nicht gültig)\b", fa))
+    val = not inv and bool(re.search(r"\b(?:valid|gültig)\b", fa))
+    num = last_int(fa) if inv else None
+    if item["broken"] is None:
+        ok = val
+    else:
+        ok = inv and num == item["broken"]
+    return {"correct": ok, "score": float(ok), "pred": "valid" if val else (f"invalid: {num}" if inv else None),
+            "gold": item["gold"], "detail": {"ok_valid" if item["broken"] is None else "ok_invalid": float(ok),
+                                             "accepted_wrong": float(item["broken"] is not None and val)}}
 
 
 # ---------------------------------------------------------------- event_order
@@ -13012,6 +13078,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "verify_solution": task(load_verify_solution, score_verify_solution, 24, 96),
     "list_diff": task(load_list_diff, score_list_diff, 24, 96),
     "flashback_order": task(load_flashback_order, score_flashback_order, 24, 96),
     "unsat_detect": task(load_unsat_detect, score_unsat_detect, 24, 96),

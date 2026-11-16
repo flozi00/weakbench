@@ -106,7 +106,11 @@ trained closest to them, so the suite now leans on four kinds of evidence that t
    error lists whose quotes must exist in the reply (`lang_quality`), per-sentence support labels
    (`summary_faithful`), pairwise in both orders (`pairwise.py`), four canaries every judge must pass first, and
    `pairwise.py --audit` for the judge's own position consistency and length bias, and `--rejudge` for agreement
-   between two judges on the same replies.
+   between two judges on the same replies. A judge that reasons despite thinking off is supported
+   (`--judge-think-budget`; its reasoning before `</think>` is stripped, the canaries still gate it), and every judge
+   reply goes through `tasks_judge.loads_lenient` (bare YES/NO or labels, trailing commas, single quotes repaired;
+   non-JSON still fails the item). Smoke on LFM2.5-24B as candidate and judge (`--tasks judge_all --limit 3`):
+   267 items, 1 parse error, since fixed — self-judged scores are not results, the run only proves the plumbing.
 4. **Language as a first-class skill**: reply-language control under pull (`lang_switch`, `mgsm_mixed`),
    grammaticality (`grammar_pairs`), proofreading without over-editing (`spell_fix`), plain-language rewriting
    with fact retention (`simplify`), native-editor error rates and fluency (`lang_quality`), and the language of

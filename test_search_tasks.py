@@ -377,7 +377,7 @@ def test_toy_machine_inverse():  # substitute 1-9 into the listing and run the t
         target = int(re.search(r"holds (-?\d+)\.", q)[1])
         ask = re.search(r"register (\w) holds", q)[1]
         fits = []
-        for v in range(1, 10):
+        for v in range(1, 51):
             lines = {k: ln.replace("?", str(v)) for k, ln in re.findall(r"^(\d+): (.+)$", q, re.M)}
             reg, pc = {"A": 0, "B": 0, "C": 0}, 1
             while True:

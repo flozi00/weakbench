@@ -11377,8 +11377,9 @@ def score_cube_turns(item, reply):
 
 # ---------------------------------------------------------------- toy_machine_inverse
 # The toy_machine register machine run backwards: one starting value is unknown ("put X ?"), the final value of a
-# register is given; which start value (1-9) produces it? Exactly one value does. Executing forward is easy for 24B
-# models (toy_machine ~0.9); inverting needs algebra over the loop or a disciplined search. `ok`, `final_value_bait`.
+# register is given; which start value (1-50) produces it? Exactly one value does. Executing forward is easy for 24B
+# models (toy_machine ~0.9); with 50 candidates, trying them all is long, so the loop must be inverted. (1-9 was
+# solved by trial: LFM2.5-24B 0.92-1.00.) `ok`, `final_value_bait`.
 def load_toy_machine_inverse(lang, n, seed):
     items = []
     for i, att in common.redraws(n or 96, items):
@@ -11393,16 +11394,18 @@ def load_toy_machine_inverse(lang, n, seed):
             prog += body + [("shrink", cnt, 1), ("hop", start, cnt)] + [("stop",)]
             ask = r.choice([x, y])
             finals = {}
-            for v in range(1, 10):
+            for v in range(1, 51):
                 p2 = [("put", x, v) if op == ("put", x, None) else op for op in prog]
                 reg, _ = tm_run(p2)
                 finals[v] = reg[ask] if reg else None
-            gold = i % 9 + 1
+            gold = r.randint(11, 50)
             if finals[gold] is not None and list(finals.values()).count(finals[gold]) == 1 and finals[gold] != gold:
                 break
         listing = "\n".join(f"{k + 1}: " + ("put {} ?".format(x) if op == ("put", x, None) else tm_text(op))
                             for k, op in enumerate(prog))
-        q = (f"{TM_SPEC[lang]}\n\nProgram (\"?\" is an unknown whole number from 1 to 9):\n{listing}\n\n" +
+        head = ("Program (\"?\" is an unknown whole number from 1 to 50)" if lang == "en" else
+                "Programm („?“ ist eine unbekannte ganze Zahl von 1 bis 50)")
+        q = (f"{TM_SPEC[lang]}\n\n{head}:\n{listing}\n\n" +
              (f"When the machine stops, register {ask} holds {finals[gold]}. Which number is \"?\"?" if lang == "en" else
               f"Wenn die Maschine anhält, steht in Register {ask} der Wert {finals[gold]}. Welche Zahl ist „?“?"))
         items.append({"id": str(i), "lang": lang, "gold": gold, "bait": finals[gold],

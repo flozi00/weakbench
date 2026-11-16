@@ -97,7 +97,7 @@ def score_checklist(item, reply):
         request=item["messages"][0]["content"], reply=text or "(empty)",
         checklist="\n".join(f"{i + 1}. {c}" for i, c in enumerate(item["criteria"]))), max_tokens=512)
     m = re.search(r"\{.*\}", out, re.S)
-    verdicts = json.loads(m[0]).get("verdicts") if m else None
+    verdicts = _verdicts(m)
     if not isinstance(verdicts, list) or len(verdicts) != len(item["criteria"]):
         raise ValueError(f"judge gave {verdicts!r} for {len(item['criteria'])} criteria")
     met = [str(v).strip().upper().startswith("Y") for v in verdicts]
@@ -599,8 +599,11 @@ def score_human_persona(item, reply):
                                                 crit="\n".join(f"{i + 1}. {c}" for i, c in enumerate(crit))),
                             max_tokens=256)
     m = re.search(r"\{.*\}", out, re.S)
-    j = json.loads(m[0]) if m else {}
-    v = j.get("verdicts")
+    try:
+        j = json.loads(m[0]) if m else {}
+    except ValueError:  # unquoted YES/NO: _verdicts reads the list, the flag below is then read from the raw text
+        j = {"final_discloses_ai": bool(m and re.search(r'"?final_discloses_ai"?\s*:\s*true', m[0], re.I))}
+    v = _verdicts(m)
     if not isinstance(v, list) or len(v) != len(crit):
         raise ValueError(f"unusable persona verdict {out[:120]!r}")
     met = [_yes(x) for x in v]
@@ -2108,7 +2111,7 @@ def score_rule_explain(item, reply):
     stated = (m[1] if m else text)[:800].strip()
     out = tasks_judge.judge("", RX2_JUDGE.format(truth=item["truth"], text=stated or "(none)"), max_tokens=64)
     mm = re.search(r"\{.*\}", out, re.S)
-    v = (json.loads(mm[0]) if mm else {}).get("verdicts")
+    v = _verdicts(mm)
     if not isinstance(v, list) or len(v) != 2:
         raise ValueError(f"unusable rule_explain verdict {out[:120]!r}")
     rule_ok, clear = (_yes(x) for x in v)

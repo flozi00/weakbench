@@ -3749,6 +3749,41 @@ def load_novel_metaphor(lang, n, seed):
     return items if n is None else items[:n]
 
 
+# ---------------------------------------------------------------- rhyme_pick (which word rhymes: sound, not spelling)
+# A model sees spelling, not sound. Each item: the target, the one real rhyme, an eye rhyme or a vowel-length trap (same
+# letters, other sound: love/move, Bus/Mus) and two others. Gold position balanced over A-D; `literal` = the trap.
+RP_ITEMS = {"en": [("love", "dove", "move", "lose", "low"), ("cough", "off", "though", "cow", "up"),
+                   ("great", "late", "treat", "grit", "get"), ("blood", "mud", "food", "good", "bad"),
+                   ("said", "bed", "paid", "side", "so"), ("heart", "start", "heard", "hurt", "hate"),
+                   ("shoe", "through", "toe", "show", "she"), ("eight", "plate", "height", "eat", "it"),
+                   ("word", "bird", "sword", "ward", "wad"), ("steak", "make", "beak", "stick", "sky"),
+                   ("won", "sun", "on", "wine", "win"), ("bough", "cow", "rough", "bog", "boo"),
+                   ("come", "drum", "home", "came", "cam"), ("flood", "bud", "wood", "flowed", "fled"),
+                   ("break", "lake", "speak", "brick", "bay"), ("friend", "bend", "fiend", "fried", "fan")],
+            "de": [("Weg", "Steg", "Speck", "Wagen", "Weh"), ("Tag", "mag", "Dach", "Tisch", "Tal"),
+                   ("Bus", "Fluss", "Mus", "Bass", "Busch"), ("Rose", "Hose", "Rosse", "Rasen", "Rost"),
+                   ("Staat", "Rat", "statt", "Start", "Rot"), ("Saal", "Wahl", "Ball", "Seil", "Salz"),
+                   ("Mond", "lohnt", "Hund", "mehr", "Monat"), ("Fuß", "Gruß", "Kuss", "Fass", "Fuchs"),
+                   ("Herz", "Schmerz", "Harz", "Holz", "Herd"), ("Haus", "Maus", "Hose", "Hass", "Hauch"),
+                   ("Nacht", "lacht", "nackt", "Nichte", "Naht"), ("Licht", "nicht", "Lid", "Luft", "Lied"),
+                   ("Wasser", "nasser", "Wesen", "Wüste", "Waschen"), ("Baum", "Traum", "Bau", "Boom", "Bart"),
+                   ("Kuchen", "suchen", "Küchen", "kochen", "Kuppel"), ("Wein", "klein", "Wien", "Weh", "Wind")]}
+RP_ASK = {"de": "Welches Wort reimt sich auf „{w}“ (gesprochen, in deutscher Standardaussprache)?\n\n{opts}\n\nAntworte mit einer Zeile \"Antwort: X\".",
+          "en": "Which word rhymes with \"{w}\" (spoken, in standard pronunciation)?\n\n{opts}\n\nReply with a line \"Answer: X\"."}
+
+
+def load_rhyme_pick(lang, n, seed):
+    items = []
+    for k, (word, right, trap, *other) in enumerate(RP_ITEMS[lang]):
+        rest = [trap] + other
+        random.Random(f"rhyme_pick:{lang}:{k}").shuffle(rest)
+        opts = rest[:k % 4] + [right] + rest[k % 4:]
+        items.append({"id": f"{lang}{k}", "lang": lang, "gold": "ABCD"[k % 4], "literal": "ABCD"[opts.index(trap)],
+                      "messages": [{"role": "user", "content": RP_ASK[lang].format(
+                          w=word, opts="\n".join(f"{c}. {o}" for c, o in zip("ABCD", opts)))}]})
+    return items if n is None else items[:n]
+
+
 # ---------------------------------------------------------------- en_indirect_q (embedded question word order)
 # "Can you tell me where the station is?" keeps statement order; German speakers (and models) carry over the direct
 # question order ("where is the station"). Half the items are direct questions as controls, where inversion is right.
@@ -5395,6 +5430,7 @@ TASKS = {
     "de_austrian": task(("de",), load_de_austrian, score_de_austrian, 20, 20, lang_check=False),
     "en_comparison": task(("en",), load_en_comparison, score_en_comparison, 16, 16, lang_check=False),
     "novel_metaphor": task(("de", "en"), load_novel_metaphor, score_idioms, 8, 8, lang_check=False),
+    "rhyme_pick": task(("de", "en"), load_rhyme_pick, score_idioms, 16, 16, lang_check=False),
     "en_indirect_q": task(("en",), load_en_indirect_q, score_en_indirect_q, 16, 16, lang_check=False),
     "de_foreign_plural": task(("de",), load_de_foreign_plural, score_de_foreign_plural, 18, 18, lang_check=False),
     "en_apostrophe": task(("en",), load_en_apostrophe, score_en_apostrophe, 16, 16, lang_check=False),

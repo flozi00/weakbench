@@ -10473,6 +10473,76 @@ def score_knight_moves(item, reply):
                        "open_board_bait": float(item["detour"] and v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- river_crossing
+# A ferry puzzle with new rules: a keeper brings 3-4 animals across a river; the boat holds the keeper and up to c
+# animals; some pairs may not be left on a bank without the keeper. The fewest one-way trips? Not the wolf-goat-cabbage
+# answer (7) by rote: the conflict graph and capacity are generated, and BFS gives the gold. Bait: the trips with no
+# conflicts at all. Gold (odd: 5, 7, 9) in about equal parts. `ok_cap<c>`, `no_conflict_bait`.
+RVC_ANIMALS = {"en": ["the fox", "the hen", "the dog", "the cat", "the goat"], "de": ["den Fuchs", "das Huhn", "den Hund", "die Katze", "die Ziege"]}
+RVC_NOM = {"en": ["the fox", "the hen", "the dog", "the cat", "the goat"], "de": ["der Fuchs", "das Huhn", "der Hund", "die Katze", "die Ziege"]}
+
+
+def rc_trips(k, cap, bad):
+    from collections import deque
+    full = frozenset(range(k))
+    start, goal = (full, 0), (frozenset(), 1)  # (animals on the left bank, keeper side 0 = left)
+    ok = lambda bank: not any(a in bank and b in bank for a, b in bad)  # noqa: E731
+    seen, dq = {start: 0}, deque([start])
+    while dq:
+        left, side = st = dq.popleft()
+        if st == goal:
+            return seen[st]
+        here = left if side == 0 else full - left
+        for m in range(0, cap + 1):
+            for load in itertools.combinations(sorted(here), m):
+                nl = left - set(load) if side == 0 else left | set(load)
+                stay = nl if side == 0 else full - nl  # the bank the keeper leaves
+                if not ok(stay):
+                    continue
+                ns = (frozenset(nl), 1 - side)
+                if ns not in seen:
+                    seen[ns] = seen[st] + 1
+                    dq.append(ns)
+    return None
+
+
+def load_river_crossing(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("river_crossing", i, att)
+        while True:
+            k, cap = r.choice([3, 4]), r.choice([1, 2])
+            pairs = list(itertools.combinations(range(k), 2))
+            bad = r.sample(pairs, r.randint(1, min(3, len(pairs))))
+            names = r.sample(range(5), k)
+            gold, free = rc_trips(k, cap, bad), rc_trips(k, cap, [])
+            if gold and gold != free and gold >= 5 and sum(it["gold"] == gold for it in items) < len(items) // 3 + 2:
+                break
+        A, N = RVC_ANIMALS[lang], RVC_NOM[lang]
+        who = ", ".join(A[names[j]] for j in range(k - 1)) + (" and " if lang == "en" else " und ") + A[names[k - 1]]
+        rules = "\n".join("- " + (f"{N[names[a]].capitalize()} and {N[names[b]]} may not stay on a bank without the keeper."
+                                   if lang == "en" else
+                                   f"{N[names[a]].capitalize()} und {N[names[b]]} dürfen nicht ohne den Wärter an einem Ufer bleiben.")
+                           for a, b in bad)
+        boat = ({1: "one animal", 2: "up to two animals"} if lang == "en" else {1: "ein Tier", 2: "bis zu zwei Tiere"})[cap]
+        q = (f"A keeper must bring {who} across a river. The boat holds the keeper and {boat}; only the keeper can row, and "
+             f"the boat never crosses without the keeper.\n{rules}\nWhat is the smallest number of one-way crossings needed "
+             f"to get everyone to the other side?" if lang == "en" else
+             f"Ein Wärter muss {who} über einen Fluss bringen. Das Boot fasst den Wärter und {boat}; nur der Wärter kann "
+             f"rudern, und das Boot fährt nie ohne ihn.\n{rules}\nWie viele einfache Überfahrten braucht man mindestens, "
+             f"bis alle auf der anderen Seite sind?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": free, "cap": cap,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_river_crossing(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_cap{item['cap']}": float(ok), "no_conflict_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11581,6 +11651,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "river_crossing": task(load_river_crossing, score_river_crossing, 24, 96),
     "knight_moves": task(load_knight_moves, score_knight_moves, 24, 96),
     "cube_net": task(load_cube_net, score_cube_net, 24, 96),
     "sliding_puzzle": task(load_sliding_puzzle, score_sliding_puzzle, 24, 96),

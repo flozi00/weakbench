@@ -132,7 +132,7 @@ the same puzzle splits cleanly by whether the steps are given or must be found. 
 `sliding_puzzle` 0.92-1.00, `toy_machine` 0.88-0.92, `diff_apply` 0.96-1.00, `lru_cache` 0.92-1.00. Searching for the
 steps, or folding space mentally, falls to chance: `puzzle8_min` 0.13-0.17 (chance 0.17), `river_crossing` 0.25-0.33,
 `cube_net` 0.29-0.33 (bent opposites 0.08-0.17), `hanoi_state` 0.29-0.46, `paper_punch` 1 fold 0.88-1.00, 2-3 folds
-0.00-0.13. Most failures run to the 12k-token cap without an answer. These tasks keep headroom that a static set
+0.00-0.13. Most failures run to the 12k-token cap without an answer. The controlled version of the same contrast is `cube_turns`: identical cubes and moves, but half the items spell out where the top/front face goes and half name the move only — LFM2.5-24B scores 1.00 hinted vs 0.58 bare in both languages. Counting on a fixed 3-D body (`painted_cube` 0.92-0.96) is fine; resolving a movement is what breaks. These tasks keep headroom that a static set
 loses once trained on, and every gold is re-solved from the prompt text by an independent solver in
 `test_search_tasks.py`.
 

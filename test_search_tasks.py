@@ -451,6 +451,18 @@ def test_bridge_torch():  # the proven greedy recursion (Rote 2002): send the tw
         times = [int(x) for x in re.findall(r"\b[A-Z][a-z]+ (\d+) min", q)]
         assert best(times) == it["gold"], q
 
+
+def test_seesaw_balance():  # moments from the printed seats; the answer seat is the only free one that zeroes them
+    for it in prompts(tn.load_seesaw_balance):
+        q = it["messages"][0]["content"]
+        kids = [(int(w), float(d) * (-1 if side == "left" else 1))
+                for w, d, side in re.findall(r"\((\d+) kg\): ([\d.]+) m (left|right)", q)]
+        new_w = int(re.search(r"\((\d+) kg\) sits down", q)[1])
+        taken = {p for _, p in kids}
+        fits = [x / 2 for x in range(-6, 7) if x and x / 2 not in taken
+                and abs(sum(w * p for w, p in kids) + new_w * x / 2) < 1e-9]
+        assert fits == [it["x"]], (q, fits)
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

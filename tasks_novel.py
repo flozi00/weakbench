@@ -11554,6 +11554,57 @@ def score_bridge_torch(item, reply):
             "detail": {f"ok_p{item['k']}": float(ok), "escort_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- seesaw_balance
+# A seesaw with seats every 0.5 m up to 3 m on each side of the pivot; 2-4 children (weights in kg) already sit on
+# given seats on both sides. Where must one more child sit so the seesaw balances (sum of weight x distance equal on
+# both sides)? Exactly one seat works. `ok`, `wrong_side_bait` (the right distance on the wrong side).
+SB_KIDS = ["Ana", "Ben", "Cem", "Dora", "Eli", "Finn"]
+
+
+def load_seesaw_balance(lang, n, seed):
+    items = []
+    seats = [x / 2 for x in range(-6, 7) if x]  # -3.0 .. 3.0 m, no seat on the pivot
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("seesaw_balance", i, att)
+        while True:
+            k = r.randint(2, 4)
+            pos = r.sample(seats, k)
+            if not (any(p < 0 for p in pos) and any(p > 0 for p in pos)) and k > 2:
+                continue
+            wts = [r.randrange(20, 46, 2) for _ in range(k)]
+            w_new = r.randrange(20, 46, 2)
+            moment = sum(w * p for w, p in zip(wts, pos))
+            x = -moment / w_new
+            if x in seats and x not in pos:
+                break
+        names = r.sample(SB_KIDS, k + 1)
+        side = lambda p: (("left" if p < 0 else "right") if lang == "en" else ("links" if p < 0 else "rechts"))  # noqa: E731
+        fmt = lambda v: f"{v:g}".replace(".", "," if lang == "de" else ".")  # noqa: E731
+        sits = "\n".join(f"- {nm} ({w} kg): {fmt(abs(p))} m {side(p)}" + ("" if lang == "en" else " vom Drehpunkt")
+                         + (" of the pivot" if lang == "en" else "") for nm, w, p in zip(names, wts, pos))
+        q = (f"A seesaw has seats every 0.5 m, up to 3 m left and right of the pivot. These children sit on it:\n{sits}\n\n"
+             f"{names[-1]} ({w_new} kg) sits down as well. Where must {names[-1]} sit so that the seesaw balances exactly? "
+             f"Give the distance and the side (left or right)." if lang == "en" else
+             f"Eine Wippe hat alle 0,5 m einen Sitz, bis 3 m links und rechts vom Drehpunkt. Diese Kinder sitzen darauf:\n"
+             f"{sits}\n\n{names[-1]} ({w_new} kg) setzt sich dazu. Wo muss {names[-1]} sitzen, damit die Wippe genau im "
+             f"Gleichgewicht ist? Nenne den Abstand und die Seite (links oder rechts).")
+        items.append({"id": str(i), "lang": lang, "gold": f"{fmt(abs(x))} m {side(x)}", "x": x,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_seesaw_balance(item, reply):
+    fa = (final_answer(reply["content"]) or "").lower().replace(",", ".")
+    m = re.search(r"(\d+(?:\.\d+)?)\s*m", fa) or re.search(r"(\d+(?:\.\d+)?)", fa)
+    sides = {s for s in ("left", "right", "links", "rechts") if re.search(rf"\b{s}\b", fa)}
+    dist = float(m[1]) if m else None
+    side = None if len(sides) != 1 else (-1 if sides.pop() in ("left", "links") else 1)
+    v = dist * side if dist is not None and side else None
+    ok = v is not None and abs(v - item["x"]) < 1e-9
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"wrong_side_bait": float(v is not None and abs(v + item["x"]) < 1e-9)}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12662,6 +12713,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "seesaw_balance": task(load_seesaw_balance, score_seesaw_balance, 24, 96),
     "bridge_torch": task(load_bridge_torch, score_bridge_torch, 24, 96),
     "box_push": task(load_box_push, score_box_push, 24, 96),
     "toy_machine_inverse": task(load_toy_machine_inverse, score_toy_machine_inverse, 24, 96),

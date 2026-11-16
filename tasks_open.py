@@ -2391,7 +2391,8 @@ For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
 1. Every fact a reader needs is kept and correct (dates, times, places, amounts, phone numbers, what to do and by when); nothing is invented.
 2. Hard or official words are avoided or explained in simple words.
 3. Each sentence says one thing, and the German is correct (grammar, spelling)."""
-LS_PASSIVE = re.compile(r"\b(?:wird|werden|wurde|wurden)\b[^.!?]{0,60}\b(?:ge\w+[tn]|\w+iert)\b(?!\s+(?:haben|werden))|\bworden\b", re.I)
+LS_PASSIVE = re.compile(r"\b(?:wird|werden|wurde|wurden)\b[^.!?]{0,60}\b(?:ge\w+[tn]|\w+iert)\b(?!\s+(?:haben|werden))|\bworden\b"
+                        r"|\b(?:ge\w+[tn]|\w+iert)\s+(?:wird|werden|wurde|wurden)\b", re.I)  # also the subordinate order "..., geholt wird"
 LS_KONJ = re.compile(r"\b(?:würde\w*|hätte\w*|wäre\w*|könnte\w*|sollte\w*|müsste\w*|dürfte\w*)\b", re.I)
 
 

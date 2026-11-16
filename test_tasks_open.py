@@ -901,6 +901,8 @@ def test_leichte_sprache():
         long = ok + "\nWenn Sie keinen Termin haben und trotzdem kommen, dann müssen Sie sehr lange warten."
         assert to.score_leichte_sprache(x, {"content": long})["detail"]["short_sentences"] == 0
         assert to.score_leichte_sprache(x, {"content": ok + "\nDie Tonne wird nicht geleert."})["detail"]["no_passive"] == 0
+        sub = ok + "\nAbholtag ist der Tag, an dem die Tonne geholt wird."  # seen in an LFM reply
+        assert to.score_leichte_sprache(x, {"content": sub})["detail"]["no_passive"] == 0
     finally:
         stop()
 

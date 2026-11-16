@@ -23,15 +23,16 @@ import common
 csv.field_size_limit(sys.maxsize)
 OMNI = ("ArtificialAnalysis/AA-Omniscience-Public-v1.1", "1f9cbcec472000b28f9782205f1ef9498b45bd21")
 LCR = ("ArtificialAnalysis/AA-LCR", "9a77ef56b717057ade24ceab4d273712a0b4f19e")
-SETUP = {"url": None, "model": None, "timeout": 900, "max_model_len": None}  # configure() fills it
+SETUP = {"url": None, "model": None, "timeout": 900, "max_model_len": None, "think_budget": 0}  # configure() fills it
 THINK_OFF = {"enable_thinking": False, "thinking": False}
 LCR_TOKEN_RATIO = 1.25  # AA counts cl100k tokens; the served tokenizer needs up to this many per cl100k token
 LCR_ANSWER_TOKENS = 4096
 
 
-def configure(url, model, max_model_len, timeout=900):
-    """Called once by quality.main(): the judge server and the context the served model has."""
-    SETUP.update(url=url, model=model, max_model_len=max_model_len, timeout=timeout)
+def configure(url, model, max_model_len, timeout=900, think_budget=0):
+    """Called once by quality.main(): the judge server and the context the served model has. think_budget > 0 raises
+    every judge call's max_tokens to it, for a judge that reasons even with thinking off (its reasoning is stripped)."""
+    SETUP.update(url=url, model=model, max_model_len=max_model_len, timeout=timeout, think_budget=think_budget)
 
 
 def judge(system, prompt, max_tokens=512):
@@ -39,7 +40,7 @@ def judge(system, prompt, max_tokens=512):
     if not SETUP["url"]:
         raise RuntimeError("no judge configured: pass --judge-url")
     msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
-    body = {"model": SETUP["model"], "messages": msgs, "max_tokens": max_tokens, "temperature": 0,
+    body = {"model": SETUP["model"], "messages": msgs, "max_tokens": max(max_tokens, SETUP["think_budget"]), "temperature": 0,
             "chat_template_kwargs": dict(THINK_OFF)}
     msg = common.request(SETUP["url"], "/v1/chat/completions", body, timeout=SETUP["timeout"])["choices"][0]["message"]
     text = msg.get("content") or ""

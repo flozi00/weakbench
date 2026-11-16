@@ -1415,6 +1415,8 @@ def main(argv=None):
     ap.add_argument("--judge-url", help="server that grades aa_omniscience / aa_lcr; the SAME one for both arms of "
                     "an A/B (never the server under test)")
     ap.add_argument("--judge-model", help="model id on --judge-url (default: the one it serves)")
+    ap.add_argument("--judge-think-budget", type=int, default=0,
+                    help="max_tokens for every judge call, for a judge that reasons despite thinking off (default: off)")
     ap.add_argument("--drift-framing", choices=("raw", "gemma4-assistant"), default="raw",
                     help="explicit teacher-forced protocol; Gemma 4 IT uses a fixed assistant continuation "
                     "prefix, with the same corpus, warmup and self-check thresholds; apply to both arms")
@@ -1460,7 +1462,7 @@ def main(argv=None):
         if not args.judge_url:
             ap.error(f"{', '.join(n for n in names if TASKS[n].get('needs_judge'))} require --judge-url")
         judge_model = common.server_info(args.judge_url, args.judge_model)["model"]
-    tasks_judge.configure(args.judge_url, judge_model, server.get("max_model_len"), args.timeout)
+    tasks_judge.configure(args.judge_url, judge_model, server.get("max_model_len"), args.timeout, args.judge_think_budget)
     if judge_model and not args.dry_run:
         try:
             print(f"judge {judge_model}: {tasks_judge.preflight()} canaries passed", file=sys.stderr)

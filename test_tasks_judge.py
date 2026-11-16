@@ -199,6 +199,17 @@ def test_judge_strips_unopened_think():
             assert tj.judge("", "x") == want, (content, tj.judge("", "x"))
         finally:
             stop()
+    bodies = []  # --judge-think-budget raises every call's max_tokens; off by default
+    url, stop = mock_server.serve(lambda path, body: bodies.append(body) or {"content": "x</think>A", "finish_reason": "stop"})
+    try:
+        tj.configure(url, "mock", 32768, think_budget=4096)
+        assert tj.judge("", "x", max_tokens=16) == "A" and bodies[-1]["max_tokens"] == 4096
+        tj.configure(url, "mock", 32768)
+        tj.judge("", "x", max_tokens=16)
+        assert bodies[-1]["max_tokens"] == 16
+    finally:
+        stop()
+
 
 if __name__ == "__main__":
     test_judge_strips_unopened_think()

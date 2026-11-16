@@ -19,7 +19,7 @@ uv run quality.py --url ... --arm mymodel --tasks traps,de_grammar   # named gro
                                                    # judge, and whole modules lang_all, novel_all, judge_all
 ```
 
-Judge tasks need a judge server: `--judge-url URL --judge-model ID`.
+Judge tasks need a judge server: `--judge-url URL --judge-model ID`; a judge that reasons even with thinking off needs `--judge-think-budget 8192` (its reasoning is stripped, the canaries still gate it).
 
 Comparing two runs, item by item and with statistics:
 

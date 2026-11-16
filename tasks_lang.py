@@ -4255,7 +4255,7 @@ def load_de_comma_pairs(lang, n, seed):
 # adjective) keeps its normal case. Two versions differ only in the first letter after the colon; lower-case gold in
 # half (nouns after the colon are capitalised anyway and are left out).
 CC_ITEMS = [("Er sagte nur eins: Er komme morgen nicht.", "Er sagte nur eins: er komme morgen nicht."),
-            ("Das Ergebnis war klar: wir hatten verloren.", "Das Ergebnis war klar: Wir hatten verloren."),
+            ("Das Ergebnis war klar: Wir hatten verloren.", "Das Ergebnis war klar: wir hatten verloren."),
             ("Die Regel ist einfach: Wer zuerst kommt, mahlt zuerst.", "Die Regel ist einfach: wer zuerst kommt, mahlt zuerst."),
             ("Das Wetter war: kalt, nass und windig.", "Das Wetter war: Kalt, nass und windig."),
             ("Sie hatte nur einen Wunsch: endlich schlafen.", "Sie hatte nur einen Wunsch: Endlich schlafen."),

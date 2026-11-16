@@ -11159,6 +11159,59 @@ def score_job_assign(item, reply):
             "detail": {f"ok_n{item['k']}": float(ok), "greedy_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- seat_count
+# 5-6 people on a bench in a row and 2-3 constraints (X next to Y, X not next to Z, X at an end, X left of Y); in how
+# many orders can they sit? Brute force over all permutations. Formulas exist for one constraint, not for a mix, so
+# the model must count with care. Bait: the count under the first constraint alone. `ok_c<constraints>`,
+# `first_rule_bait`.
+SEATC_PEOPLE = ["Ana", "Ben", "Cem", "Dora", "Eli", "Finn"]
+
+
+def seatc_ok(order, rule):
+    kind, a, b = rule
+    pa, pb = order.index(a), order.index(b) if b else None
+    return {"next": lambda: abs(pa - pb) == 1, "apart": lambda: abs(pa - pb) != 1,
+            "end": lambda: pa in (0, len(order) - 1), "left": lambda: pa < pb}[kind]()
+
+
+def load_seat_count(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("seat_count", i, att)
+        while True:
+            k = r.choice([5, 6])
+            ppl = SEATC_PEOPLE[:k]
+            rules = []
+            for kind in r.sample(["next", "apart", "end", "left"], r.choice([2, 3])):
+                a, b = r.sample(ppl, 2)
+                rules.append((kind, a, None if kind == "end" else b))
+            perms = list(itertools.permutations(ppl))
+            gold = sum(all(seatc_ok(o, ru) for ru in rules) for o in perms)
+            bait = sum(seatc_ok(o, rules[0]) for o in perms)
+            if (0 < gold and gold != bait and len({(a, b) for _, a, b in rules}) == len(rules)
+                    and sum(it["gold"] == gold for it in items) < len(items) // 6 + 2):  # no count dominates
+                break
+        T = {"en": {"next": "{a} sits directly next to {b}.", "apart": "{a} does not sit directly next to {b}.",
+                    "end": "{a} sits at one of the two ends.", "left": "{a} sits somewhere to the left of {b}."},
+             "de": {"next": "{a} sitzt direkt neben {b}.", "apart": "{a} sitzt nicht direkt neben {b}.",
+                    "end": "{a} sitzt an einem der beiden Enden.", "left": "{a} sitzt irgendwo links von {b}."}}[lang]
+        rl = "\n".join("- " + T[kind].format(a=a, b=b) for kind, a, b in rules)
+        q = (f"{', '.join(ppl)} sit on a bench in a row ({k} seats, left to right). All of these must hold:\n{rl}\n\nIn how "
+             f"many different orders can they sit?" if lang == "en" else
+             f"{', '.join(ppl)} sitzen nebeneinander auf einer Bank ({k} Plätze, von links nach rechts). Alles hiervon muss "
+             f"gelten:\n{rl}\n\nIn wie vielen verschiedenen Reihenfolgen können sie sitzen?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "nrules": len(rules),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_seat_count(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_c{item['nrules']}": float(ok), "first_rule_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12267,6 +12320,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "seat_count": task(load_seat_count, score_seat_count, 24, 96),
     "job_assign": task(load_job_assign, score_job_assign, 24, 96),
     "cable_network": task(load_cable_network, score_cable_network, 24, 96),
     "key_door_maze": task(load_key_door_maze, score_key_door_maze, 24, 96),

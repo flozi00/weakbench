@@ -304,6 +304,30 @@ def test_job_assign():  # bitmask dynamic programming over the printed table
             best = nxt
         assert best[(1 << k) - 1] == it["gold"], q
 
+
+def test_seat_count():  # rules re-read from the English text, positions checked as a dict
+    for it in prompts(tn.load_seat_count):
+        q = it["messages"][0]["content"]
+        ppl = re.match(r"(.+?) sit on a bench", q)[1].split(", ")
+        rules = re.findall(r"^- (.+)$", q, re.M)
+        count = 0
+        for o in itertools.permutations(ppl):
+            pos = {p: j for j, p in enumerate(o)}
+            ok = True
+            for ru in rules:
+                w = ru.split()
+                a = w[0]
+                if "not sit directly" in ru:
+                    ok &= abs(pos[a] - pos[w[-1].rstrip(".")]) != 1
+                elif "directly next" in ru:
+                    ok &= abs(pos[a] - pos[w[-1].rstrip(".")]) == 1
+                elif "ends" in ru:
+                    ok &= pos[a] in (0, len(ppl) - 1)
+                else:
+                    ok &= pos[a] < pos[w[-1].rstrip(".")]
+            count += ok
+        assert count == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

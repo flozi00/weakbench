@@ -4145,7 +4145,11 @@ def score_de_linking(item, reply):
 DSY_ITEMS = [("Zu-cker", "Zuk-ker"), ("Fens-ter", "Fen-ster"), ("Wa-gen", "Wag-en"), ("Mut-ter", "Mu-tter"),
              ("Kas-ten", "Ka-sten"), ("Ap-fel", "A-pfel"), ("Kat-ze", "Ka-tze"), ("Bä-cker", "Bäk-ker"),
              ("Kis-te", "Ki-ste"), ("Lö-we", "Löw-e"), ("sin-gen", "sing-en"), ("Hoff-nung", "Hof-fnung"),
-             ("Wes-pe", "We-spe"), ("Ha-se", "Has-e"), ("Kü-che", "Küch-e"), ("Zim-mer", "Zi-mmer")]
+             ("Wes-pe", "We-spe"), ("Ha-se", "Has-e"), ("Kü-che", "Küch-e"), ("Zim-mer", "Zi-mmer"),
+             ("Ste-cker", "Stek-ker"), ("Pis-te", "Pi-ste"), ("Fla-sche", "Flasch-e"), ("Kan-ne", "Ka-nne"),
+             ("Tas-se", "Ta-sse"), ("Blu-me", "Blum-e"), ("Fens-ter-bank", "Fen-ster-bank"), ("Ra-dio", "Rad-io"),
+             ("Hal-tung", "Halt-ung"), ("Brü-cke", "Brük-ke"), ("Wol-ke", "Wo-lke"), ("Kis-sen", "Ki-ssen"),
+             ("Lö-sung", "Lös-ung"), ("ba-cken", "bak-ken"), ("Res-te", "Re-ste"), ("Bür-ger-steig", "Bür-gers-teig")]
 
 
 def load_de_syllables(lang, n, seed):

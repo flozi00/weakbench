@@ -331,7 +331,7 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `de_capitals_rules` | Groß-/Kleinschreibung beyond nouns (am besten, heute Abend, abends, beim Lesen, im Voraus); lower-case gold in half | de | 16 / 16 | auto | exact, case-sensitive; `ok_upper`, `ok_lower` |
 | `de_adj_endings` | singular adjective endings after the determiner (einen kleinen Hund, mit kaltem Wasser, der alte Mann) | de | 16 / 16 | auto | exact word; `ok_adj_ending` |
 | `de_linking` | Fugenelement in compounds (Arbeitsplatz but Bahnhof, Hundeleine but Tischdecke); linking-free gold in half | de | 16 / 16 | auto | exact word; `ok_linked`, `ok_plain` |
-| `de_syllables` | Silbentrennung after the reform (Zu-cker, Fens-ter, Wa-gen, sin-gen, Kü-che); both forms have the same letters | de | 16 / 16 | auto | exact split; `ok_syllables` |
+| `de_syllables` | Silbentrennung after the reform (Zu-cker, Fens-ter, Wa-gen, sin-gen, Kü-che, Bür-ger-steig); the wrong form is a mis-split of the same letters or the pre-1996 ck -> k-k | de | 32 / 32 | auto | exact split; `ok_syllables` |
 | `de_dative_plural` | Dativ-Plural -n where it belongs (mit den Kindern) and nowhere else (Ich sehe die Kinder), each direction in half | de | 16 / 16 | auto | exact word; `ok_add_n`, `ok_no_extra_n` |
 | `en_agreement_quant` | agreement after quantifiers (each of ... has, a number of ... have, the number of ... is, none of the milk is); singular gold in half | en | 16 / 16 | auto | exact word; `ok_singular`, `ok_plural` |
 | `en_modal_perfect` | modal + have + participle (must have left, should have told, can't have seen) against bare past, regularised participles, "of"; length-balanced | en | 16 / 16 | auto | exact form; `ok_modal_perfect` |

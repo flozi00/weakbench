@@ -10750,7 +10750,7 @@ def score_view_side(item, reply):
 
 # ---------------------------------------------------------------- nonogram
 # A 5x5 nonogram (row and column clues: lengths of the filled runs) with exactly one solution; give one named row as
-# "#" (filled) and "." (empty). The asked row is never fixed by its own clue alone, so the columns must be used.
+# "#" (filled) and "-" (empty; a "." would clash with the full stop). The asked row is never fixed by its own clue alone, so the columns must be used.
 # `ok`, `row_only_bait` (a pattern that fits the row clue but not the puzzle).
 def ng_clue(cells):
     runs, k = [], 0
@@ -10795,32 +10795,29 @@ def load_nonogram(lang, n, seed):
             if free:
                 break
         ask = r.choice(free)
-        gold = "".join("#" if x else "." for x in grid[ask])
-        bait = next("".join("#" if x else "." for x in p) for p in itertools.product((0, 1), repeat=5)
+        gold = "".join("#" if x else "-" for x in grid[ask])
+        bait = next("".join("#" if x else "-" for x in p) for p in itertools.product((0, 1), repeat=5)
                     if ng_clue(p) == rows[ask] and list(p) != grid[ask])
         fmt = lambda rc: " ".join(map(str, rc)) or "0"  # noqa: E731
         rl = "\n".join(f"{'Row' if lang == 'en' else 'Zeile'} {j + 1}: {fmt(rc)}" for j, rc in enumerate(rows))
         cl = "\n".join(f"{'Column' if lang == 'en' else 'Spalte'} {c + 1}: {fmt(cc)}" for c, cc in enumerate(cols))
         q = (f"A 5x5 nonogram. Each clue lists, in order, the lengths of the runs of filled cells in that row (left to right) "
              f"or column (top to bottom); runs are separated by at least one empty cell; 0 means the line is empty. The puzzle "
-             f"has exactly one solution.\n{rl}\n{cl}\n\nWhat is row {ask + 1}? Write it as five characters, # for filled and . "
-             f"for empty (e.g. #..##)." if lang == "en" else
+             f"has exactly one solution.\n{rl}\n{cl}\n\nWhat is row {ask + 1}? Write it as five characters, # for filled and - "
+             f"for empty (e.g. #--##)." if lang == "en" else
              f"Ein 5x5-Nonogramm. Jeder Hinweis nennt der Reihe nach die Längen der Blöcke gefüllter Felder in der Zeile (von "
              f"links nach rechts) oder Spalte (von oben nach unten); Blöcke sind durch mindestens ein leeres Feld getrennt; 0 "
              f"heißt, die Linie ist leer. Das Rätsel hat genau eine Lösung.\n{rl}\n{cl}\n\nWie sieht Zeile {ask + 1} aus? "
-             f"Schreibe sie als fünf Zeichen, # für gefüllt und . für leer (z. B. #..##).")
+             f"Schreibe sie als fünf Zeichen, # für gefüllt und - für leer (z. B. #--##).")
         items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items
 
 
 def score_nonogram(item, reply):
-    # the raw answer line: final_answer() trims a trailing "." that belongs to the pattern ("##.#.")
-    lines = re.findall(r"(?:answer|antwort)\s*\**\s*:(.*)", reply["content"] or "", re.I)
-    fa = (lines[-1] if lines else "").replace("■", "#").replace("□", ".").replace("X", "#").replace("x", "#")
-    m = re.findall(r"(?<![#.])[#.]{5,6}(?![#.])", fa.replace(" ", "").replace("`", ""))
-    m = [x[:5] if len(x) == 6 and x.endswith(".") else x for x in m]  # "#..#." + the sentence's full stop
-    v = m[-1] if m and len(m[-1]) == 5 else None
+    fa = (final_answer(reply["content"]) or "").replace("■", "#").replace("□", "-").replace("–", "-").replace("X", "#")
+    m = re.findall(r"(?<![#-])[#-]{5}(?![#-])", fa.replace(" ", "").replace("`", ""))
+    v = m[-1] if m else None
     ok = v == item["gold"]
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
             "detail": {"row_only_bait": float(v is not None and not ok and ng_clue([c == "#" for c in v]) ==

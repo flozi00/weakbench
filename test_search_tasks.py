@@ -194,7 +194,7 @@ def test_nonogram():  # brute force over all 2^25 grids is too slow: column-wise
         sols = [g for g in itertools.product(*cand) if all(runs([col[j] for col in g]) == rows[j] for j in range(5))]
         assert len(sols) == 1, q
         ask = int(re.search(r"What is row (\d)", q)[1]) - 1
-        assert "".join("#" if col[ask] else "." for col in sols[0]) == it["gold"], q
+        assert "".join("#" if col[ask] else "-" for col in sols[0]) == it["gold"], q
 
 if __name__ == "__main__":
     for name, fn in list(globals().items()):

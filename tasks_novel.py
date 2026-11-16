@@ -10612,6 +10612,83 @@ def score_lights_out(item, reply):
             "detail": {f"ok_{item['gold']}": float(ok), "lamp_count_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- paper_punch
+# A square sheet marked as a 4x4 grid (columns A-D left to right, rows 1-4 top to bottom) is folded in half 2-3 times
+# (left onto right, top onto bottom, ...), a hole is punched through all layers at one square, and the sheet is
+# unfolded. Which squares have holes? Mental folding with mirror images. Bait: the mirror of the last fold only.
+# `ok_f<folds>`, `last_fold_bait`.
+PP_FOLD = {"en": {"L": "the left half onto the right half", "R": "the right half onto the left half",
+                  "T": "the top half onto the bottom half", "B": "the bottom half onto the top half"},
+           "de": {"L": "die linke Hälfte auf die rechte", "R": "die rechte Hälfte auf die linke",
+                  "T": "die obere Hälfte auf die untere", "B": "die untere Hälfte auf die obere"}}
+
+
+def pp_fold(stack, cols, rows, f):
+    """stack: {(col, row): [original cells]} for the visible region cols x rows; returns the folded region."""
+    if f in "LR":
+        keep = cols[len(cols) // 2:] if f == "L" else cols[:len(cols) // 2]
+        new = {(c, r): list(stack[(c, r)]) for c in keep for r in rows}
+        for c in cols:
+            if c not in keep:
+                for r in rows:
+                    new[(cols[0] + cols[-1] - c, r)] += stack[(c, r)]
+        return new, keep, rows
+    keep = rows[len(rows) // 2:] if f == "T" else rows[:len(rows) // 2]
+    new = {(c, r): list(stack[(c, r)]) for c in cols for r in keep}
+    for r in rows:
+        if r not in keep:
+            for c in cols:
+                new[(c, rows[0] + rows[-1] - r)] += stack[(c, r)]
+    return new, cols, keep
+
+
+def load_paper_punch(lang, n, seed):
+    items = []
+    lab = lambda c: "ABCD"[c[0]] + str(c[1] + 1)  # noqa: E731
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("paper_punch", i, att)
+        k = 2 + i % 2
+        while True:
+            cols, rows = [0, 1, 2, 3], [0, 1, 2, 3]
+            stack = {(c, w): [(c, w)] for c in cols for w in rows}
+            folds, last_before = [], None
+            for _ in range(k):
+                opts = [f for f in "LRTB" if len(cols if f in "LR" else rows) > 1]
+                f = r.choice(opts)
+                last_before = (stack, cols, rows)
+                stack, cols, rows = pp_fold(stack, cols, rows, f)
+                folds.append(f)
+            at = (r.choice(cols), r.choice(rows))
+            gold = sorted(lab(c) for c in stack[at])
+            if len(set(folds)) > 1 or k == 2:
+                break
+        # bait: only the last fold mirrored (the punched square and its image in the last fold)
+        ps, pc, pr = last_before
+        bait = sorted({lab(at)} | {lab(c) for c in ([(pc[0] + pc[-1] - at[0], at[1])] if folds[-1] in "LR"
+                                                     else [(at[0], pr[0] + pr[-1] - at[1])])})
+        steps = "\n".join(f"{j + 1}. " + (f"Fold {PP_FOLD['en'][f]}." if lang == "en" else f"Falte {PP_FOLD['de'][f]}.")
+                           for j, f in enumerate(folds))
+        q = (f"A square sheet of paper is marked as a 4x4 grid: columns A-D from left to right, rows 1-4 from top to bottom "
+             f"(A1 is the top-left square). It lies flat and is folded:\n{steps}\nThen a hole is punched through all layers at "
+             f"the square that now lies on top of square {lab(at)} (as marked on the bottom layer, which never moved). The "
+             f"sheet is unfolded. Which squares have a hole? List them, comma-separated." if lang == "en" else
+             f"Ein quadratisches Blatt Papier ist als 4x4-Raster markiert: Spalten A-D von links nach rechts, Zeilen 1-4 von "
+             f"oben nach unten (A1 ist das Feld oben links). Es liegt flach und wird gefaltet:\n{steps}\nDann wird an der "
+             f"Stelle über Feld {lab(at)} (so markiert auf der untersten Lage, die sich nie bewegt hat) ein Loch durch alle "
+             f"Lagen gestanzt. Das Blatt wird aufgefaltet. Welche Felder haben ein Loch? Nenne sie durch Kommas getrennt.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "folds": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_paper_punch(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    v = sorted(set(re.findall(r"\b([A-D][1-4])\b", fa.upper()))) or None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_f{item['folds']}": float(ok), "last_fold_bait": float(v == item["bait"] and v != item["gold"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11720,6 +11797,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "paper_punch": task(load_paper_punch, score_paper_punch, 24, 96),
     "lights_out": task(load_lights_out, score_lights_out, 24, 96),
     "river_crossing": task(load_river_crossing, score_river_crossing, 24, 96),
     "knight_moves": task(load_knight_moves, score_knight_moves, 24, 96),

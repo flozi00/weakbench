@@ -144,6 +144,31 @@ def test_toy_machine():  # interpreter over the listing text
         assert reg[re.search(r"register (\w) when", q)[1]] == it["gold"]
 
 
+
+def test_paper_punch():  # move every original square through the folds as a point; holes = squares landing on the punch
+    for it in prompts(tn.load_paper_punch):
+        q = it["messages"][0]["content"]
+        folds = re.findall(r"Fold the (left|right|top|bottom) half", q)
+        at = re.search(r"on top of square ([A-D][1-4])", q)[1]
+        punch = ("ABCD".index(at[0]) + 0.5, int(at[1]) - 0.5)
+        holes = []
+        for c in range(4):
+            for w in range(4):
+                x, y, x0, x1, y0, y1 = c + 0.5, w + 0.5, 0.0, 4.0, 0.0, 4.0
+                for f in folds:
+                    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+                    if f == "left":
+                        x, x0 = (2 * mx - x if x < mx else x), mx
+                    elif f == "right":
+                        x, x1 = (2 * mx - x if x > mx else x), mx
+                    elif f == "top":
+                        y, y0 = (2 * my - y if y < my else y), my
+                    else:
+                        y, y1 = (2 * my - y if y > my else y), my
+                if (x, y) == punch:
+                    holes.append("ABCD"[c] + str(w + 1))
+        assert sorted(holes) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

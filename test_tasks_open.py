@@ -865,5 +865,23 @@ def test_subtitle_mt():
         tasks_judge.configure(None, None, None)
 
 
+
+def test_story_continue():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_story_continue("de", None, 0)[0]
+        assert "ihre Katze Pip" in x["opening"]
+        good = ("Mara zog mit ihrer gesunden Hand die Jacke an und trat hinaus in den Schnee. " * 6).strip()
+        r = to.score_story_continue(x, {"content": good})
+        assert r["correct"] and r["detail"]["no_other_species"] == 1, r
+        assert not to.score_story_continue(x, {"content": "Mara suchte."})["correct"]  # too short
+        assert to.score_story_continue(x, {"content": good.replace("Mara", "Sie")})["detail"]["names_hero"] == 0
+        dog = good + " Der Hund des Nachbarn bellte."
+        assert to.score_story_continue(x, {"content": dog})["detail"]["no_other_species"] == 0
+    finally:
+        stop()
+
 if __name__ == "__main__":
+    test_story_continue()
     test_subtitle_mt()

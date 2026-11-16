@@ -2289,6 +2289,76 @@ def score_steelman(item, reply):
                        "no_undercut": float(no_undercut), "grammar": float(grammar)}}
 
 
+# ---------------------------------------------------------------- story_continue (judge + exact: keep the facts while writing)
+# A story opening fixes facts (the hero's name, her pet and its name, the town, the season, an injury); the model
+# continues it in 80-150 words. Code: the hero's name appears, the length band (another species named = info only). Judge:
+# no contradiction of any stated fact, a real continuation (not a summary or a restart), natural style and grammar.
+# Free writing drifts: the cat becomes a dog, winter becomes a sunny beach day, the broken arm climbs a tree.
+STC_SETUPS = {"en": [("Mara", "cat", "Pip", "Bergen", "winter", "a broken left arm"),
+                     ("Lena", "dog", "Bruno", "Lisbon", "autumn", "a sprained ankle"),
+                     ("Ida", "rabbit", "Flock", "Graz", "spring", "a bandaged right hand"),
+                     ("Noor", "parrot", "Kiwi", "Dublin", "summer", "a cast on her right leg"),
+                     ("Selma", "tortoise", "Otto", "Tallinn", "winter", "stitches above her eye"),
+                     ("Ruth", "hamster", "Nugget", "Seville", "summer", "a broken finger")],
+              "de": [("Mara", "Katze", "Pip", "Bergen", "Winter", "einem gebrochenen linken Arm"),
+                     ("Lena", "Hund", "Bruno", "Lissabon", "Herbst", "einem verstauchten Knöchel"),
+                     ("Ida", "Kaninchen", "Flocke", "Graz", "Frühling", "einer verbundenen rechten Hand"),
+                     ("Noor", "Papagei", "Kiwi", "Dublin", "Sommer", "einem Gips am rechten Bein"),
+                     ("Selma", "Schildkröte", "Otto", "Tallinn", "Winter", "einer genähten Wunde über dem Auge"),
+                     ("Ruth", "Hamster", "Nugget", "Sevilla", "Sommer", "einem gebrochenen Finger")]}
+STC_SPECIES = {"en": ["cat", "dog", "rabbit", "parrot", "tortoise", "hamster"],
+               "de": ["Katze", "Kater", "Hund", "Kaninchen", "Papagei", "Schildkröte", "Hamster"]}
+STC_JUDGE = """STORY OPENING ({lang}):
+{opening}
+
+CONTINUATION WRITTEN BY THE MODEL:
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. The continuation contradicts none of the facts in the opening (who, the pet and its kind and name, the town, the season, the injury and what it rules out).
+2. It continues the story from where the opening stops (not a summary, not a restart, not a different story).
+3. It reads as natural {lang} prose with correct grammar and spelling."""
+
+
+def load_story_continue(lang, n, seed):
+    tasks_judge.check_judge()
+    items = []
+    for i, (hero, pet, pet_name, town, season, injury) in enumerate(STC_SETUPS[lang][:n or 6]):
+        opening = (f"It was {season} in {town}. {hero} had been walking with {injury} for two weeks now, which made everything "
+                   f"slower. That morning her {pet}, {pet_name}, was nowhere to be found, and the back door stood open."
+                   if lang == "en" else
+                   f"Es war {season} in {town}. {hero} lief seit zwei Wochen mit {injury} herum, was alles langsamer machte. "
+                   f"An diesem Morgen war ihr{'e' if pet in ('Katze', 'Schildkröte') else ''} {pet} {pet_name} nirgends zu "
+                   f"finden, und die Hintertür stand offen.")
+        ask = ("Continue this story in 80 to 150 words. Keep everything the opening says true." if lang == "en" else
+               "Schreibe diese Geschichte in 80 bis 150 Wörtern weiter. Alles, was der Anfang sagt, muss stimmen bleiben.")
+        items.append({"id": str(i), "lang": lang, "opening": opening, "hero": hero, "pet": pet,
+                      "messages": [{"role": "user", "content": f"{ask}\n\n{opening}"}]})
+    return items
+
+
+def score_story_continue(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    words = len(text.split())
+    band = 70 <= words <= 165  # a little slack around 80-150
+    name = item["hero"] in text
+    other = [sp for sp in STC_SPECIES[item["lang"]] if sp.lower() != item["pet"].lower()
+             and not (item["pet"] == "Katze" and sp == "Kater")
+             and re.search(rf"\b{sp}\w*\b", text, re.I)]
+    out = tasks_judge.judge("", STC_JUDGE.format(lang={"de": "German", "en": "English"}[item["lang"]],
+                                                 opening=item["opening"], text=text or "(empty)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable story_continue verdict {out[:120]!r}")
+    consistent, continues, style = (_yes(x) for x in v)
+    met = [band, name, consistent, continues, style]  # another species may be a neighbour's: info only, the judge decides
+    return {"correct": all(met), "score": round(sum(met) / 5, 4), "pred": text[:160], "gold": None,
+            "detail": {"length_band": float(band), "names_hero": float(name), "no_other_species": float(not other),
+                       "consistent": float(consistent), "continues": float(continues), "style": float(style)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2878,6 +2948,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                          "think": False, "max_tokens": 256,
                          "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},
                          "lang_check": True, "opt_in": True, "needs_judge": True},
+         "story_continue": {"langs": ("de", "en"), "load": load_story_continue, "score": score_story_continue,
+                            "think": False, "max_tokens": 600,
+                            "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},
+                            "lang_check": True, "opt_in": True, "needs_judge": True},
          "steelman": {"langs": ("de", "en"), "load": load_steelman, "score": score_steelman,
                       "think": False, "max_tokens": 400,
                       "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},

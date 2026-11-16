@@ -370,6 +370,36 @@ def test_cube_turns():  # face-name cycles (where each face's letter goes), read
         ask = re.search(r"on the (\w+) face at the end", q)[1]
         assert face[ask] == it["gold"], q
 
+
+def test_toy_machine_inverse():  # substitute 1-9 into the listing and run the text interpreter: exactly the gold fits
+    for it in prompts(tn.load_toy_machine_inverse):
+        q = it["messages"][0]["content"]
+        target = int(re.search(r"holds (-?\d+)\.", q)[1])
+        ask = re.search(r"register (\w) holds", q)[1]
+        fits = []
+        for v in range(1, 10):
+            lines = {k: ln.replace("?", str(v)) for k, ln in re.findall(r"^(\d+): (.+)$", q, re.M)}
+            reg, pc = {"A": 0, "B": 0, "C": 0}, 1
+            while True:
+                w = lines[str(pc)].split()
+                if w[0] == "stop":
+                    break
+                if w[0] == "hop" and reg[w[3]] > 0:
+                    pc = int(w[1])
+                    continue
+                if w[0] == "put":
+                    reg[w[1]] = int(w[2])
+                elif w[0] == "grow":
+                    reg[w[1]] += reg[w[2]]
+                elif w[0] == "shrink":
+                    reg[w[1]] -= int(w[2])
+                elif w[0] == "twice":
+                    reg[w[1]] *= 2
+                pc += 1
+            if reg[ask] == target:
+                fits.append(v)
+        assert fits == [it["gold"]], (q, fits)
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

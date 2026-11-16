@@ -11375,6 +11375,47 @@ def score_cube_turns(item, reply):
                        "start_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- toy_machine_inverse
+# The toy_machine register machine run backwards: one starting value is unknown ("put X ?"), the final value of a
+# register is given; which start value (1-9) produces it? Exactly one value does. Executing forward is easy for 24B
+# models (toy_machine ~0.9); inverting needs algebra over the loop or a disciplined search. `ok`, `final_value_bait`.
+def load_toy_machine_inverse(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("toy_machine_inverse", i, att)
+        while True:
+            cnt, x, y = r.sample("ABC", 3)
+            loops = r.randint(3, 6)
+            prog = [("put", cnt, loops), ("put", x, None), ("put", y, r.randint(0, 4))]
+            start = len(prog) + 1
+            body = [r.choice([("grow", y, x), ("grow", x, y), ("twice", x), ("shrink", y, r.randint(1, 3)), ("grow", y, cnt)])
+                    for _ in range(r.randint(2, 3))]
+            prog += body + [("shrink", cnt, 1), ("hop", start, cnt)] + [("stop",)]
+            ask = r.choice([x, y])
+            finals = {}
+            for v in range(1, 10):
+                p2 = [("put", x, v) if op == ("put", x, None) else op for op in prog]
+                reg, _ = tm_run(p2)
+                finals[v] = reg[ask] if reg else None
+            gold = i % 9 + 1
+            if finals[gold] is not None and list(finals.values()).count(finals[gold]) == 1 and finals[gold] != gold:
+                break
+        listing = "\n".join(f"{k + 1}: " + ("put {} ?".format(x) if op == ("put", x, None) else tm_text(op))
+                            for k, op in enumerate(prog))
+        q = (f"{TM_SPEC[lang]}\n\nProgram (\"?\" is an unknown whole number from 1 to 9):\n{listing}\n\n" +
+             (f"When the machine stops, register {ask} holds {finals[gold]}. Which number is \"?\"?" if lang == "en" else
+              f"Wenn die Maschine anhält, steht in Register {ask} der Wert {finals[gold]}. Welche Zahl ist „?“?"))
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": finals[gold],
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_toy_machine_inverse(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"final_value_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12483,6 +12524,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "toy_machine_inverse": task(load_toy_machine_inverse, score_toy_machine_inverse, 24, 96),
     "cube_turns": task(load_cube_turns, score_cube_turns, 24, 96),
     "painted_cube": task(load_painted_cube, score_painted_cube, 24, 96),
     "piece_fit": task(load_piece_fit, score_piece_fit, 24, 96),

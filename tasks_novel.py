@@ -169,6 +169,20 @@ citation_check  Four generated sources about invented companies and an answer of
                 exactly one citation points to a source that does not support its claim (the fact sits in another
                 source). Name the claim number. `wrong_pos` in detail.
 
+Self-built state and search (the model must generate the steps itself or picture space; given step lists are
+easy for 24B models, these are not; each gold is checked by an independent solver in its own test run):
+merge_conflict  3-way merge of a config file, which lines conflict (both changed, differently). `one_side_flagged`.
+dice_roll       A die tipped 4-8 times over its edges, which number is on top.
+hanoi_state     Tower of Hanoi (4-6 disks, optimal), which disks lie on a peg after move m.
+cube_net        A generated cube net (any of the 11), which letter is opposite; `ok_straight` / `ok_bent`.
+knight_moves    Fewest knight moves with blocked squares: forced detours vs blocks off every shortest path.
+river_crossing  Generated ferry puzzles (animals, boat size, conflict pairs), fewest one-way crossings (BFS).
+lights_out      3x3 Lights Out, fewest presses to turn all lamps off.
+sliding_puzzle  3x3 sliding puzzle moved by gap directions, which tile ends at a position.
+toy_machine     An invented register machine with a counted loop (40-160 steps), a register's final value.
+lru_cache       A library desk with LRU eviction, how many archive fetches (FIFO bait).
+genetics_cross  Mendel crosses with 2-3 genes, P(offspring traits) as a fraction (genotype bait).
+
 All of them run with thinking on (dialog_state, if_gen: off, extract: off, meeting_actions: off, data2text: off); the answer is the last "Answer:"/"Antwort:" line.
 """
 import common

@@ -11115,6 +11115,50 @@ def score_cable_network(item, reply):
             "detail": {f"ok_v{item['k']}": float(ok), "cheapest_edges_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- job_assign
+# 4-5 people and as many jobs with the hours each person needs for each job; every person takes exactly one job. The
+# fewest total hours (assignment problem, brute force over all permutations). Bait: greedy (cheapest pair first),
+# which is worse on every item. `ok_n<size>`, `greedy_bait`.
+JA_PEOPLE = ["Ana", "Ben", "Cem", "Dana", "Eli"]
+JA_JOBS = {"en": ["painting", "cooking", "cleaning", "shopping", "gardening"],
+           "de": ["Streichen", "Kochen", "Putzen", "Einkaufen", "Gartenarbeit"]}
+
+
+def load_job_assign(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("job_assign", i, att)
+        while True:
+            k = r.choice([4, 5])
+            cost = [[r.randint(1, 9) for _ in range(k)] for _ in range(k)]
+            gold = min(sum(cost[p][j] for p, j in enumerate(perm)) for perm in itertools.permutations(range(k)))
+            left_p, left_j, greedy = set(range(k)), set(range(k)), 0
+            while left_p:
+                c, p, j = min((cost[p][j], p, j) for p in left_p for j in left_j)
+                greedy += c
+                left_p.discard(p)
+                left_j.discard(j)
+            if greedy != gold:
+                break
+        J = JA_JOBS[lang][:k]
+        head = "| | " + " | ".join(J) + " |\n|" + "---|" * (k + 1)
+        rows = "\n".join(f"| {JA_PEOPLE[p]} | " + " | ".join(map(str, cost[p])) + " |" for p in range(k))
+        q = (f"Hours each person needs for each job:\n{head}\n{rows}\n\nEvery person does exactly one job and every job is done "
+             f"by exactly one person. What is the smallest possible total number of hours?" if lang == "en" else
+             f"Stunden, die jede Person für jede Aufgabe braucht:\n{head}\n{rows}\n\nJede Person übernimmt genau eine Aufgabe, "
+             f"und jede Aufgabe wird von genau einer Person erledigt. Wie viele Stunden sind es insgesamt mindestens?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": greedy, "k": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_job_assign(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_n{item['k']}": float(ok), "greedy_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12223,6 +12267,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "job_assign": task(load_job_assign, score_job_assign, 24, 96),
     "cable_network": task(load_cable_network, score_cable_network, 24, 96),
     "key_door_maze": task(load_key_door_maze, score_key_door_maze, 24, 96),
     "puzzle8_min": task(load_puzzle8_min, score_puzzle8_min, 24, 96),

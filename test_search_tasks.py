@@ -288,6 +288,22 @@ def test_cable_network():  # Prim's algorithm instead of Kruskal
             total += c
         assert total == it["gold"], q
 
+
+def test_job_assign():  # bitmask dynamic programming over the printed table
+    for it in prompts(tn.load_job_assign):
+        q = it["messages"][0]["content"]
+        cost = [[int(x) for x in row.split(" | ")] for row in re.findall(r"^\| [A-Z][a-z]+ \| ([\d | ]+?) \|$", q, re.M)]
+        k = len(cost)
+        best = {0: 0}
+        for p in range(k):
+            nxt = {}
+            for m, v in best.items():
+                for j in range(k):
+                    if not m >> j & 1:
+                        nxt[m | 1 << j] = min(nxt.get(m | 1 << j, 10 ** 9), v + cost[p][j])
+            best = nxt
+        assert best[(1 << k) - 1] == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

@@ -11056,6 +11056,65 @@ def score_key_door_maze(item, reply):
             "detail": {"door_open_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- cable_network
+# Villages and the cost of laying cable between some pairs; the cheapest set of cables that connects every village
+# (minimum spanning tree, Kruskal). Bait: the n-1 cheapest cables, which always close a cycle here, so the bait is
+# never a valid network. `ok_v<villages>`, `cheapest_edges_bait`.
+CN_VILLAGES = ["Ahlen", "Borg", "Cranz", "Dahn", "Elm", "Fehm", "Gohr", "Hamm"]
+
+
+def cn_mst(n, edges):
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    total, used = 0, 0
+    for w, a, b in sorted(edges):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+            total += w
+            used += 1
+    return total if used == n - 1 else None
+
+
+def load_cable_network(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("cable_network", i, att)
+        while True:
+            k = r.randint(5, 7)
+            pairs = r.sample(list(itertools.combinations(range(k), 2)), r.randint(k + 1, 2 * k))
+            costs = r.sample(range(2, 40), len(pairs))  # distinct costs: one cheapest network
+            edges = [(c, a, b) for c, (a, b) in zip(costs, pairs)]
+            gold = cn_mst(k, edges)
+            bait = sum(sorted(costs)[:k - 1])
+            if gold and gold != bait:
+                break
+        names = r.sample(CN_VILLAGES, k)
+        lines = "\n".join(f"- {names[a]} – {names[b]}: {c}" for c, a, b in r.sample(edges, len(edges)))
+        q = (f"These villages must all be connected to one network (directly or through other villages): "
+             f"{', '.join(sorted(names))}. Cables can only be laid between these pairs, at this cost (in thousand euros):"
+             f"\n{lines}\n\nWhat is the lowest total cost of a set of cables that connects every village?" if lang == "en" else
+             f"Diese Dörfer sollen alle an ein Netz angeschlossen werden (direkt oder über andere Dörfer): "
+             f"{', '.join(sorted(names))}. Kabel können nur zwischen diesen Paaren verlegt werden, zu diesen Kosten (in "
+             f"Tausend Euro):\n{lines}\n\nWie hoch sind die Gesamtkosten der günstigsten Kabelauswahl, die alle Dörfer "
+             f"verbindet?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "k": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_cable_network(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_v{item['k']}": float(ok), "cheapest_edges_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12164,6 +12223,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "cable_network": task(load_cable_network, score_cable_network, 24, 96),
     "key_door_maze": task(load_key_door_maze, score_key_door_maze, 24, 96),
     "puzzle8_min": task(load_puzzle8_min, score_puzzle8_min, 24, 96),
     "diff_apply": task(load_diff_apply, score_diff_apply, 24, 96),

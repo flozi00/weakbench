@@ -275,6 +275,19 @@ def test_key_door_maze():  # two plain BFS legs: S -> K (door shut), then K -> G
         via = (bfs(grid, s_, k, False) or 10 ** 6) + (bfs(grid, k, g, True) or 10 ** 6)
         assert min(x for x in (direct, via) if x) == it["gold"], q
 
+
+def test_cable_network():  # Prim's algorithm instead of Kruskal
+    for it in prompts(tn.load_cable_network):
+        q = it["messages"][0]["content"]
+        edges = [(a, b, int(c)) for a, b, c in re.findall(r"^- (\w+) – (\w+): (\d+)$", q, re.M)]
+        nodes = {x for a, b, _ in edges for x in (a, b)}
+        inside, total = {next(iter(sorted(nodes)))}, 0
+        while inside != nodes:
+            c, v = min((c, b if a in inside else a) for a, b, c in edges if (a in inside) != (b in inside))
+            inside.add(v)
+            total += c
+        assert total == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

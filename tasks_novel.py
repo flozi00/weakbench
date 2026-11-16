@@ -12116,7 +12116,8 @@ def score_robot_turns(item, reply):
 
 # ---------------------------------------------------------------- pancake_flips
 # A stack of 5-6 pancakes of different sizes (listed top to bottom); one flip reverses the top k pancakes. The fewest
-# flips to sort the stack, smallest on top (BFS over permutations: no formula gives the optimum). Gold 3-6 balanced;
+# flips to sort the whole stack by size (BFS over permutations: no formula gives the optimum; "smallest on top and
+# largest at the bottom" alone was read as only those two by LFM2.5, so the full order is spelled out). Gold 3-6 balanced;
 # the count of out-of-place pancakes is never the gold. `ok_<gold>`, `misplaced_bait`.
 def pf_flips(stack):
     from collections import deque
@@ -12147,12 +12148,12 @@ def load_pancake_flips(lang, n, seed):
                 break
         q = (f"A stack of {k} pancakes, sizes from top to bottom: {', '.join(map(str, stack))} (1 is the smallest). One flip "
              f"puts the spatula under some pancake and turns over everything above it, so the top k pancakes come back in "
-             f"reverse order. What is the smallest number of flips that sorts the stack with the smallest pancake on top "
-             f"and the largest at the bottom?" if lang == "en" else
+             f"reverse order. What is the smallest number of flips that sorts the whole stack by size (from top to bottom 1, 2, "
+             f"3, ..., the largest at the very bottom)?" if lang == "en" else
              f"Ein Stapel aus {k} Pfannkuchen, Größen von oben nach unten: {', '.join(map(str, stack))} (1 ist der kleinste). "
              f"Bei einem Wenden schiebt man den Pfannenwender unter einen Pfannkuchen und dreht alles darüber um, die oberen k "
-             f"Pfannkuchen liegen danach in umgekehrter Reihenfolge. Wie oft muss man mindestens wenden, bis der kleinste oben "
-             f"und der größte unten liegt?")
+             f"Pfannkuchen liegen danach in umgekehrter Reihenfolge. Wie oft muss man mindestens wenden, bis der ganze Stapel "
+             f"der Größe nach sortiert ist (von oben nach unten 1, 2, 3, ..., der größte ganz unten)?")
         items.append({"id": str(i), "lang": lang, "gold": want, "bait": mis,
                       "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
     return items

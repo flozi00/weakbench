@@ -341,6 +341,18 @@ def test_piece_fit():  # every 2x2 window: with f free squares it holds C(f, 3) 
                 total += {4: 4, 3: 1}.get(f, 0)
         assert total == it["gold"], q
 
+
+def test_painted_cube():  # count by the number of painted faces each unit cube touches, via coordinates on the boundary
+    names = ["top", "bottom", "front", "back", "left", "right"]
+    for it in prompts(tn.load_painted_cube):
+        q = it["messages"][0]["content"]
+        n = int(re.search(r"cube of (\d)x", q)[1])
+        painted = re.search(r"Only these faces are painted: ([a-z, ]+) \(", q)[1].split(", ")
+        k = int(re.search(r"exactly (\d) painted", q)[1])
+        planes = {"top": (2, n - 1), "bottom": (2, 0), "front": (1, 0), "back": (1, n - 1), "left": (0, 0), "right": (0, n - 1)}
+        cnt = sum(sum(c[planes[f][0]] == planes[f][1] for f in painted) == k for c in itertools.product(range(n), repeat=3))
+        assert cnt == it["gold"] and set(painted) <= set(names), q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

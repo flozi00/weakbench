@@ -11253,6 +11253,54 @@ def score_piece_fit(item, reply):
             "detail": {"empty_board_bait": float(v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- painted_cube
+# An n x n x n wooden cube (n = 3-5) painted on some of its six faces only (named: top, bottom, front, back, left,
+# right), then cut into unit cubes; how many small cubes have exactly k painted faces? Not the all-six textbook case,
+# so the formula must be rebuilt in 3-D. Bait: the all-faces-painted count. `ok_k<k>`, `all_faces_bait`.
+PC_FACES = {"en": ["top", "bottom", "front", "back", "left", "right"], "de": ["oben", "unten", "vorne", "hinten", "links", "rechts"]}
+
+
+def pc_count(n, painted, k):
+    total = 0
+    for x in range(n):
+        for y in range(n):
+            for z in range(n):
+                f = [z == n - 1, z == 0, y == 0, y == n - 1, x == 0, x == n - 1]
+                total += sum(f[j] for j in painted) == k
+    return total
+
+
+def load_painted_cube(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("painted_cube", i, att)
+        while True:
+            size = r.choice([3, 4, 5])
+            painted = sorted(r.sample(range(6), r.randint(2, 5)))
+            k = r.choice([0, 1, 2, 3])
+            gold, bait = pc_count(size, painted, k), pc_count(size, range(6), k)
+            if gold > 0 and gold != bait and sum(it["gold"] == gold for it in items) < len(items) // 8 + 2:
+                break
+        F = PC_FACES[lang]
+        faces = ", ".join(F[j] for j in painted)
+        q = (f"A wooden cube of {size}x{size}x{size} cm stands on a table. Only these faces are painted: {faces} (the others "
+             f"stay bare). Then it is cut into {size ** 3} small 1 cm cubes. How many small cubes have exactly {k} painted "
+             f"face{'s' if k != 1 else ''}?" if lang == "en" else
+             f"Ein Holzwürfel von {size}x{size}x{size} cm steht auf einem Tisch. Nur diese Seiten werden angemalt: {faces} (die "
+             f"anderen bleiben unbemalt). Dann wird er in {size ** 3} kleine Würfel von 1 cm zersägt. Wie viele kleine Würfel "
+             f"haben genau {k} bemalte Fläche{'n' if k != 1 else ''}?")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "k": k,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_painted_cube(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_k{item['k']}": float(ok), "all_faces_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12361,6 +12409,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "painted_cube": task(load_painted_cube, score_painted_cube, 24, 96),
     "piece_fit": task(load_piece_fit, score_piece_fit, 24, 96),
     "seat_count": task(load_seat_count, score_seat_count, 24, 96),
     "job_assign": task(load_job_assign, score_job_assign, 24, 96),

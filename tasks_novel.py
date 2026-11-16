@@ -10748,6 +10748,85 @@ def score_view_side(item, reply):
             "detail": {f"ok_{item['side']}": float(ok), "map_bait": float(item["side"] != "S" and v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- nonogram
+# A 5x5 nonogram (row and column clues: lengths of the filled runs) with exactly one solution; give one named row as
+# "#" (filled) and "." (empty). The asked row is never fixed by its own clue alone, so the columns must be used.
+# `ok`, `row_only_bait` (a pattern that fits the row clue but not the puzzle).
+def ng_clue(cells):
+    runs, k = [], 0
+    for c in list(cells) + [0]:
+        if c:
+            k += 1
+        elif k:
+            runs.append(k)
+            k = 0
+    return runs
+
+
+def ng_solutions(rows, cols, size=5, limit=2):
+    cand = [[p for p in itertools.product((0, 1), repeat=size) if ng_clue(p) == rc] for rc in rows]
+    out = []
+
+    def go(j, grid):
+        if len(out) >= limit:
+            return
+        if j == size:
+            if all(ng_clue([g[c] for g in grid]) == cols[c] for c in range(size)):
+                out.append([list(g) for g in grid])
+            return
+        for p in cand[j]:
+            grid.append(p)
+            go(j + 1, grid)
+            grid.pop()
+    go(0, [])
+    return out
+
+
+def load_nonogram(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 72, items):
+        r = rng_of("nonogram", i, att)
+        while True:
+            grid = [[int(r.random() < 0.55) for _ in range(5)] for _ in range(5)]
+            rows, cols = [ng_clue(g) for g in grid], [ng_clue([g[c] for g in grid]) for c in range(5)]
+            if len(ng_solutions(rows, cols)) != 1:
+                continue
+            free = [j for j in range(5) if sum(1 for p in itertools.product((0, 1), repeat=5) if ng_clue(p) == rows[j]) > 1]
+            if free:
+                break
+        ask = r.choice(free)
+        gold = "".join("#" if x else "." for x in grid[ask])
+        bait = next("".join("#" if x else "." for x in p) for p in itertools.product((0, 1), repeat=5)
+                    if ng_clue(p) == rows[ask] and list(p) != grid[ask])
+        fmt = lambda rc: " ".join(map(str, rc)) or "0"  # noqa: E731
+        rl = "\n".join(f"{'Row' if lang == 'en' else 'Zeile'} {j + 1}: {fmt(rc)}" for j, rc in enumerate(rows))
+        cl = "\n".join(f"{'Column' if lang == 'en' else 'Spalte'} {c + 1}: {fmt(cc)}" for c, cc in enumerate(cols))
+        q = (f"A 5x5 nonogram. Each clue lists, in order, the lengths of the runs of filled cells in that row (left to right) "
+             f"or column (top to bottom); runs are separated by at least one empty cell; 0 means the line is empty. The puzzle "
+             f"has exactly one solution.\n{rl}\n{cl}\n\nWhat is row {ask + 1}? Write it as five characters, # for filled and . "
+             f"for empty (e.g. #..##)." if lang == "en" else
+             f"Ein 5x5-Nonogramm. Jeder Hinweis nennt der Reihe nach die Längen der Blöcke gefüllter Felder in der Zeile (von "
+             f"links nach rechts) oder Spalte (von oben nach unten); Blöcke sind durch mindestens ein leeres Feld getrennt; 0 "
+             f"heißt, die Linie ist leer. Das Rätsel hat genau eine Lösung.\n{rl}\n{cl}\n\nWie sieht Zeile {ask + 1} aus? "
+             f"Schreibe sie als fünf Zeichen, # für gefüllt und . für leer (z. B. #..##).")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_nonogram(item, reply):
+    # the raw answer line: final_answer() trims a trailing "." that belongs to the pattern ("##.#.")
+    lines = re.findall(r"(?:answer|antwort)\s*\**\s*:(.*)", reply["content"] or "", re.I)
+    fa = (lines[-1] if lines else "").replace("■", "#").replace("□", ".").replace("X", "#").replace("x", "#")
+    m = re.findall(r"(?<![#.])[#.]{5,6}(?![#.])", fa.replace(" ", "").replace("`", ""))
+    m = [x[:5] if len(x) == 6 and x.endswith(".") else x for x in m]  # "#..#." + the sentence's full stop
+    v = m[-1] if m and len(m[-1]) == 5 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"row_only_bait": float(v is not None and not ok and ng_clue([c == "#" for c in v]) ==
+                                              ng_clue([c == "#" for c in item["gold"]]))}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -11856,6 +11935,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "nonogram": task(load_nonogram, score_nonogram, 24, 72),
     "view_side": task(load_view_side, score_view_side, 24, 96),
     "paper_punch": task(load_paper_punch, score_paper_punch, 24, 96),
     "lights_out": task(load_lights_out, score_lights_out, 24, 96),

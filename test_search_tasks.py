@@ -182,6 +182,20 @@ def test_view_side():  # rotate the map until the visitor's side is at the botto
         depth, lr = pos[where]
         assert grid[2 - depth][lr] == it["gold"], q
 
+
+def test_nonogram():  # brute force over all 2^25 grids is too slow: column-wise candidates instead of row-wise
+    def runs(cells):
+        return [len(x) for x in "".join("#" if c else "." for c in cells).split(".") if x]
+    for it in prompts(tn.load_nonogram, 24):
+        q = it["messages"][0]["content"]
+        rows = [[int(x) for x in v.split()] if v != "0" else [] for v in re.findall(r"^Row \d: ([\d ]+)$", q, re.M)]
+        cols = [[int(x) for x in v.split()] if v != "0" else [] for v in re.findall(r"^Column \d: ([\d ]+)$", q, re.M)]
+        cand = [[p for p in itertools.product((0, 1), repeat=5) if runs(p) == c] for c in cols]
+        sols = [g for g in itertools.product(*cand) if all(runs([col[j] for col in g]) == rows[j] for j in range(5))]
+        assert len(sols) == 1, q
+        ask = int(re.search(r"What is row (\d)", q)[1]) - 1
+        assert "".join("#" if col[ask] else "." for col in sols[0]) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

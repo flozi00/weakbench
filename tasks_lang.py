@@ -4139,6 +4139,31 @@ def score_de_linking(item, reply):
     return r
 
 
+# ---------------------------------------------------------------- de_syllables (Silbentrennung nach der Reform)
+# "Zu-cker" (ck stays together), "Fens-ter" (st is split since 1996), "Wa-gen" (one consonant goes to the next
+# syllable), "Mut-ter" (double consonants split). Both forms have the same letters, so length cannot help.
+DSY_ITEMS = [("Zu-cker", "Zuk-ker"), ("Fens-ter", "Fen-ster"), ("Wa-gen", "Wag-en"), ("Mut-ter", "Mu-tter"),
+             ("Kas-ten", "Ka-sten"), ("Ap-fel", "A-pfel"), ("Kat-ze", "Ka-tze"), ("Bä-cker", "Bäk-ker"),
+             ("Kis-te", "Ki-ste"), ("Lö-we", "Löw-e"), ("sin-gen", "sing-en"), ("Hoff-nung", "Hof-fnung"),
+             ("Wes-pe", "We-spe"), ("Ha-se", "Has-e"), ("Kü-che", "Küch-e"), ("Zim-mer", "Zi-mmer")]
+
+
+def load_de_syllables(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Wie wird das Wort am Zeilenende nach der aktuellen deutschen "
+                           f"Rechtschreibung getrennt: „{two_opts(i, g, (g, w))[0]}“ oder „{two_opts(i, g, (g, w))[1]}“? "
+                           f"Antworte nur mit der Trennung."}]}
+            for i, (g, w) in enumerate(DSY_ITEMS[:n or len(DSY_ITEMS)])]
+
+
+def score_de_syllables(item, reply):
+    t = re.sub(r"[‐‑–—]", "-", strip_lead(reply["content"] or ""))  # typographic hyphens count as "-"
+    found = [o for o in item["opts"] if re.search(rf"(?<![\wäöüß-]){re.escape(o)}(?![\wäöüß-])", t, re.I)]
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"ok_syllables": float(ok)}}
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5443,6 +5468,7 @@ TASKS = {
     "en_modal_perfect": task(("en",), load_en_modal_perfect, score_en_modal_perfect, 16, None, lang_check=False),
     "en_adj_order": task(("en",), load_en_adj_order, score_en_adj_order, 16, None, lang_check=False),
     "de_linking": task(("de",), load_de_linking, score_de_linking, 16, None, lang_check=False),
+    "de_syllables": task(("de",), load_de_syllables, score_de_syllables, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

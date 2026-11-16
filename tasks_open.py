@@ -2359,6 +2359,72 @@ def score_story_continue(item, reply):
                        "consistent": float(consistent), "continues": float(continues), "style": float(style)}}
 
 
+# ---------------------------------------------------------------- leichte_sprache (judge + exact: German Easy Language)
+# An official-style German notice rewritten in Leichte Sprache (Netzwerk Leichte Sprache rules). Code: every sentence
+# at most 12 words, no passive ("wird/wurde ... -t/-en" with a participle, "worden"), no Konjunktiv ("würde", "hätte",
+# "wäre", "könnte", "sollte"), no genitive article "des" (the passive check also catches "wird gehen": Leichte Sprache
+# keeps to the present tense, so that is intended). Judge: every fact of the notice kept (dates, amounts,
+# what to do), hard words explained or avoided, one statement per sentence, correct German. de only.
+LS_NOTICES = [
+    "Aufgrund umfangreicher Sanierungsarbeiten wird das Bürgeramt in der Zeit vom 3. bis 14. März geschlossen. "
+    "Anträge auf Ausstellung eines Personalausweises können während dieses Zeitraums ausschließlich im Bürgerbüro "
+    "Nord, Lindenstraße 8, gestellt werden. Eine vorherige Terminvereinbarung unter 0341 123 45 ist zwingend erforderlich.",
+    "Die Müllabfuhr für die Biotonne erfolgt ab dem 1. April nicht mehr am Dienstag, sondern am Donnerstag. Bitte stellen "
+    "Sie die Tonne bis spätestens 6 Uhr am Abholtag an den Straßenrand. Nicht rechtzeitig bereitgestellte Tonnen werden "
+    "nicht geleert.",
+    "Der Antrag auf Wohngeld ist bis zum 30. Juni einzureichen. Dem Antrag sind Nachweise über das Einkommen der letzten "
+    "drei Monate sowie der aktuelle Mietvertrag beizufügen. Unvollständige Anträge können nicht bearbeitet werden.",
+    "Infolge eines Wasserrohrbruchs ist die Versorgung mit Trinkwasser in der Gartenstraße am Mittwoch zwischen 8 und 14 "
+    "Uhr unterbrochen. Ein Wasserwagen steht an der Ecke Gartenstraße und Ringweg bereit. Das Wasser sollte nach der "
+    "Unterbrechung zwei Minuten lang ablaufen gelassen werden.",
+    "Die Sprechstunde der Hausarztpraxis entfällt in der Woche vom 22. bis 26. Juli wegen Urlaubs. Die Vertretung "
+    "übernimmt die Praxis Dr. Yilmaz, Marktplatz 3, Telefon 0341 987 65. In dringenden Notfällen wählen Sie die 112.",
+    "Für die Teilnahme am Schwimmkurs ist eine Anmeldung bis zum 15. Mai erforderlich. Die Kursgebühr in Höhe von 45 Euro "
+    "ist bei der ersten Kursstunde in bar zu entrichten. Bitte bringen Sie Badekleidung und ein Handtuch mit."]
+LS_JUDGE = """ORIGINAL NOTICE (German):
+{src}
+
+REWRITE IN LEICHTE SPRACHE (German Easy Language):
+{text}
+
+For each criterion answer YES or NO. Reply with ONLY {{"verdicts": [...]}}.
+1. Every fact a reader needs is kept and correct (dates, times, places, amounts, phone numbers, what to do and by when); nothing is invented.
+2. Hard or official words are avoided or explained in simple words.
+3. Each sentence says one thing, and the German is correct (grammar, spelling)."""
+LS_PASSIVE = re.compile(r"\b(?:wird|werden|wurde|wurden)\b[^.!?]{0,60}\b(?:ge\w+[tn]|\w+iert)\b(?!\s+(?:haben|werden))|\bworden\b", re.I)
+LS_KONJ = re.compile(r"\b(?:würde\w*|hätte\w*|wäre\w*|könnte\w*|sollte\w*|müsste\w*|dürfte\w*)\b", re.I)
+
+
+def load_leichte_sprache(lang, n, seed):
+    tasks_judge.check_judge()
+    return [{"id": str(i), "lang": "de", "src": src,
+             "messages": [{"role": "user", "content": "Schreibe diesen Text in Leichter Sprache (nach den Regeln des Netzwerks "
+                           "Leichte Sprache: kurze Sätze, ein Gedanke pro Satz, kein Passiv, kein Konjunktiv, schwere Wörter "
+                           "erklären). Alle wichtigen Angaben müssen erhalten bleiben. Schreibe nur den neuen Text.\n\n" + src}]}
+            for i, src in enumerate(LS_NOTICES[:n or len(LS_NOTICES)])]
+
+
+def score_leichte_sprache(item, reply):
+    tasks_judge.check_judge()
+    text = (reply["content"] or "").strip()
+    sents = [x for x in re.split(r"(?<=[.!?])\s+|\n+", re.sub(r"(?m)^\s*[-*•]\s*", "", text)) if re.search(r"\w", x)]
+    short = bool(sents) and all(len(re.findall(r"\S+", x)) <= 12 for x in sents)
+    no_passive = not LS_PASSIVE.search(text)
+    no_konj = not LS_KONJ.search(text)
+    no_gen = not re.search(r"\bdes\b", text, re.I)
+    out = tasks_judge.judge("", LS_JUDGE.format(src=item["src"], text=text or "(leer)"), max_tokens=64)
+    m = re.search(r"\{.*\}", out, re.S)
+    v = (json.loads(m[0]) if m else {}).get("verdicts")
+    if not isinstance(v, list) or len(v) != 3:
+        raise ValueError(f"unusable leichte_sprache verdict {out[:120]!r}")
+    facts, easy, one_thing = (_yes(x) for x in v)
+    met = [short, no_passive, no_konj, no_gen, facts, easy, one_thing]
+    return {"correct": all(met), "score": round(sum(met) / 7, 4), "pred": text[:160], "gold": None,
+            "detail": {"short_sentences": float(short), "no_passive": float(no_passive), "no_konjunktiv": float(no_konj),
+                       "no_genitive": float(no_gen), "facts_kept": float(facts), "hard_words": float(easy),
+                       "one_statement": float(one_thing)}}
+
+
 # ---------------------------------------------------------------- delay_notice (judge + exact: a bad-news customer email)
 # A support agent gets an internal note: the order is late, here is the new date, here is the ONE thing we may offer.
 # The email must carry the new date and the offer exactly (checked in code) and must not invent more (a refund, a
@@ -2952,6 +3018,10 @@ TASKS = {"open_checklist": {"langs": ("de", "en"), "load": load_checklist, "scor
                             "think": False, "max_tokens": 600,
                             "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},
                             "lang_check": True, "opt_in": True, "needs_judge": True},
+         "leichte_sprache": {"langs": ("de",), "load": load_leichte_sprache, "score": score_leichte_sprache,
+                             "think": False, "max_tokens": 900,
+                             "counts": {"quick": {"de": 6}, "full": {"de": None}},
+                             "lang_check": True, "opt_in": True, "needs_judge": True},
          "steelman": {"langs": ("de", "en"), "load": load_steelman, "score": score_steelman,
                       "think": False, "max_tokens": 400,
                       "counts": {"quick": {"de": 6, "en": 6}, "full": {"de": None, "en": None}},

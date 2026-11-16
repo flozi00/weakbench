@@ -882,6 +882,29 @@ def test_story_continue():
     finally:
         stop()
 
+
+def test_leichte_sprache():
+    url, stop = mock_server.serve(lambda path, body: {"content": '{"verdicts": ["YES", "YES", "YES"]}', "finish_reason": "stop"})
+    try:
+        tasks_judge.configure(url, "mock", 32768)
+        x = to.load_leichte_sprache("de", None, 0)[0]
+        good = ("Das Bürger-Amt ist zu.\nDas ist vom 3. März bis zum 14. März.\nDort wird gebaut.\n"
+                "Sie brauchen einen neuen Ausweis?\nDann gehen Sie zum Bürger-Büro Nord.\nDie Adresse ist: Lindenstraße 8.\n"
+                "Sie brauchen vorher einen Termin.\nRufen Sie an: 0341 123 45.")
+        r = to.score_leichte_sprache(x, {"content": good})
+        assert r["detail"]["short_sentences"] == 1 and r["detail"]["no_konjunktiv"] == 1, r
+        assert r["detail"]["no_passive"] == 0  # "Dort wird gebaut." is a passive: the rules forbid it
+        ok = good.replace("Dort wird gebaut.", "Dort sind Bau-Arbeiten.")
+        assert to.score_leichte_sprache(x, {"content": ok})["correct"]
+        assert to.score_leichte_sprache(x, {"content": ok + "\nSie könnten auch später kommen."})["detail"]["no_konjunktiv"] == 0
+        assert to.score_leichte_sprache(x, {"content": ok + "\nDie Öffnungszeiten des Amtes stehen im Internet."})["detail"]["no_genitive"] == 0
+        long = ok + "\nWenn Sie keinen Termin haben und trotzdem kommen, dann müssen Sie sehr lange warten."
+        assert to.score_leichte_sprache(x, {"content": long})["detail"]["short_sentences"] == 0
+        assert to.score_leichte_sprache(x, {"content": ok + "\nDie Tonne wird nicht geleert."})["detail"]["no_passive"] == 0
+    finally:
+        stop()
+
 if __name__ == "__main__":
+    test_leichte_sprache()
     test_story_continue()
     test_subtitle_mt()

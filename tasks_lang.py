@@ -4347,6 +4347,38 @@ def load_de_verb_cluster(lang, n, seed):
     return items
 
 
+# ---------------------------------------------------------------- de_pronoun_order (object order in the Mittelfeld)
+# Two pronouns: accusative before dative ("Ich gebe es ihm", not "ihm es"); a pronoun before a noun phrase ("Ich gebe
+# ihm das Buch", "Ich zeige es meiner Schwester"). Only these firm cases (two nouns may come in either order). The
+# wrong version swaps the two objects, so the words are identical; gold position balanced.
+PO_ITEMS = [("Ich gebe es ihm morgen.", "Ich gebe ihm es morgen."),
+            ("Kannst du sie mir zeigen?", "Kannst du mir sie zeigen?"),
+            ("Er hat es ihr gestern geschickt.", "Er hat ihr es gestern geschickt."),
+            ("Wir erklären es euch später.", "Wir erklären euch es später."),
+            ("Ich habe ihm das Buch gegeben.", "Ich habe das Buch ihm gegeben."),
+            ("Sie zeigt es ihrer Schwester.", "Sie zeigt ihrer Schwester es."),
+            ("Bring ihn mir bitte zurück.", "Bring mir ihn bitte zurück."),
+            ("Der Arzt hat ihr die Tabletten verschrieben.", "Der Arzt hat die Tabletten ihr verschrieben."),
+            ("Hast du es deinem Chef schon gesagt?", "Hast du deinem Chef es schon gesagt?"),
+            ("Ich leihe sie dir gern.", "Ich leihe dir sie gern."),
+            ("Wir haben ihnen den Weg erklärt.", "Wir haben den Weg ihnen erklärt."),
+            ("Er schenkt ihn seinem Sohn.", "Er schenkt seinem Sohn ihn."),
+            ("Kannst du es uns übersetzen?", "Kannst du uns es übersetzen?"),
+            ("Sie hat mir den Schlüssel gegeben.", "Sie hat den Schlüssel mir gegeben."),
+            ("Ich schicke sie euch per Post.", "Ich schicke euch sie per Post."),
+            ("Der Kellner bringt es dem Gast.", "Der Kellner bringt dem Gast es.")]
+
+
+def load_de_pronoun_order(lang, n, seed):
+    items = []
+    for i, (g, w) in enumerate(PO_ITEMS[:n or len(PO_ITEMS)]):
+        a, b = two_opts(i, g, (g, w))
+        items.append({"id": str(i), "lang": "de", "gold": "A" if a == g else "B", "literal": "B" if a == g else "A",
+                      "messages": [{"role": "user", "content": "Welcher Satz hat die richtige Wortstellung?\n"
+                                    f"A. {a}\nB. {b}\nAntworte mit einer Zeile \"Antwort: A\" oder \"Antwort: B\"."}]})
+    return items
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5835,6 +5867,7 @@ TASKS = {
     "de_comma_pairs": task(("de",), load_de_comma_pairs, score_idioms, 16, None, lang_check=False),
     "de_colon_case": task(("de",), load_de_colon_case, score_idioms, 16, None, lang_check=False),
     "de_verb_cluster": task(("de",), load_de_verb_cluster, score_idioms, 16, None, lang_check=False),
+    "de_pronoun_order": task(("de",), load_de_pronoun_order, score_idioms, 16, None, lang_check=False),
     "en_common_misspell": task(("en",), load_en_common_misspell, score_en_common_misspell, 16, None, lang_check=False),
     "en_time_preps": task(("en",), load_en_time_preps, score_en_place_preps, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),

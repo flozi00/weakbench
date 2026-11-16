@@ -549,7 +549,7 @@ def test_end_to_end():
     mc = {(r["lang"], r["id"]): r for r in items(run_dir, "fake_mc")}
     assert len(mc) == 8 and list(mc["en", "0"]) == [
         "task", "lang", "id", "correct", "score", "pred", "gold", "finish_reason", "prompt_tokens",
-        "completion_tokens", "latency_s", "junk", "lang_ok", "error", "reply", "detail"]
+        "completion_tokens", "latency_s", "junk", "lang_ok", "think_lang_ok", "error", "reply", "detail"]
     assert mc["en", "0"]["correct"] is True and mc["en", "0"]["pred"] == "B" and mc["en", "2"]["correct"] is False
     err = mc["de", "3"]
     assert err["correct"] is None and err["score"] is None and "HTTP 400" in err["error"]
@@ -688,5 +688,22 @@ def test_groups_known():
     assert not set(q.GROUPS) & set(q.TASKS)  # a group never shadows a task name
 
 
+
+def test_think_lang():
+    """The language of the reasoning is recorded: English thinking on a German item is a switch (LFM2.5 does this
+    behind an unopened </think>), German thinking matches; no reasoning gives None."""
+    en = "We need to find the answer. The question is about the train and the time it takes, so we compute it. " * 3
+    de = "Wir müssen die Antwort finden. Die Frage ist, wie lange der Zug braucht, und das rechnen wir aus. " * 3
+    item = {"id": "1", "lang": "de", "messages": quality.user("x"), "gold": "B", "n_options": 4}
+    out = []
+    for content in (en + "</think>B", de + "</think>B", "B"):
+        url, stop, _ = serving(lambda body, c=content: {"content": c})
+        try:
+            out.append(quality.run_item(url, "fake_mc", FAKE["fake_mc"], item, {"model": "m", "messages": item["messages"]}, 30)["think_lang_ok"])
+        finally:
+            stop()
+    assert out == [False, True, None], out
+
 if __name__ == "__main__":
+    test_think_lang()
     test_groups_known()

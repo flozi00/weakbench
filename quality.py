@@ -947,7 +947,7 @@ def run_item(url, name, t, item, body, timeout):
     """One request -> one record; never raises (a failed item is a record with `error`)."""
     rec = {"task": name, "lang": item["lang"], "id": str(item["id"]), **dict.fromkeys((
         "correct", "score", "pred", "gold", "finish_reason", "prompt_tokens", "completion_tokens", "latency_s",
-        "junk", "lang_ok", "error", "reply")), "detail": {}}
+        "junk", "lang_ok", "think_lang_ok", "error", "reply")), "detail": {}}
     t0 = time.monotonic()
     try:
         if item.get("turns"):  # multi-turn: send each turn, append the reply, score the last one
@@ -1019,6 +1019,8 @@ def run_item(url, name, t, item, body, timeout):
         check = item.get("lang_check", t.get("lang_check", True))  # items may opt out (reply in another language)
         rec["lang_ok"] = (res["lang_ok"] if "lang_ok" in res else
                           lang_ok(reply["content"], item["lang"]) if check else None)
+        # the language the model THINKS in: a German task reasoned in English is a switch the reply hides
+        rec["think_lang_ok"] = lang_ok(reply["reasoning"], item["lang"], min_words=30) if check and reply["reasoning"] else None
     except Exception as exc:  # noqa: BLE001 — never crash the run
         rec.update(correct=None, score=None, error=f"{type(exc).__name__}: {exc}"[:500],
                    latency_s=rec["latency_s"] or round(time.monotonic() - t0, 3))
@@ -1267,6 +1269,9 @@ def summarize(run_dir):
                                                      if r["completion_tokens"] is not None]),
                      "secs": round(sum(r["latency_s"] or 0 for r in rs), 1)})  # request-seconds, not wall time
     for row in rows:
+        thought = [r["think_lang_ok"] for r in cells[(row["task"], row["lang"])] if r.get("think_lang_ok") is not None]
+        if thought:  # share of items whose reasoning is in the cell's language (None: no reasoning or undecidable)
+            row["extra"]["think_lang_match"] = round(statistics.fmean(thought), 4)
         row["extra"].update(cross_lingual(cells, row["task"]))
         if TASKS.get(row["task"], {}).get("grouped"):
             row["extra"].update(group_consistency(cells[(row["task"], row["lang"])]))

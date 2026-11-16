@@ -109,7 +109,9 @@ trained closest to them, so the suite now leans on four kinds of evidence that t
    between two judges on the same replies.
 4. **Language as a first-class skill**: reply-language control under pull (`lang_switch`, `mgsm_mixed`),
    grammaticality (`grammar_pairs`), proofreading without over-editing (`spell_fix`), plain-language rewriting
-   with fact retention (`simplify`), native-editor error rates and fluency (`lang_quality`).
+   with fact retention (`simplify`), native-editor error rates and fluency (`lang_quality`), and the language of
+   the reasoning itself: every cell with a language check reports `think_lang_match` (share of items whose
+   reasoning is in the cell's language; LFM2.5 reasons in English on German tasks behind an unopened `</think>`).
 
 The board's **General index** averages only the categories built this way (generalization, open, truthfulness,
 robustness). Smoke run 2026-11-14 on a 4B model (`--limit 5`, a 27B judge, run

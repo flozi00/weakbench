@@ -4379,6 +4379,43 @@ def load_de_pronoun_order(lang, n, seed):
     return items
 
 
+# ---------------------------------------------------------------- de_zu_infinitive (where "zu" goes)
+# Separable verbs take "zu" inside (anzurufen, aufzuräumen), inseparable ones before (zu verstehen, zu besuchen). The
+# wrong form moves it ("zu anrufen", "verzustehen"); both forms have the same letters. Separable gold in half.
+ZI_ITEMS = [("Ich versuche, dich morgen ___.", "anzurufen", "zu anrufen"),
+            ("Es ist schwer, diesen Text ___.", "zu verstehen", "verzustehen"),
+            ("Vergiss nicht, dein Zimmer ___.", "aufzuräumen", "zu aufräumen"),
+            ("Wir planen, unsere Großeltern ___.", "zu besuchen", "bezusuchen"),
+            ("Er hat keine Lust, früh ___.", "aufzustehen", "zu aufstehen"),
+            ("Sie hat versprochen, das Paket ___.", "zu bezahlen", "bezuzahlen"),
+            ("Denk daran, die Heizung ___.", "auszuschalten", "zu ausschalten"),
+            ("Es ist verboten, hier ___.", "zu übernachten", "überzunachten"),
+            ("Ich habe vor, im Sommer ___.", "umzuziehen", "zu umziehen"),
+            ("Er versucht, den Fehler ___.", "zu erklären", "erzuklären"),
+            ("Vergiss nicht, die Fenster ___.", "zuzumachen", "zu zumachen"),
+            ("Es fällt mir schwer, ihm ___.", "zu verzeihen", "verzuzeihen"),
+            ("Sie beschloss, beim Projekt ___.", "mitzumachen", "zu mitmachen"),
+            ("Wir hoffen, den Termin nicht ___.", "zu vergessen", "verzugessen"),
+            ("Hast du Zeit, mich vom Bahnhof ___?", "abzuholen", "zu abholen"),
+            ("Er bittet darum, die Rechnung ___.", "zu überprüfen", "überzuprüfen")]
+
+
+def load_de_zu_infinitive(lang, n, seed):
+    return [{"id": str(i), "lang": "de", "gold": g, "opts": (g, w),
+             "messages": [{"role": "user", "content": f"Welche Form ist richtig: „{two_opts(i, g, (g, w))[0]}“ oder "
+                           f"„{two_opts(i, g, (g, w))[1]}“? Antworte nur mit der Form.\n\n{sent}"}]}
+            for i, (sent, g, w) in enumerate(ZI_ITEMS[:n or len(ZI_ITEMS)])]
+
+
+def score_de_zu_infinitive(item, reply):
+    t = re.sub(r"\([^()]*\)", " ", strip_lead(reply["content"] or "")).lower()
+    found = [o for o in item["opts"] if re.search(rf"(?<![\wäöüß]){re.escape(o.lower())}(?![\wäöüß])", t)]
+    v = found[0] if len(found) == 1 else None
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {"ok_separable" if " " not in item["gold"] else "ok_inseparable": float(ok)}}
+
+
 # ---------------------------------------------------------------- de_verb_preps (fixed prepositions of German verbs)
 # The preposition belongs to the verb, not to the meaning of the noun; English transfer gives "warten für" (wait for),
 # "abhängen von" vs "depend on" ... Minimal pairs where the preposition changes the meaning (sich freuen auf / über).
@@ -5868,6 +5905,7 @@ TASKS = {
     "de_colon_case": task(("de",), load_de_colon_case, score_idioms, 16, None, lang_check=False),
     "de_verb_cluster": task(("de",), load_de_verb_cluster, score_idioms, 16, None, lang_check=False),
     "de_pronoun_order": task(("de",), load_de_pronoun_order, score_idioms, 16, None, lang_check=False),
+    "de_zu_infinitive": task(("de",), load_de_zu_infinitive, score_de_zu_infinitive, 16, None, lang_check=False),
     "en_common_misspell": task(("en",), load_en_common_misspell, score_en_common_misspell, 16, None, lang_check=False),
     "en_time_preps": task(("en",), load_en_time_preps, score_en_place_preps, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),

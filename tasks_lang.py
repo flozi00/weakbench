@@ -4528,6 +4528,23 @@ def score_en_place_preps(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {f"ok_{item['gold']}": float(ok)}}
 
 
+# ---------------------------------------------------------------- en_time_preps (in / on / at for times)
+# "on Monday", "in May", "at night", "in the morning" but "on Monday morning", "at Christmas" but "on Christmas Day".
+# Only BrE = AmE items (no "at/on the weekend"). Six items per preposition.
+ETP_ITEMS = [("The shop is closed ___ Sundays.", "on"), ("She was born ___ 1998.", "in"), ("The film starts ___ 8 pm.", "at"),
+             ("We usually go skiing ___ February.", "in"), ("I can't sleep ___ night.", "at"), ("Let's meet ___ Monday morning.", "on"),
+             ("The leaves fall ___ autumn.", "in"), ("They got married ___ 14 June.", "on"), ("The bus leaves ___ noon.", "at"),
+             ("I always feel tired ___ the afternoon.", "in"), ("We open presents ___ Christmas Day.", "on"), ("The whole family visits ___ Christmas.", "at"),
+             ("The castle was built ___ the 15th century.", "in"), ("I'll call you ___ my birthday.", "on"), ("He was busy ___ the moment.", "at"),
+             ("The museum is free ___ the first Sunday of the month.", "on"), ("It gets dark early ___ winter.", "in"), ("She left ___ sunrise.", "at")]
+
+
+def load_en_time_preps(lang, n, seed):
+    return [{"id": str(i), "lang": "en", "gold": g, "opts": ("in", "on", "at"),
+             "messages": [{"role": "user", "content": f"Fill the gap with \"in\", \"on\" or \"at\". Answer with the word only.\n\n{sent}"}]}
+            for i, (sent, g) in enumerate(ETP_ITEMS[:n or len(ETP_ITEMS)])]
+
+
 # ---------------------------------------------------------------- en_since_for (since / for / ago)
 # German "seit" covers both since (a point) and for (a span), "vor" is "ago": a classic transfer error.
 SFA_ITEMS = [("I have lived here ___ 2015.", "since"), ("I have lived here ___ ten years.", "for"),
@@ -5721,6 +5738,7 @@ TASKS = {
     "de_comma_pairs": task(("de",), load_de_comma_pairs, score_idioms, 16, None, lang_check=False),
     "de_colon_case": task(("de",), load_de_colon_case, score_idioms, 16, None, lang_check=False),
     "en_common_misspell": task(("en",), load_en_common_misspell, score_en_common_misspell, 16, None, lang_check=False),
+    "en_time_preps": task(("en",), load_en_time_preps, score_en_place_preps, 16, None, lang_check=False),
     "de_verb_preps": task(("de",), load_de_verb_preps, score_de_verb_preps, 16, 16, lang_check=False),
     "en_confusables": task(("en",), load_en_confusables, score_en_confusables, 20, 20, lang_check=False),
     "de_imperative": task(("de",), load_de_imperative, score_de_imperative, 16, 16, lang_check=False),

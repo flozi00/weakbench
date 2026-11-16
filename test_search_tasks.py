@@ -496,6 +496,41 @@ def test_strip_fold():  # each square as (x, height): a fold mirrors x and puts 
         pile = sorted((c for c in sq if sq[c][0] == x), key=lambda c: -sq[c][1])
         assert "".join(pile) == it["gold"], (q, pile)
 
+
+def test_unsat_detect():  # rules re-read from the text; brute force decides possible vs impossible
+    for it in prompts(tn.load_unsat_detect):
+        q = it["messages"][0]["content"]
+        ppl = re.match(r"(.+?) sit on a bench", q)[1].split(", ")
+        rules = re.findall(r"^- (.+)$", q, re.M)
+
+        def holds(o, ru):
+            pos = {p: j for j, p in enumerate(o)}
+            w = ru.rstrip(".").split()
+            a, b = w[0], w[-1]
+            if "middle seat" in ru:
+                return pos[a] == 2
+            if "ends" in ru:
+                return pos[a] in (0, 4)
+            if "not sit directly" in ru:
+                return abs(pos[a] - pos[b]) != 1
+            if "directly next" in ru:
+                return abs(pos[a] - pos[b]) == 1
+            return pos[a] < pos[b]
+        possible = any(all(holds(o, ru) for ru in rules) for o in itertools.permutations(ppl))
+        assert possible == it["sat"], q
+        if possible:
+            assert all(holds(it["gold"].split(", "), ru) for ru in rules)
+
+
+def test_flashback_order():  # offsets re-read from the English text and chained in telling order
+    for it in prompts(tn.load_flashback_order):
+        q = it["messages"][0]["content"]
+        day, cur = {"A": 0}, 0
+        for letter, n_, rel in re.findall(r"\(([B-E])\) (\d+) days? (before|after) that", q):
+            cur += int(n_) * (-1 if rel == "before" else 1)
+            day[letter] = cur
+        assert "".join(sorted(day, key=day.get)) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

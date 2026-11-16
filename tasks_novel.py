@@ -11726,6 +11726,137 @@ def score_strip_fold(item, reply):
             "detail": {f"ok_f{item['folds']}": float(ok), "no_reverse_bait": float(v == item["bait"] and v != item["gold"])}}
 
 
+# ---------------------------------------------------------------- unsat_detect
+# Seating puzzles (5 people on a bench, 3-5 mixed rules) where half have NO valid order. The model gives one valid
+# order (checked against every rule in code) or says it is impossible. Models invent a solution rather than admit
+# none exists; the possible half guards against "always impossible". `ok_possible`, `ok_impossible`,
+# `invented_order` (an order offered for an impossible puzzle).
+UD_RULES = {"en": {"next": "{a} sits directly next to {b}.", "apart": "{a} does not sit directly next to {b}.",
+                   "end": "{a} sits at one of the two ends.", "left": "{a} sits somewhere to the left of {b}.",
+                   "middle": "{a} sits in the middle seat."},
+            "de": {"next": "{a} sitzt direkt neben {b}.", "apart": "{a} sitzt nicht direkt neben {b}.",
+                   "end": "{a} sitzt an einem der beiden Enden.", "left": "{a} sitzt irgendwo links von {b}.",
+                   "middle": "{a} sitzt auf dem mittleren Platz."}}
+
+
+def ud_ok(order, rule):
+    kind, a, b = rule
+    if kind == "middle":
+        return order.index(a) == len(order) // 2
+    return seatc_ok(order, rule)
+
+
+def load_unsat_detect(lang, n, seed):
+    items = []
+    ppl = SEATC_PEOPLE[:5]
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("unsat_detect", i, att)
+        want_sat = i % 2 == 0
+        while True:
+            rules = []
+            for _ in range(r.randint(3, 5)):
+                kind = r.choice(["next", "apart", "end", "left", "middle"])
+                a, b = r.sample(ppl, 2)
+                rules.append((kind, a, None if kind in ("end", "middle") else b))
+            if len(set(rules)) < len(rules):
+                continue
+            sols = [o for o in itertools.permutations(ppl) if all(ud_ok(o, ru) for ru in rules)]
+            # each rule alone is satisfiable, so the clash only shows in combination
+            if all(any(ud_ok(o, ru) for o in itertools.permutations(ppl)) for ru in rules) and bool(sols) == want_sat:
+                break
+        T = UD_RULES[lang]
+        rl = "\n".join("- " + T[k].format(a=a, b=b) for k, a, b in rules)
+        q = (f"{', '.join(ppl)} sit on a bench with 5 seats in a row. All of these rules must hold:\n{rl}\n\nGive one "
+             f"seating order from left to right that satisfies every rule, as names separated by commas. If no such order "
+             f"exists, answer \"impossible\"." if lang == "en" else
+             f"{', '.join(ppl)} sitzen auf einer Bank mit 5 Plätzen nebeneinander. Alle diese Regeln müssen gelten:\n{rl}\n\n"
+             f"Nenne eine Sitzordnung von links nach rechts, die jede Regel erfüllt, als Namen durch Kommas getrennt. Wenn es "
+             f"keine solche Ordnung gibt, antworte \"unmöglich\".")
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(sols[0]) if sols else ("impossible" if lang == "en" else "unmöglich"),
+                      "sat": bool(sols), "rules": rules, "people": ppl,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_unsat_detect(item, reply):
+    fa = final_answer(reply["content"]) or ""
+    names = re.findall(r"\b(" + "|".join(item["people"]) + r")\b", fa)
+    said_imp = bool(re.search(r"\b(?:impossible|unmöglich|no (?:valid )?order|keine)\b", fa, re.I))
+    order = tuple(names) if len(names) == 5 and len(set(names)) == 5 else None
+    if item["sat"]:
+        ok = order is not None and all(ud_ok(order, tuple(ru)) for ru in item["rules"])
+    else:
+        ok = said_imp and order is None
+    return {"correct": ok, "score": float(ok), "pred": ", ".join(order) if order else ("impossible" if said_imp else None),
+            "gold": item["gold"], "detail": {"ok_possible" if item["sat"] else "ok_impossible": float(ok),
+                                             "invented_order": float(not item["sat"] and order is not None)}}
+
+
+# ---------------------------------------------------------------- flashback_order
+# A short narrative told out of order: each sentence dates its event relative to the one told just before ("2 days
+# before that, she had ...", "3 days after that, she ..."), so the chain of offsets and the tenses must be followed.
+# Five events, each with a letter; give their chronological order. Bait: the order of mention. `ok`, `text_order_bait`.
+FB_EVENTS = {"en": [("bought a train ticket", "had bought a train ticket"), ("packed her suitcase", "had packed her suitcase"),
+                    ("called her sister", "had called her sister"), ("lost her keys", "had lost her keys"),
+                    ("found a note under the door", "had found a note under the door"), ("missed the bus", "had missed the bus"),
+                    ("fed the neighbour's cat", "had fed the neighbour's cat")],
+             "de": [("kaufte eine Zugfahrkarte", "hatte eine Zugfahrkarte gekauft"), ("packte ihren Koffer", "hatte ihren Koffer gepackt"),
+                    ("rief ihre Schwester an", "hatte ihre Schwester angerufen"), ("verlor ihre Schlüssel", "hatte ihre Schlüssel verloren"),
+                    ("fand einen Zettel unter der Tür", "hatte einen Zettel unter der Tür gefunden"), ("verpasste den Bus", "hatte den Bus verpasst"),
+                    ("fütterte die Katze der Nachbarn", "hatte die Katze der Nachbarn gefüttert")]}
+
+
+def load_flashback_order(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("flashback_order", i, att)
+        ev = r.sample(range(len(FB_EVENTS["en"])), 5)  # chronological order of the five events (day 0..4 offsets)
+        days = sorted(r.sample(range(1, 9), 5))  # each event on its own day
+        while True:
+            told = r.sample(range(5), 5)  # the order of telling
+            if told != list(range(5)) and told[0] != 0:
+                break
+        letters = "ABCDE"
+        E = FB_EVENTS[lang]
+        sents, prev = [], None
+        for k, idx in enumerate(told):
+            e_simple, e_plup = E[ev[idx]]
+            v0, rest0 = e_simple.split(" ", 1)
+            if k == 0:
+                sents.append(f"({letters[k]}) One morning, Lena {e_simple}." if lang == "en" else
+                             f"({letters[k]}) Eines Morgens {v0} Lena {rest0}.")
+                prev = days[idx]
+                continue
+            delta = days[idx] - prev  # relative to the event told just before: the chain must be followed
+            n_ = abs(delta)
+            if lang == "en":
+                when = f"{n_} day{'s' if n_ != 1 else ''} " + ("before that" if delta < 0 else "after that")
+                sents.append(f"({letters[k]}) {when.capitalize()}, she {e_plup if delta < 0 else e_simple}.")
+            else:
+                when = f"{n_} Tag{'e' if n_ != 1 else ''} " + ("davor" if delta < 0 else "danach")
+                v, rest = (e_plup if delta < 0 else e_simple).split(" ", 1)
+                sents.append(f"({letters[k]}) {when} {v} sie {rest}.")
+            prev = days[idx]
+        order = sorted(range(5), key=lambda k: days[told[k]])
+        gold = "".join(letters[k] for k in order)
+        q = (f"Read the story. Each sentence is marked with a letter, but the sentences are not in the order things happened."
+             f"\n\n{' '.join(sents)}\n\nIn what order did the five events happen? Answer with the five letters, earliest first."
+             if lang == "en" else
+             f"Lies die Geschichte. Jeder Satz hat einen Buchstaben, aber die Sätze stehen nicht in der Reihenfolge, in der "
+             f"alles geschah.\n\n{' '.join(sents)}\n\nIn welcher Reihenfolge geschahen die fünf Ereignisse? Antworte mit den fünf "
+             f"Buchstaben, das früheste zuerst.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_flashback_order(item, reply):
+    fa = (final_answer(reply["content"]) or "").upper()
+    cands = [re.sub(r"[^A-E]", "", x) for x in re.findall(r"\b[A-E]+\b(?:[\s,>-]+[A-E]\b)*", fa)]
+    v = next((c for c in reversed(cands) if len(c) == 5 and len(set(c)) == 5), None)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"text_order_bait": float(v == "ABCDE")}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12834,6 +12965,8 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "flashback_order": task(load_flashback_order, score_flashback_order, 24, 96),
+    "unsat_detect": task(load_unsat_detect, score_unsat_detect, 24, 96),
     "strip_fold": task(load_strip_fold, score_strip_fold, 24, 96),
     "sun_relative": task(load_sun_relative, score_sun_relative, 24, 96),
     "seesaw_balance": task(load_seesaw_balance, score_seesaw_balance, 24, 96),

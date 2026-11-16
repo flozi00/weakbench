@@ -11659,6 +11659,73 @@ def score_sun_relative(item, reply):
             "detail": {f"ok_{item['hemi']}": float(ok), "compass_bait": float(compass)}}
 
 
+# ---------------------------------------------------------------- strip_fold
+# A paper strip of 8 squares with 8 random letters (left to right) lies flat and is folded in half 1-3 times, each time the
+# left half onto the right half or the right half onto the left half; the folded part turns over and lands on top.
+# Which letters are in the stack, from top to bottom? 1-D mental folding (paper_punch is the 2-D form). Bait: the
+# stack with the moved half not reversed. `ok_f<folds>`, `no_reverse_bait`.
+def sf_fold(stacks, side, reverse=True):
+    """stacks: list of piles (bottom->top) left to right; folding `side` ("L"/"R") onto the other half."""
+    h = len(stacks) // 2
+    left, right = stacks[:h], stacks[h:]
+    if side == "L":  # left half turns over onto the right: pile i lands on right pile h-1-i, upside down
+        moved, keep = left, right
+        return [keep[j] + (list(reversed(moved[h - 1 - j])) if reverse else moved[j]) for j in range(h)]
+    moved, keep = right, left
+    return [keep[j] + (list(reversed(moved[h - 1 - j])) if reverse else moved[j]) for j in range(h)]
+
+
+def load_strip_fold(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("strip_fold", i, att)
+        k = i % 3 + 1
+        folds = [r.choice("LR") for _ in range(k)]
+        labels = "".join(r.sample("ABCDEFGHKLMNPRSTUVWXYZ", 8))
+        st = st_bait = [[c] for c in labels]
+        for f in folds:
+            st = sf_fold(st, f)
+            st_bait = sf_fold(st_bait, f, reverse=False)
+        if len(st) == 1:
+            gold, bait = "".join(reversed(st[0])), "".join(reversed(st_bait[0]))
+        else:  # fewer than 3 folds leave several piles: ask for the pile under one named square
+            j = r.randrange(len(st))
+            gold, bait = "".join(reversed(st[j])), "".join(reversed(st_bait[j]))
+        name = {"en": {"L": "the left half onto the right half", "R": "the right half onto the left half"},
+                "de": {"L": "die linke Hälfte auf die rechte", "R": "die rechte Hälfte auf die linke"}}[lang]
+        steps = "\n".join(f"{t + 1}. " + (f"Fold {name[f]}." if lang == "en" else f"Falte {name[f]}.")
+                           for t, f in enumerate(folds))
+        if len(st) == 1:
+            ask = ("Which letters lie in the stack, from top to bottom?" if lang == "en" else
+                   "Welche Buchstaben liegen im Stapel, von oben nach unten?")
+        else:
+            bottom = st[j][0]
+            ask = (f"Which letters lie in the pile whose bottom square is {bottom}, from top to bottom?" if lang == "en" else
+                   f"Welche Buchstaben liegen in dem Stapel, dessen unterstes Feld {bottom} ist, von oben nach unten?")
+        q = (f"A paper strip of 8 squares is labelled {' '.join(labels)} from left to right (the labels are printed through, "
+             f"so they read the same from both sides). It lies flat and is folded in half, each time the moving half "
+             f"turning over onto the other half:\n{steps}\n{ask} Answer with the letters only, e.g. CBAD."
+             if lang == "en" else
+             f"Ein Papierstreifen aus 8 Feldern ist von links nach rechts mit {' '.join(labels)} beschriftet (die Buchstaben "
+             f"sind durchgedruckt, von beiden Seiten gleich lesbar). Er liegt flach und wird jeweils in der Mitte gefaltet, "
+             f"wobei die bewegte Hälfte umklappt und auf der anderen landet:\n{steps}\n{ask} Antworte nur mit den "
+             f"Buchstaben, z. B. CBAD.")
+        items.append({"id": str(i), "lang": lang, "gold": gold, "bait": bait, "folds": k, "labels": labels,
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_strip_fold(item, reply):
+    fa = (final_answer(reply["content"]) or "").upper()
+    L = item["labels"]
+    runs = re.findall(rf"\b[{L}]+\b(?:[\s,>-]+[{L}]\b)*", fa)  # "YRLN" or "Y R L N" / "Y, R, L, N"
+    cands = [re.sub(rf"[^{L}]", "", x) for x in runs]
+    v = next((c for c in reversed(cands) if len(c) == len(item["gold"])), None)
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_f{item['folds']}": float(ok), "no_reverse_bait": float(v == item["bait"] and v != item["gold"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12767,6 +12834,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "strip_fold": task(load_strip_fold, score_strip_fold, 24, 96),
     "sun_relative": task(load_sun_relative, score_sun_relative, 24, 96),
     "seesaw_balance": task(load_seesaw_balance, score_seesaw_balance, 24, 96),
     "bridge_torch": task(load_bridge_torch, score_bridge_torch, 24, 96),

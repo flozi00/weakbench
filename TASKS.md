@@ -426,6 +426,7 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `river_crossing` | generated ferry puzzles (3-4 animals, boat for 1-2, 1-3 conflict pairs), fewest one-way crossings (BFS); gold 5/7/9 balanced | de, en | 24 / 96 | auto | exact integer; `ok_cap<c>`, `no_conflict_bait` |
 | `lights_out` | 3x3 Lights Out, fewest presses that turn all lamps off (all 512 press sets); gold 2-5 balanced, lamp count never the gold | de, en | 24 / 96 | auto | exact integer; `ok_<gold>`, `lamp_count_bait` |
 | `paper_punch` | a 4x4-marked sheet folded 1-3 times (equal parts), punched, unfolded: which squares have holes | de, en | 24 / 96 | auto | exact set of squares; `ok_f<folds>`, `last_fold_bait` |
+| `strip_fold` | an 8-square paper strip with random letters folded in half 1-3 times (equal parts): the letters in a pile / the stack from top to bottom (1-D form of paper_punch) | de, en | 24 / 96 | auto | exact letter order; `ok_f<folds>`, `no_reverse_bait` |
 | `view_side` | 3x3 market stalls as a map, which stall is at a position named from a visitor's side (perspective taking); sides balanced | de, en | 24 / 96 | auto | exact stall; `ok_<side>`, `map_bait` |
 | `nonogram` | 5x5 nonogram with exactly one solution; give a row its own clue does not fix, as # and - | de, en | 24 / 72 | auto | exact pattern; `row_only_bait` |
 | `word_ladder` | fewest one-letter steps between two words through a given 14-20 word list (BFS); a detour is always forced; gold 3-6 balanced | de, en | 24 / 96 | auto | exact integer; `ok_<gold>`, `hamming_bait` |

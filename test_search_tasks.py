@@ -476,6 +476,26 @@ def test_sun_relative():  # bearings in degrees: sun bearing minus facing bearin
         side = {0: "in front of her", 90: "to her right", 180: "behind her", 270: "to her left"}[(sun - face) % 360]
         assert side == it["gold"], q
 
+
+def test_strip_fold():  # each square as (x, height): a fold mirrors x and puts the moving half, flipped, on top
+    for it in prompts(tn.load_strip_fold):
+        q = it["messages"][0]["content"]
+        labels = re.search(r"labelled ((?:[A-Z] ){7}[A-Z]) from", q)[1].split()
+        sq = {c: [j + 0.5, 0] for j, c in enumerate(labels)}
+        lo, hi = 0.0, 8.0
+        for side in re.findall(r"Fold the (left|right) half", q):
+            mid = (lo + hi) / 2
+            moving = [c for c, (x, _) in sq.items() if (x < mid) == (side == "left")]
+            top = max(h for c, (x, h) in sq.items() if c not in moving)
+            mtop = max(sq[c][1] for c in moving)
+            for c in moving:
+                sq[c] = [2 * mid - sq[c][0], top + 1 + (mtop - sq[c][1])]
+            lo, hi = (mid, hi) if side == "left" else (lo, mid)
+        m = re.search(r"bottom square is ([A-Z])", q)
+        x = sq[m[1]][0] if m else (lo + hi) / 2
+        pile = sorted((c for c in sq if sq[c][0] == x), key=lambda c: -sq[c][1])
+        assert "".join(pile) == it["gold"], (q, pile)
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

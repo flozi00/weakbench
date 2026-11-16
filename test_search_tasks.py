@@ -531,6 +531,14 @@ def test_flashback_order():  # offsets re-read from the English text and chained
             day[letter] = cur
         assert "".join(sorted(day, key=day.get)) == it["gold"], q
 
+
+def test_list_diff():  # set difference of the printed lists
+    for it in prompts(tn.load_list_diff):
+        q = it["messages"][0]["content"]
+        a = set(re.search(r"List A:\n(.+)", q)[1].split(", "))
+        b = set(re.search(r"List B:\n(.+)", q)[1].split(", "))
+        assert ", ".join(sorted(a - b)) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

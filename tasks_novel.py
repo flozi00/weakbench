@@ -11857,6 +11857,52 @@ def score_flashback_order(item, reply):
     return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"], "detail": {"text_order_bait": float(v == "ABCDE")}}
 
 
+# ---------------------------------------------------------------- list_diff
+# Two shuffled lists of 24-30 article codes (like "KX-4821"); which codes are in list A but not in list B? 2-4 codes
+# differ, and B holds near-twins of them (one character changed: KX-4821 vs KX-4827), so skimming finds nothing
+# missing. Exact attention over a long list. `ok`, `missed_twin` (a code with a near-twin in B was left out).
+def ld_code(r):
+    return r.choice("BDFHKMNPRTVXZ") + r.choice("ABCEGJLQSWY") + "-" + "".join(r.choice("0123456789") for _ in range(4))
+
+
+def load_list_diff(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("list_diff", i, att)
+        size, k = r.randint(24, 30), r.randint(2, 4)
+        codes = set()
+        while len(codes) < size:
+            codes.add(ld_code(r))
+        a = sorted(codes)
+        gone = r.sample(a, k)
+        twins = []
+        for c in gone:
+            pos = r.choice([0, 1, 3, 4, 5, 6])
+            pool = "0123456789" if pos >= 3 else ("BDFHKMNPRTVXZ" if pos == 0 else "ABCEGJLQSWY")
+            t = c[:pos] + r.choice([x for x in pool if x != c[pos]]) + c[pos + 1:]
+            twins.append(t)
+        b = [c for c in a if c not in gone] + [t for t in twins if t not in codes]
+        r.shuffle(a)
+        r.shuffle(b)
+        gold = sorted(gone)
+        q = (f"List A:\n{', '.join(a)}\n\nList B:\n{', '.join(b)}\n\nWhich codes are in list A but not in list B? "
+             f"List all of them, comma-separated." if lang == "en" else
+             f"Liste A:\n{', '.join(a)}\n\nListe B:\n{', '.join(b)}\n\nWelche Codes stehen in Liste A, aber nicht in Liste B? "
+             f"Nenne alle, durch Kommas getrennt.")
+        items.append({"id": str(i), "lang": lang, "gold": ", ".join(gold),
+                      "messages": [{"role": "user", "content": q + "\n" + ASK[lang]}]})
+    return items
+
+
+def score_list_diff(item, reply):
+    fa = (final_answer(reply["content"]) or "").upper()
+    got = sorted(set(re.findall(r"\b[A-Z]{2}-\d{4}\b", fa)))
+    want = item["gold"].split(", ")
+    ok = got == want
+    return {"correct": ok, "score": float(ok), "pred": ", ".join(got) or None, "gold": item["gold"],
+            "detail": {"missed_twin": float(bool(set(want) - set(got))), "extra": float(bool(set(got) - set(want)))}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12965,6 +13011,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "list_diff": task(load_list_diff, score_list_diff, 24, 96),
     "flashback_order": task(load_flashback_order, score_flashback_order, 24, 96),
     "unsat_detect": task(load_unsat_detect, score_unsat_detect, 24, 96),
     "strip_fold": task(load_strip_fold, score_strip_fold, 24, 96),

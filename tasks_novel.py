@@ -10935,6 +10935,65 @@ def score_diff_apply(item, reply):
             "detail": {"original_bait": float(item["bait"] is not None and v == item["bait"])}}
 
 
+# ---------------------------------------------------------------- puzzle8_min
+# A 3x3 sliding puzzle a few moves away from the solved order (1 2 3 / 4 5 6 / 7 8 _); the fewest moves to solve it
+# (BFS). Unlike sliding_puzzle the moves are not given: the model must search. Gold 7-12 in equal parts; the count of
+# misplaced tiles is never the gold. `ok_<gold>`, `misplaced_bait`.
+P8_GOAL = (1, 2, 3, 4, 5, 6, 7, 8, 0)
+
+
+def p8_nbrs(st):
+    g = st.index(0)
+    for p in (g - 3, g + 3, g - 1, g + 1):
+        if 0 <= p < 9 and (abs(p - g) == 3 or p // 3 == g // 3):
+            s2 = list(st)
+            s2[g], s2[p] = s2[p], 0
+            yield tuple(s2)
+
+
+def p8_dist(st):
+    from collections import deque
+    seen, dq = {st: 0}, deque([st])
+    while dq:
+        c = dq.popleft()
+        if c == P8_GOAL:
+            return seen[c]
+        for nb in p8_nbrs(c):
+            if nb not in seen:
+                seen[nb] = seen[c] + 1
+                dq.append(nb)
+    return None
+
+
+def load_puzzle8_min(lang, n, seed):
+    items = []
+    for i, att in common.redraws(n or 96, items):
+        r = rng_of("puzzle8_min", i, att)
+        want = i % 6 + 7
+        while True:
+            st = P8_GOAL
+            for _ in range(want + r.randint(0, 8)):
+                st = r.choice(list(p8_nbrs(st)))
+            misplaced = sum(1 for a, b in zip(st, P8_GOAL) if a and a != b)
+            if p8_dist(st) == want and misplaced != want:
+                break
+        grid = "\n".join(" ".join(str(x) if x else "_" for x in st[j:j + 3]) for j in (0, 3, 6))
+        q = (f"A 3x3 sliding puzzle (\"_\" is the gap; a move slides one tile next to the gap into it):\n{grid}\n\nWhat is the "
+             f"smallest number of moves to reach\n1 2 3\n4 5 6\n7 8 _" if lang == "en" else
+             f"Ein 3x3-Schiebepuzzle („_“ ist die Lücke; ein Zug schiebt ein Plättchen neben der Lücke hinein):\n{grid}\n\n"
+             f"Wie viele Züge braucht man mindestens, um\n1 2 3\n4 5 6\n7 8 _\nzu erreichen")
+        items.append({"id": str(i), "lang": lang, "gold": want, "bait": misplaced,
+                      "messages": [{"role": "user", "content": q + "?\n" + ASK[lang]}]})
+    return items
+
+
+def score_puzzle8_min(item, reply):
+    v = last_int(final_answer(reply["content"]) or "")
+    ok = v == item["gold"]
+    return {"correct": ok, "score": float(ok), "pred": v, "gold": item["gold"],
+            "detail": {f"ok_{item['gold']}": float(ok), "misplaced_bait": float(v == item["bait"])}}
+
+
 # ---------------------------------------------------------------- event_order
 EO_EVENTS = {"en": ["breakfast", "the dentist", "shopping", "the gym", "lunch", "the call", "the walk"],
              "de": ["Frühstück", "Zahnarztbesuch", "Einkaufen", "Training", "Mittagessen", "Telefonat", "Spaziergang"]}
@@ -12043,6 +12102,7 @@ TASKS = {
     "element_facts": task(load_element_facts, score_element_facts, 24, 96),
     "country_currency": task(load_country_currency, score_country_currency, 24, None),
     "leap_days": task(load_leap_days, score_leap_days, 24, 120),
+    "puzzle8_min": task(load_puzzle8_min, score_puzzle8_min, 24, 96),
     "diff_apply": task(load_diff_apply, score_diff_apply, 24, 96),
     "word_ladder": task(load_word_ladder, score_word_ladder, 24, 96),
     "nonogram": task(load_nonogram, score_nonogram, 24, 72),

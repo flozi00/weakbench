@@ -232,6 +232,29 @@ def test_diff_apply():  # apply the printed hunks by their headers, bottom-up so
         k = int(re.search(r"What is line (\d+)", q)[1])
         assert lines[k - 1] == it["gold"], q
 
+
+def test_puzzle8_min():  # iterative deepening DFS instead of BFS
+    goal = "12345678_"
+    for it in prompts(tn.load_puzzle8_min, 48):
+        q = it["messages"][0]["content"]
+        st = "".join(re.findall(r"^([\d_]) ([\d_]) ([\d_])$", q, re.M)[0] + re.findall(r"^([\d_]) ([\d_]) ([\d_])$", q, re.M)[1]
+                     + re.findall(r"^([\d_]) ([\d_]) ([\d_])$", q, re.M)[2])
+
+        def dfs(s, depth, prev):
+            if s == goal:
+                return True
+            if depth == 0:
+                return False
+            g = s.index("_")
+            for p in (g - 3, g + 3, g - 1, g + 1):
+                if 0 <= p < 9 and (abs(p - g) == 3 or p // 3 == g // 3) and p != prev:
+                    t = list(s)
+                    t[g], t[p] = t[p], "_"
+                    if dfs("".join(t), depth - 1, g):
+                        return True
+            return False
+        assert next(d for d in range(15) if dfs(st, d, -1)) == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

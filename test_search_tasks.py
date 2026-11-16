@@ -555,6 +555,28 @@ def test_verify_solution():  # each printed rule checked against the printed ord
                 broken.append(int(k))
         assert broken == ([] if it["broken"] is None else [it["broken"]]), q
 
+
+def test_ice_slide():  # layered search over stop cells, sliding re-implemented from the printed board
+    for it in prompts(tn.load_ice_slide):
+        q = it["messages"][0]["content"]
+        grid = [ln.split() for ln in re.findall(r"^((?:[#.BG] )+[#.BG])$", q, re.M)]
+        h, w = len(grid), len(grid[0])
+        find = lambda c: next((y, x) for y, row in enumerate(grid) for x, v in enumerate(row) if v == c)  # noqa: E731
+        start, goal = find("B"), find("G")
+
+        def slide(p, dy, dx):
+            y, x = p
+            while 0 <= y + dy < h and 0 <= x + dx < w and grid[y + dy][x + dx] != "#":
+                y, x = y + dy, x + dx
+            return (y, x)
+        layer, seen, d = {start}, {start}, 0
+        while goal not in layer:
+            layer = {slide(p, dy, dx) for p in layer for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))} - seen
+            seen |= layer
+            d += 1
+            assert layer, q
+        assert d == it["gold"], q
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

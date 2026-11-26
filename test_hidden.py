@@ -20,6 +20,7 @@ import hidden
 import quality
 import test_closed_auction as auction_fixture
 import test_closed_fusion as fusion_fixture
+import test_closed_incidence as incidence_fixture
 import test_closed_commitments as booking_fixture
 import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
@@ -102,6 +103,9 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "failure_incidence":
+                        fields = {"mode": "program", "expected": incidence_fixture.fixture()}
+                        answer = incidence_fixture.accepted()
                     elif family == "sentence_fusion":
                         fields = {"mode": "program", "expected": fusion_fixture.fixture()}
                         answer = ("Ida sichtete Otto nicht, bevor Otto Elin fand." if lang == "de"

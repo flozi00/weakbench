@@ -12,7 +12,7 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v13` text suite has 43 families scored by code. Across German and English, these contribute 1,444 quick or 2,888 full cases. A judge adds four rubric-graded families, bringing the totals to 1,508 quick or 3,016 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v14` text suite has 44 families scored by code. Across German and English, these contribute 1,476 quick or 2,952 full cases. A judge adds four rubric-graded families, bringing the totals to 1,540 quick or 3,080 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
 To run the new text tasks on a local model:
 

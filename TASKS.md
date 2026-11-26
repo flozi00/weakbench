@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v13` release runs each text family in German and English. Counts are per language.
+The `closed-v14` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -49,6 +49,7 @@ The `closed-v13` release runs each text family in German and English. Counts are
 | `package_auction` | Awarding indivisible bundles with at most one winning bid per participant, then charging each winner for the value displaced | 16 | 32 | Any feasible maximum-value allocation passes with its own exact Clarke-pivot payments and zero charges to losers. |
 | `loop_game` | Finding a winning move or a draw on a directed game board with alternating play and possible cycles | 16 | 32 | Exact outcome, duration for a forced result, and all equally optimal first destinations |
 | `sentence_fusion` | Joining two events in one German or English sentence while preserving participant roles, negation and a specified temporal, causal or additive relation | 16 | 32 | A semantic parser accepts equivalent clause orders and constructions from the grammar supplied with each task. |
+| `failure_incidence` | Estimating the probability that a machine remains operational or experiences either of two failures at two times, with delayed observation and censoring | 16 | 32 | Exact risk-set counts and state probabilities. Equivalent fractions are accepted. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |

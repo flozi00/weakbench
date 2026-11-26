@@ -194,6 +194,11 @@ def test_parse_reply():
                  "tool_calls": [{"name": "f", "arguments": {"a": 1}}, {"name": "g", "arguments": "{bad"}]}
     r = quality.parse_reply({"choices": [{"message": {"content": None, "reasoning": "r"}}]})
     assert r["content"] == "" and r["reasoning"] == "r"
+    combined = {"content": "first</think>Hello <think>second</think>again<think>truncated",
+                "reasoning_content": "first", "reasoning": "another language"}
+    reply = quality.parse_reply({"choices": [{"message": combined}]}, all_reasoning=True)
+    assert reply["content"] == "Hello again"
+    assert reply["reasoning_parts"] == ["first", "another language", "second", "truncated"]
     assert quality.split_think("text <think>cut off") == ("text", "cut off")
 
 

@@ -876,7 +876,7 @@ def build_body(name, t, item, args, model, honored=True):
         body |= {"chat_template_kwargs": dict(THINK_OFF), "temperature": 0}
         if honored is False:  # the server thinks anyway: give it a thinking budget
             body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
-    elif name in hidden.LANGUAGE_REPORTS or (name in ("language_relay", "quoted_quorum") and args.think == "on"):
+    elif name in hidden.LANGUAGE_REPORTS or (name in ("language_relay", "quoted_quorum", "reader_gamebook") and args.think == "on"):
         body["chat_template_kwargs"] = {"enable_thinking": True, "thinking": True}
     elif not t["think"]:  # --think on over a thinking-off task: a 256-token budget never reaches the answer
         body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
@@ -899,10 +899,27 @@ def split_think(content):
     return content.strip(), ""
 
 
-def parse_reply(resp, *, raw_tool_args=False):
+def split_reasoning_parts(content):
+    """Separate individual tagged sections, including a bare closing tag and a truncated final section."""
+    sections = re.split(r"(<think>|</think>)", content)
+    in_reasoning = len(sections) > 1 and sections[1] == "</think>"
+    visible, traces = [], []
+    for section in sections:
+        if section == "<think>":
+            in_reasoning = True
+        elif section == "</think>":
+            in_reasoning = False
+        elif in_reasoning:
+            if section.strip():
+                traces.append(section.strip())
+        else:
+            visible.append(section)
+    return "".join(visible).strip(), traces
+
+
+def parse_reply(resp, *, raw_tool_args=False, all_reasoning=False):
     ch = resp["choices"][0]
     msg = ch.get("message") or {}
-    content, think = split_think(msg.get("content") or "")
     calls = []
     for tc in msg.get("tool_calls") or []:
         fn = tc.get("function") or {}
@@ -914,8 +931,18 @@ def parse_reply(resp, *, raw_tool_args=False):
             except ValueError:
                 pass
         calls.append({"name": fn.get("name"), "arguments": args})
-    reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
-    return {"content": content, "reasoning": "\n".join(part for part in (reasoning, think) if part),
+    text = msg.get("content") or ""
+    if all_reasoning:
+        content, tagged = split_reasoning_parts(text)
+        native = [msg.get("reasoning_content"), msg.get("reasoning")]
+        parts = list(dict.fromkeys(part.strip() for part in [*native, *tagged] if part and part.strip()))
+        extra = {"reasoning_parts": parts}
+    else:
+        content, think = split_think(text)
+        native = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        parts = [part for part in (native, think) if part]
+        extra = {}
+    return {"content": content, "reasoning": "\n".join(parts), **extra,
             "tool_calls": calls, "finish_reason": ch.get("finish_reason")}
 
 
@@ -1052,7 +1079,7 @@ def run_item(url, name, t, item, body, timeout, private=False):
             reply["tool_forced"] = forced
         else:
             resp = common.request(url, "/v1/chat/completions", body, timeout=timeout)
-            reply = parse_reply(resp)
+            reply = parse_reply(resp, all_reasoning=name == "reader_gamebook")
             usage = (resp.get("usage") if isinstance(resp, dict) else None) or {}
         rec["latency_s"] = round(time.monotonic() - t0, 3)
         rec.update(finish_reason=reply["finish_reason"], prompt_tokens=usage.get("prompt_tokens"),

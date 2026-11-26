@@ -27,7 +27,11 @@ import test_closed_proofs as proof_fixture
 import test_closed_reference as reference_fixture
 import test_closed_relay as relay_fixture
 import test_closed_backstage as backstage_fixture
+import test_closed_gamebook as gamebook_fixture
 import test_closed_bag as bag_fixture
+import test_closed_probes as probes_fixture
+import test_closed_recourse as recourse_fixture
+import test_closed_counterpoint as counterpoint_fixture
 import test_closed_imagery as imagery_fixture
 import test_closed_inquiry as inquiry_fixture
 import test_closed_halfplanes as halfplane_fixture
@@ -45,6 +49,7 @@ class ClosedSuiteTests(unittest.TestCase):
         self.enter(patch.multiple(common, RUNS=self.tmp / "runs", RESULTS=self.tmp / "results"))
         rows = []
         self.answers = {}
+        self.prompt_indices = {}
         for family in hidden.FULL_COUNTS:
             for lang in hidden.LANGS:
                 for i in range(4):
@@ -109,6 +114,20 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "mutation_suite":
+                        fields = {"mode": "program", "expected": probes_fixture.fixture()}
+                        answer = probes_fixture.witness()
+                    elif family == "causal_recourse":
+                        fields = {"mode": "program", "expected": recourse_fixture.fixture()}
+                        answer = recourse_fixture.witness()
+                    elif family == "counterpoint_repair":
+                        fields = {"mode": "program", "expected": counterpoint_fixture.fixture()}
+                        answer = counterpoint_fixture.witness()
+                    elif family == "reader_gamebook":
+                        spec = gamebook_fixture.fixture(lang)
+                        prompt += "\n" + gamebook_fixture.sample_prompt(lang, spec)
+                        fields = {"mode": "program", "expected": spec}
+                        answer = gamebook_fixture.witness(lang)
                     elif family == "backstage_reveal":
                         fields = {"mode": "program", "expected": backstage_fixture.fixture()}
                         answer = backstage_fixture.witness(lang)
@@ -153,6 +172,7 @@ class ClosedSuiteTests(unittest.TestCase):
                         fields = {"mode": "judge", "rubric": ["sentinel-criterion", "sentinel-other"]}
                     else:
                         fields = {"mode": "exact", "expected": answer}
+                    self.prompt_indices[prompt] = i // 2 if family == "adaptive_measurement" else i
                     rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
                     self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion", "imagery_chain", "backstage_reveal") else json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
@@ -193,14 +213,14 @@ class ClosedSuiteTests(unittest.TestCase):
             full = hidden.load(release, family, "en", None, 43)
             quick = hidden.load(release, family, "de", 2, 43)
             self.assertEqual([r["id"] for r in full[:2]], [r["id"] for r in quick])
-            self.assertEqual([r["messages"][0]["content"].split("/")[-1] for r in full[:2]],
-                             [r["messages"][0]["content"].split("/")[-1] for r in quick])
+            self.assertEqual([self.prompt_indices[r["messages"][0]["content"]] for r in full[:2]],
+                             [self.prompt_indices[r["messages"][0]["content"]] for r in quick])
             if family == "adaptive_measurement":
                 self.assertEqual(quick[0]["messages"], quick[1]["messages"])
                 self.assertNotEqual(quick[0]["expected"]["target"], quick[1]["expected"]["target"])
                 self.assertEqual(quick[0]["tools"], quick[1]["tools"])
             elif family in hidden.PAIRED_VARIANTS:
-                first, second = (int(r["messages"][0]["content"].split("/")[-1]) for r in quick)
+                first, second = (self.prompt_indices[r["messages"][0]["content"]] for r in quick)
                 self.assertEqual((first % 2, second - first), (0, 1))
         expected = {"expected": {"x": [1], "z": False}}
         for text, valid, correct in [('{"z":false,"x":[1]}', True, True),
@@ -627,6 +647,11 @@ class ClosedSuiteTests(unittest.TestCase):
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])
                 self.assertEqual(row["extra"]["answer_facts_ok"], 1)
+            if row["task"] == "reader_gamebook":
+                self.assertEqual(row["extra"]["book_playable"], 1)
+                self.assertEqual(row["extra"]["reasoning_present"], 0)
+                self.assertEqual(row["extra"]["correct_with_all_channels"], 0)
+                self.assertNotIn("reasoning_language_ok", row["extra"])
             if row["task"] == "language_relay":
                 self.assertEqual(row["extra"]["visible_reports_correct"], 1)
                 self.assertEqual(row["extra"]["reasoning_present_fraction"], 0)

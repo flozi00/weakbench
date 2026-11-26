@@ -12,13 +12,13 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v17` text suite has 54 families scored by code. Across German and English, these contribute 1,796 quick or 3,592 full cases. A judge adds four rubric-graded families, bringing the totals to 1,860 quick or 3,720 full. Quick samples half of each family in each language, keeping each counterfactual pair together and matching the sample across languages. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v18` text suite has 58 families scored by code. Across German and English, these contribute 1,924 quick or 3,848 full cases. A judge adds four rubric-graded families, bringing the totals to 1,988 quick or 3,976 full. Quick samples half of each family in each language, keeping each counterfactual pair together and matching the sample across languages. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
 To run the new text tasks on a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks backstage_reveal,bag_query,rule_time_slice,distance_repair --concurrency 4 --max-parallel 4
+  --tasks reader_gamebook,counterpoint_repair,mutation_suite,causal_recourse --concurrency 4 --max-parallel 4
 ```
 
 Three optional private image families add 96 quick or 192 full questions across the two languages. To send the held-out charts, silhouettes and control panels to a local vision model, run:

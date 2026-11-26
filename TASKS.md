@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v17` release runs each text family in German and English. Counts are per language.
+The `closed-v18` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -60,6 +60,10 @@ The `closed-v17` release runs each text family in German and English. Counts are
 | `bag_query` | Writing a declarative query that handles duplicate rows, absent matches, grouping and NULL values | 16 | 32 | Checks the returned multiset of rows on all 1,540 admitted input databases. Equivalent query plans pass. |
 | `rule_time_slice` | Reconstructing decisions at the original filing date and after later corrections | 16 | 32 | Grades both interval timelines with their decisive revisions and all intervals where the decision itself changed. |
 | `distance_repair` | Reconstructing every optimal rail layout from unlabeled distances, including duplicate or erroneous readings | 16 | 32 | Grades the minimum replacements, all normalized layouts and the multiset of adjacent gaps shared by every optimum. |
+| `reader_gamebook` | Writing freely worded passages for a branching book in the requested language | 16 | 32 | Follows visible choices, verifies every promised ending and checks that all routes have already introduced the motifs recalled in each passage. |
+| `counterpoint_repair` | Repairing a melody against a fixed bass under stated voice-leading and cadence rules | 16 | 32 | Accepts every valid line that minimizes changed notes and then total displacement in semitones. |
+| `mutation_suite` | Designing tests that expose every distinguishable behavioral change in a pure sequence program | 16 | 32 | Checks expected outputs, all equivalent variants and both minimum suite size and minimum total input length. |
+| `causal_recourse` | Learning a device from experiments and choosing one intervention that achieves its target across environments | 16 | 32 | Checks the inferred mechanisms and accepts any cheapest feasible plan or a correct report of impossibility. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -70,6 +74,10 @@ Judged cells run when a judge endpoint is supplied. `drift` measures teacher-for
 The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence`, `quoted_perspective` and `localized_proof`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
 
 The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. `all_channels_verified` counts a pass only when the request, visible justification, visible answer and API-exposed reasoning can all be verified in the target language. It uses every scored item, including those with no returned reasoning. A conditional metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
+
+For `reader_gamebook`, the model writes each paragraph and chooses how to link the passages. Each visible choice follows one of two affirmative forms supplied in the request. The functional score verifies the exact destinations, promised routes and availability of motif words across all possible readings. A separate measure checks whether the request, each paragraph, each choice and each returned reasoning segment have identifiable target-language evidence. A missing reasoning channel contributes zero to `all_channels_verified`. Word lists can pass the vocabulary and language checks. This family measures the mechanics of interactive writing. It cannot rate literary merit or idiomatic prose.
+
+For `causal_recourse`, feasibility and mechanism identification use all 32 responses per language. Intervention legality, environmental coverage, price and optimality use the 23 tasks per language with a feasible solution. A correct impossibility answer does not create observations for those four checks.
 
 For `language_relay`, the language listed on the leaderboard is the starting language. Each of three assistant responses is checked against the current prompt and the facts then available. The original start language returns on turn three. An absent native reasoning channel can still yield a correct visible report. `all_channels_verified` counts a pass only when all four language channels are evidenced on all three turns, across all scored conversations. `correct_with_all_channels` additionally requires three correct, grounded reports. The per-turn checks distinguish missing reasoning, a trace whose language cannot be determined, a mixed-language report and an unsupported date bound.
 

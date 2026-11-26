@@ -46,7 +46,7 @@ def main(argv=None):
             message = completion["choices"][0]["message"]
             if not isinstance(message, dict) or not any(k in message for k in ("content", "reasoning", "reasoning_content")):
                 raise ValueError
-            reply = quality.parse_reply(completion)
+            reply = quality.parse_reply(completion, all_reasoning=args.task == "reader_gamebook")
             if trace is not None:
                 reply["observation_trace"] = trace
         result = (hidden.closed_relay.finish(reply["turns"]) if args.task == "language_relay"

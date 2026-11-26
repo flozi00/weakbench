@@ -15,7 +15,11 @@ import urllib.request
 
 import closed_imagery
 import closed_inquiry
+import closed_gamebook
 import closed_bag
+import closed_probes
+import closed_recourse
+import closed_counterpoint
 import closed_backstage
 import closed_fabric
 import closed_halfplanes
@@ -39,9 +43,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "0e266a2d9c1a66cd013e85ec866bf9c3ddcf758a"
-DATA_PATH = "releases/closed-v17/cases.jsonl"
-DATA_SHA256 = "9a3e815a66f13059af2a105957f6616efaac94f0bf0edfac8493a3cb2afd62b7"
+DATA_REVISION = "dc6094466c3949ea5b603b514189160f6d7036d3"
+DATA_PATH = "releases/closed-v18/cases.jsonl"
+DATA_SHA256 = "4c1646fbcc26936bb6e65de62ff7faf0c95c158c67afcd0cef423631e5f3bf62"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -56,7 +60,11 @@ PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_la
             "imagery_chain": closed_imagery,
             "source_inquiry": closed_inquiry,
             "backstage_reveal": closed_backstage,
+            "reader_gamebook": closed_gamebook,
             "bag_query": closed_bag,
+            "mutation_suite": closed_probes,
+            "causal_recourse": closed_recourse,
+            "counterpoint_repair": closed_counterpoint,
             "comparator_fabric": closed_fabric,
             "halfplane_proof": closed_halfplanes,
             "quoted_quorum": closed_quorum,
@@ -81,7 +89,11 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "imagery_chain": sorted(closed_imagery.DETAIL_KEYS),
                    "source_inquiry": sorted(closed_inquiry.DETAIL_KEYS),
                    "backstage_reveal": sorted(closed_backstage.DETAIL_KEYS),
+                   "reader_gamebook": sorted(closed_gamebook.DETAIL_KEYS),
                    "bag_query": sorted(closed_bag.DETAIL_KEYS),
+                   "mutation_suite": sorted(closed_probes.DETAIL_KEYS),
+                   "causal_recourse": sorted(closed_recourse.DETAIL_KEYS),
+                   "counterpoint_repair": sorted(closed_counterpoint.DETAIL_KEYS),
                    "comparator_fabric": sorted(closed_fabric.DETAIL_KEYS),
                    "halfplane_proof": sorted(closed_halfplanes.DETAIL_KEYS),
                    "quoted_quorum": sorted(closed_quorum.DETAIL_KEYS),
@@ -106,12 +118,13 @@ FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 3
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
                                 "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion", "failure_incidence", "quoted_quorum",
-                                "imagery_chain", "source_inquiry", "comparator_fabric", "halfplane_proof", "backstage_reveal", "bag_query"), 32),
+                                "imagery_chain", "source_inquiry", "comparator_fabric", "halfplane_proof", "backstage_reveal", "bag_query",
+                                "mutation_suite", "causal_recourse", "counterpoint_repair", "reader_gamebook"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
-    {"key": "coding", "label": "Programs and queries", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric", "bag_query"]},
-    {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
+    {"key": "coding", "label": "Programs and queries", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric", "bag_query", "mutation_suite"]},
+    {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair", "causal_recourse"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
@@ -126,12 +139,12 @@ CATEGORIES = [
     {"key": "spreadsheets", "label": "Spreadsheet formulas", "tasks": ["formula_relocation"]},
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology", "distance_repair"]},
     {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope", "rule_time_slice"]},
-    {"key": "creative_writing", "label": "Creative writing", "tasks": ["imagery_chain", "backstage_reveal"]},
+    {"key": "creative_writing", "label": "Creative writing", "tasks": ["imagery_chain", "backstage_reveal", "reader_gamebook"]},
     {"key": "source_research", "label": "Source research and contradictions", "tasks": ["source_inquiry"]},
     {"key": "mathematical_proof", "label": "Mathematical certificates", "tasks": ["halfplane_proof"]},
     {"key": "observing_plan", "label": "Astronomical observation planning", "tasks": ["transit_exposures"]},
     {"key": "accessibility", "label": "Accessibility", "tasks": ["header_binding", "accessible_edit"]},
-    {"key": "music", "label": "Music notation", "tasks": ["polyphonic_score"]},
+    {"key": "music", "label": "Music notation and voice leading", "tasks": ["polyphonic_score", "counterpoint_repair"]},
     {"key": "unicode", "label": "Unicode text processing", "tasks": ["grapheme_edits", "normalization_join"]},
     {"key": "network_optimization", "label": "Network optimization", "tasks": ["flow_certificate"]},
     {"key": "print_production", "label": "Print production", "tasks": ["booklet_imposition"]},
@@ -195,6 +208,8 @@ def decode(data):
             if mode == "program" and not PROGRAMS[family].validate_expected(row["expected"]):
                 raise ValueError
             if family == "panel_grounding" and tuple(row["expected"]["size"]) != image_size:
+                raise ValueError
+            if family == "reader_gamebook" and not closed_gamebook.request_language_ok(row["prompt"], lang, row["expected"]):
                 raise ValueError
             if family == "quoted_quorum" and not closed_quorum.request_language_ok(row["prompt"], lang, row["expected"]):
                 raise ValueError

@@ -876,6 +876,8 @@ def build_body(name, t, item, args, model, honored=True):
         body |= {"chat_template_kwargs": dict(THINK_OFF), "temperature": 0}
         if honored is False:  # the server thinks anyway: give it a thinking budget
             body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
+    elif name == "language_evidence":
+        body["chat_template_kwargs"] = {"enable_thinking": True, "thinking": True}
     elif not t["think"]:  # --think on over a thinking-off task: a 256-token budget never reaches the answer
         body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
     body |= {k: item[k] for k in ("tools", "tool_choice", "temperature") if k in item}
@@ -912,7 +914,8 @@ def parse_reply(resp):
             except ValueError:
                 pass
         calls.append({"name": fn.get("name"), "arguments": args})
-    return {"content": content, "reasoning": (msg.get("reasoning_content") or msg.get("reasoning") or "") + think,
+    reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+    return {"content": content, "reasoning": "\n".join(part for part in (reasoning, think) if part),
             "tool_calls": calls, "finish_reason": ch.get("finish_reason")}
 
 
@@ -1000,7 +1003,7 @@ def run_item(url, name, t, item, body, timeout, private=False):
     if private:
         # Model, judge and server error text may reproduce private prompts and rubrics.
         rec.update(reply=None, pred=None, gold=None)
-        rec["detail"] = {k: v for k, v in rec["detail"].items() if k == "valid_json" and type(v) is float}
+        rec["detail"] = hidden.public_checks(name, rec["detail"])
         for key in ("prompt_tokens", "completion_tokens"):
             if type(rec[key]) is not int:
                 rec[key] = None

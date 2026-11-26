@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v2` release runs each family in German and English. Counts are per language.
+The `closed-v3` release runs each family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -12,12 +12,20 @@ The `closed-v2` release runs each family in German and English. Counts are per l
 | `quantity_contract` | Solving proportional arithmetic with unit conversions and specified rounding | 24 | 48 | Exact JSON |
 | `schema_dispatch` | Translating a request into a function call that fits a previously unseen tool schema | 24 | 48 | Exact JSON |
 | `archive_retrieval` | Linking records across registers and distinguishing entries with the same title | 16 | 32 | Exact JSON |
+| `replica_merge` | Reconstructing a snapshot from concurrent document edits, causal history and deletions | 16 | 32 | Exact JSON |
+| `transfer_audit` | Reconciling stock and its origin across handoffs, corrected records and a reporting cutoff | 16 | 32 | Exact JSON |
+| `workshop_schedule` | Scheduling dependent jobs on shared resources with closures, release times and deadlines | 16 | 32 | A simulator checks every constraint and the earliest possible finish. Any optimal timetable passes. |
+| `language_evidence` | Computing two outcomes, explaining their values and giving a decision and margin in the requested language | 16 | 32 | Code checks the facts in both visible fields using the sentence forms supplied in the prompt. It checks the language of the request, both fields and any returned reasoning. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
 | `contrastive_tutoring` | Explaining a learner's reasoning error using the observations in the task | 8 | 16 | Rubric judge |
 
 Judged cells run when a judge endpoint is supplied. `drift` measures teacher-forced numerical stability with public fixtures. `--image` adds the generated vision capability check.
+
+The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
+
+The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. A metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
 
 ## Historical diagnostics
 

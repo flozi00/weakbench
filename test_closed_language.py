@@ -68,6 +68,15 @@ class ReportChecks(unittest.TestCase):
                 self.assertEqual(result["correct"], lang == "de")
                 self.assertEqual(result["detail"]["reasoning_present"], 1)
 
+    def test_unstructured_response_has_no_separate_visible_language_grades(self):
+        result = evaluate("de", raw="Eine freie Antwort außerhalb des Berichts.", native=REQUESTS["de"])
+        self.assertFalse(result["correct"])
+        self.assertIsNone(result["lang_ok"])
+        self.assertNotIn("answer_language_ok", result["detail"])
+        self.assertNotIn("justification_language_ok", result["detail"])
+        self.assertEqual(result["detail"]["report_fields_present"], 0)
+        self.assertEqual(result["detail"]["reasoning_language_ok"], 1)
+
     def test_switched_visible_fields_and_negation(self):
         en = SAMPLES["en"]
         for key, de_key in zip(language.FIELDS["en"], language.FIELDS["de"]):

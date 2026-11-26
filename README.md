@@ -12,7 +12,22 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v2` release has six exact-match families. Providing a judge adds four rubric-graded families. Across German and English, quick runs all ten families on 324 cases and full runs them on 648. Quick takes the first half of each ordered family and language selection. For a subset, pass `--tasks revision_ledger,evidence_handover --judge-url URL`. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v3` release has ten families scored by code. Across German and English, these contribute 388 quick or 776 full cases. A judge adds four rubric-graded families, bringing the totals to 452 quick or 904 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+
+To run just the four new verifiable families on a local model:
+
+```sh
+python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
+  --tasks replica_merge,transfer_audit,workshop_schedule,language_evidence --concurrency 4 --max-parallel 4
+```
+
+The scheduling verifier accepts alternative optimal timetables. The language verifier grades a short visible justification and a final answer against the facts and the requested language. It also measures the language of any API-exposed reasoning and reports how often the model supplied that channel.
+
+To check a saved chat completion offline, use the ID from the run's `items-<task>.jsonl` and the same private release. The command reads the full completion from a local file or standard input and prints only the verdict and numeric checks. Exit code 0 means correct, 1 means incorrect and 2 indicates an input or release error.
+
+```sh
+python3 check_response.py --task language_evidence --lang de --id "$ITEM_ID" --response completion.json
+```
 
 Both model endpoints receive private material. Use endpoints approved for the dataset. The candidate receives each prompt. The judge also sees the rubric and candidate response. Closed-run artifacts retain opaque item IDs, scores, timing, token counts, error types and the release identity. Their contents support paired A/B comparisons. Prefill drift uses separate public technical probes because its output includes token IDs. Use `--no-drift` for a generation-only run, or `--image` for the optional generated vision capability check.
 
@@ -21,11 +36,11 @@ python3 compare.py --help
 python3 speed.py --help
 ```
 
-`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. The five added families change the composite. To compare an earlier model with a new one, evaluate both on `closed-v2`. Family counts and scoring appear in the [task catalogue](TASKS.md).
+`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. To compare an earlier model with a new one, evaluate both on the same release. The previous `closed-v2` runner is pinned at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md).
 
 ## Maintain the release
 
-The private repository `flozi00/weakbench-data` holds the release JSONL. Each row has a unique ID, family, language, scoring mode and prompt. Exact rows carry the expected JSON value. Judged rows carry an ordered list of criteria. Author and independently validate replacements outside the code checkout, upload to the private dataset, then update the immutable revision, checksum and cell sizes in `hidden.py`. The preparation command checks repository visibility and file integrity before staging the data.
+The private repository `flozi00/weakbench-data` holds the release JSONL. Each row has a unique ID, family, language, scoring mode and prompt. Exact rows carry the expected JSON value. Program rows carry the verifier's inputs. Judged rows carry an ordered list of criteria. Author and independently validate replacements outside the code checkout, upload to the private dataset, then update the immutable revision, checksum and cell sizes in `hidden.py`. The preparation command checks repository visibility and file integrity before staging the data.
 
 For a judge evaluation, download `authoring/closed-v2/calibration.jsonl` from the pinned private dataset revision to a private local directory. Run `python3 calibrate_judge.py --controls PATH --judge-url URL` with the prepared release. It reports agreement with labelled passing and failing answers separately for German and English.
 

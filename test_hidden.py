@@ -11,6 +11,7 @@ from unittest.mock import patch
 import urllib.request
 
 import common
+import check_response
 import hidden
 import quality
 
@@ -23,15 +24,33 @@ class ClosedSuiteTests(unittest.TestCase):
         self.enter(patch.dict(os.environ, {"BENCH_CACHE": str(self.tmp / "cache"), "HF_TOKEN": "dummy"}))
         self.enter(patch.multiple(common, RUNS=self.tmp / "runs", RESULTS=self.tmp / "results"))
         rows = []
+        self.answers = {}
         for family in hidden.FULL_COUNTS:
             for lang in hidden.LANGS:
                 for i in range(4):
-                    exact = family in hidden.PLAIN_TASKS
-                    rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}",
-                                 "prompt": f"sentinel-input/{family}/{lang}/{i}",
-                                 "mode": "exact" if exact else "judge",
-                                 **({"expected": ["sentinel-answer", i]} if exact else
-                                    {"rubric": ["sentinel-criterion", "sentinel-other"]})})
+                    prompt = f"sentinel-input/{family}/{lang}/{i}"
+                    answer = ["sentinel-answer", i]
+                    if family == "workshop_schedule":
+                        fields = {"mode": "program", "expected": {
+                            "tasks": {"A": {"duration": 1, "release": 0, "deadline": 2, "resources": ["X"], "after": []}},
+                            "closures": {"X": []}, "optimum": 1}}
+                        answer = {"A": 0}
+                    elif family == "language_evidence":
+                        intro = ("Bitte vergleiche die beiden Werte und gib an, welche Wahl sich daraus ergibt."
+                                 if lang == "de" else "Compare the two values and explain which choice follows from the result.")
+                        prompt = f"sentinel-input/{intro}/{i}"
+                        fields = {"mode": "program", "expected": {"values": {"Testa": 7, "Testo": 3}, "prefer": "max"}}
+                        answer = ({"begründung": "Für Testa ergibt sich ein Endwert von 7. Für Testo ergibt sich ein Endwert von 3.",
+                                   "antwort": "Meine Wahl fällt damit auf Testa. Der absolute Unterschied beträgt hier 4."}
+                                  if lang == "de" else
+                                  {"justification": "The final value for Testa is 7. The final value for Testo is 3.",
+                                   "answer": "My choice is therefore Testa. The two values differ by 4."})
+                    elif family in hidden.JUDGE_TASKS:
+                        fields = {"mode": "judge", "rubric": ["sentinel-criterion", "sentinel-other"]}
+                    else:
+                        fields = {"mode": "exact", "expected": answer}
+                    rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
+                    self.answers[prompt] = json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
         self.enter(patch.multiple(hidden, FULL_COUNTS=dict.fromkeys(hidden.FULL_COUNTS, 4),
                                   DATA_SHA256=hashlib.sha256(self.payload).hexdigest()))
@@ -87,6 +106,27 @@ class ClosedSuiteTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 hidden.verdict(lambda *a, **kw: bad, "task", ["c1", "c2"], "answer")
 
+    def test_offline_completion(self):
+        item = hidden.load(hidden.release(), "language_evidence", "de", 1, 0)[0]
+        response = self.tmp / "completion.json"
+        argv = ["--task", "language_evidence", "--lang", "de", "--id", item["id"], "--response", str(response)]
+        answer = self.answers[item["messages"][0]["content"]]
+        completions = [(None, 0), ("We compare the two values and choose the larger one.", 1)]
+        for reasoning, expected_exit in completions:
+            response.write_text(json.dumps({"choices": [{"message": {"content": answer, "reasoning": reasoning}}]}))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(check_response.main(argv), expected_exit)
+            report = json.loads(out.getvalue())
+            self.assertEqual(report["checks"]["reasoning_present"], float(reasoning is not None))
+            self.assertNotIn("Testa", out.getvalue())
+        response.write_text("invalid PRIVATE_SENTINEL")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as failure:
+            check_response.main(argv)
+        self.assertEqual(failure.exception.code, 2)
+        self.assertNotIn("PRIVATE_SENTINEL", err.getvalue())
+
     def test_cli(self):
         def request(url, route, body=None, **kw):
             if route == "/v1/models":
@@ -106,7 +146,7 @@ class ClosedSuiteTests(unittest.TestCase):
                 self.assertNotIn("sentinel-criterion", json.dumps(body))
                 if fail:
                     raise RuntimeError(prompt)
-                content = json.dumps(["sentinel-answer", int(prompt.split("/")[-1])])
+                content = self.answers[prompt]
             return {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
 
         self.enter(patch.object(common, "request", side_effect=request))
@@ -123,6 +163,10 @@ class ClosedSuiteTests(unittest.TestCase):
             self.assertEqual(row["accuracy"], float(row["task"] in hidden.PLAIN_TASKS))
             self.assertEqual(row["score_mean"], 1 if row["task"] in hidden.PLAIN_TASKS else 0.5)
             self.assertEqual(row["extra"]["xl_correct_agree"], 1)
+            if row["task"] == "language_evidence":
+                self.assertEqual(row["extra"]["reasoning_present"], 0)
+                self.assertNotIn("all_channels_language_ok", row["extra"])
+                self.assertEqual(row["extra"]["answer_facts_ok"], 1)
         info = json.loads((run / "run_info.json").read_text())
         self.assertEqual(info["data_revision"], hidden.DATA_REVISION)
         self.assertEqual(info["data_sha256"], hidden.DATA_SHA256)

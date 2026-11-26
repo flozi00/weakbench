@@ -24,7 +24,7 @@ FORMS = {
         "margin": ("The absolute difference between the two is {value}", "The two values differ by {value}"),
     },
 }
-DETAIL_KEYS = frozenset(("valid_json", "request_language_ok", "justification_language_ok", "answer_language_ok",
+DETAIL_KEYS = frozenset(("valid_json", "report_fields_present", "request_language_ok", "justification_language_ok", "answer_language_ok",
                          "justification_facts_ok", "answer_facts_ok", "reasoning_present", "reasoning_language_decidable",
                          "reasoning_language_ok", "all_language_ok", "all_channels_language_ok"))
 
@@ -202,10 +202,13 @@ def score(item, reply):
     native = reply.get("reasoning") or ""
     present = isinstance(native, str) and bool(native.strip())
     all_ok = request_ok and reason_ok and answer_ok
-    detail = {"valid_json": float(valid_json), "request_language_ok": float(request_ok),
-              "justification_language_ok": float(reason_ok), "answer_language_ok": float(answer_ok),
+    detail = {"valid_json": float(valid_json), "report_fields_present": float(has_fields),
+              "request_language_ok": float(request_ok),
               "justification_facts_ok": float(evidence_ok), "answer_facts_ok": float(conclusion_ok),
               "reasoning_present": float(present)}
+    if has_fields:
+        detail["justification_language_ok"] = float(reason_ok)
+        detail["answer_language_ok"] = float(answer_ok)
     if present:
         native_ok = language_status(native, lang)
         detail["reasoning_language_decidable"] = float(native_ok is not None)
@@ -215,4 +218,4 @@ def score(item, reply):
         detail["all_channels_language_ok"] = float(all_ok)
     detail["all_language_ok"] = float(all_ok)
     correct = all_ok and evidence_ok and conclusion_ok
-    return {"correct": correct, "score": float(correct), "lang_ok": answer_ok, "detail": detail}
+    return {"correct": correct, "score": float(correct), "lang_ok": answer_ok if has_fields else None, "detail": detail}

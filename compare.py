@@ -282,8 +282,40 @@ def rel_drop(pairs):
     return ma, mb, (ma - mb) / ma if ma else None
 
 
+def hidden_protocol(runs, item_sets):
+    """A private release is comparable only with the very same items and grading protocol."""
+    infos = [run_info(path) for path, _ in runs]
+    if not any("data_revision" in info or "data_sha256" in info for info in infos):
+        return []
+    reasons = []
+    for key, values in (
+            ("data revision", [info.get("data_revision") for info in infos]),
+            ("data checksum", [info.get("data_sha256") for info in infos]),
+            ("suite code", [manifest.get("bench_code_sha") for _, manifest in runs])):
+        if not all(values) or len(set(values)) != 1:
+            reasons.append(f"hidden benchmark {key} missing or different")
+    for info, rows in zip(infos, item_sets):
+        if info.get("expected_items") != len(rows) or any(not usable(row) for row in rows.values()):
+            reasons.append("hidden benchmark has missing or unscored items")
+            break
+    if any(rows.keys() != item_sets[0].keys() for rows in item_sets[1:]):
+        reasons.append("hidden benchmark item selections differ")
+    for key in (*ARGS["quality"], "judge_model", "judge_think_budget"):
+        values = [(manifest.get("args") or {}).get(key) for _, manifest in runs]
+        if any(v != values[0] for v in values[1:]):
+            reasons.append(f"hidden benchmark argument {key} differs")
+    if len({info.get("judge_model") for info in infos}) > 1:
+        reasons.append("hidden benchmark judge models differ")
+    return reasons
+
+
 def quality(a_runs, b_runs, args):
     A, B = [items(p) for p, _ in a_runs], [items(p) for p, _ in b_runs]
+    mismatches = hidden_protocol(a_runs + b_runs, A + B)
+    if mismatches:
+        result = {"kind": "quality", "verdict": "INCONCLUSIVE", "fails": [],
+                  "inconclusive": mismatches, "warns": []}
+        return result, header("quality", a_runs, b_runs), "; ".join(mismatches)
     prs = pair(A[0], B[0])
     rows = []
     for cell in sorted({k[:2] for k in A[0]} | {k[:2] for k in B[0]}):

@@ -40,7 +40,7 @@ import sys
 import traceback
 from collections import defaultdict
 
-from compare import (DataError, flips, fmt, holm, items, load_runs, mcnemar, mean100,
+from compare import (DataError, hidden_protocol, flips, fmt, holm, items, load_runs, mcnemar, mean100,
                      paired_scores, pair, run_info, table, usable, value)
 
 EXIT = {"GENERALIZED": 0, "NEUTRAL": 0, "FORGETTING": 1, "INCONCLUSIVE": 3}
@@ -51,7 +51,7 @@ IN_DATASET = ("bfcl", "ifstruct")
 def protocol_diff(base, tuned):
     """Reasons the two runs cannot be paired. Empty list = comparable."""
     mb, mt = base[1], tuned[1]
-    out = []
+    out = hidden_protocol([base, tuned], [items(base[0]), items(tuned[0])])
     for key in ("bench_code_sha", "bench_git_sha"):
         vb, vt = mb.get(key), mt.get(key)
         if vb and vt and vb != vt:

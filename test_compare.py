@@ -288,6 +288,22 @@ def test_protocol_mismatch():
     assert res["warns"] == ["A1 and B1 differ in bench_code_sha: '111' vs '222'"]
 
 
+def test_private_release_protocol():
+    info = {"data_revision": "a" * 40, "data_sha256": "b" * 64, "expected_items": 2}
+    its = [item("hidden", "de", "toy", True), item("hidden", "en", "toy", False)]
+    a = make_run("hidden-A", "quality", its, info=info, bench_code_sha="1")
+    for name, rows, meta, sha, expected in [
+            ("same", its, info, "1", 0),
+            ("legacy", its, {}, "1", 3),
+            ("rotation", its, dict(info, data_revision="c" * 40), "1", 3),
+            ("changed", its, dict(info, data_sha256="d" * 64), "1", 3),
+            ("subset", its[:1], info, "1", 3),
+            ("scorer", its, info, "2", 3)]:
+        b = make_run("hidden-" + name, "quality", rows, info=meta, bench_code_sha=sha)
+        rc, output, _ = gate("--a", a, "--b", b)
+        assert rc == expected, last(output)
+
+
 def test_speed_range_verdicts():
     v = compare.range_verdict
     assert v([800, 830], [901, 915], 1) == "WIN" and v([800, 830], [700, 790], 1) == "LOSS"

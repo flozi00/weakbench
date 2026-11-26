@@ -1,40 +1,42 @@
 # weakbench
 
-A benchmark suite built to **find where an LLM is weak**, not to produce a headline number.
+WeakBench measures where language models struggle in German and English. The default quality suite uses original cases held in a private Hugging Face dataset. This repository contains the runner, scorers, release pins and public calibration controls.
 
-- **Generated, contamination-free tasks.** Most items are produced from a seed (`rng_of(task, i)`), so they cannot have been in the training data. Covered: rule induction, invented operators, state tracking, logic grids, scheduling, code tracing, probability and others (see `TASKS.md`).
-- **Structured LLM-as-judge.** The judge works from checklists, verified quotes, per-sentence labels and MQM error spans instead of a free 1-10 score. Before a run it must pass a 4-canary preflight. `pairwise.py` compares A/B in both orders.
-- **Language quality (German and English).** Grammar minimal pairs, case and verb morphology, language switching, register, idioms, pragmatics and coreference. Cross-lingual consistency is reported as `xl_*` sub-metrics: the same item in DE and EN should get the same verdict.
-- **Traps.** Sycophancy, false premises, injected instructions, context conflicts, distractors and underspecified tool calls. See `TRAPS.md`.
+## Run the private suite
 
-## Quickstart
-
-Any OpenAI-compatible chat server works:
+Use Python 3.11 or newer. Prepare the pinned release with an account that can read the dataset. The model process can then run with access to the prepared cache alone. Set `BENCH_CACHE` on both commands to choose its location.
 
 ```sh
-uv run quality.py --url http://host:8000 --arm mymodel --tier quick
-uv run quality.py --url ... --arm mymodel --tasks rule_induction,coref --langs de,en
-uv run quality.py --url ... --arm mymodel --tasks traps,de_grammar   # named groups: traps, generalization,
-                                                   # de_grammar, en_grammar, grammar_analysis, language, knowledge, search_state,
-                                                   # judge, and whole modules lang_all, novel_all, judge_all
+python3 hidden.py prepare
+python3 quality.py --url http://candidate:8000 --arm reference --tier quick
+python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-Judge tasks need a judge server: `--judge-url URL --judge-model ID`; a judge that reasons even with thinking off needs `--judge-think-budget 8192` (its reasoning is stripped, the canaries still gate it).
+The quick tier takes half the cases from each family and language in a repeatable order. Full uses every case. A run without a judge evaluates three exact-match families. Providing a judge adds two families with criterion-level grades. For a subset, pass `--tasks revision_ledger,evidence_handover --judge-url URL`. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
-Comparing two runs, item by item and with statistics:
+Both model endpoints receive private material. Use endpoints approved for the dataset. The candidate receives each prompt. The judge also sees the rubric and candidate response. Closed-run artifacts retain opaque item IDs, scores, timing, token counts, error types and the release identity. Their contents support paired A/B comparisons. Prefill drift uses separate public technical probes because its output includes token IDs. Use `--no-drift` for a generation-only run, or `--image` for the optional generated vision capability check.
 
 ```sh
-uv run compare.py runs/<A> runs/<B>
-uv run pairwise.py --help                          # A/B judged in both orders
-uv run speed.py --help                             # throughput / latency
+python3 compare.py --help
+python3 speed.py --help
 ```
 
-Results go to `runs/<timestamp>-<arm>/` (jsonl per task plus `summary.json`).
+See [the task catalogue](TASKS.md) for counts and scoring. `run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Keep the revision, scorer, item selection, judge and generation settings fixed when comparing runs.
 
-## Datasets
+## Maintain the release
 
-- Public datasets are downloaded at pinned revisions and cached in `~/.cache/weakbench`.
-- Datasets we write ourselves (hand-written idioms, coreference twins, judge checklists, personas, riddles, the German XSTest translation, ...) live in the private dataset `flozi00/weakbench-data` (`sets/<module>.<NAME>.py`, Python literals), pinned by `common.DATA_REV`. `common.OwnSet` fetches one on first use with the `hf auth login` token; without access only the tasks that need it fail, loudly. To change a set: edit the file there, then bump `DATA_REV`.
+The private repository `flozi00/weakbench-data` holds the release JSONL. Each row has a unique ID, family, language, scoring mode and prompt. Exact rows carry the expected JSON value. Judged rows carry an ordered list of criteria. Author and independently validate replacements outside the code checkout, upload to the private dataset, then update the immutable revision, checksum and cell sizes in `hidden.py`. The preparation command checks repository visibility and file integrity before staging the data.
+
+For a judge evaluation, download `authoring/closed-v1/calibration.jsonl` from the private dataset to a private local directory. Run `python3 calibrate_judge.py --controls PATH --judge-url URL` with the prepared release. It reports agreement with labelled passing and failing answers separately for German and English.
+
+## Historical diagnostics
+
+Historical public datasets and generated probes are available through an explicit diagnostic profile. These commands use the dependencies declared in `pyproject.toml`. Diagnostic runs write richer artifacts, including model responses, for analysis of historical benchmark results.
+
+```sh
+uv run quality.py --suite diagnostics --url http://candidate:8000 --arm exploration --tasks traps,de_grammar
+uv run pairwise.py --help
+```
 
 ## Weakness report
 

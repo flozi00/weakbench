@@ -60,6 +60,16 @@ def main():
         rows = json.loads((run / "summary.json").read_text())
         gaps, baits, cliffs, cons = report(rows)
         print(f"== {run.name}")
+        info_path = run / "run_info.json"
+        if info_path.exists() and json.loads(info_path.read_text()).get("data_revision"):
+            print("Private holdout accuracy, lowest first (scored / attempted):")
+            for row in sorted((r for r in rows if r.get("accuracy") is not None),
+                              key=lambda r: (r["accuracy"], r["task"], r["lang"])):
+                total = row["n"]
+                print(f"  {row['accuracy']:6.1%}  {row['task']}/{row['lang']}"
+                      f"  {total - row['errors']}/{total}")
+            if not any((gaps, baits, cliffs, cons)):
+                continue
         print("Trap gaps (control - trap), largest first:")
         for g, cell, txt in gaps[:15]:
             print(f"  {g:+.2f}  {cell:28s} {txt}")

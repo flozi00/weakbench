@@ -15,20 +15,19 @@ import json
 import random
 import re
 
-import langdetect
-
 from common import CACHE, hf_file, read_rows
-from vendor.ifeval import instructions_util
-from vendor.ifeval import utils as ifeval
-from vendor.ifstruct_validator import validate_response
 
 IFEVAL_DATA = ("LLaMAX/BenchMAX_Rule-based", "36a659fc9dddc2b344d98971ea0643527a3658d1")
 IFSTRUCT_DATA = ("LiquidAI/ifstruct-v1.0", "2e342ca5f2673fb1287411fdbadcdfde82b35682")
 
-instructions_util.NLTK_DATA_DIR = CACHE / "nltk"
-# Unseeded langdetect is random: a borderline reply could flip between two runs and
-# show up as a spurious A/B difference (upstream IFEval leaves it unseeded).
-langdetect.DetectorFactory.seed = 0
+def _ifeval_setup():
+    import langdetect
+    from vendor.ifeval import instructions_util
+
+    instructions_util.NLTK_DATA_DIR = CACHE / "nltk"
+    langdetect.DetectorFactory.seed = 0
+    instructions_util.download_nltk_resources()
+    langdetect.detector_factory.init_factory()
 
 
 def _pick(ids, n, seed):
@@ -42,8 +41,7 @@ def load_ifeval(lang, n, seed):
     chosen = _pick([str(r["key"]) for r in rows], n, seed)
     # Fetch nltk data and langdetect's profiles now rather than in the first,
     # possibly concurrent, score() calls (langdetect's lazy init is not thread-safe).
-    instructions_util.download_nltk_resources()
-    langdetect.detector_factory.init_factory()
+    _ifeval_setup()
     # Items that ask for a reply in another language opt out of the runner's
     # German/English language check (complying is not a mismatch).
     return [{"id": str(r["key"]), "lang": lang, "messages": [{"role": "user", "content": r["prompt"]}],
@@ -53,6 +51,8 @@ def load_ifeval(lang, n, seed):
 
 
 def score_ifeval(item, reply):
+    from vendor.ifeval import utils as ifeval
+
     inp = ifeval.InputExample(key=int(item["id"]), instruction_id_list=item["instruction_id_list"],
                               prompt=item["messages"][0]["content"], kwargs=item["kwargs"], lang=item["lang"])
     text = reply.get("content") or ""
@@ -83,6 +83,8 @@ def load_ifstruct(lang, n, seed):
 
 
 def score_ifstruct(item, reply):
+    from vendor.ifstruct_validator import validate_response
+
     try:  # argument mapping as in upstream ifstruct/eval.py run_one()
         res = validate_response(
             response=reply.get("content") or "",
@@ -216,6 +218,7 @@ def mt_holds(kind, text):
 
 def load_multiturn(lang, n, seed):
     """IFEval items with at least two instructions, as a three-turn conversation (see the block comment)."""
+    _ifeval_setup()
     rows = read_rows(hf_file(*IFEVAL_DATA, f"ifeval_{lang}.jsonl"))
     rows = [r for r in rows if len(r["instruction_id_list"]) >= 2]  # one to keep, one to lose
     by_key = {str(r["key"]): r for r in rows}
@@ -237,6 +240,8 @@ def load_multiturn(lang, n, seed):
 
 def _strict(item, text):
     """Per-instruction strict flags of `text` against the item's original instruction set."""
+    from vendor.ifeval import utils as ifeval
+
     inp = ifeval.InputExample(key=int(item["id"]), instruction_id_list=item["instruction_id_list"],
                               prompt=item["messages"][0]["content"], kwargs=item["kwargs"], lang=item["lang"])
     try:

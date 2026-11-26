@@ -8,7 +8,7 @@ one OpenAI-compatible chat server, so compare.py can pair two runs (reference
 build vs custom kernels / NVFP4) item by item.
 
     uv run quality.py --url URL --arm NAME [--model ID] [--tier quick|full]
-        [--tasks a,b,...] [--langs en,de] [--limit N] [--concurrency 32]
+        [--suite closed|diagnostics] [--tasks a,b,...] [--langs en,de] [--limit N] [--concurrency 32]
         [--think auto|on|off] [--temperature T] [--max-tokens N] [--timeout 1800]
         [--image] [--no-drift] [--drift-framing raw|gemma4-assistant] [--dry-run]
     uv run quality.py --resume RUN_DIR [--concurrency N] [--timeout S] [--dry-run]
@@ -49,6 +49,8 @@ import zlib
 from pathlib import Path
 
 import common
+import drift_corpus
+import hidden
 import tasks_agent
 import tasks_code
 import tasks_if
@@ -943,7 +945,7 @@ def parse_reply(resp):
             "tool_calls": calls, "finish_reason": ch.get("finish_reason")}
 
 
-def run_item(url, name, t, item, body, timeout):
+def run_item(url, name, t, item, body, timeout, private=False):
     """One request -> one record; never raises (a failed item is a record with `error`)."""
     rec = {"task": name, "lang": item["lang"], "id": str(item["id"]), **dict.fromkeys((
         "correct", "score", "pred", "gold", "finish_reason", "prompt_tokens", "completion_tokens", "latency_s",
@@ -1022,8 +1024,17 @@ def run_item(url, name, t, item, body, timeout):
         # the language the model THINKS in: a German task reasoned in English is a switch the reply hides
         rec["think_lang_ok"] = lang_ok(reply["reasoning"], item["lang"], min_words=30) if check and reply["reasoning"] else None
     except Exception as exc:  # noqa: BLE001 — never crash the run
-        rec.update(correct=None, score=None, error=f"{type(exc).__name__}: {exc}"[:500],
+        rec.update(correct=None, score=None, error=type(exc).__name__ if private else f"{type(exc).__name__}: {exc}"[:500],
                    latency_s=rec["latency_s"] or round(time.monotonic() - t0, 3))
+    if private:
+        # Model, judge and server error text may reproduce private prompts and rubrics.
+        rec.update(reply=None, pred=None, gold=None)
+        rec["detail"] = {k: v for k, v in rec["detail"].items() if k == "valid_json" and type(v) is float}
+        for key in ("prompt_tokens", "completion_tokens"):
+            if type(rec[key]) is not int:
+                rec[key] = None
+        if rec["finish_reason"] not in ("stop", "length", "tool_calls", "content_filter"):
+            rec["finish_reason"] = None
     return rec
 
 
@@ -1064,6 +1075,8 @@ def drift_texts(lang, n):
     hidden-state bug, vLLM #53488). code = HumanEval+ prompt + canonical solution of
     consecutive problems packed into one text: a single problem is < 500 tokens,
     so the 164 problems give 14 texts (full tier: 14, not 32)."""
+    if CTX.get("closed"):
+        return drift_corpus.texts(lang, n)
     if lang != "code":
         return [t[:DRIFT_CHARS] for t in common.wiki_texts(lang, n)]
     docs, cur = [], ""
@@ -1131,7 +1144,7 @@ def self_check(url, model, anchor, timeout):
     again. A sane server predicts the copy almost perfectly and prose plausibly:
     mean NLL over the last 15% of positions (inside the copy, which is ~20%) < 0.5
     nats, ppl over positions >= WARMUP before them < 100."""
-    text = common.wiki_texts("en", 1)[0][:4000]
+    text = (drift_corpus.texts if CTX.get("closed") else common.wiki_texts)("en", 1)[0][:4000]
     doc = drift_doc(drift_request(url, model, f"{anchor}{text}\n\n{text[:1000]}", timeout), "en", "self-check")
     if doc is None:
         return {"ok": False, "reason": "the server returned no prompt_logprobs"}
@@ -1214,12 +1227,13 @@ def run_drift(url, model, run_dir, langs, n, timeout, info, framing="raw"):
 
 
 # ---------------------------------------------------------------- run
-def load_cells(names, langs, args):
+def load_cells(names, langs, args, registry=None):
     """[(task, lang, items)] for the tier; a dataset that fails to load aborts the run (a skipped cell
     would be missing from this arm only)."""
+    registry = TASKS if registry is None else registry
     cells = []
     for name in names:
-        t = TASKS[name]
+        t = registry[name]
         for lang in (x for x in t["langs"] if x in langs):
             n = t["counts"][args.tier].get(lang, 0)
             if n == 0:
@@ -1401,10 +1415,14 @@ def main(argv=None):
     ap.add_argument("--url")
     ap.add_argument("--arm", help="run label, e.g. ref / nvfp4-kernels")
     ap.add_argument("--model", help="model id (default: the first /v1/models entry)")
+    ap.add_argument("--suite", choices=("closed", "diagnostics"), default="closed",
+                    help="closed private release (default) or historical diagnostic tasks")
     ap.add_argument("--tier", choices=("quick", "full"), default="quick")
     ap.add_argument("--tasks", help="comma list incl. drift (default: every task with items at the tier + drift)")
     ap.add_argument("--langs", default="en,de")
     ap.add_argument("--limit", type=int, help="cap items per (task, lang) and drift docs per lang (smoke runs)")
+    ap.add_argument("--max-parallel", type=int, default=0, help="cap requests in flight to the model")
+    ap.add_argument("--yield-above", type=int, default=0, help="yield when running + waiting requests exceed this line")
     ap.add_argument("--concurrency", type=int, default=32)
     ap.add_argument("--think", choices=("auto", "on", "off"), default="auto")
     ap.add_argument("--temperature", type=float, help="override every request's temperature")
@@ -1412,7 +1430,7 @@ def main(argv=None):
     ap.add_argument("--timeout", type=float, default=1800, help="per request, seconds")
     ap.add_argument("--image", action="store_true", help="add the synthetic-image task")
     ap.add_argument("--no-drift", action="store_true")
-    ap.add_argument("--judge-url", help="server that grades aa_omniscience / aa_lcr; the SAME one for both arms of "
+    ap.add_argument("--judge-url", help="server that grades judge tasks; the SAME one for both arms of "
                     "an A/B (never the server under test)")
     ap.add_argument("--judge-model", help="model id on --judge-url (default: the one it serves)")
     ap.add_argument("--judge-think-budget", type=int, default=0,
@@ -1432,14 +1450,26 @@ def main(argv=None):
         if ignored := [k for k, v in vars(args).items()
                        if k not in keep and v not in (ap.get_default(k), manifest["args"].get(k))]:
             print(f"note: --resume uses the run's own args; ignoring {', '.join(ignored)}", file=sys.stderr)
-        args = argparse.Namespace(**{**vars(args), **manifest["args"], **keep})
+        args = argparse.Namespace(**{**vars(args), "suite": "diagnostics", **manifest["args"], **keep})
     elif not (args.url and args.arm):
         ap.error("--url and --arm are required (unless --resume)")
 
-    langs, known = args.langs.split(","), [*TASKS, "drift"]
-    names = [x for n in args.tasks.split(",") for x in GROUPS.get(n, [n])] if args.tasks else [
-        n for n, t in TASKS.items() if n != "image" and not t.get("opt_in")
-        and any(t["counts"][args.tier].get(x, 0) != 0 for x in t["langs"] if x in langs)] + ["drift"]
+    closed = args.suite == "closed"
+    langs = args.langs.split(",")
+    if args.limit is not None and args.limit <= 0:
+        ap.error("--limit must be positive")
+    if closed:
+        if not set(langs) <= set(hidden.LANGS) or len(langs) != len(set(langs)):
+            ap.error("closed suite requires distinct languages from en,de")
+        common.verify_tls()
+        known = [*hidden.PLAIN_TASKS, *hidden.JUDGE_TASKS, "image", "drift"]
+        names = (args.tasks.split(",") if args.tasks else
+                 [*hidden.PLAIN_TASKS, *(hidden.JUDGE_TASKS if args.judge_url else ()), "drift"])
+    else:
+        known = [*TASKS, "drift"]
+        names = [x for n in args.tasks.split(",") for x in GROUPS.get(n, [n])] if args.tasks else [
+            n for n, t in TASKS.items() if n != "image" and not t.get("opt_in")
+            and any(t["counts"][args.tier].get(x, 0) != 0 for x in t["langs"] if x in langs)] + ["drift"]
     if bad := [n for n in names if n not in known]:
         ap.error(f"unknown task(s) {', '.join(bad)}; known: {', '.join(known)}")
     if args.image and "image" not in names:
@@ -1450,25 +1480,41 @@ def main(argv=None):
     drift = "drift" in names and not args.no_drift
     names = [n for n in names if n != "drift"]
 
+    if not names and not drift:
+        ap.error("no tasks selected")
+    if len(names) != len(set(names)):
+        ap.error("duplicate task selection")
+    if closed:
+        try:
+            registry = {**hidden.tasks(hidden.release(), tasks_judge.judge), "image": TASKS["image"]}
+        except (ValueError, OSError) as exc:
+            ap.error(str(exc))
+    else:
+        registry = TASKS
+    common.throttle_configure(args.url, args.max_parallel, args.yield_above, judge_url=args.judge_url)
     server = common.server_info(args.url, args.model)
     if args.resume and (diff := [f"{k} {manifest['server'].get(k)!r} -> {server.get(k)!r}"
                                  for k in ("version", "root", "max_model_len", "model")
                                  if manifest["server"].get(k) != server.get(k)]):
         raise SystemExit(f"error: cannot resume {run_dir.name}: the server was changed to another build since this run "
                          f"started ({'; '.join(diff)}); start a new run")
-    CTX.update(tier=args.tier, max_model_len=server.get("max_model_len"))
+    CTX.update(closed=closed, tier=args.tier, max_model_len=server.get("max_model_len"))
     judge_model = None
-    if any(TASKS[n].get("needs_judge") for n in names):
+    if any(registry[n].get("needs_judge") for n in names):
         if not args.judge_url:
-            ap.error(f"{', '.join(n for n in names if TASKS[n].get('needs_judge'))} require --judge-url")
+            ap.error(f"{', '.join(n for n in names if registry[n].get('needs_judge'))} require --judge-url")
         judge_model = common.server_info(args.judge_url, args.judge_model)["model"]
+        if not judge_model:
+            ap.error("judge server returned no model ID")
     tasks_judge.configure(args.judge_url, judge_model, server.get("max_model_len"), args.timeout, args.judge_think_budget)
     if judge_model and not args.dry_run:
         try:
-            print(f"judge {judge_model}: {tasks_judge.preflight()} canaries passed", file=sys.stderr)
+            canaries = hidden.preflight(tasks_judge.judge) if closed else tasks_judge.preflight()
+            print(f"judge {judge_model}: {canaries} canaries passed", file=sys.stderr)
         except RuntimeError as e:
             raise SystemExit(f"error: {e}")
-    cells = load_cells(names, langs, args)
+    cells = load_cells(names, langs, args, registry)
+    expected_items = sum(len(items) for _, _, items in cells)
     if args.resume:  # items with an error are retried; their new record supersedes the old one
         done = {(r["task"], r["lang"], str(r["id"])) for f in run_dir.glob("items-*.jsonl")
                 for r in common.read_jsonl(f) if not r.get("error")}
@@ -1481,7 +1527,7 @@ def main(argv=None):
         print(f"model {server['model']}, max_model_len {server['max_model_len']}, tier {args.tier}\n\n"
               "| task | lang | items | think | max_tokens |\n|---|---|---|---|---|")
         for name, lang, items in cells:
-            t = TASKS[name]
+            t = registry[name]
             print(f"| {name} | {lang} | {len(items)} | {'on' if think_on(t, args) else 'off'} | "
                   f"{args.max_tokens or t['max_tokens']} |")
         docs = {lang: len(drift_texts(lang, n_docs)) for lang in drift_langs}
@@ -1495,11 +1541,19 @@ def main(argv=None):
         run_dir, manifest = common.new_run("quality", args.arm, args.url, args.model, vars(args))
     model, info_path = manifest["server"]["model"], run_dir / "run_info.json"
     info = json.loads(info_path.read_text()) if info_path.exists() else {}
+    if closed:
+        release_info = {"data_repo": hidden.DATA_REPO, "data_revision": hidden.DATA_REVISION,
+                        "data_sha256": hidden.DATA_SHA256, "expected_items": expected_items}
+        if args.resume and (any(info.get(k) != v for k, v in release_info.items()) or
+                            manifest.get("bench_code_sha") != common._code_sha()):
+            raise SystemExit("cannot resume a closed run from another data or scorer revision")
+        info.update(release_info)
+        common.write_atomic(info_path, json.dumps(info, indent=2))
     jobs = [x for group in itertools.zip_longest(*([(name, it) for it in items] for name, _, items in cells))
             for x in group if x is not None]  # round-robin over cells: every task progresses from the start
-    if "thinking_off_honored" not in info and any(not think_on(TASKS[name], args) for name, _ in jobs):
+    if "thinking_off_honored" not in info and any(not think_on(registry[name], args) for name, _ in jobs):
         info["thinking_off_honored"] = thinking_off_honored(args.url, model, args.timeout)
-        info_path.write_text(json.dumps(info, indent=2))
+        common.write_atomic(info_path, json.dumps(info, indent=2))
         if info["thinking_off_honored"] is False:
             print(f"warning: {args.url} still reasons with enable_thinking=false; thinking-off tasks "
                   f"keep the kwargs but get max_tokens >= {THINK_MAX_TOKENS}", file=sys.stderr)
@@ -1507,16 +1561,16 @@ def main(argv=None):
         raise SystemExit(f"error: this run was graded by {info['judge_model']}, not {judge_model}")
     if judge_model:  # compare.py refuses to pair runs graded by different judges
         info["judge_model"] = judge_model
-        info["judge_canaries"] = len(tasks_judge.CANARIES)  # all passed, or the run had exited before this
-        info_path.write_text(json.dumps(info, indent=2))
+        info["judge_canaries"] = canaries  # all passed, or the run had exited before this
+        common.write_atomic(info_path, json.dumps(info, indent=2))
     honored = info.get("thinking_off_honored")
 
     print(f"quality {run_dir.name}: {len(jobs)} items in {len(cells)} cells, model {model}, "
           f"concurrency {args.concurrency}", flush=True)
     t0, errors, step = time.monotonic(), 0, max(1, len(jobs) // 20)
     with concurrent.futures.ThreadPoolExecutor(args.concurrency) as ex:
-        futs = [ex.submit(run_item, args.url, name, TASKS[name], it,
-                          build_body(name, TASKS[name], it, args, model, honored), args.timeout) for name, it in jobs]
+        futs = [ex.submit(run_item, args.url, name, registry[name], it,
+                          build_body(name, registry[name], it, args, model, honored), args.timeout, closed) for name, it in jobs]
         for k, fut in enumerate(concurrent.futures.as_completed(futs), 1):
             rec = fut.result()  # appended from this thread only: no lock needed
             common.append_jsonl(run_dir / f"items-{rec['task']}.jsonl", rec)
@@ -1530,9 +1584,11 @@ def main(argv=None):
         print(f"drift: {n_docs} docs per language, sequentially", flush=True)
         rows += run_drift(args.url, model, run_dir, drift_langs, n_docs, args.timeout, info,
                           framing=args.drift_framing)
-        info_path.write_text(json.dumps(info, indent=2))
+        common.write_atomic(info_path, json.dumps(info, indent=2))
     common.finish_run(run_dir, manifest, rows)
     print_table(manifest, info, rows)
+    if closed and any(row.get("errors") for row in rows):
+        raise SystemExit(f"closed run contains unscored items; retry with --resume {run_dir}")
     return run_dir
 
 

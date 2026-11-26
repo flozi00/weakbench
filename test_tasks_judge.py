@@ -102,7 +102,7 @@ ARMS = iter(range(100))
 
 
 def run_quality(url, *extra):  # a run dir is named after the second and the arm: one arm name per call
-    return quality.main(["--url", url, "--arm", f"t{next(ARMS)}", "--no-drift", "--limit", "3", *extra])
+    return quality.main(["--suite", "diagnostics", "--url", url, "--arm", f"t{next(ARMS)}", "--no-drift", "--limit", "3", *extra])
 
 
 def canary_aware(body):

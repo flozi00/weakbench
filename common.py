@@ -65,6 +65,18 @@ CTX = ssl._create_unverified_context()
 RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
+def verify_tls():
+    """Require the system trust store for model and judge calls carrying private data."""
+    global CTX
+    CTX = ssl.create_default_context()
+    # An embedded caller may have already contacted this host in another profile.
+    with _POOL_LOCK:
+        for key in list(_POOL):
+            if key[0] == "https":
+                for conn in _POOL.pop(key):
+                    conn.close()
+
+
 class HTTPError(RuntimeError):
     def __init__(self, status, body):
         super().__init__(f"HTTP {status}: {body[:300]}")
@@ -133,11 +145,50 @@ def _release(key, conn, resp):
             _POOL.setdefault(key, []).append(conn)
 
 
+# -------------------------------------------------------------------------- throttle
+# A scheduled job shares one set of slots across candidate and judge. A/B speed
+# runs leave this disabled so their requested concurrency remains measurable.
+_THROTTLE = {"urls": set(), "yield_above": 0, "poll_s": 2.0}
+_SLOTS = None
+
+
+def throttle_configure(url, max_parallel=0, yield_above=0, poll_s=2.0, judge_url=None):
+    global _SLOTS
+    max_parallel = int(max_parallel or 0)
+    _THROTTLE.update(urls={u.rstrip("/") for u in (url, judge_url) if u},
+                     yield_above=int(yield_above or 0), poll_s=max(0.5, float(poll_s)))
+    _SLOTS = threading.BoundedSemaphore(max_parallel) if max_parallel else None
+
+
+def _throttle_enter(url, body):
+    """Hold a slot from admission until the response is consumed, including SSE streams."""
+    slots = _SLOTS
+    ceiling = _THROTTLE["yield_above"]
+    if body is None or (slots is None and not ceiling) or url.rstrip("/") not in _THROTTLE["urls"]:
+        return lambda: None
+    if slots is not None:
+        slots.acquire()
+    try:
+        while ceiling:
+            load = metrics(url)
+            running = load.get("num_requests_running")
+            # A server without these gauges still has the hard client-side cap.
+            if running is None or running + load.get("num_requests_waiting", 0) < ceiling:
+                break
+            time.sleep(_THROTTLE["poll_s"])
+    except BaseException:
+        if slots is not None:
+            slots.release()
+        raise
+    return slots.release if slots is not None else (lambda: None)
+
+
 def request(url, path, body=None, timeout=900, retries=3):
     """One JSON call. Retries gateway/overload errors and dropped connections
     with backoff (a 30-minute suite must survive one 502); a 4xx is the
     request's fault and raises at once."""
     for attempt in range(retries + 1):
+        release = _throttle_enter(url, body)
         try:
             key, conn, resp = _send(url.rstrip("/") + path, body, timeout)
             try:
@@ -153,25 +204,31 @@ def request(url, path, body=None, timeout=900, retries=3):
         except (OSError, http.client.HTTPException):  # refused, reset, timeout, truncated reply
             if attempt == retries:
                 raise
+        finally:
+            release()
         time.sleep(2 ** attempt)
 
 
 def stream(url, path, body, timeout=900):
     """Yield (monotonic time, parsed chunk) for each SSE data line. The
     connection returns to the pool only after a fully read response."""
-    key, conn, resp = _send(url.rstrip("/") + path, {**body, "stream": True}, timeout)
-    complete = False
+    release = _throttle_enter(url, body)
     try:
-        while raw := resp.readline():
-            line = raw.decode(errors="replace").strip()
-            if line.startswith("data:") and not line.endswith("[DONE]"):
-                yield time.monotonic(), json.loads(line[5:])
-        complete = True
-    finally:  # an abandoned or failed stream leaves the socket mid-response: close it
-        if complete:
-            _release(key, conn, resp)
-        else:
-            conn.close()
+        key, conn, resp = _send(url.rstrip("/") + path, {**body, "stream": True}, timeout)
+        complete = False
+        try:
+            while raw := resp.readline():
+                line = raw.decode(errors="replace").strip()
+                if line.startswith("data:") and not line.endswith("[DONE]"):
+                    yield time.monotonic(), json.loads(line[5:])
+            complete = True
+        finally:  # an abandoned or failed stream leaves the socket mid-response: close it
+            if complete:
+                _release(key, conn, resp)
+            else:
+                conn.close()
+    finally:
+        release()
 
 
 def metrics(url):
@@ -226,7 +283,9 @@ def _code_sha():
     scorers): two runs with equal hashes ran the same prompts, defaults and
     scorers, committed or not."""
     h = hashlib.sha256()
-    for f in sorted(p for p in HERE.rglob("*.py") if not p.name.startswith("test_") and "runs" not in p.parts):
+    # Installed environments, run artifacts and private caches are outside the suite.
+    sources = [*HERE.glob("*.py"), *(HERE / "vendor").rglob("*.py")]
+    for f in sorted(p for p in sources if not p.name.startswith("test_")):
         h.update(str(f.relative_to(HERE)).encode() + b"\0" + f.read_bytes() + b"\0")
     return h.hexdigest()[:12]
 

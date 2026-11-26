@@ -10,6 +10,8 @@ import json
 import struct
 import sys
 import tempfile
+import threading
+import time
 import zlib
 from pathlib import Path
 
@@ -259,6 +261,73 @@ def test_main_dry_run_skip_and_run():
     assert len(ledger) == 8 and ledger[0]["arm"] == "t" and ledger[0]["model"] == M
     assert "skip rag-32k" in log.getvalue() and "| scenario | c | round |" in log.getvalue()
     assert json.loads((run_dir / "manifest.json").read_text())["args"]["ramp"] == 0.04
+
+
+def test_throttle_yields_to_user_traffic():
+    """The politeness gate: a POST waits while the model runs
+    more than --yield-above, and goes once the load is back under; GETs (the
+    yield poll's own /metrics, /v1/models) never wait."""
+    load = {"num_requests_running": 1.0, "num_requests_waiting": 1.0}
+    real_metrics = common.metrics
+    common.metrics = lambda url: dict(load)  # noqa: E731 — fake a busy model
+    try:
+        with mock(lambda p, b: {"content": "w", "completion_tokens": 1}) as url:
+            common.throttle_configure(url, max_parallel=2, yield_above=2, poll_s=0.05)
+            done = []
+            worker = threading.Thread(target=lambda: done.append(
+                common.request(url, "/v1/chat/completions", {"messages": []}, timeout=5)), daemon=True)
+            worker.start()
+            worker.join(0.4)
+            assert not done and worker.is_alive()  # running + waiting is already at the ceiling
+            t0 = time.monotonic()
+            common.request(url, "/v1/models")  # a GET is not the model's business: no wait
+            assert time.monotonic() - t0 < 0.3
+            load["num_requests_waiting"] = 0.0
+            worker.join(5)
+            assert done, "the request must go once the model is back under the yield line"
+    finally:
+        common.throttle_configure("", 0, 0)
+        common.metrics = real_metrics
+
+
+def test_throttle_caps_own_requests():
+    """At most --max-parallel of the suite's own requests are on the model at once."""
+    live, peak, lock = [0], [0], threading.Lock()
+
+    def responder(p, b):
+        with lock:
+            live[0] += 1
+            peak[0] = max(peak[0], live[0])
+        time.sleep(0.2)
+        with lock:
+            live[0] -= 1
+        return {"content": "w", "completion_tokens": 1}
+
+    try:
+        with mock(responder) as url, mock(responder) as judge_url:
+            common.throttle_configure(url, max_parallel=4, judge_url=judge_url)
+            threads = [threading.Thread(target=common.request,
+                                        args=(endpoint, "/v1/chat/completions", {"m": 1}),
+                                        kwargs={"timeout": 5}, daemon=True) for endpoint in (url, judge_url) * 6]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(10)
+            assert peak[0] == 4, peak[0]
+    finally:
+        common.throttle_configure("", 0, 0)
+
+
+def test_main_dry_run_skips_cells_above_the_cap():
+    try:
+        argv = ["--arm", "t", "--scenarios", "chat-en", "--conc", "1,8", "--seconds", "0.4",
+                "--max-parallel", "2"]
+        with mock(lambda p, b: {"content": "w"}) as url:
+            with contextlib.redirect_stdout(io.StringIO()) as dry:
+                assert speed.main(["--url", url, *argv, "--dry-run"]) is None
+        assert "skip c8: above --max-parallel 2" in dry.getvalue()
+    finally:
+        common.throttle_configure("", 0, 0)
 
 
 if __name__ == "__main__":

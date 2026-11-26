@@ -110,7 +110,7 @@ def run(reply, *argv, tasks=FAKE):
     url, stop = mock_server.serve(responder)
     saved, quality.TASKS = quality.TASKS, tasks
     try:
-        return quality.main(["--url", url, *argv]), bodies
+        return quality.main(["--suite", "diagnostics", "--url", url, *argv]), bodies
     finally:
         quality.TASKS = saved
         stop()
@@ -633,7 +633,7 @@ def test_resume():
     url2, stop2, bodies2 = serving(reply_ok, max_model_len=16384)
     saved, quality.TASKS = quality.TASKS, FAKE
     try:
-        run_dir = quality.main(["--url", url, "--arm", "resume", "--tasks", "fake_mc", "--no-drift"])
+        run_dir = quality.main(["--suite", "diagnostics", "--url", url, "--arm", "resume", "--tasks", "fake_mc", "--no-drift"])
         assert summary(run_dir)["fake_mc", "de"]["errors"] == 1
         path = run_dir / "manifest.json"
         orig = path.read_text()

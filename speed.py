@@ -494,6 +494,12 @@ def main(argv=None):
     ap.add_argument("--conc", default="1,8,32")
     ap.add_argument("--seconds", type=float, default=60)
     ap.add_argument("--rounds", type=int, default=1)
+    ap.add_argument("--max-parallel", type=int, default=0,
+                    help="cap the suite's own requests in flight on the model (0 = off; the nightly "
+                         "leaderboard sets this so its traffic never crowds a pool)")
+    ap.add_argument("--yield-above", type=int, default=0,
+                    help="send nothing new while the model runs more than this many requests "
+                         "(running + waiting, from /metrics; 0 = off; user traffic has the right of way)")
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--ramp", type=float, help="seconds left out of aggregate tok/s (default min(5, seconds/10))")
     ap.add_argument("--vision", action="store_true", help="add the vision scenario (multimodal models)")
@@ -509,11 +515,17 @@ def main(argv=None):
     args.ramp = min(5.0, args.seconds / 10) if args.ramp is None else args.ramp
     if not 0 <= args.ramp < args.seconds:
         ap.error("--ramp must be in [0, --seconds)")
+    common.throttle_configure(args.url, args.max_parallel, args.yield_above)
 
     data = (common.request(args.url, "/v1/models", timeout=30) or {}).get("data") or [{}]
     entry = next((m for m in data if m.get("id") == args.model), data[0])
     args.model, mml = args.model or entry.get("id"), entry.get("max_model_len")
     cells, skipped, minutes = plan(names, conc, args.rounds, args.seconds, mml)
+    if args.max_parallel:  # a cell above the own cap would break the politeness rule
+        over = sorted({c for _, _, c in cells if c > args.max_parallel})
+        if over:
+            cells = [c for c in cells if c[2] <= args.max_parallel]
+            skipped[f"c{','.join(map(str, over))}"] = f"above --max-parallel {args.max_parallel}"
     print(f"{args.model} (max_model_len {mml}): {len(cells)} cells = "
           f"[{', '.join(dict.fromkeys(n for _, n, _ in cells))}] x c={conc} x {args.rounds} round(s), "
           f"~{minutes:.0f} min", flush=True)

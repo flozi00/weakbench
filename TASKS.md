@@ -1,5 +1,23 @@
 # TASKS.md — every task of `quality.py`
 
+## Closed quality suite
+
+Each cell runs in German and English. Counts are per language.
+
+| Task | Weakness tested | Quick | Full | Scoring |
+|---|---|---:|---:|---|
+| `revision_ledger` | Updating a record when later evidence supersedes earlier entries | 24 | 48 | Exact JSON |
+| `service_windows` | Applying interacting time-window constraints | 24 | 48 | Exact JSON |
+| `snapshot_trace` | Tracking object state through Python operations | 18 | 36 | Exact JSON |
+| `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
+| `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
+
+Judged cells run when a judge endpoint is supplied. `drift` measures teacher-forced numerical stability with public fixtures. `--image` adds the generated vision capability check.
+
+## Historical diagnostics
+
+The remainder of this catalogue describes `--suite diagnostics`.
+
 Data is read at pinned revisions; item subsets are seeded; every item keeps the same id in every language, so two runs pair item by item. `*` runs model-written code (opt-in), `**` needs `--judge-url` (opt-in), `†` downloads images (opt-in).
 
 | Task | Data (pinned) | Langs | quick / full per lang | Thinking | Score |

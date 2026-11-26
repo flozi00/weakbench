@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v3` release runs each family in German and English. Counts are per language.
+The `closed-v4` release runs each family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -16,6 +16,14 @@ The `closed-v3` release runs each family in German and English. Counts are per l
 | `transfer_audit` | Reconciling stock and its origin across handoffs, corrected records and a reporting cutoff | 16 | 32 | Exact JSON |
 | `workshop_schedule` | Scheduling dependent jobs on shared resources with closures, release times and deadlines | 16 | 32 | A simulator checks every constraint and the earliest possible finish. Any optimal timetable passes. |
 | `language_evidence` | Computing two outcomes, explaining their values and giving a decision and margin in the requested language | 16 | 32 | Code checks the facts in both visible fields using the sentence forms supplied in the prompt. It checks the language of the request, both fields and any returned reasoning. |
+| `stratified_effect` | Comparing pooled rates and rates standardized to a common population | 16 | 32 | Exact rational differences and direction |
+| `censored_bounds` | Inferring attainable differences when some binary observations are missing and totals impose joint constraints | 16 | 32 | Sharp lower and upper bounds and the attainable signs |
+| `frame_registration` | Moving a position and a free vector between three-dimensional coordinate frames | 16 | 32 | Integer coordinates in the requested frame |
+| `raster_topology` | Tracking connected components and holes after a local change to a binary mosaic | 16 | 32 | Exact topology for the specified foreground and background adjacency |
+| `automata_witness` | Producing the shortest input that distinguishes two finite-state readers, or establishing equivalence | 16 | 32 | Canonical witness and accepting reader |
+| `assumption_core` | Finding a smallest conflicting set of rules and a consistent assignment under the specified relaxation | 16 | 32 | Canonical conflict and assignment, including satisfiable controls |
+| `header_binding` | Finding readings identified by repeated labels and several levels of table headers | 16 | 32 | Both source cell IDs and their signed difference |
+| `polyphonic_score` | Reading simultaneous notes, tied continuations and new attacks in a symbolic score | 16 | 32 | Sounding pitches by voice, new attacks and next onset |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |

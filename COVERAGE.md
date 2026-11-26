@@ -8,7 +8,26 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
-## Covered
+## Private coverage review, closed-v4
+
+The starting point was the executable registry at `c38602ef`: 14 private families and 463 separately selectable diagnostics. For each proposed addition we compared the input representation, the operation the model must perform and the evidence needed for a correct answer. A nearby task in a broad domain can still leave a specific capability unmeasured. HELM uses a scenario inventory to make such omissions visible. [Liang et al., Holistic Evaluation of Language Models](https://arxiv.org/abs/2211.09110)
+
+| Earlier diagnostic | Capability added to the private suite | Independent check and method reference |
+|---|---|---|
+| `simpson`, `weighted_mean` | Compute the numerical change from pooling to comparison under common population weights | Two exact-rational calculations compare both groups. [NCHS direct standardization](https://www.cdc.gov/nchs/hus/sources-definitions/age-adjustment.htm) |
+| `interval_math`, `math_missing` | Find the extreme attainable differences and the possible signs under coupled constraints on missing binary observations | Enumerated completions cross-check feasible subgroup totals. An interval spanning zero may still exclude a tie. [Horowitz and Manski on sharp bounds](https://doi.org/10.1080/01621459.2000.10473902) |
+| `spatial`, `grid_transform` | Carry a point and a free vector through a chain of 3D frames in either direction | Global placements agree with an independent homogeneous-matrix calculation. [Lynch and Park on changes of frame](https://modernrobotics.northwestern.edu/nu-gm-book-resource/3-3-1-homogeneous-transformation-matrices/) |
+| `paper_punch`, `grid_transform` | Recompute foreground components and enclosed background regions under a local change | Flood-fill is checked against a second connectivity implementation and the Euler characteristic. [scikit-image digital topology reference](https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_euler_number.html) |
+| `rule_induction`, `counterexample` | Establish equivalence of two finite-state readers or construct a shortest separating input | Witnesses are checked by a second procedure on both readers, including equivalence and ties. [Hopcroft and Karp on automata equivalence](https://ecommons.cornell.edu/entities/publication/aa8cfe15-dcea-4be5-ae03-359120f548ea) |
+| `unsat_detect`, `logic_grid` | Explain inconsistency with a smallest rule set and provide a consistent assignment after relaxation | Subset enumeration is checked against a minimum-hitting-set calculation. A greedy deletion can leave a larger core. [Ignatiev et al. on smallest MUSes](https://alexeyignatiev.github.io/assets/pdf/iplms-cp15-preprint.pdf) |
+| `table_qa`, `table_build` | Recover two readings from a multi-level table with repeated leaf labels | Explicit header links agree with the generator's coordinate model. An independent audit also reconstructed the spanned layout. The test evaluates table interpretation. [W3C WAI multi-level tables](https://www.w3.org/WAI/tutorials/tables/multi-level/) |
+| No symbolic score-reading task in the starting registry | Distinguish sounding notes, tied continuations and simultaneous new attacks in multiple voices | An absolute voice timeline agrees with a parser that replays the serialized score. These are original symbolic compositions. [MusicXML duration](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/duration/) and [tie](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/tie/) |
+
+The release adds 256 German and 256 English questions. Each language contains 16 contrast pairs per new family. Both renderings of a scenario share one gold result. Scoring the opposite variant's gold failed on all 512 new items. Per language, the best constant JSON answer earns 8/32 for automata, 2/32 for conflict cores and 1/32 for each other family. These are checks against shortcuts. Model capability estimates need matched model runs and distinct scenarios as the units of analysis.
+
+The next areas identified in the inventory are edits indexed by grapheme cluster, Unicode-normalization collisions, and experiments in which the next observation must depend on an earlier result. Existing wordplay, locale formatting and retrieval diagnostics provide comparison points. The exact Unicode repertoire, the source of tool observations and the required evidence for identification determine whether the proposed additions test a distinct skill.
+
+## Historical diagnostic coverage
 
 | Area | Task(s) | Langs | Scoring | Notes |
 |---|---|---|---|---|

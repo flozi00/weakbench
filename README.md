@@ -12,13 +12,13 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v3` release has ten families scored by code. Across German and English, these contribute 388 quick or 776 full cases. A judge adds four rubric-graded families, bringing the totals to 452 quick or 904 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v4` release has 18 families scored by code. Across German and English, these contribute 644 quick or 1,288 full cases. A judge adds four rubric-graded families, bringing the totals to 708 quick or 1,416 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
-To run just the four new verifiable families on a local model:
+To run the new spatial and statistical tasks on a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks replica_merge,transfer_audit,workshop_schedule,language_evidence --concurrency 4 --max-parallel 4
+  --tasks frame_registration,raster_topology,stratified_effect,censored_bounds --concurrency 4 --max-parallel 4
 ```
 
 The scheduling verifier accepts alternative optimal timetables. The language verifier grades a short visible justification and a final answer against the facts and the requested language. It also measures the language of any API-exposed reasoning and reports how often the model supplied that channel.
@@ -36,7 +36,7 @@ python3 compare.py --help
 python3 speed.py --help
 ```
 
-`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. To compare an earlier model with a new one, evaluate both on the same release. The previous `closed-v2` runner is pinned at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md).
+`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. The `closed-v3` runner is pinned at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
 
 ## Maintain the release
 

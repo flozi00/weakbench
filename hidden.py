@@ -17,22 +17,25 @@ import closed_language
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "ea8b718ebef6b027baae4d6001deb05bc7d67c0f"
-DATA_PATH = "releases/closed-v3/cases.jsonl"
-DATA_SHA256 = "6aa8cdfac9241ae1f95179e6baf46582b5d3ddb99943eaa9cd627fc9d6afd26f"
+DATA_REVISION = "8d4f722cb4da34b85088b6a768e3f73e779daad5"
+DATA_PATH = "releases/closed-v4/cases.jsonl"
+DATA_SHA256 = "7d979850dffb383a55bed782a9fc8cecf4f087037651c714f25a88d9498f2d6c"
+RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
+               "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
-               "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit")
+               "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_V4)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language}
 PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
-THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS))
+THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_V4))
 JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
 PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, *PROGRAMS, "quantity_contract", "schema_dispatch",
-                             "archive_retrieval", "replica_merge", "transfer_audit"))
+                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_V4))
 PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "schedule_optimal"),
                    "language_evidence": sorted(closed_language.DETAIL_KEYS)}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
+               **dict.fromkeys(RESEARCH_V4, 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
@@ -44,6 +47,11 @@ CATEGORIES = [
     {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
     {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
     {"key": "tutoring", "label": "Tutoring", "tasks": ["contrastive_tutoring"]},
+    {"key": "statistics", "label": "Statistical inference", "tasks": ["stratified_effect", "censored_bounds"]},
+    {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
+    {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core"]},
+    {"key": "accessibility", "label": "Accessible tables", "tasks": ["header_binding"]},
+    {"key": "music", "label": "Music notation", "tasks": ["polyphonic_score"]},
 ]
 LANGS = ("en", "de")
 

@@ -50,6 +50,31 @@ class PairTests(unittest.TestCase):
             (path/"run_info.json").unlink()
             self.assertTrue(all("pair_checks" not in r for r in quality.summarize(path)))
 
+    def test_only_matching_correct_neutrals_and_observed_wrong_demands(self):
+        self.family = "audit_pressure"
+        cells = {}
+        for lang in ("de", "en"):
+            rows = []
+            for ordinal, (neutral, pressured) in enumerate([
+                (1, 1), (1, 0), (0, 1), (1, None), (None, 1), (1, 1), (1, .5), (True, 1)
+            ]):
+                first, second = self.row(lang, 2 * ordinal, False), self.row(lang, 2 * ordinal + 1, False)
+                first["detail"] = {} if neutral is None else {"pressure_neutral_correct": neutral}
+                second["detail"] = {} if pressured is None else {"pressure_wrong_endorsement": pressured}
+                second["detail"]["audit_false_positive" if ordinal == 0 else "audit_false_negative"] = 0
+                if ordinal == 5:
+                    second["error"] = "timeout"
+                if lang == "de" or ordinal != 0:
+                    rows.extend((second, first))
+            cells[self.family, lang] = rows
+        stats = closed_pairs.checks(cells, self.rev, {self.family: 16}, {self.family})
+        self.assertEqual(stats[self.family, "de"]["pressure_flip_to_user"], {"passed": 1, "scored": 2})
+        self.assertEqual(stats[self.family, "en"]["pressure_flip_to_user"], {"passed": 0, "scored": 1})
+        self.assertEqual(stats[self.family, "de"]["pressure_flip_to_fabricated_defect"], {"passed": 1, "scored": 1})
+        self.assertEqual(stats[self.family, "de"]["pressure_flip_to_false_clearance"], {"passed": 0, "scored": 1})
+        self.assertNotIn("pressure_flip_to_unwarranted_certainty", stats[self.family, "de"])
+        self.assertFalse(closed_pairs.checks(cells, "x" * 40, {self.family: 16}, {self.family}))
+
     def test_unpaired_singletons_and_unrecognized_ids(self):
         rows=[self.row("de",0,False),self.row("en",0,False)]
         cells={(self.family,r["lang"]):[r] for r in rows}

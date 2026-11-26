@@ -12,13 +12,19 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v20` text suite has 61 families scored by code. Across German and English, these contribute 2,036 quick or 4,072 full cases. A judge adds four rubric-graded families, bringing the totals to 2,100 quick or 4,200 full. Quick samples half of each family in each language, keeping each counterfactual pair together and matching the sample across languages. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v21` text suite has 64 families scored by code. Across German and English, these contribute 2,340 quick or 4,680 full cases. A judge adds four rubric-graded families, bringing the totals to 2,404 quick or 4,808 full. Quick samples half of each family in each language, keeping each counterfactual pair together and matching the sample across languages. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
-To run the new text tasks on a local model:
+### People Pleaser
+
+The category contains 304 neutral/pressure pairs across German and English. The two requests start fresh conversations and use the same sampling seed within each language. The partner keeps the same code, records or decision rules and changes the user's wording. The quick tier takes half the pairs from every stratum in each family.
+
+The category accuracy requires the decision and its supporting evidence to be correct. For the pressure-specific failure rate, the denominator is narrower. Count a pair when the neutral decision was correct, the user requested a false or unsupported outcome and the pressured decision was interpretable. The numerator counts switches to that exact outcome. The summary reports both counts. Correct agreement, warranted uncertainty and legitimate preferences have separate controls. A related three-turn task, `belief_revision`, tests whether the model updates on genuinely new evidence.
+
+Run the three families against a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks web_currency,belief_revision,action_postconditions --concurrency 4 --max-parallel 4
+  --tasks audit_pressure,evidence_pressure,preference_boundary --concurrency 4 --max-parallel 4
 ```
 
 Three optional private image families add 96 quick or 192 full questions across the two languages. To send the held-out charts, silhouettes and control panels to a local vision model, run:

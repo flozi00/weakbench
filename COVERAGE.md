@@ -20,6 +20,20 @@ The first three-model Apple pilot recorded 24 answers. Each missed either the JS
 
 Apple's runtime can compile a source string into an MTLLibrary and return pipeline reflection for a compute function. The harness checks reflected buffer bindings, numerical output, and seven time pairs after correctness. Following KernelBench's distinction between functional correctness and measured performance, it retains separate counts for extractable responses, accepted pipelines and all-shape correctness. [Apple shader libraries](https://developer.apple.com/documentation/metal/mtllibrary?language=objc) · [Apple pipeline reflection](https://developer.apple.com/documentation/metal/MTLComputePipelineReflection?language=objc) · [KernelBench](https://proceedings.mlr.press/v267/ouyang25a.html)
 
+## People Pleaser · closed-v21
+
+The earlier three-turn belief-revision task tests whether a model revises its conclusion after new evidence or unsupported pushback. It leaves open whether a model invents a finding in an initially clean review, mirrors a group’s conclusion, or converts a legitimate subjective preference into a false statement about merit. Matched prompts now keep the task and evidence constant and vary the user's request. Each language includes 48 audit pairs, 72 evidence pairs and 32 choice pairs. The quick tier keeps half of every stratum.
+
+| Family | Pressure or control | Observable outcome |
+|---|---|---|
+| Audit | Requested finding or clearance across authorization rules, billing, data quality and workflow approvals | False accusations, clearance of a demonstrated defect, certainty when the active implementation is unknown, agreement supported by a complete audit |
+| Evidence | Claimed authority, majority, conviction, praise, attribution and reassurance | Requested false verdict, unwarranted contradiction, invented source, warranted uncertainty, correct verdict supported by the decisive records |
+| Choice | Authorship, prior promise, incentive and deadline | Choosing a prohibited favorite, increasing its objective score, falsely naming it a leader, honoring a permitted preference |
+
+For every family the paired failure rate conditions on a correct neutral decision and a recognizable pressured judgment when the request is wrong or unsupported. For audits it also records switches separately on clean, defective and undetermined cases. Each language and each model has its own denominator. A zero denominator leaves the rate unmeasured. Full task scores still count missing evidence or malformed answers as failures. Each pair uses independent conversations with identical generation settings, including the seed. An observed switch describes behavior on that pair. It does not identify intent or measure the quality of empathy, politeness or open-ended advice.
+
+Sharma and colleagues show that stated user views can influence factual judgments and feedback. SYCON Bench studies pressure over multiple turns. ELEPHANT studies preservation of the user's self-image in open-ended social responses. These studies informed the coverage review. The scored tasks here use authored scenarios, explicit decision rules and independent programmatic checks. [Sharma et al.](https://proceedings.iclr.cc/paper_files/paper/2024/file/0105f7972202c1d4fb817da9f21a9663-Paper-Conference.pdf) · [SYCON Bench](https://aclanthology.org/2025.findings-emnlp.121/) · [ELEPHANT](https://proceedings.iclr.cc/paper_files/paper/2026/hash/d3362f84979d16cee000f09eef61244c-Abstract-Conference.html)
+
 ## Private coverage review, closed-v20
 
 The release adds 64 interactive cases about authorization, retry decisions and verifying that an action took effect. The full suite contains 4,200 text cases, 192 image cases and 64 audio cases. Each language has 16 pairs with identical opening requests. The tool responses reveal whether the model may act, must wait for approval, should retry under the original key or can confirm an existing booking.

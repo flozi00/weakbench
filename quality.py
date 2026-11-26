@@ -868,10 +868,10 @@ def think_on(t, args):
 
 def build_body(name, t, item, args, model, honored=True):
     """Thinking-off tasks: template kwargs + greedy; thinking tasks: the server's
-    sampling defaults made repeatable by the per-item seed. --temperature and
+    sampling defaults made repeatable by item or matched-pair seed. --temperature and
     --max-tokens override everything."""
     body = {"model": model, "messages": item["messages"], "max_tokens": item.get("max_tokens") or t["max_tokens"],
-            "seed": seed_of(name, item["lang"], item["id"])}
+            "seed": seed_of(name, item["lang"], item.get("sampling_id", item["id"]))}
     if not think_on(t, args):
         body |= {"chat_template_kwargs": dict(THINK_OFF), "temperature": 0}
         if honored is False:  # the server thinks anyway: give it a thinking budget

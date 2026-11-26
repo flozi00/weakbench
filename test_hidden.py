@@ -33,6 +33,9 @@ import test_closed_probes as probes_fixture
 import test_closed_recourse as recourse_fixture
 import test_closed_counterpoint as counterpoint_fixture
 import test_closed_imagery as imagery_fixture
+import test_closed_audit_pressure as audit_pressure_fixture
+import test_closed_evidence_pressure as evidence_pressure_fixture
+import test_closed_preference_boundary as preference_fixture
 import test_closed_actions as action_fixture
 import test_closed_revision as revision_fixture
 import test_closed_web_currency as web_fixture
@@ -143,6 +146,11 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "imagery_chain":
                         fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
                         answer = imagery_fixture.witness(lang)
+                    elif family in hidden.PRESSURE_PROGRAMS:
+                        fixtures = {"audit_pressure": audit_pressure_fixture, "evidence_pressure": evidence_pressure_fixture,
+                                    "preference_boundary": preference_fixture}
+                        expected, answer = fixtures[family].fixture(lang, i)
+                        fields = {"mode": "program", "expected": expected}
                     elif family == "action_postconditions":
                         fields = {"mode":"program", "expected":action_fixture.fixture("missing")}
                     elif family == "belief_revision":
@@ -218,6 +226,28 @@ class ClosedSuiteTests(unittest.TestCase):
         req = urllib.request.Request("https://huggingface.co/file", headers={"Authorization": "Bearer dummy"})
         redirected = hidden.HubRedirect().redirect_request(req, None, 302, "", {}, "https://cdn.example/file")
         self.assertNotIn("Authorization", dict(redirected.header_items()))
+
+    def test_pressure_quick_tier_balances_each_stratum_and_matches_languages(self):
+        for family in hidden.PRESSURE_PROGRAMS:
+            cells = {(family, lang): [
+                {"expected": {"stratum": i // 8}, "prompt": f"{lang} {i}"} for i in range(32)
+            ] for lang in hidden.LANGS}
+            for seed in (0, 1, 43):
+                ids = []
+                for lang in hidden.LANGS:
+                    full = hidden.load(cells, family, lang, None, seed)
+                    quick = hidden.load(cells, family, lang, 16, seed)
+                    self.assertEqual(full[:16], quick)
+                    args = SimpleNamespace(think="auto", temperature=None, max_tokens=None)
+                    requests = [quality.build_body(family, {"think": True, "max_tokens": 100}, it, args, "fixture") for it in quick]
+                    self.assertEqual(len({req["seed"] for req in requests}), 8)
+                    for neutral, pressure in zip(requests[::2], requests[1::2], strict=True):
+                        self.assertNotEqual(neutral["messages"], pressure["messages"])
+                        self.assertEqual({k: v for k, v in neutral.items() if k != "messages"},
+                                         {k: v for k, v in pressure.items() if k != "messages"})
+                    self.assertEqual([sum(it["expected"]["stratum"] == s for it in quick) for s in range(4)], [4] * 4)
+                    ids.append([item["id"] for item in quick])
+                self.assertEqual(*ids)
 
     def test_sampling_and_scores(self):
         release = hidden.release()

@@ -17,6 +17,9 @@ import closed_imagery
 import closed_inquiry
 import closed_web_tools
 import closed_actions
+import closed_audit_pressure
+import closed_evidence_pressure
+import closed_preference_boundary
 import closed_revision
 import closed_web_currency
 import closed_gamebook
@@ -47,9 +50,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "3b450ec2e329e3b9e3b2bfc11e10207d2d02c14a"
-DATA_PATH = "releases/closed-v20/cases.jsonl"
-DATA_SHA256 = "9a7b5b89df98b8cc1d1d25d7f08f28ceaca5bf9b8fa6827b9c447cf1a61a5fde"
+DATA_REVISION = "daf02d68afd8d2981334060591af28a8c4857635"
+DATA_PATH = "releases/closed-v21/cases.jsonl"
+DATA_SHA256 = "5ace8dfadf3c717c4b922e82186b3d946835ba3fb8f098ad106f1c583dbf1bbd"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -58,7 +61,9 @@ RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium",
                   "accessible_edit", "bridge_loading", "loop_game", "transit_exposures", "rule_time_slice", "distance_repair")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
-PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
+PRESSURE_PROGRAMS = {"audit_pressure": closed_audit_pressure, "evidence_pressure": closed_evidence_pressure,
+                     "preference_boundary": closed_preference_boundary}
+PROGRAMS = {**PRESSURE_PROGRAMS, "workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
             "imagery_chain": closed_imagery,
@@ -85,7 +90,8 @@ THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEA
 JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
 PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, *PROGRAMS, "quantity_contract", "schema_dispatch",
                              "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT, *VISUAL_COUNTS, *AUDIO_COUNTS))
-PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "schedule_optimal"),
+PROGRAM_METRICS = {**{family: sorted(module.DETAIL_KEYS) for family, module in PRESSURE_PROGRAMS.items()},
+                   "workshop_schedule": ("valid_json", "schedule_feasible", "schedule_optimal"),
                    "language_evidence": sorted(closed_language.DETAIL_KEYS),
                    "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS),
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
@@ -121,7 +127,8 @@ EXACT_FIELDS = {
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
                  **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
-FULL_COUNTS = {"web_currency": 48, "action_postconditions":32, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
+FULL_COUNTS = {"audit_pressure": 96, "evidence_pressure": 144, "preference_boundary": 64,
+               "web_currency": 48, "action_postconditions":32, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
@@ -130,6 +137,7 @@ FULL_COUNTS = {"web_currency": 48, "action_postconditions":32, "belief_revision"
                                 "mutation_suite", "causal_recourse", "counterpoint_repair", "reader_gamebook"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
+    {"key": "people_pleaser", "label": "People Pleaser", "tasks": list(PRESSURE_PROGRAMS)},
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Programs and queries", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric", "bag_query", "mutation_suite"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair", "causal_recourse"]},
@@ -243,6 +251,20 @@ def decode(data):
         rows = cells["adaptive_measurement", lang]
         if not closed_observations.valid_pairs(rows):
             raise ValueError("invalid private observation pairs")
+    for family, arm in closed_pairs.PRESSURE_ARMS.items():
+        strata = []
+        for lang in LANGS:
+            rows = cells[family, lang]
+            order = []
+            for first, second in zip(rows[::2], rows[1::2], strict=True):
+                neutral, pressure = first["expected"], second["expected"]
+                if (neutral[arm] != "neutral" or pressure[arm] == "neutral" or first["prompt"] == second["prompt"]
+                        or any(neutral[k] != pressure[k] for k in neutral if k != arm)):
+                    raise ValueError(f"invalid neutral/pressure pair for {family}")
+                order.append(neutral["stratum"])
+            strata.append(order)
+        if strata[0] != strata[1] or any(n % 2 for n in collections.Counter(strata[0]).values()):
+            raise ValueError(f"unaligned pressure strata for {family}")
     return cells
 
 
@@ -310,7 +332,15 @@ def load(cells, family, lang, n, seed):
     rows = cells[family, lang]
     step = 2 if family in PAIRED_VARIANTS else 1
     starts = list(range(0, len(rows), step))
-    random.Random(seed).shuffle(starts)
+    rng = random.Random(seed)
+    rng.shuffle(starts)
+    if family in PRESSURE_PROGRAMS:
+        # Keep half of every pressure/truth stratum in the quick tier.
+        strata = collections.defaultdict(list)
+        for start in starts:
+            strata[rows[start]["expected"]["stratum"]].append(start)
+        quick = {start for pairs in strata.values() for start in pairs[:len(pairs) // 2]}
+        starts = [start for start in starts if start in quick] + [start for start in starts if start not in quick]
     order = [i for start in starts for i in range(start, min(start + step, len(rows)))]
     items = []
     for ordinal in order[:n]:
@@ -325,6 +355,8 @@ def load(cells, family, lang, n, seed):
                        {"type": "text", "text": row["prompt"]}]
         item = {"id": uid, "lang": lang, "messages": [{"role": "user", "content": content}],
                 **{k: row[k] for k in ("expected", "rubric") if k in row}}
+        if family in PRESSURE_PROGRAMS:
+            item["sampling_id"] = closed_pairs.item_id(DATA_REVISION, family, ordinal - ordinal % 2)
         if family in TEXT_DIALOGUES:
             item["turns"] = [item["messages"], *[[{"role": "user", "content": text}] for text in row["followups"]]]
         if family == "adaptive_measurement":

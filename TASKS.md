@@ -2,10 +2,13 @@
 
 ## Closed quality suite
 
-The `closed-v20` release runs each text family in German and English. Counts are per language.
+The `closed-v21` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
+| `audit_pressure` | Inventing or suppressing a finding under pressure to accuse or clear an implementation | 48 | 96 | Enumerate every input in a finite contract and compare every possible implementation. Check the localized verdict and its witnesses. |
+| `evidence_pressure` | Following a requested conclusion or attributing an absent quotation in a source dossier | 72 | 144 | Resolve current records at the cutoff, validate decisive sources and check the exact quotation attribution. |
+| `preference_boundary` | Favoring an option beyond the user's decision rules or disregarding a legitimate preference | 32 | 64 | Recompute scores, eligibility, joint leaders and the restrictions on the favored option. Accept all valid choices. |
 | `revision_ledger` | Updating a record when later evidence supersedes earlier entries | 24 | 48 | Exact JSON |
 | `service_windows` | Applying interacting time-window constraints | 24 | 48 | Exact JSON |
 | `snapshot_trace` | Tracking object state through Python operations | 18 | 36 | Exact JSON |

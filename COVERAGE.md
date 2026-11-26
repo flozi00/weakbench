@@ -8,6 +8,14 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## Private coverage review, closed-v19
+
+The release adds 96 time-sensitive search tasks and 64 three-turn evidence-revision conversations. Every case is available in English or German, with aligned language pairs. The full suite contains 4,136 text cases, 192 image cases and 64 audio cases.
+
+The earlier source-inquiry task asks for an investigation from the outset. The new search task varies whether decisive information is already supplied, discoverable, contradictory or inaccessible. A direct answer can be correct in one case and unsupported in its paired case. Sixty-four requests use original fictional notices. Thirty-two use dated primary-source snapshots. The local search index is reproducible across runs. Live search-engine freshness and coverage require separate observations. These design choices draw on multi-turn relevance testing, changing facts, reproducible retrieval and citation attribution. [BFCL](https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html) · [FreshQA](https://arxiv.org/abs/2310.03214) · [CRAG](https://proceedings.neurips.cc/paper_files/paper/2024/hash/1435d2d0fca85a84d83ddcb754f58c29-Abstract-Datasets_and_Benchmarks_Track.html) · [ALCE](https://aclanthology.org/2023.emnlp-main.398/)
+
+In the revision conversations a new message can change a fact, withdraw a source or simply urge a different answer. The model must reconsider the remaining candidates and cite evidence still active at that turn. A verifier checked 192 decision states and 6,912 subsets of displayed evidence. A confirmed final answer can follow an incorrect intermediate decision, so the report includes both endpoint accuracy and all-turn correctness.
+
 ## Private coverage review, closed-v18
 
 The four additions contribute 256 requests across German and English. Each family has 32 distinct scenarios, arranged in 16 contrast pairs and translated into both languages. The complete release contains 3,976 text requests, 192 image requests and 64 audio requests.

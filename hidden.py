@@ -15,6 +15,9 @@ import urllib.request
 
 import closed_imagery
 import closed_inquiry
+import closed_web_tools
+import closed_revision
+import closed_web_currency
 import closed_gamebook
 import closed_bag
 import closed_probes
@@ -43,9 +46,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "dc6094466c3949ea5b603b514189160f6d7036d3"
-DATA_PATH = "releases/closed-v18/cases.jsonl"
-DATA_SHA256 = "4c1646fbcc26936bb6e65de62ff7faf0c95c158c67afcd0cef423631e5f3bf62"
+DATA_REVISION = "f2c37aad540b553dec9b7e1a37d249e238bfca48"
+DATA_PATH = "releases/closed-v19/cases.jsonl"
+DATA_SHA256 = "26be9704145b6fa6a5f31a7128553750120311ae367b9926ef70cb780241b5c1"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -58,7 +61,8 @@ PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_la
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
             "imagery_chain": closed_imagery,
-            "source_inquiry": closed_inquiry,
+            "source_inquiry": closed_inquiry, "web_currency": closed_web_currency,
+            "belief_revision": closed_revision,
             "backstage_reveal": closed_backstage,
             "reader_gamebook": closed_gamebook,
             "bag_query": closed_bag,
@@ -71,7 +75,7 @@ PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_la
             "failure_incidence": closed_incidence, "sentence_fusion": closed_fusion, "panel_grounding": closed_grounding,
             "package_auction": closed_auction, "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
 LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
-TEXT_DIALOGUES = frozenset(("commitment_repair", "language_relay"))
+TEXT_DIALOGUES = frozenset(("commitment_repair", "language_relay", "belief_revision"))
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
 VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32, "panel_grounding": 32}
 AUDIO_COUNTS = {"tap_timing": 32}
@@ -88,6 +92,8 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
                    "imagery_chain": sorted(closed_imagery.DETAIL_KEYS),
                    "source_inquiry": sorted(closed_inquiry.DETAIL_KEYS),
+                   "web_currency": sorted(closed_web_currency.DETAIL_KEYS),
+                   "belief_revision": list(closed_revision.DETAIL_KEYS),
                    "backstage_reveal": sorted(closed_backstage.DETAIL_KEYS),
                    "reader_gamebook": sorted(closed_gamebook.DETAIL_KEYS),
                    "bag_query": sorted(closed_bag.DETAIL_KEYS),
@@ -113,7 +119,7 @@ EXACT_FIELDS = {
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
                  **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
-FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
+FULL_COUNTS = {"web_currency": 48, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
@@ -128,7 +134,7 @@ CATEGORIES = [
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
-    {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
+    {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement", "web_currency"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
     {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
     {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
@@ -140,7 +146,7 @@ CATEGORIES = [
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology", "distance_repair"]},
     {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope", "rule_time_slice"]},
     {"key": "creative_writing", "label": "Creative writing", "tasks": ["imagery_chain", "backstage_reveal", "reader_gamebook"]},
-    {"key": "source_research", "label": "Source research and contradictions", "tasks": ["source_inquiry"]},
+    {"key": "source_research", "label": "Source research and contradictions", "tasks": ["source_inquiry", "belief_revision"]},
     {"key": "mathematical_proof", "label": "Mathematical certificates", "tasks": ["halfplane_proof"]},
     {"key": "observing_plan", "label": "Astronomical observation planning", "tasks": ["transit_exposures"]},
     {"key": "accessibility", "label": "Accessibility", "tasks": ["header_binding", "accessible_edit"]},
@@ -321,6 +327,8 @@ def load(cells, family, lang, n, seed):
             item["turns"] = [item["messages"], *[[{"role": "user", "content": text}] for text in row["followups"]]]
         if family == "adaptive_measurement":
             item.update(closed_observations.runtime(item["expected"], lang))
+        if family == "web_currency":
+            item.update(closed_web_tools.runtime(item["expected"], lang))
         if family == "source_inquiry":
             item["start_tool_session"] = functools.partial(closed_inquiry.runtime, item["expected"], lang)
             item.update(item["start_tool_session"]())

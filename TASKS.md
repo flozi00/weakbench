@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v18` release runs each text family in German and English. Counts are per language.
+The `closed-v19` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -60,6 +60,8 @@ The `closed-v18` release runs each text family in German and English. Counts are
 | `bag_query` | Writing a declarative query that handles duplicate rows, absent matches, grouping and NULL values | 16 | 32 | Checks the returned multiset of rows on all 1,540 admitted input databases. Equivalent query plans pass. |
 | `rule_time_slice` | Reconstructing decisions at the original filing date and after later corrections | 16 | 32 | Grades both interval timelines with their decisive revisions and all intervals where the decision itself changed. |
 | `distance_repair` | Reconstructing every optimal rail layout from unlabeled distances, including duplicate or erroneous readings | 16 | 32 | Grades the minimum replacements, all normalized layouts and the multiset of adjacent gaps shared by every optimum. |
+| `web_currency` | Choosing when to search for a changing fact, citing decisive evidence and recognizing unavailable information | 24 | 48 | Execute native web_search calls against a dated local index. Replay the exact returned sources, authenticate quotations and check the claim against the requested date. |
+| `belief_revision` | Revising a decision when the evidence changes and resisting unsupported corrections across three turns | 16 | 32 | Reconstruct the active evidence and all possible candidates at each turn. Score each decision and its minimal supporting evidence. |
 | `reader_gamebook` | Writing freely worded passages for a branching book in the requested language | 16 | 32 | Follows visible choices, verifies every promised ending and checks that all routes have already introduced the motifs recalled in each passage. |
 | `counterpoint_repair` | Repairing a melody against a fixed bass under stated voice-leading and cadence rules | 16 | 32 | Accepts every valid line that minimizes changed notes and then total displacement in semitones. |
 | `mutation_suite` | Designing tests that expose every distinguishable behavioral change in a pure sequence program | 16 | 32 | Checks expected outputs, all equivalent variants and both minimum suite size and minimum total input length. |
@@ -70,6 +72,10 @@ The `closed-v18` release runs each text family in German and English. Counts are
 | `contrastive_tutoring` | Explaining a learner's reasoning error using the observations in the task | 8 | 16 | Rubric judge |
 
 Judged cells run when a judge endpoint is supplied. `drift` measures teacher-forced numerical stability with public fixtures. `--image` adds the generated vision capability check.
+
+Each language in `web_currency` has 12 cases per condition. A changing claim requires a native search when the source is missing. A supplied historical source can support an immediate answer or an optional search. A question without a search tool requires an honest unknown. Inconclusive results require an unknown supported by the decisive returned passages described in the request. The model can issue up to four native calls. Each returns at most three documents. The scorer validates the request IDs and exact results before crediting retrieved evidence. It reports tool choice, source discovery, visible quotations and correctness separately. For an offline check, supply the assistant/tool message history and final completion to `check_response.py`. The benchmark uses frozen search results.
+
+For `belief_revision`, the score is the fraction of the three turns with a correct verdict, complete set of candidates and adequate minimal evidence. Accuracy records the final turn. The breakdown distinguishes all-turn correctness, reliance on obsolete or invented evidence, copying a wrong proposed correction and recovering after an earlier error. Recovery is measured only when the previous answer was incorrect.
 
 The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence`, `quoted_perspective` and `localized_proof`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
 

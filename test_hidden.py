@@ -33,6 +33,8 @@ import test_closed_probes as probes_fixture
 import test_closed_recourse as recourse_fixture
 import test_closed_counterpoint as counterpoint_fixture
 import test_closed_imagery as imagery_fixture
+import test_closed_revision as revision_fixture
+import test_closed_web_currency as web_fixture
 import test_closed_inquiry as inquiry_fixture
 import test_closed_halfplanes as halfplane_fixture
 import test_closed_quorum as quorum_fixture
@@ -140,6 +142,13 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "imagery_chain":
                         fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
                         answer = imagery_fixture.witness(lang)
+                    elif family == "belief_revision":
+                        fields = {"mode":"program", "expected":revision_fixture.fixture(), "followups":["second","third"]}
+                    elif family == "web_currency":
+                        spec = web_fixture.fixture(("current","unavailable","historical_given","unresolved")[i])
+                        prompt += " " + web_fixture.question(spec)
+                        fields = {"mode": "program", "expected": spec}
+                        answer = web_fixture.answer(spec)
                     elif family == "source_inquiry":
                         fields = {"mode": "program", "expected": inquiry_fixture.fixture(lang)}
                     elif family == "halfplane_proof":
@@ -606,6 +615,19 @@ class ClosedSuiteTests(unittest.TestCase):
                 content = json.dumps(controls.get(case["task"], [True, False]))
             elif prompt == quality.PREFLIGHT:
                 content = "391"
+            elif "belief_revision" in messages[0]["content"]:
+                if fail:
+                    raise RuntimeError(messages[0]["content"])
+                lang = messages[0]["content"].split("/")[2]
+                content = json.dumps(revision_fixture.examples(lang)[len(messages)//2])
+            elif "web_currency" in messages[0]["content"]:
+                if fail:
+                    raise RuntimeError(messages[0]["content"])
+                key = messages[0]["content"]
+                condition = ("current","unavailable","historical_given","unresolved")[self.prompt_indices[key]]
+                if condition in ("current","unresolved") and len(messages) == 1:
+                    return {"choices":[{"message":web_fixture.call_message(),"finish_reason":"tool_calls"}]}
+                content = self.answers[key]
             elif "source_inquiry" in messages[0]["content"]:
                 if fail:
                     raise RuntimeError(messages[0]["content"])

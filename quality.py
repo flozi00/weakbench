@@ -1017,6 +1017,10 @@ def run_item(url, name, t, item, body, timeout, private=False):
                     usage[k] += u.get(k) or 0
                 del r
             reply["turns"] = contents
+        elif item.get("native_web_search"):
+            reply, usage = hidden.closed_web_tools.run(
+                item, body, lambda outgoing: common.request(url, "/v1/chat/completions", outgoing, timeout=timeout),
+                parse_reply=parse_reply)
         elif item.get("tool_exec"):  # tool loop: the model calls, we execute, until it answers
             msgs, reply = list(body["messages"]), None
             capture = item.get("capture_tool_transcript", False)

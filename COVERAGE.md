@@ -8,6 +8,20 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## Private coverage review, closed-v5
+
+The v4 catalogue included single-turn tool selection, date arithmetic, ranked voting, word operations and locale formatting. Five additions exercise different operations on related inputs.
+
+| Comparison point | New task | Evidence used to grade it |
+|---|---|---|
+| Selecting a valid tool from its schema | `adaptive_measurement` needs a sequence of experiments. Two possible specimens present the same request. | Each tool result must agree with the hidden specimen. At every step, both outcomes must still permit a solution within the remaining budget. The 16 designs were also tested against 6,610 fixed probe sets and a policy that identifies all 140 possible specimens. [Nowak, generalized binary search](https://nowak.ece.wisc.edu/GBS_arxiv_v4.pdf) |
+| Service windows and date arithmetic | `civil_recurrence` expands recurring wall-clock slots across a gap and a fold, applies explicit policies and cancels absolute instants. | A piecewise-offset inverse and a minute-by-minute forward simulation agree. Cases include both ends of a transition and shifts that cause valid occurrences to coincide. The task supplies a fictional clock and its own policies. [PEP 495](https://peps.python.org/pep-0495/) |
+| Ranked voting and resource scheduling | `quota_matching` assigns places with rankings on both sides, incomplete lists and capacities. | Two deferred-acceptance runs agree with the applicant-wise best and worst among all stable assignments. The two outcomes differ on 11 of 32 scenarios per language. [Gale and Shapley](https://doi.org/10.1080/00029890.1962.11989827) |
+| Word reversal, spelling and locale rules | `grapheme_edits` indexes successive edits by extended grapheme cluster. An edit can change later boundaries. | Boundary rules and an independent grammar reproduce the final scalar sequence and byte counts. The bounded repertoire passed 82 applicable official boundary vectors. [Unicode 15.1 grapheme boundaries](https://www.unicode.org/reports/tr29/tr29-43.html) |
+| Collation and format conversion | `normalization_join` matches duplicate records under Unicode normalization and full case folding. | A property-table implementation cross-checks the standard-library normalizer. Both retain multiplicities and count the bytes of the original keys. The bounded repertoire passed 730 comparisons from 73 applicable official test rows. [Unicode 15.1 normalization](https://www.unicode.org/reports/tr15/tr15-54.html) |
+
+Each family contributes 16 contrast pairs in each language. The interactive tasks differ in their tool state within a pair, and the four exact-output tasks differ in their visible inputs. Only the former family requires a chat endpoint that supports tool calls. The check on a saved transcript establishes consistency with the hidden state. Its provenance depends on the system that captured it.
+
 ## Private coverage review, closed-v4
 
 The starting point was the executable registry at `c38602ef`: 14 private families and 463 separately selectable diagnostics. For each proposed addition we compared the input representation, the operation the model must perform and the evidence needed for a correct answer. A nearby task in a broad domain can still leave a specific capability unmeasured. HELM uses a scenario inventory to make such omissions visible. [Liang et al., Holistic Evaluation of Language Models](https://arxiv.org/abs/2211.09110)

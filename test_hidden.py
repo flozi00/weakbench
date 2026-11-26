@@ -45,6 +45,11 @@ class ClosedSuiteTests(unittest.TestCase):
                                   if lang == "de" else
                                   {"justification": "The final value for Testa is 7. The final value for Testo is 3.",
                                    "answer": "My choice is therefore Testa. The two values differ by 4."})
+                    elif family == "adaptive_measurement":
+                        prompt = f"sentinel-input/{family}/{lang}/{i // 2}"
+                        fields = {"mode": "program", "expected": {
+                            "budget": 2, "probes": ["side", "left", "right"], "target": ("A", "C")[i % 2],
+                            "table": {"A": [0, 0, 0], "B": [0, 1, 0], "C": [1, 0, 0], "D": [1, 0, 1]}}}
                     elif family in hidden.JUDGE_TASKS:
                         fields = {"mode": "judge", "rubric": ["sentinel-criterion", "sentinel-other"]}
                     else:
@@ -91,7 +96,11 @@ class ClosedSuiteTests(unittest.TestCase):
             self.assertEqual([r["id"] for r in full[:2]], [r["id"] for r in quick])
             self.assertEqual([r["messages"][0]["content"].split("/")[-1] for r in full[:2]],
                              [r["messages"][0]["content"].split("/")[-1] for r in quick])
-            if family in hidden.PAIRED_VARIANTS:
+            if family == "adaptive_measurement":
+                self.assertEqual(quick[0]["messages"], quick[1]["messages"])
+                self.assertNotEqual(quick[0]["expected"]["target"], quick[1]["expected"]["target"])
+                self.assertEqual(quick[0]["tools"], quick[1]["tools"])
+            elif family in hidden.PAIRED_VARIANTS:
                 first, second = (int(r["messages"][0]["content"].split("/")[-1]) for r in quick)
                 self.assertEqual((first % 2, second - first), (0, 1))
         expected = {"expected": {"x": [1], "z": False}}
@@ -127,6 +136,31 @@ class ClosedSuiteTests(unittest.TestCase):
         self.assertEqual(failure.exception.code, 2)
         self.assertNotIn("PRIVATE_SENTINEL", err.getvalue())
 
+    def test_offline_observations(self):
+        item = hidden.load(hidden.release(), "adaptive_measurement", "de", 1, 0)[0]
+        known = item["expected"]["target"]
+        completion = {"choices": [{"message": {"content": json.dumps({"sample": known})}}]}
+        trace = []
+        for probe in ("side", "left" if known == "A" else "right"):
+            fn = {"name": "observe", "arguments": json.dumps({"probe": probe})}
+            trace.append({"role": "assistant", "tool_calls": [{"id": probe, "type": "function", "function": fn}]})
+            trace.append({"role": "tool", "tool_call_id": probe, "content": item["tool_exec"]("observe", fn["arguments"])})
+        response = self.tmp / "saved.json"
+        argv = ["--task", "adaptive_measurement", "--lang", "de", "--id", item["id"], "--response", str(response)]
+        forged = [*trace[:-1], {**trace[-1], "content": '{"probe":"sentinel-private","value":0}'}]
+        for document, exit_code in (({"messages": trace, "completion": completion}, 0),
+                                    ({"messages": item["messages"] + trace, "completion": completion}, 0),
+                                    ({"messages": forged, "completion": completion}, 1),
+                                    ({"messages": trace[:-2], "completion": completion}, 1), (completion, 1)):
+            response.write_text(json.dumps(document))
+            out = io.StringIO()
+            with patch.object(common, "request", side_effect=AssertionError), contextlib.redirect_stdout(out):
+                self.assertEqual(check_response.main(argv), exit_code)
+            report = json.loads(out.getvalue())
+            self.assertEqual(report["correct"], not exit_code)
+            self.assertEqual(set(report["checks"]), set(hidden.PROGRAM_METRICS["adaptive_measurement"]))
+            self.assertNotIn("sentinel-", out.getvalue())
+
     def test_cli(self):
         def request(url, route, body=None, **kw):
             if route == "/v1/models":
@@ -134,13 +168,24 @@ class ClosedSuiteTests(unittest.TestCase):
             if route == "/version":
                 return {"version": "mock"}
             self.assertEqual(route, "/v1/chat/completions")
-            prompt = body["messages"][-1]["content"]
+            messages = body["messages"]
+            prompt = messages[-1]["content"]
             if url == "http://judge":
                 case = json.loads(prompt)
                 controls = {p: grades for p, _, _, grades in hidden.CANARIES}
                 content = json.dumps(controls.get(case["task"], [True, False]))
             elif prompt == quality.PREFLIGHT:
                 content = "391"
+            elif "adaptive_measurement" in messages[0]["content"]:
+                if fail:
+                    raise RuntimeError(messages[0]["content"])
+                readings = [json.loads(m["content"])["value"] for m in messages if m["role"] == "tool"]
+                if len(readings) < 2:
+                    probe = "side" if not readings else ("left", "right")[readings[0]]
+                    call = {"id": "measurement", "type": "function", "function": {
+                        "name": "observe", "arguments": json.dumps({"probe": probe})}}
+                    return {"choices": [{"message": {"tool_calls": [call]}, "finish_reason": "tool_calls"}]}
+                content = json.dumps({"sample": ("A", "C")[readings[0]]})
             else:
                 self.assertTrue(prompt.startswith("sentinel-input/"))
                 self.assertNotIn("sentinel-criterion", json.dumps(body))
@@ -167,6 +212,9 @@ class ClosedSuiteTests(unittest.TestCase):
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])
                 self.assertEqual(row["extra"]["answer_facts_ok"], 1)
+            if row["task"] == "adaptive_measurement":
+                self.assertEqual(row["extra"]["measurement_identified"], 1)
+                self.assertEqual(row["extra"]["measurement_strategy_safe"], 1)
         info = json.loads((run / "run_info.json").read_text())
         self.assertEqual(info["data_revision"], hidden.DATA_REVISION)
         self.assertEqual(info["data_sha256"], hidden.DATA_SHA256)

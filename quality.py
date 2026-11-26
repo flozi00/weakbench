@@ -899,7 +899,7 @@ def split_think(content):
     return content.strip(), ""
 
 
-def parse_reply(resp):
+def parse_reply(resp, *, raw_tool_args=False):
     ch = resp["choices"][0]
     msg = ch.get("message") or {}
     content, think = split_think(msg.get("content") or "")
@@ -907,7 +907,7 @@ def parse_reply(resp):
     for tc in msg.get("tool_calls") or []:
         fn = tc.get("function") or {}
         args = fn.get("arguments")
-        if isinstance(args, str):
+        if isinstance(args, str) and not raw_tool_args:
             try:
                 parsed = json.loads(args)
                 args = parsed if isinstance(parsed, dict) else args
@@ -941,18 +941,20 @@ def run_item(url, name, t, item, body, timeout, private=False):
             reply["turns"] = contents
         elif item.get("tool_exec"):  # tool loop: the model calls, we execute, until it answers
             msgs, reply = list(body["messages"]), None
+            capture = item.get("capture_tool_transcript", False)
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
             rounds = 0
             for _ in range(item.get("max_rounds", 4)):
                 r = common.request(url, "/v1/chat/completions", {**body, "messages": msgs}, timeout=timeout)
-                reply = parse_reply(r)
+                # The observation verifier needs the original JSON to reject duplicate argument keys.
+                reply = parse_reply(r, raw_tool_args=capture)
                 u = (r.get("usage") if isinstance(r, dict) else None) or {}
                 for k in usage:  # the cell's cost is the sum over rounds, not the last round's
                     usage[k] += u.get(k) or 0
                 if not reply["tool_calls"]:
                     break
                 rounds += 1
-                calls = [{"id": f"call_{n}", "type": "function",
+                calls = [{"id": f"call_{rounds}_{n}" if capture else f"call_{n}", "type": "function",
                           "function": {"name": c["name"],
                                        "arguments": c["arguments"] if isinstance(c["arguments"], str)
                                        else json.dumps(c["arguments"])}}
@@ -967,17 +969,25 @@ def run_item(url, name, t, item, body, timeout, private=False):
             if reply is None:  # max_rounds <= 0: a misconfigured item, not a model failure
                 raise RuntimeError("tool loop ran zero rounds")
             forced = bool(reply["tool_calls"])
+            if capture:
+                trace = msgs[len(body["messages"]):]
             if forced:  # the cap was hit mid-search: make it answer from what it already has
                 # A user turn, not tool_choice="none": vLLM returns empty content for tool_choice="none"
                 # once the history carries tool_calls (measured on a 27B model), and a nudge is portable.
-                msgs.append({"role": "user", "content": "You have used all your searches. Answer the question "
-                                                        "now from what you found. Do not call any tool."})
+                nudge = "You have used all your searches. Answer the question now from what you found. Do not call any tool."
+                if capture:
+                    nudge = ("Beende die Messungen und gib jetzt deine Antwort." if item["lang"] == "de"
+                             else "Finish taking measurements and give your answer now.")
+                msgs.append({"role": "user", "content": nudge})
                 r = common.request(url, "/v1/chat/completions", {**body, "messages": msgs}, timeout=timeout)
                 reply = parse_reply(r)
                 u = (r.get("usage") if isinstance(r, dict) else None) or {}
                 for k in usage:
                     usage[k] += u.get(k) or 0
-                reply["tool_calls"] = []  # the answer is final, whatever the server still offers
+                if not capture:
+                    reply["tool_calls"] = []  # traditional search scorers treat the forced answer as final
+            if capture:
+                reply["observation_trace"] = trace
             reply["tool_rounds"] = rounds
             reply["tool_forced"] = forced
         else:

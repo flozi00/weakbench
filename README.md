@@ -12,13 +12,13 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v4` release has 18 families scored by code. Across German and English, these contribute 644 quick or 1,288 full cases. A judge adds four rubric-graded families, bringing the totals to 708 quick or 1,416 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v5` release has 23 families scored by code. Across German and English, these contribute 804 quick or 1,608 full cases. A judge adds four rubric-graded families, bringing the totals to 868 quick or 1,736 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
-To run the new spatial and statistical tasks on a local model:
+To run the interactive measurement and planning tasks on a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks frame_registration,raster_topology,stratified_effect,censored_bounds --concurrency 4 --max-parallel 4
+  --tasks adaptive_measurement,civil_recurrence,quota_matching --concurrency 4 --max-parallel 4
 ```
 
 The scheduling verifier accepts alternative optimal timetables. The language verifier grades a short visible justification and a final answer against the facts and the requested language. It also measures the language of any API-exposed reasoning and reports how often the model supplied that channel.
@@ -29,6 +29,8 @@ To check a saved chat completion offline, use the ID from the run's `items-<task
 python3 check_response.py --task language_evidence --lang de --id "$ITEM_ID" --response completion.json
 ```
 
+For `adaptive_measurement`, save the assistant tool calls and their tool replies in an array under `messages`, with the final chat completion under `completion`. The offline verifier replays those measurements against the case and checks that they identify the specimen. A correct guess alone earns zero. The ordinary runner keeps the trace in memory during scoring.
+
 Both model endpoints receive private material. Use endpoints approved for the dataset. The candidate receives each prompt. The judge also sees the rubric and candidate response. Closed-run artifacts retain opaque item IDs, scores, timing, token counts, error types and the release identity. Their contents support paired A/B comparisons. Prefill drift uses separate public technical probes because its output includes token IDs. Use `--no-drift` for a generation-only run, or `--image` for the optional generated vision capability check.
 
 ```sh
@@ -36,7 +38,7 @@ python3 compare.py --help
 python3 speed.py --help
 ```
 
-`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. The `closed-v3` runner is pinned at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
+`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. Earlier runners are available for `closed-v4` at `cfb63f1c`, `closed-v3` at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
 
 ## Maintain the release
 

@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v4` release runs each family in German and English. Counts are per language.
+The `closed-v5` release runs each family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -24,6 +24,11 @@ The `closed-v4` release runs each family in German and English. Counts are per l
 | `assumption_core` | Finding a smallest conflicting set of rules and a consistent assignment under the specified relaxation | 16 | 32 | Canonical conflict and assignment, including satisfiable controls |
 | `header_binding` | Finding readings identified by repeated labels and several levels of table headers | 16 | 32 | Both source cell IDs and their signed difference |
 | `polyphonic_score` | Reading simultaneous notes, tied continuations and new attacks in a symbolic score | 16 | 32 | Sounding pitches by voice, new attacks and next onset |
+| `civil_recurrence` | Expanding a recurring local timetable through skipped and repeated civil minutes and UTC cancellations | 16 | 32 | Exact surviving UTC set and counts of missing and repeated local times |
+| `quota_matching` | Assigning applicants to studios with quotas, strict priorities and incomplete preferences | 16 | 32 | Both applicant- and studio-proposing stable allocations |
+| `grapheme_edits` | Editing text by extended grapheme index after earlier edits change the boundaries | 16 | 32 | Final scalars, cluster count and UTF-8 length of a prefix |
+| `normalization_join` | Joining repeated records under specified Unicode normalization and case-folding operations | 16 | 32 | All matching records, their quantities and original key byte totals |
+| `adaptive_measurement` | Choosing successive measurements to identify an unknown specimen using a limited number of probes | 16 | 32 | Replay each tool result, verify that each choice can still distinguish every remaining specimen within budget, and check the final identification |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -34,6 +39,8 @@ Judged cells run when a judge endpoint is supplied. `drift` measures teacher-for
 The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
 
 The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. A metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
+
+For `adaptive_measurement`, the paired specimens start with the same request and yield different observations. Only complete evidence that identifies the specimen can earn credit. A valid decision rule may choose any probe that preserves a solution for all still-possible outcomes. The summary reports protocol validity, budget compliance, informative probes, whether the choices preserved a solution, unique identification and final-answer accuracy. Each rate uses the scored responses in the cell.
 
 ## Historical diagnostics
 

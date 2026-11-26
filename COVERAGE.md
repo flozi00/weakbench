@@ -8,6 +8,14 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## Private coverage review, closed-v10
+
+| Earlier coverage | New task and evidence |
+|---|---|
+| `ambiguous_ref` decides whether one object is unique in one room | `listener_reference` asks for one shortest German or English description that lets two recipients identify their target despite differences in what they see. Of 32 scenarios, four require abstention even though each recipient alone could identify the card. Seven admit equally short alternatives. Independent integer optimization recovered every optimum. [Dale and Reiter on referring expressions](https://arxiv.org/abs/cmp-lg/9504020) and [Yoon and Brown-Schmidt on audience design](https://doi.org/10.1111/cogs.12774) |
+| `regex_synth` tests expressions on examples and `automata_witness` supplies both acceptors | `stream_transducer` asks the model to construct a machine from a rule in prose. For every possible input sequence a product search checks that the machine emits the correct labels. A second compiler and partition refinement verify the references. The proven minimum is 1–2 states on 16 tasks, 3–4 on eight and 6–8 on eight. [Mealy on sequential circuits](https://doi.org/10.1002/j.1538-7305.1955.tb03788.x) |
+| ASR transcribes speech, `sampled_waveform` supplies numbers and `polyphonic_score` supplies notation | `tap_timing` supplies two audible patterns with separate timing references. The model locates changes and, on eight recordings, compares one pattern in reverse. Twin recordings share the same text, duration, number of attacks and sample-value histogram. Moving one attack changes the answer. A PCM decoder recovered all 64 answers and FFmpeg independently decoded all 32 recordings sample for sample. [Povel and Essens on temporal patterns](https://doi.org/10.2307/40285311) |
+
 ## Private coverage review, closed-v9
 
 - **Machine-checked proofs in German and English.** Earlier language tasks checked that a report stated prescribed facts. `localized_proof` lets the solver choose its sources and rules. Every statement must follow from an original fact or from earlier statements, every step must contribute to the proved goal, and the answer must identify that goal. A forward closure and independent backward proof search agree on all cases. The verifier accepted 256 submitted certificates covering alternative routes and valid reorderings. The language contract specifies the permitted sentence forms. ProofWriter is an earlier benchmark for natural-language proofs. [ProofWriter](https://aclanthology.org/2021.findings-acl.317/) and [Dowling and Gallier on Horn formulas](https://www.sciencedirect.com/science/article/pii/0743106684900141)

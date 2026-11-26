@@ -99,7 +99,7 @@ class VisualRunnerTests(unittest.TestCase):
 
         add(patch.dict(os.environ, {"BENCH_CACHE": str(self.tmp / "cache")}))
         add(patch.multiple(common, RUNS=self.tmp / "runs", RESULTS=self.tmp / "results"))
-        add(patch.multiple(hidden, FULL_COUNTS={"snapshot_trace": 4}, PLAIN_TASKS=("snapshot_trace",)))
+        add(patch.multiple(hidden, FULL_COUNTS={"snapshot_trace": 4}, AUDIO_COUNTS={}, PLAIN_TASKS=("snapshot_trace",)))
         self.rows = []
         self.fixtures = {}
         for family, count in (hidden.FULL_COUNTS | hidden.VISUAL_COUNTS).items():

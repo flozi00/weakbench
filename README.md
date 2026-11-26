@@ -12,13 +12,13 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v9` text suite has 35 families scored by code. Across German and English, these contribute 1,188 quick or 2,376 full cases. A judge adds four rubric-graded families, bringing the totals to 1,252 quick or 2,504 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v10` text suite has 37 families scored by code. Across German and English, these contribute 1,252 quick or 2,504 full cases. A judge adds four rubric-graded families, bringing the totals to 1,316 quick or 2,632 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
-To run the proof, spreadsheet and causal reasoning tasks on a local model:
+To run the new text tasks on a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks localized_proof,formula_relocation,shared_noise --concurrency 4 --max-parallel 4
+  --tasks listener_reference,stream_transducer --concurrency 4 --max-parallel 4
 ```
 
 Two optional private image families add 64 quick or 128 full questions across the two languages. To send the held-out charts and silhouettes to a local vision model, run:
@@ -26,6 +26,13 @@ Two optional private image families add 64 quick or 128 full questions across th
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local-vision --langs de,en --no-drift \
   --image --tasks voxel_projections,interval_plot --max-parallel 4 --concurrency 4
+```
+
+To evaluate timing differences between recorded taps, run the private audio family against a local audio-capable chat endpoint. The quick tier has 16 recordings per language and the full tier has 32.
+
+```sh
+python3 quality.py --url http://localhost:8000 --arm local-audio --langs de,en --no-drift \
+  --audio --tasks tap_timing --max-parallel 4 --concurrency 4
 ```
 
 The scheduling verifier accepts alternative optimal timetables. The language verifier grades a short visible justification and a final answer against the facts and the requested language. It also measures the language of any API-exposed reasoning and reports how often the model supplied that channel.

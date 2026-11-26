@@ -152,7 +152,7 @@ def header(kind, a_runs, b_runs):
 
 
 # manifest "args" that change what a run measures; compared when both A1 and B1 recorded them
-ARGS = {"quality": ("tier", "tasks", "langs", "limit", "think", "temperature", "max_tokens", "image", "no_drift"),
+ARGS = {"quality": ("tier", "tasks", "langs", "limit", "think", "temperature", "max_tokens", "image", "audio", "no_drift"),
         "speed": ("scenarios", "conc", "seconds", "temperature", "ramp", "vision")}
 
 

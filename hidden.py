@@ -13,6 +13,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import closed_audio
 import closed_commitments
 import closed_flow
 import closed_images
@@ -20,12 +21,14 @@ import closed_language
 import closed_observations
 import closed_perspective
 import closed_proofs
+import closed_reference
+import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "aedd600807552650c89f3bdbb815b15aad7a6dfc"
-DATA_PATH = "releases/closed-v9/cases.jsonl"
-DATA_SHA256 = "c9b28e7345338536306cc92d2786e2cf5f1a52d14d12345bead273ecaad8d152"
+DATA_REVISION = "bc08dd02338467f8f7f1c4dea5712cb2a1dfc3d2"
+DATA_PATH = "releases/closed-v10/cases.jsonl"
+DATA_SHA256 = "acf8f2669ae5124f9084e3579583fd21529e85ea0e496b4f1273665051f9a563"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -35,34 +38,40 @@ EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
-            "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs}
+            "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
+            "listener_reference": closed_reference, "stream_transducer": closed_transducer}
 LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
 VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32}
+AUDIO_COUNTS = {"tap_timing": 32}
 PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
-THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_EXACT, *VISUAL_COUNTS))
+THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_EXACT, *VISUAL_COUNTS, *AUDIO_COUNTS))
 JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
 PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, *PROGRAMS, "quantity_contract", "schema_dispatch",
-                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT, *VISUAL_COUNTS))
+                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT, *VISUAL_COUNTS, *AUDIO_COUNTS))
 PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "schedule_optimal"),
                    "language_evidence": sorted(closed_language.DETAIL_KEYS),
                    "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS),
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
+                   "listener_reference": sorted(closed_reference.DETAIL_KEYS),
+                   "stream_transducer": sorted(closed_transducer.DETAIL_KEYS),
                    "commitment_repair": sorted(closed_commitments.DETAIL_KEYS)}
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
-SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
+SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
-               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof"), 32),
+               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
+                                "listener_reference", "stream_transducer"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
-    {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge"]},
+    {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof"]},
+    {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
     {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
@@ -104,7 +113,7 @@ def decode(data):
         raise ValueError("private release checksum mismatch")
     cells = collections.defaultdict(list)
     seen = set()
-    counts = FULL_COUNTS | VISUAL_COUNTS
+    counts = FULL_COUNTS | VISUAL_COUNTS | AUDIO_COUNTS
     for number, line in enumerate(data.splitlines(), 1):
         try:
             row = strict_json(line)
@@ -123,6 +132,9 @@ def decode(data):
             if family in VISUAL_COUNTS:
                 fields.add("media")
                 closed_images.validate_media(row["media"])
+            elif family in AUDIO_COUNTS:
+                fields.add("media")
+                closed_audio.validate_media(row["media"])
             if set(row) != fields or row["mode"] != mode:
                 raise ValueError
             if not isinstance(row["prompt"], str) or not row["prompt"].strip():
@@ -220,6 +232,9 @@ def load(cells, family, lang, n, seed):
         if family in VISUAL_COUNTS:
             content = [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + row["media"]["data"]}},
                        {"type": "text", "text": row["prompt"]}]
+        elif family in AUDIO_COUNTS:
+            content = [{"type": "input_audio", "input_audio": {"format": "wav", "data": row["media"]["data"]}},
+                       {"type": "text", "text": row["prompt"]}]
         item = {"id": uid, "lang": lang, "messages": [{"role": "user", "content": content}],
                 **{k: row[k] for k in ("expected", "rubric") if k in row}}
         if family == "commitment_repair":
@@ -307,7 +322,7 @@ def preflight(judge):
 
 
 def tasks(cells, judge):
-    scorers = dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS), exact)
+    scorers = dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), exact)
     scorers.update({family: module.score for family, module in PROGRAMS.items()})
     scorers.update(dict.fromkeys(JUDGE_TASKS, functools.partial(judged, judge)))
     return {family: {"langs": LANGS, "load": functools.partial(load, cells, family),
@@ -316,7 +331,7 @@ def tasks(cells, judge):
                      "lang_check": False, "junk_check": False,
                      "needs_judge": family in JUDGE_TASKS,
                      "counts": {"quick": dict.fromkeys(LANGS, count // 2), "full": dict.fromkeys(LANGS, count)}}
-            for family, count in (FULL_COUNTS | VISUAL_COUNTS).items()}
+            for family, count in (FULL_COUNTS | VISUAL_COUNTS | AUDIO_COUNTS).items()}
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ build vs custom kernels / NVFP4) item by item.
     uv run quality.py --url URL --arm NAME [--model ID] [--tier quick|full]
         [--suite closed|diagnostics] [--tasks a,b,...] [--langs en,de] [--limit N] [--concurrency 32]
         [--think auto|on|off] [--temperature T] [--max-tokens N] [--timeout 1800]
-        [--image] [--no-drift] [--drift-framing raw|gemma4-assistant] [--dry-run]
+        [--image] [--audio --tasks tap_timing] [--no-drift] [--drift-framing raw|gemma4-assistant] [--dry-run]
     uv run quality.py --resume RUN_DIR [--concurrency N] [--timeout S] [--dry-run]
         (the run's own args from its manifest, same server build; retries the items recorded with an error)
 
@@ -1444,6 +1444,7 @@ def main(argv=None):
     ap.add_argument("--max-tokens", type=int, help="override every request's max_tokens")
     ap.add_argument("--timeout", type=float, default=1800, help="per request, seconds")
     ap.add_argument("--image", action="store_true", help="add the synthetic image check, or enable explicitly named private visual tasks")
+    ap.add_argument("--audio", action="store_true", help="enable explicitly named private audio tasks")
     ap.add_argument("--no-drift", action="store_true")
     ap.add_argument("--judge-url", help="server that grades judge tasks; the SAME one for both arms of "
                     "an A/B (never the server under test)")
@@ -1465,7 +1466,7 @@ def main(argv=None):
         if ignored := [k for k, v in vars(args).items()
                        if k not in keep and v not in (ap.get_default(k), manifest["args"].get(k))]:
             print(f"note: --resume uses the run's own args; ignoring {', '.join(ignored)}", file=sys.stderr)
-        args = argparse.Namespace(**{**vars(args), "suite": "diagnostics", **manifest["args"], **keep})
+        args = argparse.Namespace(**{**vars(args), "suite": "diagnostics", "audio": False, **manifest["args"], **keep})
     elif not (args.url and args.arm):
         ap.error("--url and --arm are required (unless --resume)")
 
@@ -1477,7 +1478,7 @@ def main(argv=None):
         if not set(langs) <= set(hidden.LANGS) or len(langs) != len(set(langs)):
             ap.error("closed suite requires distinct languages from en,de")
         common.verify_tls()
-        known = [*hidden.PLAIN_TASKS, *hidden.JUDGE_TASKS, *hidden.VISUAL_COUNTS, "image", "drift"]
+        known = [*hidden.PLAIN_TASKS, *hidden.JUDGE_TASKS, *hidden.VISUAL_COUNTS, *hidden.AUDIO_COUNTS, "image", "drift"]
         names = (args.tasks.split(",") if args.tasks else
                  [*hidden.PLAIN_TASKS, *(hidden.JUDGE_TASKS if args.judge_url else ()), "drift"])
     else:
@@ -1487,6 +1488,11 @@ def main(argv=None):
             and any(t["counts"][args.tier].get(x, 0) != 0 for x in t["langs"] if x in langs)] + ["drift"]
     if bad := [n for n in names if n not in known]:
         ap.error(f"unknown task(s) {', '.join(bad)}; known: {', '.join(known)}")
+    audio_selected = closed and any(n in hidden.AUDIO_COUNTS for n in names)
+    if audio_selected and not args.audio:
+        ap.error("explicit audio tasks require --audio")
+    if args.audio and not audio_selected:
+        ap.error("--audio requires an explicitly named private audio task in --tasks")
     visual_selected = closed and any(n in hidden.VISUAL_COUNTS for n in names)
     if not args.image and (visual_selected or "image" in names):
         ap.error("explicit image tasks require --image")

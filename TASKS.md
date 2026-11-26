@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v9` release runs each text family in German and English. Counts are per language.
+The `closed-v10` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -41,6 +41,8 @@ The `closed-v9` release runs each text family in German and English. Counts are 
 | `localized_proof` | Writing a grounded derivation in the requested language to establish one of two proposed catalogue marks | 16 | 32 | Replay each premise, rule and dependency. Accept alternative relevant proofs and check the language of the request, visible report and any returned reasoning. |
 | `formula_relocation` | Copying formulas with mixed, absolute and relative A1 references, editing input cells and recalculating the worksheet | 16 | 32 | Three recalculated values and the direct precedent cells of a designated formula |
 | `shared_noise` | Predicting an intervention on an observed individual while keeping that individual’s hidden state fixed | 16 | 32 | Four exact probabilities distinguish conditioning, population intervention and the individual counterfactual |
+| `listener_reference` | Writing a single localized description that lets two recipients identify the same card from different visible properties | 16 | 32 | The message must identify the target in both views using the minimum number of properties, or correctly report impossibility. All equally short descriptions pass. |
+| `stream_transducer` | Synthesizing a bounded finite-state machine that marks a stream according to a written rule | 16 | 32 | The complete transition table must implement the rule for every finite input. State renaming and equivalent nonminimal implementations within the stated limit pass. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -68,6 +70,16 @@ Supply `--image` and select one or both task names explicitly. Counts are per la
 | `interval_plot` | Matching groups across two independently calibrated plots and applying predicates to level and difference intervals | 16 | 32 | Qualifying group IDs, the specified group’s after-change estimate and its difference interval |
 
 The families are optional on multimodal endpoints. Their results are separate from the standard text leaderboard. The earlier public synthetic `image` check is available with `--image` alone.
+
+## Private audio tasks
+
+Select `--audio --tasks tap_timing` on a chat endpoint that accepts WAV audio. Both languages use the same recordings.
+
+| Task | Weakness tested | Quick per language | Full per language | Scoring |
+|---|---|---:|---:|---|
+| `tap_timing` | Use audible calibration to locate an extra tap or compare two tap patterns across tempos and reading directions | 16 | 32 | Exact JSON against the positions determined from the recording |
+
+Each request contains the written instruction and one mono 16 kHz PCM WAV. The suite scores the response locally and keeps the recording and response text out of result files. The separate `asr.py` benchmark measures speech transcription.
 
 ## Historical diagnostics
 

@@ -21,6 +21,7 @@ import quality
 import test_closed_commitments as booking_fixture
 import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
+import test_closed_reference as reference_fixture
 
 
 class ClosedSuiteTests(unittest.TestCase):
@@ -29,6 +30,7 @@ class ClosedSuiteTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.tmp = Path(temporary.name)
         self.enter(patch.dict(os.environ, {"BENCH_CACHE": str(self.tmp / "cache"), "HF_TOKEN": "dummy"}))
+        self.enter(patch.dict(hidden.AUDIO_COUNTS, {}, clear=True))
         self.enter(patch.dict(hidden.VISUAL_COUNTS, {}, clear=True))  # the default text portfolio fixture
         self.enter(patch.multiple(common, RUNS=self.tmp / "runs", RESULTS=self.tmp / "results"))
         rows = []
@@ -86,12 +88,19 @@ class ClosedSuiteTests(unittest.TestCase):
                         expected, request, answer = proof_fixture.wire_fixture(lang)
                         prompt = f"sentinel-input/{family}/{request}/{i}"
                         fields = {"mode": "program", "expected": expected}
+                    elif family == "listener_reference":
+                        fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
+                        answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "stream_transducer":
+                        answer = {"start": "q", "states": {"q": {"p": ["q", "m"]}}}
+                        fields = {"mode": "program", "expected": {"inputs": ["p"], "outputs": ["m"],
+                                  "reference": answer, "max_states": 2}}
                     elif family in hidden.JUDGE_TASKS:
                         fields = {"mode": "judge", "rubric": ["sentinel-criterion", "sentinel-other"]}
                     else:
                         fields = {"mode": "exact", "expected": answer}
                     rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
-                    self.answers[prompt] = json.dumps(answer, ensure_ascii=False)
+                    self.answers[prompt] = answer if family == "listener_reference" else json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
         self.enter(patch.multiple(hidden, FULL_COUNTS=dict.fromkeys(hidden.FULL_COUNTS, 4),
                                   DATA_SHA256=hashlib.sha256(self.payload).hexdigest()))
@@ -416,6 +425,11 @@ class ClosedSuiteTests(unittest.TestCase):
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])
                 self.assertEqual(row["extra"]["answer_facts_ok"], 1)
+            if row["task"] == "listener_reference":
+                self.assertEqual(row["extra"]["both_listeners_unique"], 1)
+                self.assertEqual(row["extra"]["reference_minimal"], 1)
+            if row["task"] == "stream_transducer":
+                self.assertEqual(row["extra"]["transducer_equivalent"], 1)
             if row["task"] == "localized_proof":
                 self.assertEqual(row["extra"]["proof_steps_supported"], 1)
                 self.assertEqual(row["extra"]["proof_steps_relevant"], 1)

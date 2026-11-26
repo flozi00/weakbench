@@ -50,7 +50,9 @@ def run_oracle(name):
     its = task["load"]("en", None, 0)
     assert len(its) == len(rows) - len(tc.UNUSABLE & set(rows))
     ref = {i: (r["prompt"] + r["canonical_solution"] if name == "humaneval_plus" else r["code"]) for i, r in rows.items()}
-    with concurrent.futures.ThreadPoolExecutor(16) as ex:
+    # Each oracle has a wall-clock deadline. Oversubscribing the CPU can time out
+    # a correct reference before its process receives enough execution time.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
         res = list(ex.map(lambda it: (it["id"], task["score"](it, reply(f"```python\n{ref[it['id']]}\n```"))), its))
     return [(i, r["detail"]["error"]) for i, r in res if not r["correct"]]
 

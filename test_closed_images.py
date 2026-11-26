@@ -114,6 +114,8 @@ class VisualRunnerTests(unittest.TestCase):
                         "prompt": prompt,
                         "expected": {"answer": i},
                     }
+                    if family == "panel_grounding":
+                        row.update(mode="program", expected={"size": [2, 1], "regions": [[i % 2, 0, i % 2 + 1, 1]]})
                     if family in hidden.VISUAL_COUNTS:
                         row["media"] = media(png_from(2, 1, bytes((0, i, 255 - i))))
                     self.rows.append(row)
@@ -123,6 +125,10 @@ class VisualRunnerTests(unittest.TestCase):
         cache = hidden.cache_path()
         cache.parent.mkdir(parents=True)
         cache.write_bytes(self.payload)
+
+    @staticmethod
+    def reference_answer(family, spec):
+        return {"point": spec["regions"][0][:2]} if family == "panel_grounding" else spec
 
     @staticmethod
     def encode(rows):
@@ -140,7 +146,10 @@ class VisualRunnerTests(unittest.TestCase):
             self.assertEqual([r["id"] for r in en[:16]], [r["id"] for r in de])
             self.assertEqual([r["expected"] for r in en[:16]], [r["expected"] for r in de])
             for a, b in zip(en[::2], en[1::2]):
-                self.assertEqual(a["expected"]["answer"] + 1, b["expected"]["answer"])
+                if family == "panel_grounding":
+                    self.assertNotEqual(a["expected"]["regions"], b["expected"]["regions"])
+                else:
+                    self.assertEqual(a["expected"]["answer"] + 1, b["expected"]["answer"])
             content = en[0]["messages"][0]["content"]
             self.assertEqual([p["type"] for p in content], ["image_url", "text"])
             source = self.fixtures[content[1]["text"]]
@@ -148,8 +157,10 @@ class VisualRunnerTests(unittest.TestCase):
                 content[0]["image_url"]["url"], "data:image/png;base64," + source["media"]["data"]
             )
         self.assertFalse(set(hidden.VISUAL_COUNTS) & {n for c in hidden.CATEGORIES for n in c["tasks"]})
+        panel = next(row for row in self.rows if row["family"] == "panel_grounding")
         image = next(row for row in self.rows if "media" in row)
         for before, after in (
+            (panel, {**panel, "expected": {**panel["expected"], "size": [3, 1]}}),
             (image, {k: v for k, v in image.items() if k != "media"}),
             (image, {**image, "media": {"url": "https://invalid.invalid/"}}),
             (self.rows[0], {**self.rows[0], "media": image["media"]}),
@@ -187,7 +198,8 @@ class VisualRunnerTests(unittest.TestCase):
                     self.assertEqual(
                         data["image_url"]["url"], "data:image/png;base64," + row["media"]["data"]
                     )
-                    answer = json.dumps(row["expected"])
+                    solution = self.reference_answer(row["family"], row["expected"])
+                    answer = json.dumps(solution)
                     seen.append(row["family"])
                 else:
                     seen.append("image")
@@ -213,6 +225,7 @@ class VisualRunnerTests(unittest.TestCase):
         trials = (
             ("default", [], {"snapshot_trace"}),
             ("synthetic", ["--image"], {"image", "snapshot_trace"}),
+            ("panel", ["--tasks", "panel_grounding", "--image"], {"panel_grounding"}),
             ("voxels", ["--tasks", "voxel_projections", "--image"], {"voxel_projections"}),
             ("charts", ["--tasks", "interval_plot,image", "--image"], {"interval_plot", "image"}),
             (
@@ -244,7 +257,7 @@ class VisualRunnerTests(unittest.TestCase):
                     item = next(it for it in prompts if it["id"] == record["id"])
                     path = self.tmp / "completion.json"
                     path.write_text(
-                        json.dumps({"choices": [{"message": {"content": json.dumps(item["expected"])}}]})
+                        json.dumps({"choices": [{"message": {"content": json.dumps(self.reference_answer(name, item["expected"]))}}]})
                     )
                     self.assertEqual(
                         check_response.main(

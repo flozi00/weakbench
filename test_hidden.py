@@ -19,6 +19,7 @@ import check_response
 import hidden
 import quality
 import test_closed_auction as auction_fixture
+import test_closed_fusion as fusion_fixture
 import test_closed_commitments as booking_fixture
 import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
@@ -101,6 +102,10 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "sentence_fusion":
+                        fields = {"mode": "program", "expected": fusion_fixture.fixture()}
+                        answer = ("Ida sichtete Otto nicht, bevor Otto Elin fand." if lang == "de"
+                                  else "Ida did not spot Otto before Otto found Elin.")
                     elif family == "package_auction":
                         fields = {"mode": "program", "expected": {"bids": auction_fixture.offers()}}
                         answer = {"accepted": ["Ax", "By"], "payments": {"A": 3, "B": 0, "C": 0}}
@@ -113,7 +118,7 @@ class ClosedSuiteTests(unittest.TestCase):
                     else:
                         fields = {"mode": "exact", "expected": answer}
                     rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
-                    self.answers[prompt] = answer if family == "listener_reference" else json.dumps(answer, ensure_ascii=False)
+                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion") else json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
         self.enter(patch.multiple(hidden, FULL_COUNTS=dict.fromkeys(hidden.FULL_COUNTS, 4),
                                   DATA_SHA256=hashlib.sha256(self.payload).hexdigest()))

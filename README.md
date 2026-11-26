@@ -12,7 +12,7 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v12` text suite has 42 families scored by code. Across German and English, these contribute 1,412 quick or 2,824 full cases. A judge adds four rubric-graded families, bringing the totals to 1,476 quick or 2,952 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v13` text suite has 43 families scored by code. Across German and English, these contribute 1,444 quick or 2,888 full cases. A judge adds four rubric-graded families, bringing the totals to 1,508 quick or 3,016 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
 To run the new text tasks on a local model:
 
@@ -21,11 +21,11 @@ python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-dr
   --tasks package_auction,loop_game --concurrency 4 --max-parallel 4
 ```
 
-Two optional private image families add 64 quick or 128 full questions across the two languages. To send the held-out charts and silhouettes to a local vision model, run:
+Three optional private image families add 96 quick or 192 full questions across the two languages. To send the held-out charts, silhouettes and control panels to a local vision model, run:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local-vision --langs de,en --no-drift \
-  --image --tasks voxel_projections,interval_plot --max-parallel 4 --concurrency 4
+  --image --tasks voxel_projections,interval_plot,panel_grounding --max-parallel 4 --concurrency 4
 ```
 
 To evaluate timing differences between recorded taps, run the private audio family against a local audio-capable chat endpoint. The quick tier has 16 recordings per language and the full tier has 32.

@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v12` release runs each text family in German and English. Counts are per language.
+The `closed-v13` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -48,6 +48,7 @@ The `closed-v12` release runs each text family in German and English. Counts are
 | `bridge_loading` | Replacing one resistor in a measurement bridge and accounting for the finite resistance of the meter | 16 | 32 | Exact signed meter voltage, current in a neighboring branch and its change from the initial configuration |
 | `package_auction` | Awarding indivisible bundles with at most one winning bid per participant, then charging each winner for the value displaced | 16 | 32 | Any feasible maximum-value allocation passes with its own exact Clarke-pivot payments and zero charges to losers. |
 | `loop_game` | Finding a winning move or a draw on a directed game board with alternating play and possible cycles | 16 | 32 | Exact outcome, duration for a forced result, and all equally optimal first destinations |
+| `sentence_fusion` | Joining two events in one German or English sentence while preserving participant roles, negation and a specified temporal, causal or additive relation | 16 | 32 | A semantic parser accepts equivalent clause orders and constructions from the grammar supplied with each task. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -73,12 +74,13 @@ Private summary rows include `pair_checks`. Each entry carries integer `passed` 
 
 ## Private visual tasks
 
-Supply `--image` and select one or both task names explicitly. Counts are per language.
+Supply `--image` and select the desired task names explicitly. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
 | `voxel_projections` | Determining which cubes and layer populations are forced, possible or impossible from three orthographic silhouettes and a total count | 16 | 32 | Exact per-coordinate status and feasible layer bounds across all consistent arrangements |
 | `interval_plot` | Matching groups across two independently calibrated plots and applying predicates to level and difference intervals | 16 | 32 | Qualifying group IDs, the specified group’s after-change estimate and its difference interval |
+| `panel_grounding` | Finding a usable button pixel from an action, row marker and relative location in a mixer panel, including disabled and partially covered controls | 16 | 32 | Any integer point in the active exposed region passes. An unreachable button requires an explicit null. |
 
 The families are optional on multimodal endpoints. Their results are separate from the standard text leaderboard. The earlier public synthetic `image` check is available with `--image` alone.
 

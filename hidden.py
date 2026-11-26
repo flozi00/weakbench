@@ -17,6 +17,8 @@ import closed_auction
 import closed_audio
 import closed_commitments
 import closed_flow
+import closed_fusion
+import closed_grounding
 import closed_images
 import closed_language
 import closed_pairs
@@ -29,9 +31,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "8b12cee9674700dd4ce45fab512c7efdf519f88d"
-DATA_PATH = "releases/closed-v12/cases.jsonl"
-DATA_SHA256 = "2bc37cb81c8efac0c309cc724e2892d9704422829e889836efbaff03187afa87"
+DATA_REVISION = "7e4f4767aad8cc4cf8831d6260448452a4bd4d59"
+DATA_PATH = "releases/closed-v13/cases.jsonl"
+DATA_SHA256 = "aaf15d7f57119dba1fe4ccb41f63dd19d08c7b33c914afdfd69185af6d2964f2"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -43,13 +45,14 @@ EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
+            "sentence_fusion": closed_fusion, "panel_grounding": closed_grounding,
             "package_auction": closed_auction, "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
 LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
 TEXT_DIALOGUES = frozenset(("commitment_repair", "language_relay"))
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
-VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32}
+VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32, "panel_grounding": 32}
 AUDIO_COUNTS = {"tap_timing": 32}
-PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
+PLAIN_TASKS = (*EXACT_TASKS, *(name for name in PROGRAMS if name not in VISUAL_COUNTS and name not in AUDIO_COUNTS))
 THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_EXACT, *VISUAL_COUNTS, *AUDIO_COUNTS))
 JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
 PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, *PROGRAMS, "quantity_contract", "schema_dispatch",
@@ -60,6 +63,8 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
+                   "sentence_fusion": sorted(closed_fusion.DETAIL_KEYS),
+                   "panel_grounding": sorted(closed_grounding.DETAIL_KEYS),
                    "package_auction": sorted(closed_auction.DETAIL_KEYS),
                    "listener_reference": sorted(closed_reference.DETAIL_KEYS),
                    "stream_transducer": sorted(closed_transducer.DETAIL_KEYS),
@@ -72,13 +77,14 @@ FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 3
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
-                                "listener_reference", "stream_transducer", "language_relay", "package_auction"), 32),
+                                "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay"]},
+    {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
@@ -142,7 +148,7 @@ def decode(data):
                     raise ValueError
             if family in VISUAL_COUNTS:
                 fields.add("media")
-                closed_images.validate_media(row["media"])
+                image_size = closed_images.validate_media(row["media"])
             elif family in AUDIO_COUNTS:
                 fields.add("media")
                 closed_audio.validate_media(row["media"])
@@ -151,6 +157,8 @@ def decode(data):
             if not isinstance(row["prompt"], str) or not row["prompt"].strip():
                 raise ValueError
             if mode == "program" and not PROGRAMS[family].validate_expected(row["expected"]):
+                raise ValueError
+            if family == "panel_grounding" and tuple(row["expected"]["size"]) != image_size:
                 raise ValueError
             if family in LANGUAGE_REPORTS and not closed_language.request_language_ok(row["prompt"], lang):
                 raise ValueError

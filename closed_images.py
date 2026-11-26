@@ -24,7 +24,7 @@ def _passes(w, h, bits_per_pixel, interlace):
 
 
 def validate_media(media):
-    """Raise ValueError without echoing input. Validate CRCs, raster length, filters and zlib checksum."""
+    """Return the validated raster dimensions. Reject malformed media without echoing it."""
     if not isinstance(media, dict) or set(media) != {"mime_type", "data"} or media["mime_type"] != "image/png":
         raise ValueError("invalid private PNG media")
     encoded = media["data"]
@@ -103,3 +103,4 @@ def validate_media(media):
         if any(filter_type > 4 for filter_type in pixels[offset:end:stride]):
             raise ValueError("invalid private PNG row filter")
         offset = end
+    return w, h

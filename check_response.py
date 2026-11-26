@@ -46,7 +46,7 @@ def main(argv=None):
             message = completion["choices"][0]["message"]
             if not isinstance(message, dict) or not any(k in message for k in ("content", "reasoning", "reasoning_content")):
                 raise ValueError
-            reply = (hidden.closed_web_tools.parse_final(completion, quality.parse_reply) if args.task in ("web_currency","action_postconditions")
+            reply = (hidden.closed_web_tools.parse_final(completion, quality.parse_reply) if item.get("native_web_search") or item.get("native_action_postconditions")
                      else quality.parse_reply(completion, all_reasoning=args.task == "reader_gamebook"))
             if trace is not None:
                 reply["observation_trace"] = trace

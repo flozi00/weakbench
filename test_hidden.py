@@ -38,6 +38,8 @@ import test_closed_evidence_pressure as evidence_pressure_fixture
 import test_closed_preference_boundary as preference_fixture
 import test_closed_short_code_review as short_review_fixture
 import test_closed_presupposition_repair as presupposition_fixture
+import test_closed_directed_search as directed_fixture
+import test_closed_proof_feedback as proof_feedback_fixture
 import test_closed_selective_reporting as reporting_fixture
 import test_closed_actions as action_fixture
 import test_closed_revision as revision_fixture
@@ -149,10 +151,17 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "imagery_chain":
                         fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
                         answer = imagery_fixture.witness(lang)
+                    elif family == "directed_search":
+                        expected = directed_fixture.fixture(lang)["expected"]
+                        expected["arm"] = ("neutral", "pressure")[i % 2]
+                        fields = {"mode": "program", "expected": expected}
+                        word, ids = hidden.closed_directed_search.FIELDS[lang]
+                        answer = {word: "weniger" if lang == "de" else "lower", ids: [s["id"] for s in expected["sites"]]}
                     elif family in hidden.PRESSURE_PROGRAMS:
                         fixtures = {"audit_pressure": audit_pressure_fixture, "evidence_pressure": evidence_pressure_fixture,
                                     "preference_boundary": preference_fixture, "short_code_review": short_review_fixture,
-                                    "presupposition_repair": presupposition_fixture, "selective_reporting": reporting_fixture}
+                                    "presupposition_repair": presupposition_fixture, "selective_reporting": reporting_fixture,
+                                    "proof_feedback": proof_feedback_fixture}
                         expected, answer = fixtures[family].fixture(lang, i)
                         fields = {"mode": "program", "expected": expected}
                     elif family == "action_postconditions":
@@ -236,6 +245,10 @@ class ClosedSuiteTests(unittest.TestCase):
             cells = {(family, lang): [
                 {"expected": {"stratum": i // 8}, "prompt": f"{lang} {i}"} for i in range(32)
             ] for lang in hidden.LANGS}
+            if family == "directed_search":
+                for lang in hidden.LANGS:
+                    for row in cells[family, lang]:
+                        row["expected"] = {**directed_fixture.fixture(lang)["expected"], **row["expected"]}
             for seed in (0, 1, 43):
                 ids = []
                 for lang in hidden.LANGS:
@@ -328,6 +341,25 @@ class ClosedSuiteTests(unittest.TestCase):
         self.assertEqual(check([0, 2, 3], '[false,2,4]')[1]["answer_components_correct"], 1/3)
         self.assertNotIn("answer_components_correct", check([1, 2], "[1]")[1])
         self.assertEqual(check([], "[]")[1]["answer_components_correct"], 1.0)
+
+    def test_archived_directed_search_respects_terminal_message_and_issued_sources(self):
+        name, lang = "directed_search", "en"
+        item = hidden.load(hidden.release(), name, lang, 1, 0)[0]
+        refs = [s["id"] for s in item["expected"]["sites"]]
+        trace = directed_fixture.trace(item, refs)
+        verdict = self.answers[item["messages"][0]["content"]]
+        path = self.tmp / "directed-response.json"
+        argv = ["--task", name, "--lang", lang, "--id", item["id"], "--response", str(path)]
+        for reason, extra, issued, correct in (("stop", {}, trace, True),
+                                              ("content_filter", {}, trace, False),
+                                              ("stop", {"refusal": "skipped"}, trace, False),
+                                              ("stop", {}, [], False)):
+            completion = {"choices": [{"message": {"content": verdict, **extra}, "finish_reason": reason}]}
+            path.write_text(json.dumps({"messages": issued, "completion": completion}))
+            report = io.StringIO()
+            with patch.object(common, "request", side_effect=AssertionError), contextlib.redirect_stdout(report):
+                self.assertEqual(check_response.main(argv), int(not correct))
+            self.assertIs(json.loads(report.getvalue())["correct"], correct)
 
     def test_offline_completion(self):
         item = hidden.load(hidden.release(), "language_evidence", "de", 1, 0)[0]
@@ -665,6 +697,17 @@ class ClosedSuiteTests(unittest.TestCase):
                     raise RuntimeError(messages[0]["content"])
                 lang = messages[0]["content"].split("/")[2]
                 content = json.dumps(revision_fixture.examples(lang)[len(messages)//2])
+            elif "directed_search" in messages[0]["content"]:
+                if fail:
+                    raise RuntimeError(messages[0]["content"])
+                observed = sum(message["role"] == "tool" for message in messages)
+                if observed < 2:
+                    assert [tool["function"]["name"] for tool in body["tools"]] == ["web_search"]
+                    query = ("record-n", "record-s")[observed]
+                    call = {"id": f"fixture-search-{observed}", "type": "function", "function": {
+                            "name": "web_search", "arguments": json.dumps({"query": query})}}
+                    return {"choices": [{"message": {"role":"assistant", "tool_calls":[call]}, "finish_reason":"tool_calls"}]}
+                content = self.answers[messages[0]["content"]]
             elif "web_currency" in messages[0]["content"]:
                 if fail:
                     raise RuntimeError(messages[0]["content"])
@@ -710,6 +753,13 @@ class ClosedSuiteTests(unittest.TestCase):
             self.assertEqual(row["accuracy"], float(row["task"] in hidden.PLAIN_TASKS))
             self.assertEqual(row["score_mean"], 1 if row["task"] in hidden.PLAIN_TASKS else 0.5)
             self.assertEqual(row["extra"]["xl_correct_agree"], 1)
+            if row["task"] in ("proof_feedback", "directed_search"):
+                self.assertEqual(row["pair_checks"]["pressure_pair_eligible"], {"passed": 1, "scored": 1})
+                self.assertEqual(row["pair_checks"]["pressure_flip_to_user"], {"passed": 0, "scored": 1})
+            if row["task"] == "directed_search":
+                for metric in ("directed_trace_valid", "directed_search_used", "directed_cited_proof"):
+                    self.assertEqual(row["extra"][metric], 1)
+                    self.assertEqual(row["check_counts"][metric], 2)
             if row["task"] in hidden.LANGUAGE_REPORTS:
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])

@@ -22,6 +22,8 @@ import closed_evidence_pressure
 import closed_preference_boundary
 import closed_short_code_review
 import closed_presupposition_repair
+import closed_directed_search
+import closed_proof_feedback
 import closed_selective_reporting
 import closed_revision
 import closed_web_currency
@@ -53,9 +55,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "fa90c9810fdb1a339bdfe8aec77dc11d90c73bed"
-DATA_PATH = "releases/closed-v22/cases.jsonl"
-DATA_SHA256 = "dfbaa790a614c47d841d078b38bfecdeecc4495f560dd96b7abc079a57bc63a1"
+DATA_REVISION = "82aa352898bc87934f6b701a128bde6131212d8b"
+DATA_PATH = "releases/closed-v23/cases.jsonl"
+DATA_SHA256 = "ba0db9cd345c7230a60679583d06f7f6b4b012e761fdee2f4f0ffa344ebb968c"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -66,7 +68,8 @@ EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PRESSURE_PROGRAMS = {"audit_pressure": closed_audit_pressure, "evidence_pressure": closed_evidence_pressure,
                      "preference_boundary": closed_preference_boundary, "short_code_review": closed_short_code_review,
-                     "presupposition_repair": closed_presupposition_repair, "selective_reporting": closed_selective_reporting}
+                     "presupposition_repair": closed_presupposition_repair, "selective_reporting": closed_selective_reporting,
+                     "proof_feedback": closed_proof_feedback, "directed_search": closed_directed_search}
 PROGRAMS = {**PRESSURE_PROGRAMS, "workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
@@ -131,7 +134,8 @@ EXACT_FIELDS = {
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
                  **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
-FULL_COUNTS = {"short_code_review": 48, "presupposition_repair": 48, "selective_reporting": 48,
+FULL_COUNTS = {"short_code_review": 48, "presupposition_repair": 48, "selective_reporting": 192,
+               "proof_feedback": 128, "directed_search": 144,
                "audit_pressure": 96, "evidence_pressure": 144, "preference_boundary": 64,
                "web_currency": 48, "action_postconditions":32, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
@@ -368,7 +372,7 @@ def load(cells, family, lang, n, seed):
             item.update(closed_observations.runtime(item["expected"], lang))
         if family == "action_postconditions":
             item.update(closed_actions.runtime(item["expected"], lang))
-        if family == "web_currency":
+        if family in ("web_currency", "directed_search"):
             item.update(closed_web_tools.runtime(item["expected"], lang))
         if family == "source_inquiry":
             item["start_tool_session"] = functools.partial(closed_inquiry.runtime, item["expected"], lang)

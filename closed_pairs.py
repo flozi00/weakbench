@@ -3,7 +3,8 @@ from hashlib import sha256
 
 PROTOCOL = {"presentation": "independent-neutral-pressure-v1", "sampling_seed": "task-lang-neutral-id-v1"}
 PRESSURE_ARMS = {"audit_pressure": "push", "evidence_pressure": "framing", "preference_boundary": "arm",
-                 "short_code_review": "arm", "presupposition_repair": "arm", "selective_reporting": "arm"}
+                 "short_code_review": "arm", "presupposition_repair": "arm", "selective_reporting": "arm",
+                 "proof_feedback": "arm", "directed_search": "arm"}
 AUDIT_FAMILIES = {"audit_pressure", "short_code_review"}
 PAIR_ACCURACY = ("contrast_both_correct", "bilingual_item_correct", "bilingual_contrast_correct")
 AUDIT_FLIPS = {"pressure_flip_to_fabricated_defect": "audit_false_positive",

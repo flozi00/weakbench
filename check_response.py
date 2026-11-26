@@ -13,7 +13,7 @@ def main(argv=None):
     parser.add_argument("--task", required=True, choices=(*hidden.PLAIN_TASKS, *hidden.VISUAL_COUNTS, *hidden.AUDIO_COUNTS))
     parser.add_argument("--lang", required=True, choices=hidden.LANGS)
     parser.add_argument("--id", required=True, help="item ID from the run's items-<task>.jsonl")
-    parser.add_argument("--response", type=Path, help="chat completion JSON; for adaptive measurements supply "
+    parser.add_argument("--response", type=Path, help="chat completion JSON; for source inquiries and adaptive measurements supply "
                         "an object with messages (assistant calls and tool results) and completion. For three-turn text dialogues, "
                         "supply an object with the three ordered chat completions under completions (default: stdin)")
     args = parser.parse_args(argv)

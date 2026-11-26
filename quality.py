@@ -970,6 +970,8 @@ def run_item(url, name, t, item, body, timeout, private=False):
         "junk", "lang_ok", "think_lang_ok", "error", "reply")), "detail": {}}
     t0 = time.monotonic()
     try:
+        if "start_tool_session" in item:
+            item = {**item, **item["start_tool_session"]()}
         if item.get("turns"):  # multi-turn: send each turn, append the reply, score the last one
             msgs, reply, contents = [], None, []
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
@@ -993,6 +995,8 @@ def run_item(url, name, t, item, body, timeout, private=False):
             capture = item.get("capture_tool_transcript", False)
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
             rounds = 0
+            remaining_calls = item.get("tool_call_budget")
+            over_budget = False
             for _ in range(item.get("max_rounds", 4)):
                 r = common.request(url, "/v1/chat/completions", {**body, "messages": msgs}, timeout=timeout)
                 # The observation verifier needs the original JSON to reject duplicate argument keys.
@@ -1002,6 +1006,11 @@ def run_item(url, name, t, item, body, timeout, private=False):
                     usage[k] += u.get(k) or 0
                 if not reply["tool_calls"]:
                     break
+                if remaining_calls is not None:
+                    if len(reply["tool_calls"]) > remaining_calls:
+                        over_budget = True
+                        break
+                    remaining_calls -= len(reply["tool_calls"])
                 rounds += 1
                 calls = [{"id": f"call_{rounds}_{n}" if capture else f"call_{n}", "type": "function",
                           "function": {"name": c["name"],
@@ -1015,11 +1024,13 @@ def run_item(url, name, t, item, body, timeout, private=False):
                     except Exception as exc:  # noqa: BLE001
                         out = f"error: {type(exc).__name__}: {exc}"
                     msgs.append({"role": "tool", "tool_call_id": c["id"], "content": str(out)[:6000]})
+                if "tool_batch_finished" in item:
+                    item["tool_batch_finished"]()
             if reply is None:  # max_rounds <= 0: a misconfigured item, not a model failure
                 raise RuntimeError("tool loop ran zero rounds")
-            forced = bool(reply["tool_calls"])
+            forced = bool(reply["tool_calls"]) and not over_budget
             if capture:
-                trace = msgs[len(body["messages"]):]
+                trace = None if over_budget else msgs[len(body["messages"]):]
             if forced:  # the cap was hit mid-search: make it answer from what it already has
                 # A user turn, not tool_choice="none": vLLM returns empty content for tool_choice="none"
                 # once the history carries tool_calls (measured on a 27B model), and a nudge is portable.
@@ -1027,7 +1038,7 @@ def run_item(url, name, t, item, body, timeout, private=False):
                 if capture:
                     nudge = ("Beende die Messungen und gib jetzt deine Antwort." if item["lang"] == "de"
                              else "Finish taking measurements and give your answer now.")
-                msgs.append({"role": "user", "content": nudge})
+                msgs.append({"role": "user", "content": item.get("tool_nudge", nudge)})
                 r = common.request(url, "/v1/chat/completions", {**body, "messages": msgs}, timeout=timeout)
                 reply = parse_reply(r)
                 u = (r.get("usage") if isinstance(r, dict) else None) or {}
@@ -1293,30 +1304,33 @@ def summarize(run_dir):
     for (task_name, lang, _), r in latest.items():
         cells[(task_name, lang)].append(r)
     pair_checks = {}
+    private = False
     metadata = run_dir / "run_info.json"
     if metadata.is_file():
         info = json.loads(metadata.read_bytes())
         if info.get("data_repo") == hidden.DATA_REPO and re.fullmatch("[0-9a-f]{40}", str(info.get("data_revision"))):
+            private = True
             counts = hidden.FULL_COUNTS | hidden.VISUAL_COUNTS | hidden.AUDIO_COUNTS
             pair_checks = hidden.closed_pairs.checks(cells, info["data_revision"], counts, hidden.PAIRED_VARIANTS)
     order = {name: i for i, name in enumerate(TASKS)}
     mean = lambda xs: round(statistics.fmean(xs), 4) if xs else None  # noqa: E731
 
     def extras(ok):
-        """Numeric `detail` values a task reports about itself (AA's non-hallucination rate, XSTest's over- and
-        under-refusal rates, ...), averaged per cell. A task that reports none gets an empty dict."""
+        """Collect observations for each metric, preserving its eligible denominator."""
         keys = {k for r in ok for k, v in (r.get("detail") or {}).items()
                 if isinstance(v, (int, float)) and not isinstance(v, bool)}
-        return {k: mean([r["detail"][k] for r in ok if isinstance((r.get("detail") or {}).get(k), (int, float))])
+        return {k: [r["detail"][k] for r in ok if isinstance((r.get("detail") or {}).get(k), (int, float))]
                 for k in sorted(keys)}
 
     rows = []
     for (task_name, lang), rs in sorted(cells.items(), key=lambda kv: (order.get(kv[0][0], len(order)), kv[0])):
         ok = [r for r in rs if not r["error"]]
+        samples = extras(ok)
         rows.append({"task": task_name, "lang": lang, "n": len(rs),
                      "accuracy": mean([float(r["correct"]) for r in ok if r["correct"] is not None]),
                      "score_mean": mean([r["score"] for r in ok if r["score"] is not None]),
-                     "extra": extras(ok),
+                     "extra": {k: mean(v) for k, v in samples.items()},
+                     **({"check_counts": {k: len(v) for k, v in samples.items()}} if private and samples else {}),
                      **({"pair_checks": pair_checks[task_name, lang]} if (task_name, lang) in pair_checks else {}),
                      "errors": len(rs) - len(ok), "junk": sum(bool(r["junk"]) for r in rs),
                      "truncated": sum(r["finish_reason"] == "length" for r in rs),

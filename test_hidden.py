@@ -26,6 +26,9 @@ import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
 import test_closed_reference as reference_fixture
 import test_closed_relay as relay_fixture
+import test_closed_imagery as imagery_fixture
+import test_closed_inquiry as inquiry_fixture
+import test_closed_halfplanes as halfplane_fixture
 import test_closed_quorum as quorum_fixture
 
 
@@ -104,6 +107,18 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "imagery_chain":
+                        fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
+                        answer = imagery_fixture.witness(lang)
+                    elif family == "source_inquiry":
+                        fields = {"mode": "program", "expected": inquiry_fixture.fixture(lang)}
+                    elif family == "halfplane_proof":
+                        fields = {"mode": "program", "expected": halfplane_fixture.fixture()}
+                        answer = halfplane_fixture.witness()
+                    elif family == "comparator_fabric":
+                        fields = {"mode": "program", "expected": {"wires": 2, "ticks": [[[0, 1]]],
+                                  "budget": 1, "targets": [[1, 1]]}}
+                        answer = {"stages": [[[1, 0]]]}
                     elif family == "quoted_quorum":
                         spec = quorum_fixture.fixture(lang)
                         prompt = f"sentinel-input/{family}/{quorum_fixture.sample_prompt(lang, spec)}/{i}"
@@ -128,7 +143,7 @@ class ClosedSuiteTests(unittest.TestCase):
                     else:
                         fields = {"mode": "exact", "expected": answer}
                     rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
-                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion") else json.dumps(answer, ensure_ascii=False)
+                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion", "imagery_chain") else json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
         self.enter(patch.multiple(hidden, FULL_COUNTS=dict.fromkeys(hidden.FULL_COUNTS, 4),
                                   DATA_SHA256=hashlib.sha256(self.payload).hexdigest()))
@@ -550,6 +565,11 @@ class ClosedSuiteTests(unittest.TestCase):
                 content = json.dumps(controls.get(case["task"], [True, False]))
             elif prompt == quality.PREFLIGHT:
                 content = "391"
+            elif "source_inquiry" in messages[0]["content"]:
+                if fail:
+                    raise RuntimeError(messages[0]["content"])
+                msg = inquiry_fixture.fixture_candidate(messages, messages[0]["content"].split("/")[2])
+                return {"choices": [{"message": msg, "finish_reason": "tool_calls" if msg.get("tool_calls") else "stop"}]}
             elif "adaptive_measurement" in messages[0]["content"]:
                 if fail:
                     raise RuntimeError(messages[0]["content"])

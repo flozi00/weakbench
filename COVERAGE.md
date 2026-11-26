@@ -1,12 +1,36 @@
 # COVERAGE.md — what the suite measures, and what it does not
 
 The A/B gate answers one question: *did this build of the same model lose quality or speed?* That needs tasks that
-are **scorable offline, deterministic, pairable DE/EN, and never execute model-written code**. This file maps the
+are **scorable offline, deterministic, pairable DE/EN, and evaluate submitted programs only with bounded, task-specific interpreters**. This file maps the
 suite against the capability areas a model is judged on, so a gap is a decision and not an oversight.
 
 Read `README.md` for the protocol, the gate rules and the per-task data. This file is the map.
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
+
+## Private coverage review, closed-v16
+
+The private suite adds 320 requests across five families. Each has 16 contrast pairs in German and the same 16 in English. All five have code-based scoring. The complete profile has 3,464 text, 192 image and 64 audio requests. The text figure includes the four existing rubric-graded families.
+
+| Family | Gap in the earlier closed suite | What earns credit |
+|---|---|---|
+| `imagery_chain` | Sentence fusion tests meaning preservation. It does not ask for two different imaginative treatments of a brief. | Compose a connected series of comparisons that share a licensed sensory quality, cross image domains, vary syntax and satisfy the grammatical forms of the target language. Half of the requests require a second poem with a different intermediate image. |
+| `source_inquiry` | Archive retrieval links records presented in the request. A handover can cite supplied material without searching. | Search the local collection, open the current independent originals, quote the relevant line in each, classify its stance and reach the conclusion warranted by the task's explicit evidence rule. |
+| `halfplane_proof` | Propositional cores and network cuts test other kinds of proof. | Supply an exact rational counterexample, an inconsistency certificate, or both a feasible point and a proof that the proposed bound follows. Every submitted certificate is checked algebraically. |
+| `transit_exposures` | Earlier signal questions give instantaneous samples. Earlier adaptive measurements supply the observation table. | Integrate the light over each exposure, identify all compatible periodic models, then select every follow-up window that minimizes remaining ambiguity in the worst case. |
+| `comparator_fabric` | Program tracing asks for a result and scheduling accepts one timetable. Neither requires a single parallel program to meet an output specification on every input. | Schedule directed compare-exchanges on permitted connections within a shared budget. Each required output must have the requested rank for all values, including ties. |
+
+### Verification and scope
+
+* **Writing.** An independent parser reconstructed the briefs in both languages. Two implementations found 6,852 combinations of image path and sensory properties across the bilingual requests. The scorer accepted 181,768 licensed individual formulations, using valid companion drafts where required. All 32 two-draft tests rejected a second draft that merely rephrased the same image path. This measures variation and coherence within a finite poetic form. Literary taste, voice and open-ended originality require additional evidence. [Eval4NLP study of poetry evaluation](https://aclanthology.org/2025.eval4nlp-1.9/)
+* **Research and factuality.** Both sides of each pair receive the same question and the same search index. Changing one line in a retrieved source flips the conclusion in all 16 pairs. Within each language there are eight supported, eight refuted, eight conflicting and eight unresolved cases. A correct guess without a retrieval trace failed all 64 cases. All 448 wrong-line quotations from the right document and all 224 fabricated quotations failed. Separate checks distinguish a fabricated ID, a real quote assigned to the wrong source, and an authentic but superseded source. The conflict and insufficient-evidence checks each have eight eligible cases per language. The comparisons use a stable, authored archive and a specified corroboration rule. The measured skill is gathering and attributing evidence within that archive. [FEVER](https://aclanthology.org/N18-1074/) · [AVeriTeC](https://papers.neurips.cc/paper_files/paper/2023/hash/cd86a30526cd1aff61d6f89f107634e4-Abstract-Datasets_and_Benchmarks.html)
+* **Mathematics and logic.** Exact vertex enumeration, strict Fourier–Motzkin elimination and an independent Z3 linear-real solver agreed on 22 entailments, 22 refutations and 20 inconsistent systems. Treating equality as a violation would misclassify all 22 entailed cases. The scorer accepted distinct certificates on 54 cases. The ten others have a unique counterexample point. [Boyd and Vandenberghe, Convex Optimization](https://web.stanford.edu/~boyd/cvxbook/)
+* **Observation planning.** Interval intersections, unit-time integration and a circular phase-mask implementation agreed on all 64 cases. In 27 of the 32 underlying observation histories several models fit. A follow-up observation improves the worst-case ambiguity for 25 of those 27. Replacing a whole exposure by its midpoint yields an incorrect answer in 30 of 32 histories. The idealized signal has a rectangular dip, exact photometry and a fixed list of candidate periods. [Kipping, finite integration time](https://academic.oup.com/mnras/article/408/3/1758/1075347) · [Kovács, Zucker and Mazeh, box-shaped transits](https://www.aanda.org/articles/aa/pdf/2002/31/aa2422.pdf)
+* **Coding and planning.** A binary threshold commutes with each comparison and each requested order statistic. Enumerating all binary inputs therefore tests the specified ranks for every integer input. An independent solver found legal programs in all 32 underlying situations. Its programs also passed 6,960 permutation checks and 8,640 checks with repeated values. Of 480 rejected changes that reverse one comparator, 20 fail on just one binary input. [Bundala et al., optimal-depth sorting networks](https://arxiv.org/abs/1412.5302)
+
+### Local model pilot
+
+A preregistered Mistral-7B-Instruct-v0.3 Q4_K_M pilot used one local slot, temperature zero, a fixed diagnostic seed namespace and a 768-token cap. Each of the two families contributed four held-out requests per language and one simple control per language. None of the eight poetry responses passed the specified grammar. All eight ended normally. All eight held-out program responses hit the token cap and lacked a complete extractable program. The four controls ended normally and received zero full passes. These single-model observations are separate from the release scores. [Aggregate pilot record, private](https://huggingface.co/datasets/flozi00/weakbench-data/blob/e1b5dd8d3b778f76923ffae4dbfbfb149dac1aa4/reports/closed-v16/mistral-7b-instruct-v03-q4km-poetry-and-programs.json)
 
 ## Private coverage review, closed-v15
 

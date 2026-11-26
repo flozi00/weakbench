@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v15` release runs each text family in German and English. Counts are per language.
+The `closed-v16` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -51,6 +51,11 @@ The `closed-v15` release runs each text family in German and English. Counts are
 | `sentence_fusion` | Joining two events in one German or English sentence while preserving participant roles, negation and a specified temporal, causal or additive relation | 16 | 32 | A semantic parser accepts equivalent clause orders and constructions from the grammar supplied with each task. |
 | `failure_incidence` | Estimating the probability that a machine remains operational or experiences either of two failures at two times, with delayed observation and censoring | 16 | 32 | Exact risk-set counts and state probabilities. Equivalent fractions are accepted. |
 | `quoted_quorum` | Resolving delegated votes, applying a quorum and reporting the result in the requested language with an unaltered foreign-language quotation | 16 | 32 | Exact tally, decision, source ID and quotation. The two report sentences must match the supplied target-language grammar. Any returned reasoning must pass the language probe. |
+| `imagery_chain` | Composing linked comparisons with a change of image, grammatical variation and, on half the cases, a second poem | 16 | 32 | Accepts every licensed image route and phrasing. A second draft must introduce a different intermediate image. |
+| `source_inquiry` | Investigating a claim in a local archive with superseded originals, reprints and conflicting independent sources | 16 | 32 | Replays the tool calls, authenticates exact quotations, checks each source's stance and grades the overall conclusion. |
+| `halfplane_proof` | Deciding whether linear assumptions imply a claim, contradict each other or admit a counterexample | 16 | 32 | Accepts any valid exact rational witness or nonnegative combination of the given inequalities that proves the requested status. |
+| `transit_exposures` | Inferring possible orbital periods from finite exposures and planning the most informative next observation | 16 | 32 | Checks all surviving hypotheses, all tied minimax follow-up windows and the worst-case number of remaining hypotheses. |
+| `comparator_fabric` | Writing a parallel compare-exchange program under wiring and instruction budgets | 16 | 32 | Checks resource limits and verifies the requested output ranks for every threshold input, including ties. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |

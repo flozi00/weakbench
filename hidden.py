@@ -13,6 +13,10 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import closed_imagery
+import closed_inquiry
+import closed_fabric
+import closed_halfplanes
 import closed_auction
 import closed_audio
 import closed_commitments
@@ -33,20 +37,24 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "11795e6358704440dcfa2504b0e825222e09f85f"
-DATA_PATH = "releases/closed-v15/cases.jsonl"
-DATA_SHA256 = "cf71f6c8cd6ce1bece912b2fa9279df9898bdf7a9357b023a1cf620d7c30c313"
+DATA_REVISION = "8df0f05bfba79e5f79ba7de2bea9408cc47b9725"
+DATA_PATH = "releases/closed-v16/cases.jsonl"
+DATA_SHA256 = "2c97cc4c4757e1154c539f73f9190ba7860f9eb78af20cffb693c1dd0768a9a8"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
 RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
 RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium", "formula_relocation", "shared_noise",
-                  "accessible_edit", "bridge_loading", "loop_game")
+                  "accessible_edit", "bridge_loading", "loop_game", "transit_exposures")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
+            "imagery_chain": closed_imagery,
+            "source_inquiry": closed_inquiry,
+            "comparator_fabric": closed_fabric,
+            "halfplane_proof": closed_halfplanes,
             "quoted_quorum": closed_quorum,
             "failure_incidence": closed_incidence, "sentence_fusion": closed_fusion, "panel_grounding": closed_grounding,
             "package_auction": closed_auction, "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
@@ -66,6 +74,10 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
+                   "imagery_chain": sorted(closed_imagery.DETAIL_KEYS),
+                   "source_inquiry": sorted(closed_inquiry.DETAIL_KEYS),
+                   "comparator_fabric": sorted(closed_fabric.DETAIL_KEYS),
+                   "halfplane_proof": sorted(closed_halfplanes.DETAIL_KEYS),
                    "quoted_quorum": sorted(closed_quorum.DETAIL_KEYS),
                    "failure_incidence": sorted(closed_incidence.DETAIL_KEYS),
                    "sentence_fusion": sorted(closed_fusion.DETAIL_KEYS),
@@ -82,11 +94,12 @@ FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 3
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
-                                "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion", "failure_incidence", "quoted_quorum"), 32),
+                                "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion", "failure_incidence", "quoted_quorum",
+                                "imagery_chain", "source_inquiry", "comparator_fabric", "halfplane_proof"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
-    {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer"]},
+    {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
@@ -102,6 +115,10 @@ CATEGORIES = [
     {"key": "spreadsheets", "label": "Spreadsheet formulas", "tasks": ["formula_relocation"]},
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
     {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope"]},
+    {"key": "creative_writing", "label": "Constrained poetry", "tasks": ["imagery_chain"]},
+    {"key": "source_research", "label": "Source research and contradictions", "tasks": ["source_inquiry"]},
+    {"key": "mathematical_proof", "label": "Mathematical certificates", "tasks": ["halfplane_proof"]},
+    {"key": "observing_plan", "label": "Astronomical observation planning", "tasks": ["transit_exposures"]},
     {"key": "accessibility", "label": "Accessibility", "tasks": ["header_binding", "accessible_edit"]},
     {"key": "music", "label": "Music notation", "tasks": ["polyphonic_score"]},
     {"key": "unicode", "label": "Unicode text processing", "tasks": ["grapheme_edits", "normalization_join"]},
@@ -271,6 +288,9 @@ def load(cells, family, lang, n, seed):
             item["turns"] = [item["messages"], *[[{"role": "user", "content": text}] for text in row["followups"]]]
         if family == "adaptive_measurement":
             item.update(closed_observations.runtime(item["expected"], lang))
+        if family == "source_inquiry":
+            item["start_tool_session"] = functools.partial(closed_inquiry.runtime, item["expected"], lang)
+            item.update(item["start_tool_session"]())
         items.append(item)
     return items
 

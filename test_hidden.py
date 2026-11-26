@@ -26,6 +26,8 @@ import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
 import test_closed_reference as reference_fixture
 import test_closed_relay as relay_fixture
+import test_closed_backstage as backstage_fixture
+import test_closed_bag as bag_fixture
 import test_closed_imagery as imagery_fixture
 import test_closed_inquiry as inquiry_fixture
 import test_closed_halfplanes as halfplane_fixture
@@ -107,6 +109,15 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "backstage_reveal":
+                        fields = {"mode": "program", "expected": backstage_fixture.fixture()}
+                        answer = backstage_fixture.witness(lang)
+                    elif family in hidden.EXACT_FIELDS:
+                        answer = dict.fromkeys(hidden.EXACT_FIELDS[family], i)
+                        fields = {"mode": "exact", "expected": answer}
+                    elif family == "bag_query":
+                        fields = {"mode": "program", "expected": bag_fixture.fixture()}
+                        answer = bag_fixture.witness()
                     elif family == "imagery_chain":
                         fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
                         answer = imagery_fixture.witness(lang)
@@ -143,7 +154,7 @@ class ClosedSuiteTests(unittest.TestCase):
                     else:
                         fields = {"mode": "exact", "expected": answer}
                     rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
-                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion", "imagery_chain") else json.dumps(answer, ensure_ascii=False)
+                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion", "imagery_chain", "backstage_reveal") else json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
         self.enter(patch.multiple(hidden, FULL_COUNTS=dict.fromkeys(hidden.FULL_COUNTS, 4),
                                   DATA_SHA256=hashlib.sha256(self.payload).hexdigest()))
@@ -227,6 +238,16 @@ class ClosedSuiteTests(unittest.TestCase):
                 with patch.object(hidden, "DATA_SHA256", hashlib.sha256(data).hexdigest()), self.assertRaisesRegex(
                         ValueError, "invalid private release row"):
                     hidden.decode(data)
+
+    def test_named_proof_fields_are_graded_independently(self):
+        task = hidden.tasks(hidden.release(), None)["distance_repair"]
+        item = {"expected": {"edits": 0, "layouts": [[0, 3]], "gaps": [3]}}
+        partial = task["score"](item, {"content": '{"edits":false,"gaps":[3],"layouts":[[0,3]]}'})
+        self.assertFalse(partial["correct"])
+        self.assertEqual([partial["detail"][k] for k in hidden.EXACT_FIELDS["distance_repair"].values()], [0, 1, 1])
+        for content in ("oops", '{"edits":0,"gaps":[3]}'):
+            checks = task["score"](item, {"content": content})["detail"]
+            self.assertTrue(all(checks[k] == 0 for k in hidden.EXACT_FIELDS["distance_repair"].values()))
 
     def test_exact_diagnostics_have_explicit_denominators(self):
         def check(expected, answer):

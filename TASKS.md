@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v16` release runs each text family in German and English. Counts are per language.
+The `closed-v17` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -56,6 +56,10 @@ The `closed-v16` release runs each text family in German and English. Counts are
 | `halfplane_proof` | Deciding whether linear assumptions imply a claim, contradict each other or admit a counterexample | 16 | 32 | Accepts any valid exact rational witness or nonnegative combination of the given inequalities that proves the requested status. |
 | `transit_exposures` | Inferring possible orbital periods from finite exposures and planning the most informative next observation | 16 | 32 | Checks all surviving hypotheses, all tied minimax follow-up windows and the worst-case number of remaining hypotheses. |
 | `comparator_fabric` | Writing a parallel compare-exchange program under wiring and instruction budgets | 16 | 32 | Checks resource limits and verifies the requested output ranks for every threshold input, including ties. |
+| `backstage_reveal` | Writing a mistaken search and resolving it from the characters’ available evidence | 16 | 32 | Replays the opening action and every ending. Alternative endings must follow different clues and visit different intermediate locations. |
+| `bag_query` | Writing a declarative query that handles duplicate rows, absent matches, grouping and NULL values | 16 | 32 | Checks the returned multiset of rows on all 1,540 admitted input databases. Equivalent query plans pass. |
+| `rule_time_slice` | Reconstructing decisions at the original filing date and after later corrections | 16 | 32 | Grades both interval timelines with their decisive revisions and all intervals where the decision itself changed. |
+| `distance_repair` | Reconstructing every optimal rail layout from unlabeled distances, including duplicate or erroneous readings | 16 | 32 | Grades the minimum replacements, all normalized layouts and the multiset of adjacent gaps shared by every optimum. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |

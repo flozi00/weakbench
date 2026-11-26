@@ -15,6 +15,8 @@ import urllib.request
 
 import closed_imagery
 import closed_inquiry
+import closed_bag
+import closed_backstage
 import closed_fabric
 import closed_halfplanes
 import closed_auction
@@ -37,15 +39,15 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "8df0f05bfba79e5f79ba7de2bea9408cc47b9725"
-DATA_PATH = "releases/closed-v16/cases.jsonl"
-DATA_SHA256 = "2c97cc4c4757e1154c539f73f9190ba7860f9eb78af20cffb693c1dd0768a9a8"
+DATA_REVISION = "0e266a2d9c1a66cd013e85ec866bf9c3ddcf758a"
+DATA_PATH = "releases/closed-v17/cases.jsonl"
+DATA_SHA256 = "9a3e815a66f13059af2a105957f6616efaac94f0bf0edfac8493a3cb2afd62b7"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
 RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
 RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium", "formula_relocation", "shared_noise",
-                  "accessible_edit", "bridge_loading", "loop_game", "transit_exposures")
+                  "accessible_edit", "bridge_loading", "loop_game", "transit_exposures", "rule_time_slice", "distance_repair")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
@@ -53,6 +55,8 @@ PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_la
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
             "imagery_chain": closed_imagery,
             "source_inquiry": closed_inquiry,
+            "backstage_reveal": closed_backstage,
+            "bag_query": closed_bag,
             "comparator_fabric": closed_fabric,
             "halfplane_proof": closed_halfplanes,
             "quoted_quorum": closed_quorum,
@@ -76,6 +80,8 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
                    "imagery_chain": sorted(closed_imagery.DETAIL_KEYS),
                    "source_inquiry": sorted(closed_inquiry.DETAIL_KEYS),
+                   "backstage_reveal": sorted(closed_backstage.DETAIL_KEYS),
+                   "bag_query": sorted(closed_bag.DETAIL_KEYS),
                    "comparator_fabric": sorted(closed_fabric.DETAIL_KEYS),
                    "halfplane_proof": sorted(closed_halfplanes.DETAIL_KEYS),
                    "quoted_quorum": sorted(closed_quorum.DETAIL_KEYS),
@@ -88,18 +94,23 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "commitment_repair": sorted(closed_commitments.DETAIL_KEYS),
                    "language_relay": sorted(closed_relay.DETAIL_KEYS)}
 PAIR_METRICS = closed_pairs.METRICS
+EXACT_FIELDS = {
+    "distance_repair": {"edits": "rail_minimum_edits", "layouts": "rail_all_layouts", "gaps": "rail_shared_gaps"},
+    "rule_time_slice": {"then": "rules_original", "review": "rules_reviewed", "changed": "rules_changed_days"},
+}
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
-SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
+SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
+                 **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
                                 "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion", "failure_incidence", "quoted_quorum",
-                                "imagery_chain", "source_inquiry", "comparator_fabric", "halfplane_proof"), 32),
+                                "imagery_chain", "source_inquiry", "comparator_fabric", "halfplane_proof", "backstage_reveal", "bag_query"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
-    {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric"]},
+    {"key": "coding", "label": "Programs and queries", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric", "bag_query"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
@@ -113,9 +124,9 @@ CATEGORIES = [
     {"key": "auctions", "label": "Package auctions", "tasks": ["package_auction"]},
     {"key": "games", "label": "Adversarial games", "tasks": ["loop_game"]},
     {"key": "spreadsheets", "label": "Spreadsheet formulas", "tasks": ["formula_relocation"]},
-    {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
-    {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope"]},
-    {"key": "creative_writing", "label": "Constrained poetry", "tasks": ["imagery_chain"]},
+    {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology", "distance_repair"]},
+    {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope", "rule_time_slice"]},
+    {"key": "creative_writing", "label": "Creative writing", "tasks": ["imagery_chain", "backstage_reveal"]},
     {"key": "source_research", "label": "Source research and contradictions", "tasks": ["source_inquiry"]},
     {"key": "mathematical_proof", "label": "Mathematical certificates", "tasks": ["halfplane_proof"]},
     {"key": "observing_plan", "label": "Astronomical observation planning", "tasks": ["transit_exposures"]},
@@ -177,6 +188,9 @@ def decode(data):
             if set(row) != fields or row["mode"] != mode:
                 raise ValueError
             if not isinstance(row["prompt"], str) or not row["prompt"].strip():
+                raise ValueError
+            if family in EXACT_FIELDS and (not isinstance(row["expected"], dict)
+                                           or row["expected"].keys() != EXACT_FIELDS[family].keys()):
                 raise ValueError
             if mode == "program" and not PROGRAMS[family].validate_expected(row["expected"]):
                 raise ValueError
@@ -295,13 +309,15 @@ def load(cells, family, lang, n, seed):
     return items
 
 
-def exact(item, reply):
+def exact(item, reply, *, fields=None):
     def canonical(value):
         # Preserve JSON type distinctions, including false versus 0 inside nested values.
         return json.dumps(value, allow_nan=False, sort_keys=True)
 
     gold = item["expected"]
     detail = {"valid_json": 0.0, "json_shape_ok": 0.0}
+    if fields:
+        detail.update(dict.fromkeys(fields.values(), 0.0))
     try:
         pred = strict_json(reply["content"])
         correct = canonical(pred) == canonical(gold)
@@ -316,8 +332,10 @@ def exact(item, reply):
     detail["json_shape_ok"] = float(structure)
     if structure:
         if isinstance(gold, dict) and gold:
-            matches = [canonical(pred[k]) == canonical(v) for k, v in gold.items()]
-            detail["answer_components_correct"] = sum(matches) / len(matches)
+            matches = {k: canonical(pred[k]) == canonical(v) for k, v in gold.items()}
+            detail["answer_components_correct"] = sum(matches.values()) / len(matches)
+            if fields:
+                detail.update({metric: float(matches[k]) for k, metric in fields.items()})
         elif isinstance(gold, list) and gold:
             matches = [canonical(p) == canonical(g) for p, g in zip(pred, gold)]
             detail["answer_components_correct"] = sum(matches) / len(matches)
@@ -373,6 +391,7 @@ def preflight(judge):
 
 def tasks(cells, judge):
     scorers = dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), exact)
+    scorers.update({family: functools.partial(exact, fields=fields) for family, fields in EXACT_FIELDS.items()})
     scorers.update({family: module.score for family, module in PROGRAMS.items()})
     scorers.update(dict.fromkeys(JUDGE_TASKS, functools.partial(judged, judge)))
     return {family: {"langs": LANGS, "load": functools.partial(load, cells, family),

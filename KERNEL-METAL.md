@@ -24,3 +24,9 @@ On each timing shape, two warmup batches precede seven paired baseline/candidate
 python3 -BS test_kernel_metal.py
 WEAKBENCH_METAL_E2E=1 python3 -BS test_kernel_metal.py
 ```
+
+On an idle GPU the optional speed control runs two mathematically equivalent kernels for a sum of outer products. Their signed integer inputs keep every float32 intermediate exact. One kernel expands each product, and the other factors the sum. The test requires both results to match the CPU oracle on two shapes and all seven paired GPU measurements to identify the faster implementation in both presentation directions.
+
+```sh
+WEAKBENCH_METAL_SPEED_E2E=1 python3 -BS test_kernel_metal.py
+```

@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import os
+import random
 from pathlib import Path
 import tempfile
 import unittest
@@ -235,6 +236,60 @@ class HardwareTests(unittest.TestCase):
     def test_wrong_baseline_is_infrastructure_error(self):
         with self.assertRaisesRegex(metal.BackendUnavailable, "baseline_disagrees"):
             metal.measure(ADD, program("out=9.0"), [fixture(7)])
+
+
+FACTORED = """left = 0.0
+for j in range(N):
+    left += A(j*M+i)
+right = 0.0
+for k in range(K):
+    right += B(k*M+i)
+out = left*right"""
+EXPANDED = """total = 0.0
+for j in range(N):
+    left = A(j*M+i)
+    for k in range(K):
+        total += left*B(k*M+i)
+out = total"""
+
+
+def speed_control_case(m, n, k):
+    rng = random.Random(717433 + m)
+    a = [rng.randrange(-5, 6) for _ in range(m * n)]
+    b = [rng.randrange(-5, 6) for _ in range(m * k)]
+    # Every partial sum is an exact binary32 integer for these dimensions.
+    assert 25 * n * k < 2**24
+    expected = []
+    for i in range(m):
+        row_a, row_b = a[i::m], b[i::m]
+        explicit = sum(x * y for x in row_a for y in row_b)
+        assert explicit == sum(row_a) * sum(row_b)
+        expected.append(explicit)
+    return dict(
+        shape=[m, n, k], a=a, b=b, expected=expected, atol=0.0, rtol=0.0, timing=True
+    )
+
+
+@unittest.skipUnless(
+    os.environ.get("WEAKBENCH_METAL_SPEED_E2E") == "1", "requires an idle Apple GPU"
+)
+class SpeedControlTests(unittest.TestCase):
+    def test_equivalent_kernels_in_both_directions(self):
+        cases = [
+            speed_control_case(*shape) for shape in [(2049, 29, 31), (3073, 43, 47)]
+        ]
+        fast, slow = program(FACTORED), program(EXPANDED)
+        for candidate, baseline, expected in (
+            (fast, slow, "faster"),
+            (slow, fast, "slower"),
+        ):
+            with self.subTest(expected=expected):
+                result = metal.measure(candidate, baseline, cases, seed=717433)
+                self.assertEqual(result["status"], "correct")
+                for row in result["cases"]:
+                    self.assertTrue(row["validation"]["passed"])
+                    self.assertEqual(len(row["rounds"]), 7)
+                    self.assertEqual(row["timing"]["comparison"], expected)
 
 
 if __name__ == "__main__":

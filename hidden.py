@@ -253,7 +253,8 @@ class HubRedirect(urllib.request.HTTPRedirectHandler):
         return new
 
 
-def prepare():
+def prepare_private(repo, revision, remote_path, path, validate):
+    """Prepare an immutable file after confirming its repository is private."""
     token_file = Path(os.getenv("HF_TOKEN_PATH", Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "token"))
     token = os.getenv("HF_TOKEN") or (token_file.read_text().strip() if token_file.is_file() else None)
     if not token:
@@ -265,15 +266,14 @@ def prepare():
         with opener.open(req, timeout=90) as response:
             return response.read()
 
-    meta = json.loads(fetch(f"api/datasets/{DATA_REPO}/revision/{DATA_REVISION}"))
-    if meta.get("private") is not True or meta.get("sha") != DATA_REVISION or meta.get("id") != DATA_REPO:
+    meta = json.loads(fetch(f"api/datasets/{repo}/revision/{revision}"))
+    if meta.get("private") is not True or meta.get("sha") != revision or meta.get("id") != repo:
         raise ValueError("Hub metadata does not confirm the locked private dataset")
-    path = cache_path()
     if path.exists():
-        decode(path.read_bytes())
+        validate(path.read_bytes())
         return
-    data = fetch(f"datasets/{DATA_REPO}/resolve/{DATA_REVISION}/{DATA_PATH}")
-    decode(data)
+    data = fetch(f"datasets/{repo}/resolve/{revision}/{remote_path}")
+    validate(data)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as out:
         tmp = Path(out.name)
@@ -283,6 +283,10 @@ def prepare():
             os.replace(tmp, path)
         finally:
             tmp.unlink(missing_ok=True)
+
+
+def prepare():
+    prepare_private(DATA_REPO, DATA_REVISION, DATA_PATH, cache_path(), decode)
 
 
 def release():

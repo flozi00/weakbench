@@ -183,7 +183,7 @@ def _throttle_enter(url, body):
     return slots.release if slots is not None else (lambda: None)
 
 
-def request(url, path, body=None, timeout=900, retries=3):
+def request(url, path, body=None, timeout=900, retries=3, *, reject_redirects=False):
     """One JSON call. Retries gateway/overload errors and dropped connections
     with backoff (a 30-minute suite must survive one 502); a 4xx is the
     request's fault and raises at once."""
@@ -197,6 +197,8 @@ def request(url, path, body=None, timeout=900, retries=3):
                 conn.close()
                 raise
             _release(key, conn, resp)
+            if reject_redirects and 300 <= resp.status < 400:
+                raise HTTPError(resp.status, "unexpected redirect from endpoint")
             return json.loads(raw) if raw.lstrip()[:1] in ("{", "[") else raw
         except HTTPError as exc:
             if exc.status not in RETRY_STATUS or attempt == retries:

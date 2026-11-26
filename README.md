@@ -62,6 +62,29 @@ The private repository `flozi00/weakbench-data` holds the release JSONL. Each ro
 
 For a judge evaluation, download `authoring/closed-v2/calibration.jsonl` from the pinned private dataset revision to a private local directory. Run `python3 calibrate_judge.py --controls PATH --judge-url URL` with the prepared release. It reports agreement with labelled passing and failing answers separately for German and English.
 
+## Creative league
+
+The league archives complete visible submissions and runs a round robin for each challenge. Its first private catalogue contains 24 tasks across German and English: four writing briefs, four responsive website briefs and four Three.js briefs in each language. The ordinary quality suite and its release scores are separate.
+
+Prepare the catalogue once, then use one private SQLite database for the season. Each participant has a served model ID, immutable build revision and generation settings. Run the following commands from the WeakBench checkout, supplying the endpoints and actual build revisions of your models.
+
+```sh
+python3 arena_catalog.py prepare
+db="$HOME/.local/share/weakbench/creative-league.sqlite3"
+python3 arena.py run --db "$db" --model "$MODEL_A" --revision "$BUILD_A" --url "$URL_A"
+python3 arena.py run --db "$db" --model "$MODEL_B" --revision "$BUILD_B" --url "$URL_B" \
+  --judge "$VISION_JUDGE" --judge-revision "$JUDGE_BUILD" --judge-url "$JUDGE_URL"
+python3 arena.py inspect --db "$db"
+```
+
+Add a third model with another `run` using the same database and judge. On a completed 24-task season this adds 24 candidate responses and 48 matches. Each new match takes two judge votes. Previously completed answers and votes are reused. Registering just a new judge scores the archived answers. Changing only a rubric invalidates the judgments for that challenge and preserves its answers and images. A candidate prompt or effective model setting change creates a separate generation identity. The model revisions are supplied by the operator. Use a judge independent of the candidates and a vision-capable endpoint for image comparisons.
+
+Each vote sees the brief, rubric and anonymous submissions. Writing is compared as text. For a website, the judge receives source and desktop/mobile PNGs. For Three.js it receives source and three camera views. The model supplies a self-contained HTML document or a JavaScript `buildScene(THREE)` function. Chromium renders in a disposable offline container, with a pinned local copy of Three.js. A confirmed artifact error is evidence for the judge. A renderer or judge outage leaves the fixture open. Previously generated images can still be judged when the renderer is offline. [Local renderer setup](arena-render/README.md)
+
+A consistent winner earns three points and the loser earns zero. Two tie votes, or judgments that disagree after swapping the submissions, earn one point per side. Match records distinguish agreed draws from order disagreements. `standings --db "$db" --judge-key KEY` reports pending games and whether opponents have completed comparable sets of challenges. An invalid judge response can be retried. Each accepted vote is saved immediately, including the first vote of a two-vote comparison. Visible responses that reached the output limit remain eligible and retain their finish status.
+
+The database contains private task text, rubrics, visible model answers and render images. Store it outside version control. Generation and judging share one request slot per operating-system user across all local league processes and databases. An interruption after a provider has answered but before the local transaction commits can repeat that uncommitted call. A custom local catalogue may be supplied with `--catalog FILE`, using JSONL or a JSON array of records with `id`, `kind` (`text`, `web` or `three`), `language` (`de` or `en`), `prompt` and a nonempty list of `rubric` criteria.
+
 ## Historical diagnostics
 
 Historical public datasets and generated probes are available through an explicit diagnostic profile. These commands use the dependencies declared in `pyproject.toml`. Diagnostic runs write richer artifacts, including model responses, for analysis of historical benchmark results.

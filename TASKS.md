@@ -2,21 +2,26 @@
 
 ## Closed quality suite
 
-Each cell runs in German and English. Counts are per language.
+The `closed-v2` release runs each family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
 | `revision_ledger` | Updating a record when later evidence supersedes earlier entries | 24 | 48 | Exact JSON |
 | `service_windows` | Applying interacting time-window constraints | 24 | 48 | Exact JSON |
 | `snapshot_trace` | Tracking object state through Python operations | 18 | 36 | Exact JSON |
+| `quantity_contract` | Solving proportional arithmetic with unit conversions and specified rounding | 24 | 48 | Exact JSON |
+| `schema_dispatch` | Translating a request into a function call that fits a previously unseen tool schema | 24 | 48 | Exact JSON |
+| `archive_retrieval` | Linking records across registers and distinguishing entries with the same title | 16 | 32 | Exact JSON |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
+| `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
+| `contrastive_tutoring` | Explaining a learner's reasoning error using the observations in the task | 8 | 16 | Rubric judge |
 
 Judged cells run when a judge endpoint is supplied. `drift` measures teacher-forced numerical stability with public fixtures. `--image` adds the generated vision capability check.
 
 ## Historical diagnostics
 
-The remainder of this catalogue describes `--suite diagnostics`.
+The remainder of this catalogue describes `--suite diagnostics`. The public `gsm8k` and `wmt24pp` tasks were retired in v2. To reproduce their historical scores, use revision `97d56842` with its pinned datasets. The separate `wmt_mqm` and `spell_fix` diagnostics still use WMT segments.
 
 Data is read at pinned revisions; item subsets are seeded; every item keeps the same id in every language, so two runs pair item by item. `*` runs model-written code (opt-in), `**` needs `--judge-url` (opt-in), `†` downloads images (opt-in).
 
@@ -34,7 +39,6 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `mgsm` | juletxara/mgsm | de, en | 250 / 250 | on | final number (DE number format aware) |
 | `mgsm_mixed` | juletxara/mgsm with the problem's sentences alternating DE/EN (the other language first, 247 aligned items), the instruction in the cell's language | de, en | 150 / 247 | on | final number + the reply must be in the cell's language (`lang_mismatch`) |
 | `mgsm_typo` | opt-in: the `mgsm` items with up to 4 swapped letters inside long words (numbers untouched), same ids | de, en, fr, es | 250 / 250 | on | final number; `xt_correct_agree` against `mgsm` in the same run |
-| `gsm8k` | openai/gsm8k | en | 200 / 1319 | on | final number |
 | `aime25` *** | MathArena/aime_2025 | en | 30 / 30 | on | integer after `####` (AA Intelligence Index component) |
 | `math_500` | HuggingFaceH4/MATH-500: 500 competition problems, 7 subjects, 5 levels, LaTeX answers | en | 150 / 500 | on | normalised LaTeX, else numeric (1e-6 rel); AA standalone eval |
 | `musr` | TAUR-Lab/MuSR: 756 long narratives, multi-step soft reasoning (murder mystery, object placement, team allocation) | en | 100 / 756 | on | the option's text after `Answer:` (a bare letter is accepted) |
@@ -63,7 +67,6 @@ Data is read at pinned revisions; item subsets are seeded; every item keeps the 
 | `planning` | generated STRIPS problems in three domains (blocksworld, gripper, logistics), plan checked by simulation | de, en | 60 / 300 | off | goal reached by an executable plan (`correct`); sub-metrics `valid`, `steps`, `optimal`, `len_ratio` |
 | `bfcl` | Berkeley Function Calling v3 + hafsteinn/bfcl-v3-multilingual (DE) | de, en | 250 / 1236 | off | BFCL AST checker (simple/multiple/parallel/irrelevance) |
 | `tool_env` | generated per id: a small world (contacts, calendar, flights with decoys) and inbox behind 8 tools; errands: cheapest flight + mail the reference, a meeting in a free slot, a flight under budget/arrival constraints, a conditional (book, or mail that the trip is postponed), answer an inbox question with a date from the calendar, a flaky booking service that fails once (retry, do not give up or claim success), and a request without a date (ask, do not guess) | de, en | 80 / 200 | off | the final world state: right booking, event and mail, no side effects; sub-metrics `ok_<kind>`, `side_effects`, `ok_book`, `ok_mail`, `ok_event` |
-| `wmt24pp` | google/wmt24pp en-de_DE | de (EN→DE), en (DE→EN) | 100 / 960 | off | chrF (continuous) |
 | `cruxeval_o` | cruxeval-org/cruxeval: predict a Python function's output (nothing is executed) | en | 150 / 800 | on | literal equality (`ast.literal_eval`/JSON) |
 | `cruxeval_x` | xhwl/cruxeval-x: the same output prediction in 8 languages (Python, Rust, Java, C++, TypeScript, Go, Ruby, Shell), balanced per language | en | 160 / 400 | on | normalised literal, else ordered atoms (see below) |
 | `cruxeval_x_de` | the same items behind a German instruction (item-paired by id; `Ausgabe:` and `Output:` both accepted) | de | 160 / 400 | on | normalised literal, else ordered atoms |

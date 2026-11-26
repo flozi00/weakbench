@@ -145,8 +145,8 @@ def test_quality_end_to_end():
         assert rows["aa_omniscience"]["n"] == 3 and rows["aa_omniscience"]["accuracy"] == 1.0, rows
         assert rows["aa_lcr"]["n"] == 3 and rows["humaneval_plus"]["accuracy"] == 0.0, rows
         names = [r["task"] for r in json.loads((run / "summary.json").read_text())]
-        run2 = run_quality(cand_url, "--langs", "en", "--tasks", "gsm8k")  # default selection never has opt-in tasks
-        assert {r["task"] for r in json.loads((run2 / "summary.json").read_text())} == {"gsm8k"}
+        run2 = run_quality(cand_url, "--langs", "en", "--tasks", "rule_induction")
+        assert {r["task"] for r in json.loads((run2 / "summary.json").read_text())} == {"rule_induction"}
         try:
             run_quality(cand_url, "--tasks", "aa_lcr")
             raise AssertionError("aa_lcr without --judge-url must exit")

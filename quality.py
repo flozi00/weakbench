@@ -75,9 +75,7 @@ MMLU_PROX = ("li-lab/MMLU-ProX-Lite", "e82aafb9460529687d3c7e51b401d8dd1dd309dd"
 GMMLU = ("CohereLabs/Global-MMLU-Lite", "36c2fd756f19ccf13a9a96c8e53ccecc02192b8b")
 BELEBELE = ("facebook/belebele", "7899cdfa4e1e0d733fd77c848e2c273cb1d32be2")
 MGSM = ("juletxara/mgsm", "b2f13d426afe3be8d69a7e739b36724db8b66bbc")
-GSM8K = ("openai/gsm8k", "740312add88f781978c0658806c59bc2815b9866")
 GPQA = ("LLaMAX/BenchMAX_Science", "facb668a946f180ed4d03c310b230799d5f59bf6")
-WMT = ("google/wmt24pp", "fd7405c06494bc66a57b25f55d217a72f96e60dc")
 TQA_EN = ("truthfulqa/truthful_qa", "741b8276f2d1982aa3d5b832d3ee81ed3b896490")
 TQA_DE = ("Eurolingua/truthfulqax", "6a3c892491049676409dba3f46b8b492cf944ec4")
 HUMANEVAL = ("evalplus/humanevalplus", "d32357cf319e50e9c8d8dab5ea876c72b0fd321b")
@@ -447,31 +445,6 @@ def load_mgsm_typo(lang, n, seed):
             q = q[:a] + wrong + q[b:]
         items.append({**it, "messages": user(f"{q}\n\n{tail}")})
     return items
-
-
-def load_gsm8k(lang, n, seed):
-    rows = rows_of(GSM8K, "main/test-")
-    return [math_item(f"{i:04d}", lang, rows[i]["question"], num(rows[i]["answer"].split("####")[-1], "en"))
-            for i in pick(range(len(rows)), n, seed)]
-
-
-# ---------------------------------------------------------------- translation
-WMT_PROMPT = {"de": "Translate the following English text into German. Output only the translation.",
-              "en": "Translate the following German text into English. Output only the translation."}
-
-
-def load_wmt(lang, n, seed):
-    """lang = target language: de = EN source -> German, en = German target -> English."""
-    rows = {r["segment_id"]: r for r in rows_of(WMT, "en-de_DE.jsonl")
-            if r["is_bad_source"] not in (True, "True") and r["document_id"] != "canary"}
-    src, ref = ("source", "target") if lang == "de" else ("target", "source")
-    return [{"id": str(i), "lang": lang, "messages": user(f"{WMT_PROMPT[lang]}\n\n{rows[i][src]}"),
-             "ref": rows[i][ref]} for i in pick(rows, n, seed)]
-
-
-def score_wmt(item, reply):
-    return {"correct": None, "score": round(chrf(reply["content"], item["ref"]), 5), "pred": None,
-            "gold": item["ref"], "detail": {}, "lang_ok": lang_ok(reply["content"], item["lang"], min_words=5)}
 
 
 # ---------------------------------------------------------------- long context (RULER multi-key NIAH)
@@ -855,9 +828,7 @@ TASKS = {
     # code-switched input: sentences alternate DE/EN, the answer must come in the instruction's language
     "mgsm_mixed": task(("en", "de"), load_mgsm_mixed, score_math, True, 12288, 100, None),
     "truthfulqa": task(("en", "de"), load_truthfulqa, score_mc, False, 4096, 200, None),
-    "gsm8k": task(("en",), load_gsm8k, score_math, True, 12288, 200, None),
     "gpqa": task(("en", "de", "fr", "es"), load_gpqa, score_mc, True, 16384, 0, 198),
-    "wmt24pp": task(("en", "de"), load_wmt, score_wmt, False, 1024, 100, None, lang_check=False),
     "ruler": task(("en", "de"), load_ruler, score_ruler, False, 512, 50, 30),
     # cross-lingual long-context retrieval: German haystack, English question (and back)
     "ruler_xl": {**task(("en", "de"), load_ruler_xl, score_ruler, False, 512, 30, 20), "pair_with": "ruler"},

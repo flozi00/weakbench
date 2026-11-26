@@ -72,6 +72,9 @@ class ClosedSuiteTests(unittest.TestCase):
             self.assertEqual([r["id"] for r in full[:2]], [r["id"] for r in quick])
             self.assertEqual([r["messages"][0]["content"].split("/")[-1] for r in full[:2]],
                              [r["messages"][0]["content"].split("/")[-1] for r in quick])
+            if family in hidden.PAIRED_VARIANTS:
+                first, second = (int(r["messages"][0]["content"].split("/")[-1]) for r in quick)
+                self.assertEqual((first % 2, second - first), (0, 1))
         expected = {"expected": {"x": [1], "z": False}}
         for text, valid, correct in [('{"z":false,"x":[1]}', True, True),
                                      ('{"z":0,"x":[true]}', True, False), ('true', True, False),
@@ -123,7 +126,7 @@ class ClosedSuiteTests(unittest.TestCase):
         info = json.loads((run / "run_info.json").read_text())
         self.assertEqual(info["data_revision"], hidden.DATA_REVISION)
         self.assertEqual(info["data_sha256"], hidden.DATA_SHA256)
-        self.assertEqual(info["expected_items"], 20)
+        self.assertEqual(info["expected_items"], 4 * len(hidden.FULL_COUNTS))
         fail = True
         with self.assertRaisesRegex(SystemExit, "unscored items"):
             quality.main([*argv, "--arm", "unjudged", "--limit", "1"])
@@ -136,7 +139,7 @@ class ClosedSuiteTests(unittest.TestCase):
         artifacts += [output.getvalue(), (common.RESULTS / "quality.jsonl").read_text()]
         self.assertFalse(any("sentinel-" in text for text in artifacts))
         with self.assertRaises(SystemExit):
-            quality.main([*argv, "--arm", "public", "--tasks", "gsm8k"])
+            quality.main([*argv, "--arm", "public", "--tasks", "factuality"])
 
 
 if __name__ == "__main__":

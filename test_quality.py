@@ -686,6 +686,8 @@ def test_groups_known():
     import quality as q
     assert all(t in q.TASKS for g in q.GROUPS.values() for t in g)
     assert not set(q.GROUPS) & set(q.TASKS)  # a group never shadows a task name
+    assert {"gsm8k", "wmt24pp"}.isdisjoint(q.TASKS.keys() | q.GROUPS.keys())
+    assert {"mgsm", "wmt_mqm", "roundtrip", "spell_fix"} <= q.TASKS.keys()
 
 
 

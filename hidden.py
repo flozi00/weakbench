@@ -15,13 +15,25 @@ import urllib.request
 
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "4bed0639767eee3285122b268b6062c5ce426827"
-DATA_PATH = "releases/closed-v1/cases.jsonl"
-DATA_SHA256 = "fcee2c400c34e96edbde96ca6fd6b0eeff9951e5f91b1f73e26b57611001d6a3"
-PLAIN_TASKS = ("revision_ledger", "service_windows", "snapshot_trace")
-JUDGE_TASKS = ("evidence_handover", "decision_brief")
+DATA_REVISION = "79cb6f58eae4ed52871b2c5e4667ad88274760ff"
+DATA_PATH = "releases/closed-v2/cases.jsonl"
+DATA_SHA256 = "90aea75edecf6df6b7e4d57962daba6a2c89e79dfaaa171673af8f87bbbe5f9e"
+PLAIN_TASKS = ("revision_ledger", "service_windows", "snapshot_trace",
+               "quantity_contract", "schema_dispatch", "archive_retrieval")
+JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
+PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, "quantity_contract", "schema_dispatch", "archive_retrieval"))
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
-               "evidence_handover": 16, "decision_brief": 16}
+               "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
+               "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
+CATEGORIES = [
+    {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract"]},
+    {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace"]},
+    {"key": "tools", "label": "Tool selection", "tasks": ["schema_dispatch"]},
+    {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
+    {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
+    {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
+    {"key": "tutoring", "label": "Tutoring", "tasks": ["contrastive_tutoring"]},
+]
 LANGS = ("en", "de")
 
 
@@ -128,9 +140,9 @@ def release():
 
 def load(cells, family, lang, n, seed):
     # Each language has the same scenario order within a family in this frozen release.
-    # Each judged scenario has two adjacent counterfactuals. Sample them together.
+    # Paired families store counterfactuals at adjacent ordinals. Shuffle whole pairs.
     rows = cells[family, lang]
-    step = 2 if family in JUDGE_TASKS else 1
+    step = 2 if family in PAIRED_VARIANTS else 1
     starts = list(range(0, len(rows), step))
     random.Random(seed).shuffle(starts)
     order = [i for start in starts for i in range(start, min(start + step, len(rows)))]

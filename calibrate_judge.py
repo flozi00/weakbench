@@ -12,7 +12,7 @@ import common
 import hidden
 import tasks_judge
 
-CONTROLS_SHA256 = "0cc5b38b5459abd79d9fbcd312c56aa2e3913653a6aef03b7b106de2056192f4"
+CONTROLS_SHA256 = "be4055ccd39b86b12dd8b7db8915d12119393a7eb74ace8ca9f0b845fc87a67b"
 
 
 class CalibrationError(Exception):
@@ -72,7 +72,7 @@ def calibrate(controls, judge):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--controls", type=Path, required=True,
-                        help="local authoring/closed-v1/calibration.jsonl from the private dataset")
+                        help="local authoring/closed-v2/calibration.jsonl from the private dataset")
     parser.add_argument("--judge-url", required=True, help="trusted judge server that may receive private controls")
     parser.add_argument("--judge-model", help="served model ID; defaults to the first ID at /v1/models")
     parser.add_argument("--timeout", type=int, default=180)

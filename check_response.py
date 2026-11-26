@@ -14,7 +14,7 @@ def main(argv=None):
     parser.add_argument("--lang", required=True, choices=hidden.LANGS)
     parser.add_argument("--id", required=True, help="item ID from the run's items-<task>.jsonl")
     parser.add_argument("--response", type=Path, help="chat completion JSON; for adaptive measurements supply "
-                        "an object with messages (assistant calls and tool results) and completion. For commitment repairs, "
+                        "an object with messages (assistant calls and tool results) and completion. For three-turn text dialogues, "
                         "supply an object with the three ordered chat completions under completions (default: stdin)")
     args = parser.parse_args(argv)
     try:
@@ -33,7 +33,8 @@ def main(argv=None):
                     or not isinstance(completion["completions"], list)
                     or len(completion["completions"]) != len(item["turns"])):
                 raise ValueError
-            turns = [quality.parse_text_turn(entry) for entry in completion["completions"]]
+            turns = [quality.observe_text_turn(args.task, item, index, entry)
+                     for index, entry in enumerate(completion["completions"])]
             reply = turns[-1][0]
             reply["turns"] = [proposal for _, proposal in turns]
         else:
@@ -48,7 +49,8 @@ def main(argv=None):
             reply = quality.parse_reply(completion)
             if trace is not None:
                 reply["observation_trace"] = trace
-        result = task["score"](item, reply)
+        result = (hidden.closed_relay.finish(reply["turns"]) if args.task == "language_relay"
+                  else task["score"](item, reply))
     except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, RecursionError):
         parser.error("cannot read or score chat completion JSON")
     print(json.dumps({"correct": result["correct"], "score": result["score"],

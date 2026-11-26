@@ -22,25 +22,28 @@ import closed_observations
 import closed_perspective
 import closed_proofs
 import closed_reference
+import closed_relay
 import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "bc08dd02338467f8f7f1c4dea5712cb2a1dfc3d2"
-DATA_PATH = "releases/closed-v10/cases.jsonl"
-DATA_SHA256 = "acf8f2669ae5124f9084e3579583fd21529e85ea0e496b4f1273665051f9a563"
+DATA_REVISION = "4fc0ce98d3c8f42a12e3d59643692bf8d9a22e9d"
+DATA_PATH = "releases/closed-v11/cases.jsonl"
+DATA_SHA256 = "76c943798b94550835fab748b64ab345344d483f4cec6c20cdeaf68d90eada4c"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
 RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
-RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium", "formula_relocation", "shared_noise")
+RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium", "formula_relocation", "shared_noise",
+                  "accessible_edit", "bridge_loading")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
-            "listener_reference": closed_reference, "stream_transducer": closed_transducer}
+            "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
 LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
+TEXT_DIALOGUES = frozenset(("commitment_repair", "language_relay"))
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
 VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32}
 AUDIO_COUNTS = {"tap_timing": 32}
@@ -57,20 +60,21 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
                    "listener_reference": sorted(closed_reference.DETAIL_KEYS),
                    "stream_transducer": sorted(closed_transducer.DETAIL_KEYS),
-                   "commitment_repair": sorted(closed_commitments.DETAIL_KEYS)}
+                   "commitment_repair": sorted(closed_commitments.DETAIL_KEYS),
+                   "language_relay": sorted(closed_relay.DETAIL_KEYS)}
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
-                                "listener_reference", "stream_transducer"), 32),
+                                "listener_reference", "stream_transducer", "language_relay"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
-    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof"]},
+    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
@@ -81,12 +85,13 @@ CATEGORIES = [
     {"key": "spreadsheets", "label": "Spreadsheet formulas", "tasks": ["formula_relocation"]},
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
     {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope"]},
-    {"key": "accessibility", "label": "Accessible tables", "tasks": ["header_binding"]},
+    {"key": "accessibility", "label": "Accessibility", "tasks": ["header_binding", "accessible_edit"]},
     {"key": "music", "label": "Music notation", "tasks": ["polyphonic_score"]},
     {"key": "unicode", "label": "Unicode text processing", "tasks": ["grapheme_edits", "normalization_join"]},
     {"key": "network_optimization", "label": "Network optimization", "tasks": ["flow_certificate"]},
     {"key": "print_production", "label": "Print production", "tasks": ["booklet_imposition"]},
     {"key": "coding_theory", "label": "Error-correcting codes", "tasks": ["symbol_recovery"]},
+    {"key": "circuits", "label": "DC circuits", "tasks": ["bridge_loading"]},
     {"key": "thermodynamics", "label": "Thermodynamics", "tasks": ["phase_equilibrium"]},
     {"key": "signal_processing", "label": "Signal processing", "tasks": ["sampled_waveform"]},
 ]
@@ -123,7 +128,7 @@ def decode(data):
             mode = "program" if family in PROGRAMS else "judge" if family in JUDGE_TASKS else "exact"
             field = "rubric" if mode == "judge" else "expected"
             fields = {"id", "language", "family", "mode", "prompt", field}
-            if family == "commitment_repair":
+            if family in TEXT_DIALOGUES:
                 fields.add("followups")
                 followups = row["followups"]
                 if (not isinstance(followups, list) or len(followups) != 2
@@ -143,6 +148,10 @@ def decode(data):
                 raise ValueError
             if family in LANGUAGE_REPORTS and not closed_language.request_language_ok(row["prompt"], lang):
                 raise ValueError
+            if family == "language_relay":
+                for text, target in zip([row["prompt"], *row["followups"]], closed_relay.turn_languages(lang)):
+                    if not closed_language.request_language_ok(text, target):
+                        raise ValueError
             if mode == "judge":
                 rubric = row["rubric"]
                 if (not isinstance(rubric, list) or not rubric or
@@ -237,7 +246,7 @@ def load(cells, family, lang, n, seed):
                        {"type": "text", "text": row["prompt"]}]
         item = {"id": uid, "lang": lang, "messages": [{"role": "user", "content": content}],
                 **{k: row[k] for k in ("expected", "rubric") if k in row}}
-        if family == "commitment_repair":
+        if family in TEXT_DIALOGUES:
             item["turns"] = [item["messages"], *[[{"role": "user", "content": text}] for text in row["followups"]]]
         if family == "adaptive_measurement":
             item.update(closed_observations.runtime(item["expected"], lang))

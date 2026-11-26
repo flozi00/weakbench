@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v10` release runs each text family in German and English. Counts are per language.
+The `closed-v11` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -43,6 +43,9 @@ The `closed-v10` release runs each text family in German and English. Counts are
 | `shared_noise` | Predicting an intervention on an observed individual while keeping that individual’s hidden state fixed | 16 | 32 | Four exact probabilities distinguish conditioning, population intervention and the individual counterfactual |
 | `listener_reference` | Writing a single localized description that lets two recipients identify the same card from different visible properties | 16 | 32 | The message must identify the target in both views using the minimum number of properties, or correctly report impossibility. All equally short descriptions pass. |
 | `stream_transducer` | Synthesizing a bounded finite-state machine that marks a stream according to a written rule | 16 | 32 | The complete transition table must implement the rule for every finite input. State renaming and equivalent nonminimal implementations within the stated limit pass. |
+| `language_relay` | Updating a dating report across German–English–German or English–German–English turns | 16 | 32 | Each turn must justify both sharp bounds and the decision in that turn's language. A later correct response cannot repair a failed earlier turn. |
+| `accessible_edit` | Predicting a button's accessible name and description before and after a localized change to HTML | 16 | 32 | Four exact strings under the specified whitespace normalization |
+| `bridge_loading` | Replacing one resistor in a measurement bridge and accounting for the finite resistance of the meter | 16 | 32 | Exact signed meter voltage, current in a neighboring branch and its change from the initial configuration |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -53,6 +56,8 @@ Judged cells run when a judge endpoint is supplied. `drift` measures teacher-for
 The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence`, `quoted_perspective` and `localized_proof`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
 
 The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. `all_channels_verified` counts a pass only when the request, visible justification, visible answer and API-exposed reasoning can all be verified in the target language. It uses every scored item, including those with no returned reasoning. A conditional metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
+
+For `language_relay`, the language listed on the leaderboard is the starting language. Each of three assistant responses is checked against the current prompt and the facts then available. The original start language returns on turn three. An absent native reasoning channel can still yield a correct visible report. `all_channels_verified` counts a pass only when all four language channels are evidenced on all three turns, across all scored conversations. `correct_with_all_channels` additionally requires three correct, grounded reports. The per-turn checks distinguish missing reasoning, a trace whose language cannot be determined, a mixed-language report and an unsupported date bound.
 
 For `adaptive_measurement`, the paired specimens start with the same request and yield different observations. Only complete evidence that identifies the specimen can earn credit. A valid decision rule may choose any probe that preserves a solution for all still-possible outcomes. The summary reports protocol validity, budget compliance, informative probes, whether the choices preserved a solution, unique identification and final-answer accuracy. Each rate uses the scored responses in the cell.
 

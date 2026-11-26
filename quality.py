@@ -876,7 +876,7 @@ def build_body(name, t, item, args, model, honored=True):
         body |= {"chat_template_kwargs": dict(THINK_OFF), "temperature": 0}
         if honored is False:  # the server thinks anyway: give it a thinking budget
             body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
-    elif name in hidden.LANGUAGE_REPORTS:
+    elif name in hidden.LANGUAGE_REPORTS or (name == "language_relay" and args.think == "on"):
         body["chat_template_kwargs"] = {"enable_thinking": True, "thinking": True}
     elif not t["think"]:  # --think on over a thinking-off task: a 256-token budget never reaches the answer
         body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
@@ -920,7 +920,7 @@ def parse_reply(resp, *, raw_tool_args=False):
 
 
 def parse_text_turn(completion):
-    """Read one saved or live completion for a dialogue allowing only text commitments."""
+    """Read one saved or live completion in a dialogue requiring ordinary assistant text."""
     if not isinstance(completion, dict):
         raise ValueError("invalid completion")
     choices = completion.get("choices")
@@ -941,9 +941,26 @@ def parse_text_turn(completion):
     if not isinstance(message.get("content"), str) and not (has_action and message.get("content") is None):
         raise ValueError("missing assistant text")
     reply = parse_reply(completion)
-    # A tool call or a refusal cannot double as an accepted booking, even if its
-    # accompanying visible text happens to contain a legal assignment.
+    # A tool call or refusal cannot double as a valid text response.
     return reply, None if has_action else reply["content"]
+
+
+def observe_text_turn(name, item, index, completion):
+    """Extract visible history and grade any per-turn language evidence while it is available."""
+    reply, proposal = parse_text_turn(completion)
+    if name != "language_relay":
+        return reply, proposal
+    message = completion["choices"][0]["message"]
+    # Some APIs expose both native aliases, or end a tagged prefix and then begin
+    # a second, unfinished reasoning block. Inspect every channel and send only visible text onward.
+    visible, trailing = split_think(reply["content"])
+    extra = (message.get("reasoning") if message.get("reasoning_content")
+             and message["reasoning_content"] != message.get("reasoning") else None)
+    trace = "\n".join(dict.fromkeys(part for part in (reply["reasoning"], extra, trailing) if part))
+    flags = hidden.closed_relay.grade_turn(item, index, {"content": visible if proposal is not None else None,
+                                                        "reasoning": trace})
+    reply.update(content=visible, reasoning="")
+    return reply, flags
 
 
 def run_item(url, name, t, item, body, timeout, private=False):
@@ -956,11 +973,11 @@ def run_item(url, name, t, item, body, timeout, private=False):
         if item.get("turns"):  # multi-turn: send each turn, append the reply, score the last one
             msgs, reply, contents = [], None, []
             usage = {"prompt_tokens": 0, "completion_tokens": 0}
-            for turn in item["turns"]:
+            for index, turn in enumerate(item["turns"]):
                 msgs = msgs + turn
                 r = common.request(url, "/v1/chat/completions", {**body, "messages": msgs}, timeout=timeout)
-                if name == "commitment_repair":
-                    reply, proposal = parse_text_turn(r)
+                if name in hidden.TEXT_DIALOGUES:
+                    reply, proposal = observe_text_turn(name, item, index, r)
                 else:
                     reply = parse_reply(r)
                     proposal = reply["content"]
@@ -969,6 +986,7 @@ def run_item(url, name, t, item, body, timeout, private=False):
                 u = (r.get("usage") if isinstance(r, dict) else None) or {}
                 for k in usage:  # the cell's cost is the sum over turns, not the last turn's
                     usage[k] += u.get(k) or 0
+                del r
             reply["turns"] = contents
         elif item.get("tool_exec"):  # tool loop: the model calls, we execute, until it answers
             msgs, reply = list(body["messages"]), None
@@ -1031,7 +1049,8 @@ def run_item(url, name, t, item, body, timeout, private=False):
                    junk=is_junk(reply["content"] + "\n" + reply["reasoning"],
                                 t.get("junk_check", name not in ("ifstruct", "ifstruct_de", "german_json",
                                                                  "bfcl"))))
-        res = t["score"](item, reply)
+        res = (hidden.closed_relay.finish(reply["turns"]) if name == "language_relay" and item.get("turns")
+               else t["score"](item, reply))
         rec.update({k: res.get(k) for k in ("correct", "score", "pred", "gold")}, detail=res.get("detail") or {})
         check = item.get("lang_check", t.get("lang_check", True))  # items may opt out (reply in another language)
         rec["lang_ok"] = (res["lang_ok"] if "lang_ok" in res else

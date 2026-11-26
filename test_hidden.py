@@ -22,6 +22,7 @@ import test_closed_commitments as booking_fixture
 import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
 import test_closed_reference as reference_fixture
+import test_closed_relay as relay_fixture
 
 
 class ClosedSuiteTests(unittest.TestCase):
@@ -80,6 +81,14 @@ class ClosedSuiteTests(unittest.TestCase):
                         answer = json.loads(booking_fixture.text(spec, booking_fixture.CommitmentTests.start))
                         for turn in followups:
                             self.answers[turn] = booking_fixture.text(spec, booking_fixture.CommitmentTests.short)
+                    elif family == "language_relay":
+                        spec, questions, answers = relay_fixture.wire_fixture(lang)
+                        marked = [f"sentinel-input/{part}/{i}" for part in questions]
+                        prompt, *followups = marked
+                        fields = {"mode": "program", "expected": spec, "followups": followups}
+                        answer = answers[0]
+                        for request, response in zip(followups, answers[1:]):
+                            self.answers[request] = json.dumps(response, ensure_ascii=False)
                     elif family == "quoted_perspective":
                         prompt = f"sentinel-input/{family}/{perspective_fixture.REQUESTS[lang]}/{i}"
                         fields = {"mode": "program", "expected": perspective_fixture.FACTS}
@@ -169,6 +178,21 @@ class ClosedSuiteTests(unittest.TestCase):
             with patch.object(hidden, "DATA_SHA256", hashlib.sha256(mismatched).hexdigest()):
                 with self.assertRaisesRegex(ValueError, "invalid private release row"):
                     hidden.decode(mismatched)
+
+    def test_relay_release_checks_all_three_request_languages(self):
+        for lang in hidden.LANGS:
+            for index, intended in enumerate(hidden.closed_relay.turn_languages(lang)):
+                rows = [json.loads(line) for line in self.payload.splitlines()]
+                row = next(r for r in rows if r["family"] == "language_relay" and r["language"] == lang)
+                other = relay_fixture.REQ["de" if intended == "en" else "en"]
+                if index:
+                    row["followups"][index - 1] = other
+                else:
+                    row["prompt"] = other
+                data = "\n".join(json.dumps(r) for r in rows).encode()
+                with patch.object(hidden, "DATA_SHA256", hashlib.sha256(data).hexdigest()), self.assertRaisesRegex(
+                        ValueError, "invalid private release row"):
+                    hidden.decode(data)
 
     def test_exact_diagnostics_have_explicit_denominators(self):
         def check(expected, answer):
@@ -374,6 +398,124 @@ class ClosedSuiteTests(unittest.TestCase):
             with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
                 run_offline(invalid)
 
+    def test_relay_live_history_and_strict_offline_parity(self):
+        name = "language_relay"
+        task = hidden.tasks(hidden.release(), None)[name]
+        args = SimpleNamespace(think="auto", max_tokens=None, temperature=None)
+        captured = []
+        answers = self.answers
+
+        class Server(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                msgs = body["messages"]
+                index = len(msgs) // 2
+                request = msgs[-1]["content"]
+                answer = json.loads(answers[request])
+                lang = "de" if "antwort" in answer else "en"
+                if wrong_report and index == 0:
+                    answer = {}
+                trace = relay_fixture.TRACE[lang]
+                if index == 0 and lang == "de":
+                    trace = relay_fixture.TRACE["en"]  # correct visible response, switched early reasoning
+                msg = {"role": "assistant", "content": json.dumps(answer, ensure_ascii=False)}
+                if index == 1:
+                    msg["content"] = "<think>" + trace + "</think>" + msg["content"]
+                else:
+                    msg["reasoning" if index == 2 else "reasoning_content"] = trace
+                completion = {"choices": [{"message": msg, "finish_reason": "stop"}],
+                              "usage": {"prompt_tokens": 8, "completion_tokens": 5}}
+                captured.append((body, completion))
+                data = json.dumps(completion).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *args):
+                pass
+
+        with HTTPServer(("127.0.0.1", 0), Server) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                for first, wrong_report in (("en", False), ("de", False), ("en", True)):
+                    captured.clear()
+                    item, = task["load"](first, 1, 41)
+                    body = quality.build_body(name, task, item, args, "local")
+                    self.assertNotIn("chat_template_kwargs", body)
+                    for mode, enabled in (("on", True), ("off", False)):
+                        forced_args = SimpleNamespace(think=mode, max_tokens=None, temperature=None)
+                        explicit = quality.build_body(name, task, item, forced_args, "local")
+                        self.assertEqual(explicit["chat_template_kwargs"], {"enable_thinking": enabled, "thinking": enabled})
+                        self.assertEqual(explicit["messages"], body["messages"])
+                        if (mode == "on" and first == "de") or (mode == "off" and wrong_report):
+                            body = explicit
+                    record = quality.run_item(f"http://127.0.0.1:{server.server_port}", name, task,
+                                              item, body, 5, private=True)
+                    visible, completions = [], []
+                    self.assertEqual(len(captured), 3)
+                    for index, (turn, (sent, response)) in enumerate(zip(item["turns"], captured)):
+                        visible += turn
+                        self.assertEqual(sent, {**body, "messages": visible})
+                        for trace in relay_fixture.TRACE.values():
+                            self.assertNotIn(trace, json.dumps(sent, ensure_ascii=False))
+                        response_text = "{}" if wrong_report and index == 0 else answers[turn[0]["content"]]
+                        visible.append({"role": "assistant", "content": response_text})
+                        completions.append(response)
+                    self.assertIs(record["correct"], first == "en" and not wrong_report)
+                    self.assertEqual(record["detail"]["correct_with_all_channels"], float(record["correct"]))
+                    self.assertEqual(record["detail"]["turn1_reasoning_language_ok"], float(first == "en"))
+                    self.assertEqual(record["detail"]["visible_reports_correct"], float(not wrong_report))
+                    self.assertEqual(record["detail"]["turn3_turn_correct"], 1)
+                    self.assertEqual((record["prompt_tokens"], record["completion_tokens"]), (24, 15))
+                    record_text = json.dumps(record, ensure_ascii=False)
+                    self.assertNotIn("sentinel-input", record_text)
+                    for trace in relay_fixture.TRACE.values():
+                        self.assertNotIn(trace, record_text)
+
+                    path = self.tmp / "relay-response.json"
+                    def offline(document):
+                        path.write_text(json.dumps(document))
+                        out = io.StringIO()
+                        with patch.object(common, "request", side_effect=AssertionError), contextlib.redirect_stdout(out):
+                            code = check_response.main(["--task", name, "--lang", first, "--id", item["id"],
+                                                        "--response", str(path)])
+                        return code, json.loads(out.getvalue())["checks"]
+
+                    code, detail = offline({"completions": completions})
+                    self.assertEqual(code, int(first == "de" or wrong_report))
+                    self.assertEqual(detail, record["detail"])
+                    if first == "en" and not wrong_report:
+                        # Neither a correct final turn nor an unexamined alias should hide an earlier failure.
+                        for change, key, value in (
+                            ({"reasoning_content": None}, "turn1_reasoning_present", 0),
+                            ({"reasoning_content": "3 + 4 = 7"}, "turn1_reasoning_language_decidable", 0),
+                            ({"reasoning": relay_fixture.TRACE["de"]}, "turn1_reasoning_language_ok", 0),
+                            ({"content": "{}"}, "turn1_turn_correct", 0),
+                            ({"refusal": "declined"}, "turn1_response_format_ok", 0),
+                        ):
+                            changed = json.loads(json.dumps(completions))
+                            changed[0]["choices"][0]["message"].update(change)
+                            code, detail = offline({"completions": changed})
+                            self.assertEqual(code, int(key != "turn1_reasoning_present"))
+                            self.assertEqual(detail[key], value)
+                            self.assertEqual(detail["turn3_turn_correct"], 1)
+                            with patch.object(common, "request", side_effect=changed):
+                                result = quality.run_item("http://mock", name, task, item, body, 2, private=True)
+                            self.assertEqual(detail, result["detail"])
+                        for invalid in (completions[-1], {"completions": completions[1:]},
+                                        {"completions": [*completions[:2], {"choices": []}]},
+                                        {"completions": [None, *completions[1:]]},
+                                        {"completions": completions, "turn_checks": [1, 1, 1]}):
+                            with self.assertRaises(SystemExit) as failure, contextlib.redirect_stderr(io.StringIO()):
+                                offline(invalid)
+                            self.assertEqual(failure.exception.code, 2)
+            finally:
+                server.shutdown()
+                thread.join()
+
     def test_cli(self):
         def request(url, route, body=None, **kw):
             if route == "/v1/models":
@@ -425,6 +567,14 @@ class ClosedSuiteTests(unittest.TestCase):
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])
                 self.assertEqual(row["extra"]["answer_facts_ok"], 1)
+            if row["task"] == "language_relay":
+                self.assertEqual(row["extra"]["visible_reports_correct"], 1)
+                self.assertEqual(row["extra"]["reasoning_present_fraction"], 0)
+                self.assertEqual(row["extra"]["correct_with_all_channels"], 0)
+                self.assertEqual(row["extra"]["all_channels_verified"], 0)
+                for turn in range(1, 4):
+                    self.assertEqual(row["extra"][f"turn{turn}_reasoning_present"], 0)
+                    self.assertNotIn(f"turn{turn}_reasoning_language_ok", row["extra"])
             if row["task"] == "listener_reference":
                 self.assertEqual(row["extra"]["both_listeners_unique"], 1)
                 self.assertEqual(row["extra"]["reference_minimal"], 1)

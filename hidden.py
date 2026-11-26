@@ -13,6 +13,8 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import closed_contingent_planning
+import closed_numerical_anchor
 import closed_imagery
 import closed_inquiry
 import closed_web_tools
@@ -55,9 +57,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "82aa352898bc87934f6b701a128bde6131212d8b"
-DATA_PATH = "releases/closed-v23/cases.jsonl"
-DATA_SHA256 = "ba0db9cd345c7230a60679583d06f7f6b4b012e761fdee2f4f0ffa344ebb968c"
+DATA_REVISION = "04c491ccae89f71e53c86595eddd2e44fc11ba97"
+DATA_PATH = "releases/closed-v24/cases.jsonl"
+DATA_SHA256 = "ffd22915544ba59361bfe85a3c7abbb74cf38e8639cac0e6f57fe5741d71e1e0"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -69,7 +71,8 @@ EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity
 PRESSURE_PROGRAMS = {"audit_pressure": closed_audit_pressure, "evidence_pressure": closed_evidence_pressure,
                      "preference_boundary": closed_preference_boundary, "short_code_review": closed_short_code_review,
                      "presupposition_repair": closed_presupposition_repair, "selective_reporting": closed_selective_reporting,
-                     "proof_feedback": closed_proof_feedback, "directed_search": closed_directed_search}
+                     "proof_feedback": closed_proof_feedback, "directed_search": closed_directed_search,
+                     "numerical_anchor": closed_numerical_anchor}
 PROGRAMS = {**PRESSURE_PROGRAMS, "workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
@@ -80,7 +83,7 @@ PROGRAMS = {**PRESSURE_PROGRAMS, "workshop_schedule": closed_schedule, "language
             "reader_gamebook": closed_gamebook,
             "bag_query": closed_bag,
             "mutation_suite": closed_probes,
-            "causal_recourse": closed_recourse,
+            "causal_recourse": closed_recourse, "contingent_planning": closed_contingent_planning,
             "counterpoint_repair": closed_counterpoint,
             "comparator_fabric": closed_fabric,
             "halfplane_proof": closed_halfplanes,
@@ -114,6 +117,7 @@ PROGRAM_METRICS = {**{family: sorted(module.DETAIL_KEYS) for family, module in P
                    "bag_query": sorted(closed_bag.DETAIL_KEYS),
                    "mutation_suite": sorted(closed_probes.DETAIL_KEYS),
                    "causal_recourse": sorted(closed_recourse.DETAIL_KEYS),
+                   "contingent_planning": sorted(closed_contingent_planning.DETAIL_KEYS),
                    "counterpoint_repair": sorted(closed_counterpoint.DETAIL_KEYS),
                    "comparator_fabric": sorted(closed_fabric.DETAIL_KEYS),
                    "halfplane_proof": sorted(closed_halfplanes.DETAIL_KEYS),
@@ -135,7 +139,7 @@ EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
                  **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
 FULL_COUNTS = {"short_code_review": 48, "presupposition_repair": 48, "selective_reporting": 192,
-               "proof_feedback": 128, "directed_search": 144,
+               "proof_feedback": 128, "directed_search": 144, "numerical_anchor": 144, "contingent_planning": 32,
                "audit_pressure": 96, "evidence_pressure": 144, "preference_boundary": 64,
                "web_currency": 48, "action_postconditions":32, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
@@ -149,7 +153,7 @@ CATEGORIES = [
     {"key": "people_pleaser", "label": "People Pleaser", "tasks": list(PRESSURE_PROGRAMS)},
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Programs and queries", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer", "comparator_fabric", "bag_query", "mutation_suite"]},
-    {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair", "causal_recourse"]},
+    {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair", "causal_recourse", "contingent_planning"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
@@ -468,6 +472,7 @@ def tasks(cells, judge):
     scorers.update(dict.fromkeys(JUDGE_TASKS, functools.partial(judged, judge)))
     return {family: {"langs": LANGS, "load": functools.partial(load, cells, family),
                      "score": scorers[family], "think": family in THINKING_TASKS,
+                     **({"anchor_observation": closed_numerical_anchor.anchor_observation} if family == "numerical_anchor" else {}),
                      "max_tokens": 8192 if family in THINKING_TASKS else 2048,
                      "lang_check": False, "junk_check": False,
                      "needs_judge": family in JUDGE_TASKS,

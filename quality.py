@@ -46,8 +46,10 @@ import struct
 import sys
 import time
 import zlib
+from uuid import uuid4
 from pathlib import Path
 
+import anchor_pairs
 import common
 import drift_corpus
 import hidden
@@ -990,7 +992,7 @@ def observe_text_turn(name, item, index, completion):
     return reply, flags
 
 
-def run_item(url, name, t, item, body, timeout, private=False):
+def run_item(url, name, t, item, body, timeout, private=False, *, observe=None):
     """One request -> one record; never raises (a failed item is a record with `error`)."""
     rec = {"task": name, "lang": item["lang"], "id": str(item["id"]), **dict.fromkeys((
         "correct", "score", "pred", "gold", "finish_reason", "prompt_tokens", "completion_tokens", "latency_s",
@@ -1100,6 +1102,8 @@ def run_item(url, name, t, item, body, timeout, private=False):
                           lang_ok(reply["content"], item["lang"]) if check else None)
         # the language the model THINKS in: a German task reasoned in English is a switch the reply hides
         rec["think_lang_ok"] = lang_ok(reply["reasoning"], item["lang"], min_words=30) if check and reply["reasoning"] else None
+        if observe is not None:
+            observe(t["anchor_observation"](item, reply))
     except Exception as exc:  # noqa: BLE001 — never crash the run
         rec.update(correct=None, score=None, error=type(exc).__name__ if private else f"{type(exc).__name__}: {exc}"[:500],
                    latency_s=rec["latency_s"] or round(time.monotonic() - t0, 3))
@@ -1326,12 +1330,89 @@ def load_cells(names, langs, args, registry=None):
     return cells
 
 
+def planned_items(name, lang, items, latest, closed):
+    """Keep a complete numeric pair in one work unit, including when retrying it."""
+    def done(item):
+        row = latest.get((name, lang, str(item["id"])))
+        return row is not None and not row.get("error")
+
+    if not closed or name != anchor_pairs.FAMILY:
+        return [(item,) for item in items if not done(item)]
+    groups = collections.defaultdict(list)
+    for item in items:
+        groups[item["sampling_id"]].append(item)
+    todo = []
+    for uid, group in groups.items():
+        if len(group) == 1:
+            if not done(group[0]):
+                todo.append(tuple(group))
+            continue
+        slots = {it["expected"]["arm"]: it for it in group}
+        if (len(group) != 2 or set(slots) != {"neutral", "pressure"}
+                or slots["neutral"]["id"] != uid or slots["pressure"]["id"] == uid):
+            raise ValueError("invalid matched numerical items")
+        pair = (slots["neutral"], slots["pressure"])
+        if not anchor_pairs.recorded(*(latest.get((name, lang, str(it["id"]))) for it in pair)):
+            todo.append(pair)
+    return todo
+
+
+def run_batch(url, name, task, group, args, model, honored, private):
+    """Each arm uses its own ordinary request. Only category flags survive both scorings."""
+    observations, records = [], []
+    paired = private and name == anchor_pairs.FAMILY and len(group) == 2
+    for item in group:
+        body = build_body(name, task, item, args, model, honored)
+        record = run_item(url, name, task, item, body, args.timeout, private,
+                          observe=observations.append if paired else None)
+        records.append(record)
+    if paired and not any(r["error"] for r in records):
+        try:
+            flags = anchor_pairs.diagnose(*observations)
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            records[-1].update(error=type(exc).__name__, correct=None, score=None, detail={})
+        else:
+            attempt = uuid4().hex
+            for r in records:
+                r["anchor_pair_attempt"] = attempt
+            records[-1]["anchor_pair"] = flags
+    return records
+
+
+def numeric_archive(path, *, repair=False):
+    """Keep completed lines, including a valid last row written without its final newline."""
+    raw = path.read_bytes()
+    lines = raw.splitlines(keepends=True)
+    if not lines:
+        return []
+    rows = [json.loads(line) for line in lines[:-1] if line.strip()]
+    tail = lines[-1]
+    try:
+        last = json.loads(tail)
+    except (ValueError, UnicodeError):
+        if tail.endswith(b"\n"):
+            raise
+        if repair:
+            common.write_atomic(path, raw[:-len(tail)])
+    else:
+        rows.append(last)
+        if repair and not tail.endswith(b"\n"):
+            common.write_atomic(path, raw + b"\n")
+    return rows
+
+
+def prior_records(folder):
+    latest = {}
+    for path in sorted(folder.glob("items-*.jsonl")):
+        rows = numeric_archive(path) if path.name == f"items-{anchor_pairs.FAMILY}.jsonl" else common.read_jsonl(path)
+        for r in rows:
+            latest[(r["task"], r["lang"], str(r["id"]))] = r
+    return latest
+
+
 def summarize(run_dir):
     """One row per (task, lang) over every record of the run (latest record per id wins)."""
-    latest = {}
-    for f in sorted(run_dir.glob("items-*.jsonl")):
-        for r in common.read_jsonl(f):
-            latest[(r["task"], r["lang"], str(r["id"]))] = r
+    latest = prior_records(run_dir)
     cells = collections.defaultdict(list)
     for (task_name, lang, _), r in latest.items():
         cells[(task_name, lang)].append(r)
@@ -1609,11 +1690,8 @@ def main(argv=None):
             raise SystemExit(f"error: {e}")
     cells = load_cells(names, langs, args, registry)
     expected_items = sum(len(items) for _, _, items in cells)
-    if args.resume:  # items with an error are retried; their new record supersedes the old one
-        done = {(r["task"], r["lang"], str(r["id"])) for f in run_dir.glob("items-*.jsonl")
-                for r in common.read_jsonl(f) if not r.get("error")}
-        cells = [(name, lang, [it for it in items if (name, lang, str(it["id"])) not in done])
-                 for name, lang, items in cells]
+    latest = prior_records(run_dir) if args.resume else {}
+    cells = [(name, lang, planned_items(name, lang, items, latest, closed)) for name, lang, items in cells]
     drift_langs = [x for x in ("de", "en") if x in langs] + ["code"] if drift else []
     n_docs = min(DRIFT_DOCS[args.tier], args.limit or DRIFT_DOCS[args.tier])
 
@@ -1622,12 +1700,12 @@ def main(argv=None):
               "| task | lang | items | think | max_tokens |\n|---|---|---|---|---|")
         for name, lang, items in cells:
             t = registry[name]
-            print(f"| {name} | {lang} | {len(items)} | {'on' if think_on(t, args) else 'off'} | "
+            print(f"| {name} | {lang} | {sum(map(len, items))} | {'on' if think_on(t, args) else 'off'} | "
                   f"{args.max_tokens or t['max_tokens']} |")
         docs = {lang: len(drift_texts(lang, n_docs)) for lang in drift_langs}
         for lang, k in docs.items():
             print(f"| drift | {lang} | {k} docs | - | 1 |")
-        print(f"\nestimated requests: {sum(len(c[2]) for c in cells)} items + {sum(docs.values())} drift docs "
+        print(f"\nestimated requests: {sum(sum(map(len, c[2])) for c in cells)} items + {sum(docs.values())} drift docs "
               f"+ 1 thinking preflight")
         return None
 
@@ -1645,6 +1723,9 @@ def main(argv=None):
             raise SystemExit("cannot resume a closed run from another data or scorer revision")
         info.update(release_info)
         common.write_atomic(info_path, json.dumps(info, indent=2))
+    archive = run_dir / f"items-{anchor_pairs.FAMILY}.jsonl"
+    if args.resume and closed and anchor_pairs.FAMILY in names and archive.exists():
+        numeric_archive(archive, repair=True)
     jobs = [x for group in itertools.zip_longest(*([(name, it) for it in items] for name, _, items in cells))
             for x in group if x is not None]  # round-robin over cells: every task progresses from the start
     if "thinking_off_honored" not in info and any(not think_on(registry[name], args) for name, _ in jobs):
@@ -1661,19 +1742,21 @@ def main(argv=None):
         common.write_atomic(info_path, json.dumps(info, indent=2))
     honored = info.get("thinking_off_honored")
 
-    print(f"quality {run_dir.name}: {len(jobs)} items in {len(cells)} cells, model {model}, "
+    n_items = sum(len(group) for _, group in jobs)
+    print(f"quality {run_dir.name}: {n_items} items in {len(cells)} cells, model {model}, "
           f"concurrency {args.concurrency}", flush=True)
-    t0, errors, step = time.monotonic(), 0, max(1, len(jobs) // 20)
+    t0, errors, k, step = time.monotonic(), 0, 0, max(1, n_items // 20)
     with concurrent.futures.ThreadPoolExecutor(args.concurrency) as ex:
-        futs = [ex.submit(run_item, args.url, name, registry[name], it,
-                          build_body(name, registry[name], it, args, model, honored), args.timeout, closed) for name, it in jobs]
-        for k, fut in enumerate(concurrent.futures.as_completed(futs), 1):
-            rec = fut.result()  # appended from this thread only: no lock needed
-            common.append_jsonl(run_dir / f"items-{rec['task']}.jsonl", rec)
-            errors += rec["error"] is not None
-            if k % step == 0 or k == len(jobs):
-                print(f"  {k}/{len(jobs)} items ({100 * k // len(jobs)}%), {errors} errors, "
-                      f"{time.monotonic() - t0:.0f}s", flush=True)
+        futs = [ex.submit(run_batch, args.url, name, registry[name], group, args, model, honored, closed)
+                for name, group in jobs]
+        for fut in concurrent.futures.as_completed(futs):
+            for rec in fut.result():  # one writer, neutral before pressured for a matched pair
+                common.append_jsonl(run_dir / f"items-{rec['task']}.jsonl", rec)
+                k += 1
+                errors += rec["error"] is not None
+                if k % step == 0 or k == n_items:
+                    print(f"  {k}/{n_items} items ({100 * k // n_items}%), {errors} errors, "
+                          f"{time.monotonic() - t0:.0f}s", flush=True)
 
     rows = summarize(run_dir)
     if drift_langs:

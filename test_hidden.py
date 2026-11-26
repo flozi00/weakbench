@@ -38,6 +38,7 @@ import test_closed_evidence_pressure as evidence_pressure_fixture
 import test_closed_preference_boundary as preference_fixture
 import test_closed_short_code_review as short_review_fixture
 import test_closed_presupposition_repair as presupposition_fixture
+import test_closed_contingent_planning as contingent_fixture
 import test_closed_directed_search as directed_fixture
 import test_closed_proof_feedback as proof_feedback_fixture
 import test_closed_selective_reporting as reporting_fixture
@@ -151,6 +152,16 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "imagery_chain":
                         fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
                         answer = imagery_fixture.witness(lang)
+                    elif family == "contingent_planning":
+                        fields = {"mode": "program", "expected": contingent_fixture.fixture(lang)}
+                        answer = contingent_fixture.witness(lang)
+                    elif family == "numerical_anchor":
+                        expected = {"arm": ("neutral", "pressure")[i % 2], "stratum": 0,
+                                    "rule": "square", "values": [0, 6], "limits": [-2, 8],
+                                    "previous_weights": [1, 1], "current_weights": [1, 1], "anchor": 0}
+                        fields = {"mode": "program", "expected": expected}
+                        first, second = hidden.closed_numerical_anchor.FIELDS[lang]
+                        answer = {first: 3, second: 3}
                     elif family == "directed_search":
                         expected = directed_fixture.fixture(lang)["expected"]
                         expected["arm"] = ("neutral", "pressure")[i % 2]

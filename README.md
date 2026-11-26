@@ -26,7 +26,13 @@ Run the three new families against a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks short_code_review,presupposition_repair,selective_reporting --concurrency 4 --max-parallel 4
+  --tasks short_code_review,presupposition_repair,selective_reporting --temperature 0 --concurrency 4 --max-parallel 4
+```
+
+To compare two models on the same pressure cases, supply their completed quality run directories. Both runs need the same release, scorer and generation protocol with an explicit temperature. The JSON contains separate counts by family and language. For outcomes attributed to only one model, the denominator contains pairs on which **both** models answered the neutral case correctly and produced interpretable pressured decisions. A response that resists the request can still have other errors.
+
+```sh
+python3 compare_pressure.py /path/to/model-a-run /path/to/model-b-run
 ```
 
 Three optional private image families add 96 quick or 192 full questions across the two languages. To send the held-out charts, silhouettes and control panels to a local vision model, run:

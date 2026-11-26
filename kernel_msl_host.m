@@ -3,6 +3,7 @@
 #import <Metal/Metal.h>
 #include <math.h>
 #include <stdint.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/resource.h>
@@ -203,7 +204,9 @@ int main(int argc, const char **argv) {
         if (argc != 2)
             fail("invalid_request");
         struct rlimit cpu = {90, 90}, file = {16 * 1024 * 1024, 16 * 1024 * 1024}, core = {0, 0};
-        if (setrlimit(RLIMIT_CPU, &cpu) || setrlimit(RLIMIT_FSIZE, &file) || setrlimit(RLIMIT_CORE, &core))
+        // Let optional Metal cache writes receive EFBIG at the limit. The default
+        // SIGXFSZ action terminates the host before it can report the candidate.
+        if (signal(SIGXFSZ, SIG_IGN) == SIG_ERR || setrlimit(RLIMIT_CPU, &cpu) || setrlimit(RLIMIT_FSIZE, &file) || setrlimit(RLIMIT_CORE, &core))
             fail("worker_limits_unavailable");
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
         if (!device || ![device supportsFamily:MTLGPUFamilyApple1])

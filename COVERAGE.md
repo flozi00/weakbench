@@ -8,6 +8,18 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## Private coverage review, closed-v8
+
+**Repairing one's own earlier commitments.** In earlier dialogue tasks the user supplies a record or updates an instruction. In `commitment_repair`, an assistant first books a time for each group. There are 8–58 feasible initial bookings per scenario. After each of two availability changes the assistant must minimize the cancellation cost and, among equally costly choices, the number of groups moved. The optimum depends on what that assistant actually told the user on the preceding turn. A matching dynamic program and a separate enumeration agreed in 3,272 checks and accepted all 2,588 complete optimal histories across the two languages. Contrast partners share their first two user turns and have disjoint sets of feasible final bookings. [Müller, Rudová and Barták on minimal perturbation](https://help-unitime.unitime.org/papers/patat05.pdf)
+
+**Heat transfer across a phase change.** The earlier weighted-mean task mixes water at different temperatures. `phase_equilibrium` asks for temperature and liquid masses when different materials can freeze or melt. The 32 scenarios per language include eight contrast pairs where the heat pulse changes liquid mass while the equilibrium temperature stays fixed. Six scenarios land exactly at a phase boundary. An energy sweep over the melting points and a separate solution of the heat balance from the rendered material table agreed on all 64 cases and 1,125 additional generated checks. [OpenStax on phase changes](https://openstax.org/books/university-physics-volume-2/pages/1-5-phase-changes)
+
+### What the language verifier can establish
+
+The two language-report families now publish an additional rate over every scored item. `all_channels_verified` requires positive evidence that the request, visible justification, visible answer and API-returned reasoning are all in the target language. An absent reasoning channel contributes zero to this rate. `reasoning_present` and the conditional language rate on observed reasoning remain separately available.
+
+We measured the lexical detector on public, professionally translated reading material. A mixed-language control appends the matched question in the opposite language to a passage in the target language. Errors on Belebele prompted a check for a foreign-language interrogative at the beginning of a question. On Belebele, accepted mixed controls went from 3/1,800 to 0/1,800. The separate XQuAD check went from 22/2,380 to 13/2,380. Source-language acceptance counts stayed the same in both comparisons. On XQuAD the revised detector accepted 177/240 German and 171/240 English passages; some same-language text receives an indeterminate result. These are tests on reading material. They quantify specific limitations of the heuristic when interpreting a model's reasoning-language rate. [Belebele](https://huggingface.co/datasets/facebook/belebele/tree/7899cdfa4e1e0d733fd77c848e2c273cb1d32be2) and [XQuAD](https://github.com/google-deepmind/xquad/tree/7d30520c717524000f0d9d2f9c10a069acd9d285)
+
 ## Private coverage review, closed-v7
 
 Existing visual diagnostics include simple shape relations and bar charts. The private text tasks for raster topology and bounded inference provide nearby reasoning tasks. Two new optional families send an actual PNG with the localized question. In a full run they add 128 visual cases to the 2,184 text cases.

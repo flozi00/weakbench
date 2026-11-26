@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v7` release runs each text family in German and English. Counts are per language.
+The `closed-v8` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -36,6 +36,8 @@ The `closed-v7` release runs each text family in German and English. Counts are 
 | `paired_randomization` | Evaluating a randomization test on an experiment with paired assignments and a constrained allocation | 16 | 32 | Exact randomization counts and two-sided tail probability |
 | `quantifier_scope` | Distinguishing two readings of a quantified sentence over a partially observed relation | 16 | 32 | Counts for all four truth-value pairs and canonical witness worlds for the two readings that disagree |
 | `quoted_perspective` | Resolving speaker, addressee, place and day inside nested quotations, including after an inner quotation ends | 16 | 32 | Required facts in both localized report fields, the request language and the language of any API-exposed reasoning |
+| `commitment_repair` | Preserving an assistant’s own bookings through two changes in party availability | 16 | 32 | Each booking must be feasible. Each repair must minimize cancellation weight and then the number moved relative to the assistant’s preceding booking. |
+| `phase_equilibrium` | Finding the final state after heat transfer when one or more materials can melt or solidify | 16 | 32 | Exact equilibrium temperature and liquid masses, expressed as reduced rational numbers |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -45,9 +47,11 @@ Judged cells run when a judge endpoint is supplied. `drift` measures teacher-for
 
 The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence` and `quoted_perspective`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
 
-The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. A metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
+The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. `all_channels_verified` counts a pass only when the request, visible justification, visible answer and API-exposed reasoning can all be verified in the target language. It uses every scored item, including those with no returned reasoning. A conditional metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
 
 For `adaptive_measurement`, the paired specimens start with the same request and yield different observations. Only complete evidence that identifies the specimen can earn credit. A valid decision rule may choose any probe that preserves a solution for all still-possible outcomes. The summary reports protocol validity, budget compliance, informative probes, whether the choices preserved a solution, unique identification and final-answer accuracy. Each rate uses the scored responses in the cell.
+
+For `commitment_repair`, each turn receives only the dialogue so far. A valid first booking may lead to a different valid final booking from another candidate's. The scorer accepts every minimal repair of the candidate's preceding booking. The three stored assistant completions can be checked offline together.
 
 Exact-JSON tasks also report the fraction of scored responses that parsed and the fraction with the expected top-level JSON type, keys or array length. Among responses with the expected shape, `answer_components_correct` averages the share of exact top-level values within each answer. Nested values must match in full. The leaderboard score continues to require the full answer.
 

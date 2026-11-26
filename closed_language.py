@@ -26,7 +26,7 @@ FORMS = {
 }
 DETAIL_KEYS = frozenset(("valid_json", "report_fields_present", "request_language_ok", "justification_language_ok", "answer_language_ok",
                          "justification_facts_ok", "answer_facts_ok", "reasoning_present", "reasoning_language_decidable",
-                         "reasoning_language_ok", "all_language_ok", "all_channels_language_ok"))
+                         "reasoning_language_ok", "all_language_ok", "all_channels_language_ok", "all_channels_verified"))
 
 # The shared marker lists are intentionally conservative. These extra frequent words
 # support short sentences without giving a name, digit or single token a language.
@@ -64,6 +64,14 @@ def markers():
             "en": (common.EN_WORDS | ADDITIONAL["en"]) - SHARED}
 
 
+# Interrogatives anchor the language of a question even when its object is a
+# proper name and the remaining words supply few function-word votes.
+QUESTION_STARTS = {
+    "de": frozenset("wer wen wem wessen wann warum weshalb wieso wo wohin woher wie welcher welche welches welchen welchem".split()),
+    "en": frozenset("who whom whose when why where how which what".split()),
+}
+QUESTIONS = re.compile(r'(?:^|(?<=[.!?\n]))\s*["„“«»(]*([^\W\d_]+)\b[^.!?\n]*\?', re.UNICODE)
+
 WORDS = re.compile(r"[^\W\d_]+", re.UNICODE)
 CLAUSE_BREAK = re.compile(r"[.!?,;:\n]+")
 SEPARATOR = re.compile(r"[.;\n]+")
@@ -98,6 +106,9 @@ def language_status(text, lang):
     target = vocabulary[lang]
     other = vocabulary["en" if lang == "de" else "de"]
     normalized = unicodedata.normalize("NFC", text)
+    opposite_lang = "en" if lang == "de" else "de"
+    if any(match[1].casefold() in QUESTION_STARTS[opposite_lang] for match in QUESTIONS.finditer(normalized)):
+        return False
     words = []
     undecided_clause = False
     for clause in CLAUSE_BREAK.split(normalized):
@@ -207,6 +218,7 @@ def score_report(item, reply, evidence, conclusion):
             detail["reasoning_language_ok"] = float(native_ok)
         all_ok = all_ok and native_ok is True
         detail["all_channels_language_ok"] = float(all_ok)
+    detail["all_channels_verified"] = float(present and all_ok)
     detail["all_language_ok"] = float(all_ok)
     correct = all_ok and evidence_ok and conclusion_ok
     return {"correct": correct, "score": float(correct), "lang_ok": answer_ok if has_fields else None, "detail": detail}

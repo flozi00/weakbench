@@ -29,11 +29,12 @@ class ReportChecks(unittest.TestCase):
                 result = evaluate(lang)
                 self.assertTrue(result["correct"])
                 self.assertEqual(result["detail"]["reasoning_present"], 0)
+                self.assertEqual(result["detail"]["all_channels_verified"], 0)
                 self.assertNotIn("reasoning_language_ok", result["detail"])
                 self.assertNotIn("all_channels_language_ok", result["detail"])
                 native = REQUESTS[lang]
                 detail = evaluate(lang, native=native)["detail"]
-                self.assertTrue(detail["all_channels_language_ok"] == detail["reasoning_language_ok"] == 1)
+                self.assertTrue(detail["all_channels_verified"] == detail["all_channels_language_ok"] == detail["reasoning_language_ok"] == 1)
                 self.assertLessEqual(detail.keys(), language.DETAIL_KEYS)
                 self.assertTrue(all(type(v) is float and v in (0, 1) for v in detail.values()))
                 other = "en" if lang == "de" else "de"
@@ -46,6 +47,7 @@ class ReportChecks(unittest.TestCase):
                     self.assertEqual(score["detail"]["all_channels_language_ok"], 0)
                 wrong = evaluate(lang, native=REQUESTS[other])
                 self.assertEqual(wrong["detail"]["reasoning_language_ok"], 0)
+                self.assertEqual(wrong["detail"]["all_channels_verified"], 0)
                 self.assertFalse(wrong["correct"])
                 switched = evaluate(lang, prompt=REQUESTS[other])
                 self.assertEqual(switched["detail"]["request_language_ok"], 0)
@@ -127,6 +129,14 @@ class ReportChecks(unittest.TestCase):
             ("de", "Die beiden Werte unterscheiden sich. A + B + C + D. W1 W2 W3 W4."),
         ]:
             self.assertIs(language.language_status(text, lang), True)
+
+    def test_foreign_question_after_target_language_text(self):
+        # Named entities provide little language evidence and commas split the lexical clauses.
+        self.assertIs(language.language_status("Die Werte sind eindeutig. Who painted Orion?", "de"), False)
+        self.assertIs(language.language_status("The answer is clear. Wann startet Nova?", "en"), False)
+        self.assertIs(language.language_status("Die Werte stimmen. Welche Wahl passt besser?", "de"), True)
+        self.assertIs(language.language_status("The result is clear. Which choice works better?", "en"), True)
+        self.assertIs(language.language_status("Which choice works better? Wer malt Orion?", "en"), False)
 
     def test_mixed_language_and_weak_evidence(self):
         for text, lang in [

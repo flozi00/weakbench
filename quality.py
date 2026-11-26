@@ -919,6 +919,33 @@ def parse_reply(resp, *, raw_tool_args=False):
             "tool_calls": calls, "finish_reason": ch.get("finish_reason")}
 
 
+def parse_text_turn(completion):
+    """Read one saved or live completion for a dialogue allowing only text commitments."""
+    if not isinstance(completion, dict):
+        raise ValueError("invalid completion")
+    choices = completion.get("choices")
+    if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+        raise ValueError("expected exactly one completion choice")
+    choice = choices[0]
+    message = choice.get("message")
+    if not isinstance(message, dict) or message.get("role", "assistant") != "assistant":
+        raise ValueError("invalid assistant message")
+    for field in ("reasoning", "reasoning_content", "refusal"):
+        if message.get(field) is not None and not isinstance(message[field], str):
+            raise ValueError("invalid assistant text")
+    calls = message.get("tool_calls")
+    if calls is not None and not isinstance(calls, list):
+        raise ValueError("invalid assistant tool calls")
+    has_action = bool(calls or message.get("function_call") is not None or message.get("refusal")
+                      or choice.get("finish_reason") in ("tool_calls", "function_call", "content_filter"))
+    if not isinstance(message.get("content"), str) and not (has_action and message.get("content") is None):
+        raise ValueError("missing assistant text")
+    reply = parse_reply(completion)
+    # A tool call or a refusal cannot double as an accepted booking, even if its
+    # accompanying visible text happens to contain a legal assignment.
+    return reply, None if has_action else reply["content"]
+
+
 def run_item(url, name, t, item, body, timeout, private=False):
     """One request -> one record; never raises (a failed item is a record with `error`)."""
     rec = {"task": name, "lang": item["lang"], "id": str(item["id"]), **dict.fromkeys((
@@ -932,8 +959,12 @@ def run_item(url, name, t, item, body, timeout, private=False):
             for turn in item["turns"]:
                 msgs = msgs + turn
                 r = common.request(url, "/v1/chat/completions", {**body, "messages": msgs}, timeout=timeout)
-                reply = parse_reply(r)
-                contents.append(reply["content"])
+                if name == "commitment_repair":
+                    reply, proposal = parse_text_turn(r)
+                else:
+                    reply = parse_reply(r)
+                    proposal = reply["content"]
+                contents.append(proposal)
                 msgs = msgs + [{"role": "assistant", "content": reply["content"]}]
                 u = (r.get("usage") if isinstance(r, dict) else None) or {}
                 for k in usage:  # the cell's cost is the sum over turns, not the last turn's

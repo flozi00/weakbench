@@ -12,7 +12,7 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v7` text suite has 30 families scored by code. Across German and English, these contribute 1,028 quick or 2,056 full cases. A judge adds four rubric-graded families, bringing the totals to 1,092 quick or 2,184 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v8` text suite has 32 families scored by code. Across German and English, these contribute 1,092 quick or 2,184 full cases. A judge adds four rubric-graded families, bringing the totals to 1,156 quick or 2,312 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
 To run the quoted dialogue, randomization and flow tasks on a local model:
 
@@ -38,6 +38,8 @@ python3 check_response.py --task language_evidence --lang de --id "$ITEM_ID" --r
 
 For `adaptive_measurement`, save the assistant tool calls and their tool replies in an array under `messages`, with the final chat completion under `completion`. The offline verifier replays those measurements against the case and checks that they identify the specimen. A correct guess alone earns zero. The ordinary runner keeps the trace in memory during scoring.
 
+For `commitment_repair`, use the same offline command with all three original chat completions in order in an object under `completions`. The verifier computes the cost of each repair relative to the preceding booking in that conversation.
+
 Both model endpoints receive private material. Use endpoints approved for the dataset. The candidate receives each prompt. The judge also sees the rubric and candidate response. Closed-run artifacts retain opaque item IDs, scores, timing, token counts, error types and the release identity. Their contents support paired A/B comparisons. Prefill drift uses separate public technical probes because its output includes token IDs. Use `--no-drift` for a generation-only run, or `--image` for the optional generated vision capability check.
 
 ```sh
@@ -45,7 +47,7 @@ python3 compare.py --help
 python3 speed.py --help
 ```
 
-`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. Earlier runners are available for `closed-v6` at `fbdce2de`, `closed-v5` at `de074642`, `closed-v4` at `cfb63f1c`, `closed-v3` at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
+`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. Earlier runners are available for `closed-v7` at `07db9356`, `closed-v6` at `fbdce2de`, `closed-v5` at `de074642`, `closed-v4` at `cfb63f1c`, `closed-v3` at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
 
 ## Maintain the release
 

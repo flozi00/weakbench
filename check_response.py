@@ -14,7 +14,8 @@ def main(argv=None):
     parser.add_argument("--lang", required=True, choices=hidden.LANGS)
     parser.add_argument("--id", required=True, help="item ID from the run's items-<task>.jsonl")
     parser.add_argument("--response", type=Path, help="chat completion JSON; for adaptive measurements supply "
-                        "an object with messages (assistant calls and tool results) and completion (default: stdin)")
+                        "an object with messages (assistant calls and tool results) and completion. For commitment repairs, "
+                        "supply an object with the three ordered chat completions under completions (default: stdin)")
     args = parser.parse_args(argv)
     try:
         cells = hidden.release()
@@ -27,17 +28,26 @@ def main(argv=None):
     try:
         data = args.response.read_bytes() if args.response else sys.stdin.buffer.read()
         completion = hidden.strict_json(data)
-        trace = None
-        if item.get("capture_tool_transcript") and isinstance(completion, dict) and "completion" in completion:
-            if set(completion) != {"messages", "completion"} or not isinstance(completion["messages"], list):
+        if item.get("turns"):
+            if (not isinstance(completion, dict) or set(completion) != {"completions"}
+                    or not isinstance(completion["completions"], list)
+                    or len(completion["completions"]) != len(item["turns"])):
                 raise ValueError
-            trace, completion = completion["messages"], completion["completion"]
-        message = completion["choices"][0]["message"]
-        if not isinstance(message, dict) or not any(k in message for k in ("content", "reasoning", "reasoning_content")):
-            raise ValueError
-        reply = quality.parse_reply(completion)
-        if trace is not None:
-            reply["observation_trace"] = trace
+            turns = [quality.parse_text_turn(entry) for entry in completion["completions"]]
+            reply = turns[-1][0]
+            reply["turns"] = [proposal for _, proposal in turns]
+        else:
+            trace = None
+            if item.get("capture_tool_transcript") and isinstance(completion, dict) and "completion" in completion:
+                if set(completion) != {"messages", "completion"} or not isinstance(completion["messages"], list):
+                    raise ValueError
+                trace, completion = completion["messages"], completion["completion"]
+            message = completion["choices"][0]["message"]
+            if not isinstance(message, dict) or not any(k in message for k in ("content", "reasoning", "reasoning_content")):
+                raise ValueError
+            reply = quality.parse_reply(completion)
+            if trace is not None:
+                reply["observation_trace"] = trace
         result = task["score"](item, reply)
     except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, RecursionError):
         parser.error("cannot read or score chat completion JSON")

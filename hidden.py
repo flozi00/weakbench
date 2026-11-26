@@ -13,6 +13,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import closed_commitments
 import closed_flow
 import closed_images
 import closed_language
@@ -21,19 +22,19 @@ import closed_perspective
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "0daf9f32b028b16830e5c8c04d632a7bd2b7c171"
-DATA_PATH = "releases/closed-v7/cases.jsonl"
-DATA_SHA256 = "1f8ee12494ca34385697c25917ed1f5c6c3091b8c53dc42eaf9d2edb851e7ace"
+DATA_REVISION = "85c9e782f329768135a13fc222eafd9b3d10351e"
+DATA_PATH = "releases/closed-v8/cases.jsonl"
+DATA_SHA256 = "a48b06a5edde20c5278e925f0b83fbcbbee37908301a0f2422006b1288db63ac"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
 RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
-RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6)
+RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
-            "quoted_perspective": closed_perspective}
+            "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments}
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
 VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32}
 PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
@@ -45,18 +46,19 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "language_evidence": sorted(closed_language.DETAIL_KEYS),
                    "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS),
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
-                   "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS)}
+                   "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
+                   "commitment_repair": sorted(closed_commitments.DETAIL_KEYS)}
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
-               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective"), 32),
+               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge"]},
-    {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching"]},
+    {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
@@ -72,6 +74,7 @@ CATEGORIES = [
     {"key": "network_optimization", "label": "Network optimization", "tasks": ["flow_certificate"]},
     {"key": "print_production", "label": "Print production", "tasks": ["booklet_imposition"]},
     {"key": "coding_theory", "label": "Error-correcting codes", "tasks": ["symbol_recovery"]},
+    {"key": "thermodynamics", "label": "Thermodynamics", "tasks": ["phase_equilibrium"]},
     {"key": "signal_processing", "label": "Signal processing", "tasks": ["sampled_waveform"]},
 ]
 LANGS = ("en", "de")
@@ -107,6 +110,12 @@ def decode(data):
             mode = "program" if family in PROGRAMS else "judge" if family in JUDGE_TASKS else "exact"
             field = "rubric" if mode == "judge" else "expected"
             fields = {"id", "language", "family", "mode", "prompt", field}
+            if family == "commitment_repair":
+                fields.add("followups")
+                followups = row["followups"]
+                if (not isinstance(followups, list) or len(followups) != 2
+                        or not all(isinstance(text, str) and text.strip() for text in followups)):
+                    raise ValueError
             if family in VISUAL_COUNTS:
                 fields.add("media")
                 closed_images.validate_media(row["media"])
@@ -209,6 +218,8 @@ def load(cells, family, lang, n, seed):
                        {"type": "text", "text": row["prompt"]}]
         item = {"id": uid, "lang": lang, "messages": [{"role": "user", "content": content}],
                 **{k: row[k] for k in ("expected", "rubric") if k in row}}
+        if family == "commitment_repair":
+            item["turns"] = [item["messages"], *[[{"role": "user", "content": text}] for text in row["followups"]]]
         if family == "adaptive_measurement":
             item.update(closed_observations.runtime(item["expected"], lang))
         items.append(item)

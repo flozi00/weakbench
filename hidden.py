@@ -13,11 +13,13 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import closed_auction
 import closed_audio
 import closed_commitments
 import closed_flow
 import closed_images
 import closed_language
+import closed_pairs
 import closed_observations
 import closed_perspective
 import closed_proofs
@@ -27,21 +29,21 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "4fc0ce98d3c8f42a12e3d59643692bf8d9a22e9d"
-DATA_PATH = "releases/closed-v11/cases.jsonl"
-DATA_SHA256 = "76c943798b94550835fab748b64ab345344d483f4cec6c20cdeaf68d90eada4c"
+DATA_REVISION = "8b12cee9674700dd4ce45fab512c7efdf519f88d"
+DATA_PATH = "releases/closed-v12/cases.jsonl"
+DATA_SHA256 = "2bc37cb81c8efac0c309cc724e2892d9704422829e889836efbaff03187afa87"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
 RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
 RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium", "formula_relocation", "shared_noise",
-                  "accessible_edit", "bridge_loading")
+                  "accessible_edit", "bridge_loading", "loop_game")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
-            "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
+            "package_auction": closed_auction, "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
 LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
 TEXT_DIALOGUES = frozenset(("commitment_repair", "language_relay"))
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
@@ -58,17 +60,19 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
+                   "package_auction": sorted(closed_auction.DETAIL_KEYS),
                    "listener_reference": sorted(closed_reference.DETAIL_KEYS),
                    "stream_transducer": sorted(closed_transducer.DETAIL_KEYS),
                    "commitment_repair": sorted(closed_commitments.DETAIL_KEYS),
                    "language_relay": sorted(closed_relay.DETAIL_KEYS)}
+PAIR_METRICS = closed_pairs.METRICS
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
-                                "listener_reference", "stream_transducer", "language_relay"), 32),
+                                "listener_reference", "stream_transducer", "language_relay", "package_auction"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
@@ -82,6 +86,8 @@ CATEGORIES = [
     {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
     {"key": "tutoring", "label": "Tutoring", "tasks": ["contrastive_tutoring"]},
     {"key": "statistics", "label": "Statistical inference", "tasks": ["stratified_effect", "censored_bounds", "paired_randomization", "shared_noise"]},
+    {"key": "auctions", "label": "Package auctions", "tasks": ["package_auction"]},
+    {"key": "games", "label": "Adversarial games", "tasks": ["loop_game"]},
     {"key": "spreadsheets", "label": "Spreadsheet formulas", "tasks": ["formula_relocation"]},
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
     {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope"]},
@@ -236,7 +242,7 @@ def load(cells, family, lang, n, seed):
     items = []
     for ordinal in order[:n]:
         row = rows[ordinal]
-        uid = hashlib.sha256(f"{DATA_REVISION}/{family}/{ordinal}".encode()).hexdigest()[:32]
+        uid = closed_pairs.item_id(DATA_REVISION, family, ordinal)
         content = row["prompt"]
         if family in VISUAL_COUNTS:
             content = [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + row["media"]["data"]}},

@@ -18,6 +18,7 @@ import common
 import check_response
 import hidden
 import quality
+import test_closed_auction as auction_fixture
 import test_closed_commitments as booking_fixture
 import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
@@ -100,6 +101,9 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "package_auction":
+                        fields = {"mode": "program", "expected": {"bids": auction_fixture.offers()}}
+                        answer = {"accepted": ["Ax", "By"], "payments": {"A": 3, "B": 0, "C": 0}}
                     elif family == "stream_transducer":
                         answer = {"start": "q", "states": {"q": {"p": ["q", "m"]}}}
                         fields = {"mode": "program", "expected": {"inputs": ["p"], "outputs": ["m"],
@@ -578,6 +582,8 @@ class ClosedSuiteTests(unittest.TestCase):
             if row["task"] == "listener_reference":
                 self.assertEqual(row["extra"]["both_listeners_unique"], 1)
                 self.assertEqual(row["extra"]["reference_minimal"], 1)
+            if row["task"] == "package_auction":
+                self.assertEqual(row["extra"]["auction_payments_correct"], 1)
             if row["task"] == "stream_transducer":
                 self.assertEqual(row["extra"]["transducer_equivalent"], 1)
             if row["task"] == "localized_proof":

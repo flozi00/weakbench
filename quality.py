@@ -1292,6 +1292,13 @@ def summarize(run_dir):
     cells = collections.defaultdict(list)
     for (task_name, lang, _), r in latest.items():
         cells[(task_name, lang)].append(r)
+    pair_checks = {}
+    metadata = run_dir / "run_info.json"
+    if metadata.is_file():
+        info = json.loads(metadata.read_bytes())
+        if info.get("data_repo") == hidden.DATA_REPO and re.fullmatch("[0-9a-f]{40}", str(info.get("data_revision"))):
+            counts = hidden.FULL_COUNTS | hidden.VISUAL_COUNTS | hidden.AUDIO_COUNTS
+            pair_checks = hidden.closed_pairs.checks(cells, info["data_revision"], counts, hidden.PAIRED_VARIANTS)
     order = {name: i for i, name in enumerate(TASKS)}
     mean = lambda xs: round(statistics.fmean(xs), 4) if xs else None  # noqa: E731
 
@@ -1310,6 +1317,7 @@ def summarize(run_dir):
                      "accuracy": mean([float(r["correct"]) for r in ok if r["correct"] is not None]),
                      "score_mean": mean([r["score"] for r in ok if r["score"] is not None]),
                      "extra": extras(ok),
+                     **({"pair_checks": pair_checks[task_name, lang]} if (task_name, lang) in pair_checks else {}),
                      "errors": len(rs) - len(ok), "junk": sum(bool(r["junk"]) for r in rs),
                      "truncated": sum(r["finish_reason"] == "length" for r in rs),
                      "lang_mismatch": sum(r["lang_ok"] is False for r in rs),

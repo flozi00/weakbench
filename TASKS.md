@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v11` release runs each text family in German and English. Counts are per language.
+The `closed-v12` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -46,6 +46,8 @@ The `closed-v11` release runs each text family in German and English. Counts are
 | `language_relay` | Updating a dating report across German–English–German or English–German–English turns | 16 | 32 | Each turn must justify both sharp bounds and the decision in that turn's language. A later correct response cannot repair a failed earlier turn. |
 | `accessible_edit` | Predicting a button's accessible name and description before and after a localized change to HTML | 16 | 32 | Four exact strings under the specified whitespace normalization |
 | `bridge_loading` | Replacing one resistor in a measurement bridge and accounting for the finite resistance of the meter | 16 | 32 | Exact signed meter voltage, current in a neighboring branch and its change from the initial configuration |
+| `package_auction` | Awarding indivisible bundles with at most one winning bid per participant, then charging each winner for the value displaced | 16 | 32 | Any feasible maximum-value allocation passes with its own exact Clarke-pivot payments and zero charges to losers. |
+| `loop_game` | Finding a winning move or a draw on a directed game board with alternating play and possible cycles | 16 | 32 | Exact outcome, duration for a forced result, and all equally optimal first destinations |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -64,6 +66,10 @@ For `adaptive_measurement`, the paired specimens start with the same request and
 For `commitment_repair`, each turn receives only the dialogue so far. A valid first booking may lead to a different valid final booking from another candidate's. The scorer accepts every minimal repair of the candidate's preceding booking. The three stored assistant completions can be checked offline together.
 
 Exact-JSON tasks also report the fraction of scored responses that parsed and the fraction with the expected top-level JSON type, keys or array length. Among responses with the expected shape, `answer_components_correct` averages the share of exact top-level values within each answer. Nested values must match in full. The leaderboard score continues to require the full answer.
+
+### Correctness across variants and languages
+
+Private summary rows include `pair_checks`. Each entry carries integer `passed` and `scored` counts. `contrast_both_correct` requires both variants of a contrast pair in the row's language to pass. `bilingual_item_correct` requires the two language versions of one item to pass. `bilingual_contrast_correct` requires all four responses for one contrast pair across both languages to pass. Bilingual counts appear on both language rows. Only complete groups with boolean verdicts and no technical errors enter the denominator. Failed answers and token-limited responses with a negative verdict count as incorrect. A measure without eligible groups is omitted. Summarizing a resumed run uses its latest record for each item. The pairing uses the revision recorded with the run.
 
 ## Private visual tasks
 

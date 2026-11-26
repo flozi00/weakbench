@@ -81,6 +81,20 @@ The two targets use different prompts. Generate once per target. A model revisio
 
 The four workloads cover a strided contraction, a two-dimensional edge stencil, a segmented sequence reduction and a numerically stable weighted softmax. Each has eight correctness shapes and two separately chosen timing shapes. The independent oracle checks every output including both timing shapes. Only a submission passing the entire workload earns timing. For each timed shape the runner records seven paired GPU durations for the candidate and its fixed scalar reference. A speedup above one in every pair counts as faster. Compare models on the same device, backend, release and shapes. The suite reports failed submissions and missing infrastructure separately. Speed is relative to the included hand-written reference. [Metal source contract and measurement](KERNEL-METAL.md) · [CUDA C++ compiler and hardware measurement](kernel-cuda/README.md)
 
+### Native Metal and response format
+
+The native Metal track asks for a complete Metal Shading Language compute function. Every mathematical brief has two presentations, one requesting source text and one requesting a single JSON field named `source`. Both use the same numeric inputs, launch configuration, compiler, CPU oracle and reference kernel. The archive distinguishes the two prompts. To evaluate a model on both presentations:
+
+```sh
+python3 gpu_bench.py prepare --msl
+python3 gpu_bench.py generate --target msl-code --model "$MODEL" --revision "$MODEL_REV" --url "$LOCAL_URL"
+python3 gpu_bench.py generate --target msl-json --model "$MODEL" --revision "$MODEL_REV" --url "$LOCAL_URL"
+python3 gpu_bench.py evaluate --track msl-native --reference-control
+python3 gpu_bench.py evaluate --track msl-native --model-key "$MODEL_KEY"
+```
+
+Each generation command prints the model key. Repeat `--model-key` to compare several profiles in one report. Each underlying task has two separate observations for the same model, language and brief. The report counts outcomes for both formats, just source, just JSON, neither, or unmeasured at each stage. The first stage checks whether the response can be read according to the requested envelope. Bare text reaches the compiler even when it contains invalid MSL. The next stage requires a usable native compute pipeline; the last requires correct output for every input shape. Missing submissions and infrastructure failures leave the affected stages unmeasured. The report also counts pairs whose decoded source bytes are identical. Different byte sequences can still implement the same algorithm. Differences describe these particular generated programs and formats. [Native Metal ABI and measured scope](KERNEL-MSL.md)
+
 ## Creative league
 
 The league archives complete visible submissions and runs a round robin for each challenge. Its first private catalogue contains 24 tasks across German and English: four writing briefs, four responsive website briefs and four Three.js briefs in each language. The ordinary quality suite and its release scores are separate.

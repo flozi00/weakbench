@@ -1,5 +1,5 @@
 /* WeakBench trusted Metal host. The Python front end supplies validated, generated MSL
-   and float32 buffers in its private working directory. This binary never loads
+   and private float32 inputs and float64 CPU references. This binary never loads
    candidate libraries, executables or host pointers. */
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
@@ -97,7 +97,7 @@ static double submit(Sample *x, id<MTLCommandQueue> queue, id<MTLComputePipeline
 static NSDictionary *verify(Sample *x, id<MTLCommandQueue> q, id<MTLComputePipelineState> p,
                             NSUInteger threads, NSUInteger lanes, double *us) {
     float *out = (float *)x->out.contents;
-    const float *expected = x->gold.bytes;
+    const double *expected = x->gold.bytes;
     for (uint32_t i = 0; i < x->s.L; ++i)
         out[i] = NAN;
     *(uint32_t *)x->bad.contents = 0;
@@ -151,12 +151,15 @@ int main(void) {
                 NSArray *shape = m[@"shape"];
                 NSData *ad = readData(filename(i, @"a")), *bd = readData(filename(i, @"b"));
                 x->gold = readData(filename(i, @"expected"));
+                if (x->gold.length == 0 || x->gold.length % sizeof(double) ||
+                    ad.length % sizeof(float) || bd.length % sizeof(float))
+                    fail(@"invalid_buffer_length");
                 x->s = (Shape){[shape[0] unsignedIntValue], [shape[1] unsignedIntValue],
-                               [shape[2] unsignedIntValue], (uint32_t)(x->gold.length / 4),
-                               (uint32_t)(ad.length / 4),   (uint32_t)(bd.length / 4)};
+                               [shape[2] unsignedIntValue], (uint32_t)(x->gold.length / sizeof(double)),
+                               (uint32_t)(ad.length / sizeof(float)),   (uint32_t)(bd.length / sizeof(float))};
                 x->a = input(device, ad);
                 x->b = input(device, bd);
-                x->out = [device newBufferWithLength:x->gold.length options:MTLResourceStorageModeShared];
+                x->out = [device newBufferWithLength:x->s.L * sizeof(float) options:MTLResourceStorageModeShared];
                 x->bad = [device newBufferWithLength:4 options:MTLResourceStorageModeShared];
                 if (!x->out || !x->bad)
                     fail(@"metal_allocation");

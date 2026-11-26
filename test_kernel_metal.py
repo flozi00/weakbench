@@ -3,6 +3,7 @@
 from copy import deepcopy
 import os
 import random
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -174,6 +175,21 @@ out = acc if acc > 0.0 else 0.0"""
         ):
             metal._buffers(Path(tmp), [{**fixture(8), "a": [float("inf")]}])
 
+    def test_case_hash_covers_full_precision_cpu_references(self):
+        sample = {**fixture(1), "expected": [1.00000004]}
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)
+            before = metal._buffers(path, [sample])[0]["case_hash"]
+            self.assertEqual(
+                (path / "0-expected").read_bytes(), struct.pack("<d", 1.00000004)
+            )
+            self.assertEqual((path / "0-a").read_bytes(), struct.pack("<f", 0.0))
+            self.assertEqual((path / "0-b").read_bytes(), struct.pack("<f", -0.5))
+            after = metal._buffers(path, [{**sample, "expected": [1.0]}])[0][
+                "case_hash"
+            ]
+            self.assertNotEqual(before, after)
+
     def test_unavailable_device_has_no_emulated_rank(self):
         with (
             patch.object(metal.platform, "system", return_value="Linux"),
@@ -231,6 +247,45 @@ class HardwareTests(unittest.TestCase):
                     all(
                         "timing" not in r and "rounds" not in r for r in result["cases"]
                     )
+                )
+
+    def test_catalog_reference_preserves_both_sides_of_tolerance(self):
+        for expected, actual, should_pass in (
+            (1.00000004, 1.0000640153884888, True),
+            (0.501000007, 0.5009379982948303, False),
+        ):
+            with self.subTest(expected=expected):
+                # The candidate represents the GPU's exact float32 output. Quantizing
+                # the CPU reference at either boundary would reverse the verdict.
+                self.assertEqual(
+                    struct.unpack("<f", struct.pack("<f", actual))[0], actual
+                )
+                rounded = struct.unpack("<f", struct.pack("<f", expected))[0]
+                for witness, verdict in (
+                    (expected, should_pass),
+                    (rounded, not should_pass),
+                ):
+                    self.assertEqual(
+                        abs(actual - witness) <= 6e-5 + 4e-6 * abs(witness), verdict
+                    )
+                sample = {
+                    **fixture(1),
+                    "a": [actual],
+                    "b": [expected],
+                    "expected": [expected],
+                    "atol": 6e-5,
+                    "rtol": 4e-6,
+                }
+                result = metal.measure(
+                    program("out=A(i)"), program("out=B(i)"), [sample]
+                )
+                self.assertEqual(
+                    result["status"], "correct" if should_pass else "incorrect"
+                )
+                check = result["cases"][0]["validation"]
+                self.assertEqual(check["passed"], should_pass)
+                self.assertAlmostEqual(
+                    check["max_abs_error"], abs(actual - expected), places=13
                 )
 
     def test_wrong_baseline_is_infrastructure_error(self):

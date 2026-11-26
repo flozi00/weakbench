@@ -14,6 +14,12 @@ The text coding families check functional programs on a CPU or by replay. GPU su
 
 KernelBench uses correctness and a speed threshold to evaluate generated GPU kernels. Here the runtime reports each comparison separately against a fixed reference on the same shape, with all seven measured pairs retained. The Apple path supports an explicit bounded kernel language. The CUDA path accepts native C++ with a fixed entry point and launch contract. Compilation alone supplies a distinct result. Cross-vendor ratios, multi-GPU collectives, end-to-end inference throughput and speed versus tuned vendor libraries are outside this catalogue. [KernelBench](https://github.com/ScalingIntelligence/KernelBench) · [Apple GPU timing](https://developer.apple.com/documentation/metal/mtlcommandbuffer/gpustarttime) · [NVIDIA NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html)
 
+### Native Metal format comparison
+
+The first three-model Apple pilot recorded 24 answers. Each missed either the JSON submission contract or the bounded Metal language before any model kernel could run. The matched native track tests which stages a model reaches when it can write complete MSL source. Within a pair only the response-format instruction changes. Changing the format can also change the program the model chooses to write. Comparing these new counts with those from the older bounded language changes multiple conditions.
+
+Apple's runtime can compile a source string into an MTLLibrary and return pipeline reflection for a compute function. The harness checks reflected buffer bindings, numerical output, and seven time pairs after correctness. Following KernelBench's distinction between functional correctness and measured performance, it retains separate counts for extractable responses, accepted pipelines and all-shape correctness. [Apple shader libraries](https://developer.apple.com/documentation/metal/mtllibrary?language=objc) · [Apple pipeline reflection](https://developer.apple.com/documentation/metal/MTLComputePipelineReflection?language=objc) · [KernelBench](https://proceedings.mlr.press/v267/ouyang25a.html)
+
 ## Private coverage review, closed-v20
 
 The release adds 64 interactive cases about authorization, retry decisions and verifying that an action took effect. The full suite contains 4,200 text cases, 192 image cases and 64 audio cases. Each language has 16 pairs with identical opening requests. The tool responses reveal whether the model may act, must wait for approval, should retry under the original key or can confirm an existing booking.

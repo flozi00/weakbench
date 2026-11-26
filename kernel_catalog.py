@@ -137,3 +137,90 @@ def prepare():
         cache_path(),
         lambda data: decode(data, pinned=True),
     )
+
+
+MSL_REVISION = "2bf30f76e9a4c857c6501dec834e1732da17f7d5"
+MSL_DIGEST = "37acfe141dfe043dad135b3da630da2c60ee410ae956f47478f9b1a6eac13841"
+MSL_REMOTE = "releases/gpu-msl-v1/tasks.json"
+
+
+def msl_cache_path():
+    return cache_path().parents[1] / MSL_REVISION / "native-msl.json"
+
+
+def decode_msl(data, parent, parent_sha, *, pinned=False):
+    """Join the supplement only to the validated numerical catalogue it was authored for."""
+    if len(data) > 2 << 20 or pinned and sha256(data).hexdigest() != MSL_DIGEST:
+        raise ValueError("invalid native Metal catalogue size or checksum")
+    try:
+        extension = hidden.strict_json(data)
+        if (
+            set(extension) != {"format", "parent_sha256", "tasks", "baselines"}
+            or type(extension["format"]) is not int
+            or extension["format"] != 1
+            or extension["parent_sha256"] != parent_sha
+        ):
+            raise ValueError
+        refs = extension["baselines"]
+        if (
+            not isinstance(refs, dict)
+            or set(refs) != parent["workloads"].keys()
+            or not all(
+                isinstance(v, str) and 0 < len(v.strip()) <= 65536
+                for v in refs.values()
+            )
+        ):
+            raise ValueError
+        tasks = extension["tasks"]
+        if not isinstance(tasks, list) or len(tasks) != len(parent["tasks"]):
+            raise ValueError
+        by_id = {t["id"]: t for t in parent["tasks"]}
+        overlay = {}
+        for t in tasks:
+            if set(t) != {"id", "family", "language", "prompt_code", "prompt_json"}:
+                raise ValueError
+            original = by_id[t["id"]]
+            if (
+                t["id"] in overlay
+                or any(t[k] != original[k] for k in ("family", "language"))
+                or not all(
+                    isinstance(t[k], str) and t[k].strip()
+                    for k in ("prompt_code", "prompt_json")
+                )
+                or t["prompt_code"] == t["prompt_json"]
+            ):
+                raise ValueError
+            overlay[t["id"]] = t
+        return {
+            **parent,
+            "tasks": [{**t, **overlay[t["id"]]} for t in parent["tasks"]],
+            "workloads": {
+                k: {**w, "msl": refs[k]} for k, w in parent["workloads"].items()
+            },
+        }
+    except (ValueError, KeyError, TypeError, RecursionError) as exc:
+        raise ValueError("invalid native Metal catalogue or numerical parent") from exc
+
+
+def load_msl(parent, parent_sha, path=None):
+    file = Path(path) if path else msl_cache_path()
+    if not file.is_file():
+        raise ValueError(
+            "Native Metal catalogue missing. Run python gpu_bench.py prepare --msl."
+        )
+    with file.open("rb") as stream:
+        data = stream.read((2 << 20) + 1)
+    return decode_msl(data, parent, parent_sha, pinned=path is None), sha256(
+        data
+    ).hexdigest()
+
+
+def prepare_msl():
+    parent = load_catalog()
+    hidden.prepare_private(
+        hidden.DATA_REPO,
+        MSL_REVISION,
+        MSL_REMOTE,
+        msl_cache_path(),
+        lambda data: decode_msl(data, parent, DIGEST, pinned=True),
+    )

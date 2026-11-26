@@ -175,6 +175,198 @@ class KernelArchiveTest(unittest.TestCase):
         self.assertEqual(controls[0]["model"]["key"], "reference_control")
         self.assertEqual(controls[0]["summary"]["statuses"], {"compiled": 1})
 
+    def test_native_release_and_paired_archive(self):
+        # Both formats use the same numeric inputs and exactly the same model profile.
+        parent = fixture()
+        with tempfile.TemporaryDirectory() as work:
+            folder = Path(work)
+            bundle = folder / "parent.gz"
+            bundle.write_bytes(gzip.compress(json.dumps(parent).encode()))
+            parent_sha = sha256(bundle.read_bytes()).hexdigest()
+            supplement = {
+                "format": 1,
+                "parent_sha256": parent_sha,
+                "baselines": {"demo": "reference"},
+                "tasks": [
+                    {k: v for k, v in task.items() if k in ("id", "family", "language")}
+                    | {
+                        "prompt_code": "code " + task["language"],
+                        "prompt_json": "json " + task["language"],
+                    }
+                    for task in parent["tasks"]
+                ],
+            }
+            spec = folder / "supplement.json"
+            spec.write_text(json.dumps(supplement))
+            for invalid in (
+                {"parent_sha256": "0" * 64},
+                {"baselines": {}},
+                {"tasks": [supplement["tasks"][0]] * 2},
+            ):
+                with self.assertRaises(ValueError):
+                    kernel_catalog.decode_msl(
+                        json.dumps(supplement | invalid).encode(), parent, parent_sha
+                    )
+            base = [
+                "--db",
+                str(folder / "archive"),
+                "--catalog",
+                str(bundle),
+                "--msl-catalog",
+                str(spec),
+            ]
+
+            def endpoint(url, body, timeout):
+                prompt = body["messages"][0]["content"]
+                text = {
+                    "code de": "valid",
+                    "code en": "wrong",
+                    "json de": '{"source":"wrong"}',
+                    "json en": "oops",
+                }[prompt]
+                return {
+                    "choices": [
+                        {
+                            "message": {"role": "assistant", "content": text},
+                            "finish_reason": "stop",
+                        }
+                    ]
+                }
+
+            def measure(source, reference, vectors, *, seed):
+                self.assertEqual(reference, "reference")
+                self.assertEqual(vectors, parent["workloads"]["demo"]["vectors"])
+                return {
+                    "status": "correct" if source == "valid" else "incorrect",
+                    "compiled": True,
+                    "cases": [{"validation": {"passed": source == "valid"}}],
+                }
+
+            with (
+                redirect_stdout(io.StringIO()),
+                patch("arena.answer_request", side_effect=endpoint) as requests,
+            ):
+                for target in ("msl-code", "msl-json", "msl-code"):
+                    self.assertEqual(
+                        gpu.main(
+                            [
+                                "generate",
+                                "--target",
+                                target,
+                                "--model",
+                                "local",
+                                "--revision",
+                                "r",
+                                "--url",
+                                "http://localhost:9999",
+                                *base,
+                            ]
+                        ),
+                        0,
+                    )
+                out = folder / "msl.json"
+                with patch("kernel_msl.measure", side_effect=measure) as calls:
+                    self.assertEqual(
+                        gpu.main(
+                            [
+                                "evaluate",
+                                "--track",
+                                "msl-native",
+                                "--output",
+                                str(out),
+                                *base,
+                            ]
+                        ),
+                        0,
+                    )
+                    self.assertEqual(calls.call_count, 3)
+                self.assertEqual(requests.call_count, 4)
+            report = json.loads(out.read_bytes())
+            self.assertEqual(
+                report["msl_catalog_sha256"], sha256(spec.read_bytes()).hexdigest()
+            )
+            self.assertEqual(report["catalog_sha256"], parent_sha)
+            self.assertEqual(
+                report["models"][0]["summary"]["source_comparison"],
+                {"identical": 0, "different": 1, "unavailable": 1},
+            )
+            pairs = report["models"][0]["summary"]["format_pairs"]
+            self.assertEqual(
+                pairs["parsed"],
+                dict(both=1, code_only=1, json_only=0, neither=0, unobserved=0),
+            )
+            self.assertEqual(pairs["compiled"], pairs["parsed"])
+            self.assertEqual(
+                pairs["correct"],
+                dict(both=0, code_only=1, json_only=0, neither=1, unobserved=0),
+            )
+            self.assertTrue(
+                all(
+                    "prompt" not in r and "source" not in r
+                    for r in report["models"][0]["results"]
+                )
+            )
+
+    def test_native_submission_and_unknown_pairs(self):
+        source = "// Größenvergleich" + "\n#include <metal_stdlib>"
+        for fence in ("```Metal Shading Language", "````cxx", "~~~metal"):
+            marker = fence[0] * (4 if fence.startswith("````") else 3)
+            self.assertEqual(
+                gpu.native_source(f"{fence}\n{source}\n{marker}", "code"), source
+            )
+        self.assertEqual(
+            gpu.native_source("```metal\n" + source + "\n```", "code"), source
+        )
+        self.assertEqual(
+            gpu.native_source(json.dumps({"source": source}), "json"), source
+        )
+        for text, fmt in [
+            ("answer\n```msl\nf(){}\n```", "code"),
+            ('{"source":"a","source":"b"}', "json"),
+            ('{"source":"b"}', "code"),
+            ('{"source":"b","threads":64}', "json"),
+        ]:
+            with self.subTest(fmt=fmt), self.assertRaises(gpu.SubmissionError):
+                gpu.native_source(text, fmt)
+        rows = [
+            {
+                "case_id": "x",
+                "family": "fixture",
+                "language": "de",
+                "response_format": fmt,
+                "measurement": m,
+            }
+            for fmt, m in (
+                (
+                    "code",
+                    {
+                        "status": "incorrect",
+                        "parsed": True,
+                        "compiled": True,
+                        "cases": [{"validation": {"passed": False}}],
+                    },
+                ),
+                ("json", {"status": "backend_unavailable", "parsed": True}),
+            )
+        ]
+        for row in rows:
+            row["measurement"]["source_sha256"] = "a" * 64
+        self.assertEqual(
+            gpu.paired_summary(rows)["source_comparison"],
+            {"identical": 1, "different": 0, "unavailable": 0},
+        )
+        summary = gpu.paired_summary(rows)["format_pairs"]
+        self.assertEqual(summary["parsed"]["both"], 1)
+        self.assertEqual(summary["compiled"]["unobserved"], 1)
+        self.assertEqual(summary["correct"]["unobserved"], 1)
+        self.assertEqual(
+            gpu.paired_summary(rows[:1])["format_pairs"]["parsed"]["unobserved"], 1
+        )
+        with self.assertRaises(ValueError):
+            gpu.paired_summary([rows[0], rows[0]])
+        with self.assertRaises(ValueError):
+            gpu.paired_summary([rows[0], {**rows[1], "language": "en"}])
+
     def test_answer_contract_and_scoring(self):
         program = fixture()["workloads"]["demo"]["metal"]
         self.assertEqual(

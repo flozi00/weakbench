@@ -25,7 +25,7 @@ import sys
 import tempfile
 
 HERE = Path(__file__).resolve().parent
-VERSION = "metal-element-v2"
+VERSION = "metal-element-v3"
 MAX_ELEMENTS = 1 << 20
 MAX_OUTPUT = 1 << 19
 MAX_WORK = 96_000_000
@@ -445,7 +445,7 @@ def _case_shapes(cases):
                 or not minimum <= len(c[name]) <= lim
             ):
                 raise BackendUnavailable("invalid buffer length")
-            total += len(c[name]) * 4
+            total += len(c[name]) * (8 if name == "expected" else 4)
         if total > 256 * (1 << 20):
             raise BackendUnavailable("suite exceeds memory bound")
         if type(c.get("timing", True)) is not bool or not all(
@@ -532,11 +532,13 @@ def _buffers(path, cases):
             | {"timing": c.get("timing", True)}
         )
         case_hash = hashlib.sha256(json.dumps(metadata[-1], sort_keys=True).encode())
-        for name in ("a", "b", "expected"):
+        for name, typecode in (("a", "f"), ("b", "f"), ("expected", "d")):
             try:
-                values = array.array("f", c[name])
+                values = array.array(typecode, c[name])
                 if not all(map(math.isfinite, values)):
-                    raise BackendUnavailable("case values must be finite Float32")
+                    raise BackendUnavailable(
+                        "GPU inputs and CPU reference values must be finite"
+                    )
                 if sys.byteorder != "little":
                     values.byteswap()
                 data = values.tobytes()
@@ -544,7 +546,7 @@ def _buffers(path, cases):
                 case_hash.update(data)
                 (path / f"{i}-{name}").write_bytes(data)
             except (OverflowError, TypeError, ValueError) as exc:
-                raise BackendUnavailable("invalid Float32 buffer") from exc
+                raise BackendUnavailable("invalid case buffer") from exc
         metadata[-1]["case_hash"] = case_hash.hexdigest()
     return metadata
 
@@ -683,6 +685,7 @@ def measure(candidate, baseline, cases, *, seed=0):
                         "hardware_timestamps_unavailable",
                         "threadgroup_unsupported",
                         "metal_allocation",
+                        "invalid_buffer_length",
                         "metal_command_failed",
                         "metal_library_compile_failed",
                         "metal_pipeline_compile_failed",

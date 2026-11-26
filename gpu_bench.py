@@ -17,9 +17,22 @@ from arena import Arena
 import common
 import hidden
 import kernel_catalog
+from kernel_pairs import paired_summary
 
 DEFAULT_DB = Path.home() / ".local/share/weakbench/gpu-kernels.sqlite3"
-TRACKS = ("metal", "cuda-compile", "cuda-hardware")
+TRACK_TARGETS = {
+    "metal": ("metal",),
+    "cuda-compile": ("cuda",),
+    "cuda-hardware": ("cuda",),
+    "msl-native": ("msl-code", "msl-json"),
+}
+TRACKS = tuple(TRACK_TARGETS)
+PROMPT_FIELDS = {
+    "metal": "prompt",
+    "cuda": "cuda_prompt",
+    "msl-code": "prompt_code",
+    "msl-json": "prompt_json",
+}
 
 
 class SubmissionError(ValueError):
@@ -31,6 +44,10 @@ def evaluator_digest(track):
     files = ["gpu_bench.py", "kernel_catalog.py"]
     if track == "metal":
         files.extend(("kernel_metal.py", "kernel_metal_host.m"))
+    elif track == "msl-native":
+        files.extend(
+            ("kernel_msl.py", "kernel_msl_host.m", "kernel_metal.py", "kernel_pairs.py")
+        )
     else:
         files.extend(
             (
@@ -71,6 +88,55 @@ def submission(text):
     return value
 
 
+def native_source(text, response_format):
+    """Remove only a single enclosing fence. Treat bare source syntax as the compiler's decision."""
+    if response_format not in ("code", "json"):
+        raise ValueError("unknown native submission format")
+    body = text.strip()
+    fence = re.match(r"^(`{3,}|~{3,})([^\r\n]*)\r?\n", body)
+    if fence:
+        marker, label = fence.groups()
+        if (
+            marker.startswith("`")
+            and "`" in label
+            or response_format == "json"
+            and label.strip().lower() not in ("", "json")
+        ):
+            raise SubmissionError("invalid_fence")
+        closing = re.compile(
+            rf"(?m)^[ ]{{0,3}}{re.escape(marker[0])}{{{len(marker)},}}[ \t]*\r?$"
+        )
+        last = closing.search(body, fence.end())
+        if last is None or last.end() != len(body):
+            raise SubmissionError("invalid_fence")
+        body = body[fence.end() : last.start()].removesuffix("\n").removesuffix("\r")
+    elif re.search(r"(?m)^[ ]{0,3}(?:`{3,}|~{3,})", body):
+        raise SubmissionError("invalid_fence")
+    if response_format == "json":
+        try:
+            value = hidden.strict_json(body)
+        except (ValueError, RecursionError):
+            raise SubmissionError("invalid_json") from None
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"source"}
+            or not isinstance(value["source"], str)
+        ):
+            raise SubmissionError("invalid_submission_fields")
+        body = value["source"]
+    elif body.startswith(("{", "[")):
+        raise SubmissionError("invalid_source")
+    if not body.strip():
+        raise SubmissionError("invalid_source")
+    try:
+        length = len(body.encode())
+    except UnicodeEncodeError:
+        raise SubmissionError("invalid_source") from None
+    if length > 64000 or "\x00" in body:
+        raise SubmissionError("invalid_source")
+    return body
+
+
 def tasks_for(catalog, target, language=None, case=None):
     cases = []
     for task in catalog["tasks"]:
@@ -79,9 +145,11 @@ def tasks_for(catalog, target, language=None, case=None):
         cases.append(
             {
                 "id": target + "-" + task["id"],
+                "base_id": task["id"],
+                "target": target,
                 "kind": "text",
                 "language": task["language"],
-                "prompt": task["cuda_prompt" if target == "cuda" else "prompt"],
+                "prompt": task[PROMPT_FIELDS[target]],
                 "rubric": [
                     "Evaluate against the numerical oracle on the selected backend."
                 ],
@@ -92,7 +160,24 @@ def tasks_for(catalog, target, language=None, case=None):
     return cases
 
 
-def grade(raw, workload, track, seed):
+def grade(raw, workload, track, seed, response_format=None):
+    if track == "msl-native":
+        try:
+            source = native_source(raw, response_format)
+        except SubmissionError as exc:
+            return {"status": "invalid_submission", "parsed": False, "reason": str(exc)}
+        backend = importlib.import_module("kernel_msl")
+        try:
+            result = backend.measure(
+                source, workload["msl"], workload["vectors"], seed=seed
+            )
+        except backend.BackendUnavailable as exc:
+            result = unavailable(exc)
+        return {
+            **result,
+            "parsed": True,
+            "source_sha256": sha256(source.encode()).hexdigest(),
+        }
     try:
         program = submission(raw)
     except SubmissionError as exc:
@@ -116,11 +201,15 @@ def grade(raw, workload, track, seed):
             }.get(result.get("reason"), "source_contract")
         return result
     except backend.BackendUnavailable as exc:
-        result = {"status": "backend_unavailable"}
-        code = getattr(exc, "reason_code", None)
-        if code in ("backend_timeout", "dedicated_device_unselected"):
-            result["reason"] = code
-        return result
+        return unavailable(exc)
+
+
+def unavailable(exc):
+    result = {"status": "backend_unavailable"}
+    code = getattr(exc, "reason_code", None)
+    if code in ("backend_timeout", "dedicated_device_unselected"):
+        result["reason"] = code
+    return result
 
 
 def totals(results):
@@ -143,16 +232,18 @@ def totals(results):
 def evaluate(archive, catalog, cases, track, model_key, seed):
     candidates = archive.inventory()["models"]
     if model_key:
-        candidates = [p for p in candidates if p["key"] == model_key]
+        model_keys = {model_key} if isinstance(model_key, str) else set(model_key)
+        candidates = [p for p in candidates if p["key"] in model_keys]
+        if {p["key"] for p in candidates} != model_keys:
+            raise ValueError("Unknown model profile in the submission archive.")
     if not candidates:
         raise ValueError("No matching model profile in the submission archive.")
-    target = "metal" if track == "metal" else "cuda"
     by_id = {task["id"]: task for task in catalog["tasks"]}
     results = []
     for model in candidates:
         rows = []
         for case in cases:
-            cid = case["id"].removeprefix(target + "-")
+            cid = case["base_id"]
             task = by_id[cid]
             answer = archive.response(model["key"], case["id"])
             item = {
@@ -160,16 +251,27 @@ def evaluate(archive, catalog, cases, track, model_key, seed):
                 "family": task["family"],
                 "language": task["language"],
             }
+            response_format = None
+            if track == "msl-native":
+                response_format = case["target"].removeprefix("msl-")
+                item["response_format"] = response_format
             if answer is None:
                 measured = {"status": "missing_submission"}
             else:
                 item["answer_sha256"] = sha256(answer["content"].encode()).hexdigest()
                 item["finish_reason"] = answer["finish_reason"]
                 measured = grade(
-                    answer["content"], catalog["workloads"][task["family"]], track, seed
+                    answer["content"],
+                    catalog["workloads"][task["family"]],
+                    track,
+                    seed,
+                    response_format,
                 )
             rows.append({**item, "measurement": measured})
-        results.append({"model": model, "summary": totals(rows), "results": rows})
+        summary = totals(rows)
+        if track == "msl-native":
+            summary.update(paired_summary(rows))
+        results.append({"model": model, "summary": summary, "results": rows})
     return results
 
 
@@ -177,7 +279,10 @@ def reference_control(catalog, track, seed):
     target = "metal" if track == "metal" else "cuda"
     rows = []
     for family, workload in catalog["workloads"].items():
-        measured = grade(json.dumps(workload[target]), workload, track, seed)
+        if track == "msl-native":
+            measured = grade(workload["msl"], workload, track, seed, "code")
+        else:
+            measured = grade(json.dumps(workload[target]), workload, track, seed)
         rows.append(
             {
                 "case_id": family,
@@ -220,15 +325,22 @@ def save_report(path, report):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("prepare")
+    prep = sub.add_parser("prepare")
+    prep.add_argument(
+        "--msl", action="store_true", help="also prepare the matched native Metal tasks"
+    )
     run = sub.add_parser("generate", help="archive visible responses from a model")
-    run.add_argument("--target", choices=("metal", "cuda"), required=True)
+    run.add_argument("--target", choices=PROMPT_FIELDS, required=True)
     for name in ("model", "revision", "url"):
         run.add_argument("--" + name, required=True)
     run.add_argument("--settings", type=hidden.strict_json, default={})
     test = sub.add_parser("evaluate", help="score archived kernels, without inference")
     test.add_argument("--track", choices=TRACKS, required=True)
-    test.add_argument("--model-key")
+    test.add_argument(
+        "--model-key",
+        action="append",
+        help="select a model profile; repeat to compare profiles",
+    )
     test.add_argument(
         "--reference-control",
         action="store_true",
@@ -242,6 +354,11 @@ def main(argv=None):
     )
     for p in (run, test):
         p.add_argument("--db", type=Path, default=DEFAULT_DB)
+        p.add_argument(
+            "--msl-catalog",
+            type=Path,
+            help="explicit native Metal supplement for development",
+        )
         p.add_argument("--lang", choices=("en", "de"))
         p.add_argument("--case")
         p.add_argument(
@@ -251,18 +368,35 @@ def main(argv=None):
     try:
         if args.command == "prepare":
             kernel_catalog.prepare()
+            if args.msl:
+                kernel_catalog.prepare_msl()
             print("Private GPU catalogue prepared.")
             return 0
         if args.command == "evaluate" and not 0 <= args.seed <= 0xFFFFFFFF:
             raise ValueError("GPU measurement seed must be a uint32")
-        catalog = kernel_catalog.load_catalog(args.catalog)
-        target = (
-            args.target
-            if args.command == "generate"
-            else "metal"
-            if args.track == "metal"
-            else "cuda"
+        catalog_file = args.catalog or kernel_catalog.cache_path()
+        if not catalog_file.is_file():
+            raise ValueError("GPU catalogue missing. Run python gpu_bench.py prepare.")
+        data = catalog_file.read_bytes()
+        catalog = kernel_catalog.decode(data, pinned=args.catalog is None)
+        parent_digest = sha256(data).hexdigest()
+        targets = (
+            (args.target,) if args.command == "generate" else TRACK_TARGETS[args.track]
         )
+        native = targets[0].startswith("msl-")
+        supplement = {}
+        if native:
+            catalog, digest = kernel_catalog.load_msl(
+                catalog, parent_digest, args.msl_catalog
+            )
+            supplement = {
+                "msl_catalog_sha256": digest,
+                "msl_catalog_revision": kernel_catalog.MSL_REVISION
+                if args.msl_catalog is None
+                else None,
+            }
+        elif args.msl_catalog:
+            raise ValueError("Native Metal catalogue supplied for a different target")
         control = args.command == "evaluate" and args.reference_control
         if control:
             if args.model_key or args.lang or args.case:
@@ -271,7 +405,11 @@ def main(argv=None):
                 )
             results = reference_control(catalog, args.track, args.seed)
         else:
-            cases = tasks_for(catalog, target, args.lang, args.case)
+            cases = [
+                case
+                for target in targets
+                for case in tasks_for(catalog, target, args.lang, args.case)
+            ]
             archive = Arena(args.db)
             with archive.runner():
                 archive.register_cases(cases)
@@ -295,9 +433,8 @@ def main(argv=None):
             "catalog_revision": kernel_catalog.REVISION
             if args.catalog is None
             else None,
-            "catalog_sha256": kernel_catalog.DIGEST
-            if args.catalog is None
-            else sha256(args.catalog.read_bytes()).hexdigest(),
+            "catalog_sha256": parent_digest,
+            **supplement,
             "track": args.track,
             "bench_git_sha": common._git_sha(),
             "evaluator_sha256": evaluator_digest(args.track),

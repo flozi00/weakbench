@@ -33,6 +33,7 @@ import test_closed_probes as probes_fixture
 import test_closed_recourse as recourse_fixture
 import test_closed_counterpoint as counterpoint_fixture
 import test_closed_imagery as imagery_fixture
+import test_closed_actions as action_fixture
 import test_closed_revision as revision_fixture
 import test_closed_web_currency as web_fixture
 import test_closed_inquiry as inquiry_fixture
@@ -142,6 +143,8 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "imagery_chain":
                         fields = {"mode": "program", "expected": imagery_fixture.fixture(lang)}
                         answer = imagery_fixture.witness(lang)
+                    elif family == "action_postconditions":
+                        fields = {"mode":"program", "expected":action_fixture.fixture("missing")}
                     elif family == "belief_revision":
                         fields = {"mode":"program", "expected":revision_fixture.fixture(), "followups":["second","third"]}
                     elif family == "web_currency":
@@ -615,6 +618,14 @@ class ClosedSuiteTests(unittest.TestCase):
                 content = json.dumps(controls.get(case["task"], [True, False]))
             elif prompt == quality.PREFLIGHT:
                 content = "391"
+            elif "action_postconditions" in messages[0]["content"]:
+                if fail:
+                    raise RuntimeError(messages[0]["content"])
+                lang = messages[0]["content"].split("/")[2]
+                if len(messages) == 1:
+                    call = action_fixture.wire(action_fixture.fixture("missing"), [action_fixture.LOOK])[0]
+                    return {"choices":[{"message":call,"finish_reason":"tool_calls"}]}
+                content = json.dumps({"status":"freigabe_anfordern" if lang=="de" else "request_approval","ticket":"Example","receipt":None})
             elif "belief_revision" in messages[0]["content"]:
                 if fail:
                     raise RuntimeError(messages[0]["content"])

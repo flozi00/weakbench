@@ -1,0 +1,20 @@
+{
+  "amd64": {
+    "filename": "nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/c3/68/483a78f5e8f31b08fb1bb671559968c0ca3a065ac7acabfc7cee55214fd6/nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl",
+    "digests": {
+      "blake2b_256": "c368483a78f5e8f31b08fb1bb671559968c0ca3a065ac7acabfc7cee55214fd6",
+      "md5": "4fa66889b2278cd071d938563eb626c1",
+      "sha256": "ad9b6d2ead2435f11cbb6868809d2adeeee302e9bb94bcf0539c7a40d80e8575"
+    }
+  },
+  "arm64": {
+    "filename": "nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl",
+    "url": "https://files.pythonhosted.org/packages/b7/dc/6bb80850e0b7edd6588d560758f17e0550893a1feaf436807d64d2da040f/nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl",
+    "digests": {
+      "blake2b_256": "b7dc6bb80850e0b7edd6588d560758f17e0550893a1feaf436807d64d2da040f",
+      "md5": "a885a34c49694ff3247060d36cf71b4b",
+      "sha256": "d27f20a0ca67a4bb34268a5e951033496c5b74870b868bacd046b1b8e0c3267b"
+    }
+  }
+}

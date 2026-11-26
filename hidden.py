@@ -16,6 +16,7 @@ import urllib.request
 import closed_imagery
 import closed_inquiry
 import closed_web_tools
+import closed_actions
 import closed_revision
 import closed_web_currency
 import closed_gamebook
@@ -46,9 +47,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "f2c37aad540b553dec9b7e1a37d249e238bfca48"
-DATA_PATH = "releases/closed-v19/cases.jsonl"
-DATA_SHA256 = "26be9704145b6fa6a5f31a7128553750120311ae367b9926ef70cb780241b5c1"
+DATA_REVISION = "3b450ec2e329e3b9e3b2bfc11e10207d2d02c14a"
+DATA_PATH = "releases/closed-v20/cases.jsonl"
+DATA_SHA256 = "9a7b5b89df98b8cc1d1d25d7f08f28ceaca5bf9b8fa6827b9c447cf1a61a5fde"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -62,7 +63,7 @@ PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_la
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
             "imagery_chain": closed_imagery,
             "source_inquiry": closed_inquiry, "web_currency": closed_web_currency,
-            "belief_revision": closed_revision,
+            "belief_revision": closed_revision, "action_postconditions": closed_actions,
             "backstage_reveal": closed_backstage,
             "reader_gamebook": closed_gamebook,
             "bag_query": closed_bag,
@@ -94,6 +95,7 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "source_inquiry": sorted(closed_inquiry.DETAIL_KEYS),
                    "web_currency": sorted(closed_web_currency.DETAIL_KEYS),
                    "belief_revision": list(closed_revision.DETAIL_KEYS),
+                   "action_postconditions": list(closed_actions.DETAIL_KEYS),
                    "backstage_reveal": sorted(closed_backstage.DETAIL_KEYS),
                    "reader_gamebook": sorted(closed_gamebook.DETAIL_KEYS),
                    "bag_query": sorted(closed_bag.DETAIL_KEYS),
@@ -119,7 +121,7 @@ EXACT_FIELDS = {
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
                  **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
-FULL_COUNTS = {"web_currency": 48, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
+FULL_COUNTS = {"web_currency": 48, "action_postconditions":32, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
@@ -134,7 +136,7 @@ CATEGORIES = [
     {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
-    {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement", "web_currency"]},
+    {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement", "web_currency", "action_postconditions"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
     {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
     {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
@@ -327,6 +329,8 @@ def load(cells, family, lang, n, seed):
             item["turns"] = [item["messages"], *[[{"role": "user", "content": text}] for text in row["followups"]]]
         if family == "adaptive_measurement":
             item.update(closed_observations.runtime(item["expected"], lang))
+        if family == "action_postconditions":
+            item.update(closed_actions.runtime(item["expected"], lang))
         if family == "web_currency":
             item.update(closed_web_tools.runtime(item["expected"], lang))
         if family == "source_inquiry":

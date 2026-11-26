@@ -13,7 +13,7 @@ def main(argv=None):
     parser.add_argument("--task", required=True, choices=(*hidden.PLAIN_TASKS, *hidden.VISUAL_COUNTS, *hidden.AUDIO_COUNTS))
     parser.add_argument("--lang", required=True, choices=hidden.LANGS)
     parser.add_argument("--id", required=True, help="item ID from the run's items-<task>.jsonl")
-    parser.add_argument("--response", type=Path, help="chat completion JSON; for web searches, source inquiries and adaptive measurements supply "
+    parser.add_argument("--response", type=Path, help="chat completion JSON; for action postconditions, web searches, source inquiries and adaptive measurements supply "
                         "an object with messages (assistant calls and tool results) and completion. For three-turn text dialogues, "
                         "supply an object with the three ordered chat completions under completions (default: stdin)")
     args = parser.parse_args(argv)
@@ -46,7 +46,7 @@ def main(argv=None):
             message = completion["choices"][0]["message"]
             if not isinstance(message, dict) or not any(k in message for k in ("content", "reasoning", "reasoning_content")):
                 raise ValueError
-            reply = (hidden.closed_web_tools.parse_final(completion, quality.parse_reply) if args.task == "web_currency"
+            reply = (hidden.closed_web_tools.parse_final(completion, quality.parse_reply) if args.task in ("web_currency","action_postconditions")
                      else quality.parse_reply(completion, all_reasoning=args.task == "reader_gamebook"))
             if trace is not None:
                 reply["observation_trace"] = trace

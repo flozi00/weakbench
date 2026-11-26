@@ -12,13 +12,13 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v19` text suite has 60 families scored by code. Across German and English, these contribute 2,004 quick or 4,008 full cases. A judge adds four rubric-graded families, bringing the totals to 2,068 quick or 4,136 full. Quick samples half of each family in each language, keeping each counterfactual pair together and matching the sample across languages. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v20` text suite has 61 families scored by code. Across German and English, these contribute 2,036 quick or 4,072 full cases. A judge adds four rubric-graded families, bringing the totals to 2,100 quick or 4,200 full. Quick samples half of each family in each language, keeping each counterfactual pair together and matching the sample across languages. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
 To run the new text tasks on a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks web_currency,belief_revision --concurrency 4 --max-parallel 4
+  --tasks web_currency,belief_revision,action_postconditions --concurrency 4 --max-parallel 4
 ```
 
 Three optional private image families add 96 quick or 192 full questions across the two languages. To send the held-out charts, silhouettes and control panels to a local vision model, run:
@@ -61,6 +61,25 @@ python3 speed.py --help
 The private repository `flozi00/weakbench-data` holds the release JSONL. Each row has a unique ID, family, language, scoring mode and prompt. Exact rows carry the expected JSON value. Program rows carry the verifier's inputs. Judged rows carry an ordered list of criteria. Author and independently validate replacements outside the code checkout, upload to the private dataset, then update the immutable revision, checksum and cell sizes in `hidden.py`. The preparation command checks repository visibility and file integrity before staging the data.
 
 For a judge evaluation, download `authoring/closed-v2/calibration.jsonl` from the pinned private dataset revision to a private local directory. Run `python3 calibrate_judge.py --controls PATH --judge-url URL` with the prepared release. It reports agreement with labelled passing and failing answers separately for German and English.
+
+## GPU kernel development
+
+Generate and archive one kernel per model profile and brief. The private catalogue has four numerical workloads in German and English and a separate source contract for each backend. Each of the 16 briefs requests executable code. The GPU performs the work and a CPU oracle checks each output. A compile-only track records which submissions produce a native NVIDIA SM120 CUBIN.
+
+```sh
+python3 gpu_bench.py prepare
+python3 gpu_bench.py generate --target cuda --model "$MODEL" --revision "$MODEL_REV" --url "$LOCAL_URL"
+docker build -t weakbench-kernel-cuda:1 kernel-cuda
+python3 gpu_bench.py evaluate --track cuda-compile
+python3 gpu_bench.py generate --target metal --model "$MODEL" --revision "$MODEL_REV" --url "$LOCAL_URL"
+python3 gpu_bench.py evaluate --track metal
+```
+
+Run `python3 gpu_bench.py evaluate --track metal --reference-control` to verify and time the fixed references on local hardware. The same option works on both CUDA tracks. These reports are labeled as controls and appear separately from model results.
+
+The two targets use different prompts. Generate once per target. A model revision, changed generation settings or a changed prompt creates a new archive entry. The CUDA hardware run reuses the CUDA compilation submission. On a dedicated SM120 card with the NVIDIA Container Toolkit and a passing hardware control, set `WEAKBENCH_CUDA_DEVICE` to its full GPU UUID and run `python3 gpu_bench.py evaluate --track cuda-hardware`. Generation sends one request at a time. Evaluation requires no model endpoint. Use `--lang`, `--case` and `--model-key` to select saved entries for scoring. Each evaluation saves a fresh report under `~/.local/share/weakbench/gpu-reports/`. The private SQLite archive next to that directory contains the generated source and prompts.
+
+The four workloads cover a strided contraction, a two-dimensional edge stencil, a segmented sequence reduction and a numerically stable weighted softmax. Each has eight correctness shapes and two separately chosen timing shapes. The independent oracle checks every output including both timing shapes. Only a submission passing the entire workload earns timing. For each timed shape the runner records seven paired GPU durations for the candidate and its fixed scalar reference. A speedup above one in every pair counts as faster. Compare models on the same device, backend, release and shapes. The suite reports failed submissions and missing infrastructure separately. Speed is relative to the included hand-written reference. [Metal source contract and measurement](KERNEL-METAL.md) · [CUDA C++ compiler and hardware measurement](kernel-cuda/README.md)
 
 ## Creative league
 

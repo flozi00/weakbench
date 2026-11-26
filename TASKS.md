@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v19` release runs each text family in German and English. Counts are per language.
+The `closed-v20` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -61,6 +61,7 @@ The `closed-v19` release runs each text family in German and English. Counts are
 | `rule_time_slice` | Reconstructing decisions at the original filing date and after later corrections | 16 | 32 | Grades both interval timelines with their decisive revisions and all intervals where the decision itself changed. |
 | `distance_repair` | Reconstructing every optimal rail layout from unlabeled distances, including duplicate or erroneous readings | 16 | 32 | Grades the minimum replacements, all normalized layouts and the multiset of adjacent gaps shared by every optimum. |
 | `web_currency` | Choosing when to search for a changing fact, citing decisive evidence and recognizing unavailable information | 24 | 48 | Execute native web_search calls against a dated local index. Replay the exact returned sources, authenticate quotations and check the claim against the requested date. |
+| `action_postconditions` | Dispatching once with a verified grant, handling an uncertain receipt and resuming interrupted work | 16 | 32 | Replay the native tool transcript against the dispatch ledger. Require a confirmed receipt or withhold the action for missing authorization. Count duplicate effects on eligible cases. |
 | `belief_revision` | Revising a decision when the evidence changes and resisting unsupported corrections across three turns | 16 | 32 | Reconstruct the active evidence and all possible candidates at each turn. Score each decision and its minimal supporting evidence. |
 | `reader_gamebook` | Writing freely worded passages for a branching book in the requested language | 16 | 32 | Follows visible choices, verifies every promised ending and checks that all routes have already introduced the motifs recalled in each passage. |
 | `counterpoint_repair` | Repairing a melody against a fixed bass under stated voice-leading and cadence rules | 16 | 32 | Accepts every valid line that minimizes changed notes and then total displacement in semitones. |

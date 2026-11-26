@@ -8,6 +8,20 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## GPU kernel development coverage
+
+The text coding families check functional programs on a CPU or by replay. GPU submissions add address layout, numerical stability, behavior at size boundaries and the time for a dispatch on a named device. The catalogue pairs English and German versions of each workload. Each target receives eight briefs. The four numerical workloads cover 40 distinct shapes and 403,989 expected output elements. A second implementation checked the frozen numerical inputs and outputs. Sixteen hand-written incorrect variants passed source compilation on the M4 and failed the output checks. Those controls exercise the checker independently of model performance.
+
+KernelBench uses correctness and a speed threshold to evaluate generated GPU kernels. Here the runtime reports each comparison separately against a fixed reference on the same shape, with all seven measured pairs retained. The Apple path supports an explicit bounded kernel language. The CUDA path accepts native C++ with a fixed entry point and launch contract. Compilation alone supplies a distinct result. Cross-vendor ratios, multi-GPU collectives, end-to-end inference throughput and speed versus tuned vendor libraries are outside this catalogue. [KernelBench](https://github.com/ScalingIntelligence/KernelBench) · [Apple GPU timing](https://developer.apple.com/documentation/metal/mtlcommandbuffer/gpustarttime) · [NVIDIA NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html)
+
+## Private coverage review, closed-v20
+
+The release adds 64 interactive cases about authorization, retry decisions and verifying that an action took effect. The full suite contains 4,200 text cases, 192 image cases and 64 audio cases. Each language has 16 pairs with identical opening requests. The tool responses reveal whether the model may act, must wait for approval, should retry under the original key or can confirm an existing booking.
+
+Three scores use different denominators. Withholding an unapproved action applies to 16 cases. Recovery after an ambiguous submission applies to 24. Verified completion applies to all 48 approved cases. The duplicate-effect rate records whether a second operation actually existed. A needless retry under the original key can produce exactly one booking and still fail the retry protocol.
+
+A second ledger agreed with the service simulator on 5,768 reachable transitions for a seven-action probe set. Two observation-based policies each passed all 64 cases. Reusing a valid history and answer from the paired case failed in all 64 directions. Changing the key after an uncertain result produced two physical bookings in 16 of 24 cases. These checks cover one simulated operator and a fixed set of delivery outcomes. Concurrent operators and real-world service failures require separate evaluation.
+
 ## Private coverage review, closed-v19
 
 The release adds 96 time-sensitive search tasks and 64 three-turn evidence-revision conversations. Every case is available in English or German, with aligned language pairs. The full suite contains 4,136 text cases, 192 image cases and 64 audio cases.

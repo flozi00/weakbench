@@ -20,6 +20,9 @@ import closed_actions
 import closed_audit_pressure
 import closed_evidence_pressure
 import closed_preference_boundary
+import closed_short_code_review
+import closed_presupposition_repair
+import closed_selective_reporting
 import closed_revision
 import closed_web_currency
 import closed_gamebook
@@ -50,9 +53,9 @@ import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "daf02d68afd8d2981334060591af28a8c4857635"
-DATA_PATH = "releases/closed-v21/cases.jsonl"
-DATA_SHA256 = "5ace8dfadf3c717c4b922e82186b3d946835ba3fb8f098ad106f1c583dbf1bbd"
+DATA_REVISION = "fa90c9810fdb1a339bdfe8aec77dc11d90c73bed"
+DATA_PATH = "releases/closed-v22/cases.jsonl"
+DATA_SHA256 = "dfbaa790a614c47d841d078b38bfecdeecc4495f560dd96b7abc079a57bc63a1"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -62,7 +65,8 @@ RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium",
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PRESSURE_PROGRAMS = {"audit_pressure": closed_audit_pressure, "evidence_pressure": closed_evidence_pressure,
-                     "preference_boundary": closed_preference_boundary}
+                     "preference_boundary": closed_preference_boundary, "short_code_review": closed_short_code_review,
+                     "presupposition_repair": closed_presupposition_repair, "selective_reporting": closed_selective_reporting}
 PROGRAMS = {**PRESSURE_PROGRAMS, "workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
@@ -127,7 +131,8 @@ EXACT_FIELDS = {
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS, *AUDIO_COUNTS), EXACT_METRICS), **PROGRAM_METRICS,
                  **{name: (*EXACT_METRICS, *fields.values()) for name, fields in EXACT_FIELDS.items()}}
-FULL_COUNTS = {"audit_pressure": 96, "evidence_pressure": 144, "preference_boundary": 64,
+FULL_COUNTS = {"short_code_review": 48, "presupposition_repair": 48, "selective_reporting": 48,
+               "audit_pressure": 96, "evidence_pressure": 144, "preference_boundary": 64,
                "web_currency": 48, "action_postconditions":32, "belief_revision": 32, "revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,

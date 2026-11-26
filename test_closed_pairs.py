@@ -75,6 +75,28 @@ class PairTests(unittest.TestCase):
         self.assertNotIn("pressure_flip_to_unwarranted_certainty", stats[self.family, "de"])
         self.assertFalse(closed_pairs.checks(cells, "x" * 40, {self.family: 16}, {self.family}))
 
+    def test_eligibility_separates_wrong_neutral_and_unobservable_pressure(self):
+        self.family = "short_code_review"
+        rows = []
+        for ordinal, (baseline, observed, endorsement) in enumerate([
+            (1, 1, 1), (1, 0, None), (0, 1, 1), (0, 0, None), (1, None, None),
+        ]):
+            first, second = self.row("de", 2 * ordinal, False), self.row("de", 2 * ordinal + 1, False)
+            first["detail"]["pressure_neutral_correct"] = baseline
+            if observed is not None:
+                second["detail"]["pressure_unsupported_observed"] = observed
+            if endorsement is not None:
+                second["detail"].update(pressure_wrong_endorsement=endorsement, audit_false_positive=endorsement)
+            rows.extend((first, second))
+        def stats():
+            return closed_pairs.checks({(self.family, "de"): rows}, self.rev, {self.family: 10}, {self.family})[self.family, "de"]
+        self.assertEqual(stats()["pressure_pair_eligible"], {"passed": 1, "scored": 4})
+        self.assertEqual(stats()["pressure_flip_to_user"], {"passed": 1, "scored": 1})
+        self.assertEqual(stats()["pressure_flip_to_fabricated_defect"], {"passed": 1, "scored": 1})
+        rows[1]["error"] = "timeout"
+        self.assertEqual(stats()["pressure_pair_eligible"], {"passed": 0, "scored": 3})
+        self.assertNotIn("pressure_flip_to_user", stats())
+
     def test_unpaired_singletons_and_unrecognized_ids(self):
         rows=[self.row("de",0,False),self.row("en",0,False)]
         cells={(self.family,r["lang"]):[r] for r in rows}

@@ -36,6 +36,9 @@ import test_closed_imagery as imagery_fixture
 import test_closed_audit_pressure as audit_pressure_fixture
 import test_closed_evidence_pressure as evidence_pressure_fixture
 import test_closed_preference_boundary as preference_fixture
+import test_closed_short_code_review as short_review_fixture
+import test_closed_presupposition_repair as presupposition_fixture
+import test_closed_selective_reporting as reporting_fixture
 import test_closed_actions as action_fixture
 import test_closed_revision as revision_fixture
 import test_closed_web_currency as web_fixture
@@ -148,7 +151,8 @@ class ClosedSuiteTests(unittest.TestCase):
                         answer = imagery_fixture.witness(lang)
                     elif family in hidden.PRESSURE_PROGRAMS:
                         fixtures = {"audit_pressure": audit_pressure_fixture, "evidence_pressure": evidence_pressure_fixture,
-                                    "preference_boundary": preference_fixture}
+                                    "preference_boundary": preference_fixture, "short_code_review": short_review_fixture,
+                                    "presupposition_repair": presupposition_fixture, "selective_reporting": reporting_fixture}
                         expected, answer = fixtures[family].fixture(lang, i)
                         fields = {"mode": "program", "expected": expected}
                     elif family == "action_postconditions":
@@ -194,7 +198,7 @@ class ClosedSuiteTests(unittest.TestCase):
                         fields = {"mode": "exact", "expected": answer}
                     self.prompt_indices[prompt] = i // 2 if family == "adaptive_measurement" else i
                     rows.append({"family": family, "language": lang, "id": f"{family}_{lang}_{i}", "prompt": prompt, **fields})
-                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion", "imagery_chain", "backstage_reveal") else json.dumps(answer, ensure_ascii=False)
+                    self.answers[prompt] = answer if family in ("listener_reference", "sentence_fusion", "imagery_chain", "backstage_reveal", "short_code_review") else json.dumps(answer, ensure_ascii=False)
         self.payload = "\n".join(json.dumps(r) for r in rows).encode()
         self.enter(patch.multiple(hidden, FULL_COUNTS=dict.fromkeys(hidden.FULL_COUNTS, 4),
                                   DATA_SHA256=hashlib.sha256(self.payload).hexdigest()))
@@ -742,6 +746,7 @@ class ClosedSuiteTests(unittest.TestCase):
                 self.assertEqual(row["extra"]["flow_cut_equal"], 1)
         info = json.loads((run / "run_info.json").read_text())
         self.assertEqual(info["data_revision"], hidden.DATA_REVISION)
+        self.assertEqual(info["pressure_protocol"], hidden.closed_pairs.PROTOCOL)
         self.assertEqual(info["data_sha256"], hidden.DATA_SHA256)
         self.assertEqual(info["expected_items"], 4 * len(hidden.FULL_COUNTS))
         fail = True

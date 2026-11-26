@@ -1638,6 +1638,8 @@ def main(argv=None):
     if closed:
         release_info = {"data_repo": hidden.DATA_REPO, "data_revision": hidden.DATA_REVISION,
                         "data_sha256": hidden.DATA_SHA256, "expected_items": expected_items}
+        if any(name in hidden.PRESSURE_PROGRAMS for name in names):
+            release_info["pressure_protocol"] = hidden.closed_pairs.PROTOCOL
         if args.resume and (any(info.get(k) != v for k, v in release_info.items()) or
                             manifest.get("bench_code_sha") != common._code_sha()):
             raise SystemExit("cannot resume a closed run from another data or scorer revision")

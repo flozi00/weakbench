@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v5` release runs each family in German and English. Counts are per language.
+The `closed-v6` release runs each family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -29,6 +29,13 @@ The `closed-v5` release runs each family in German and English. Counts are per l
 | `grapheme_edits` | Editing text by extended grapheme index after earlier edits change the boundaries | 16 | 32 | Final scalars, cluster count and UTF-8 length of a prefix |
 | `normalization_join` | Joining repeated records under specified Unicode normalization and case-folding operations | 16 | 32 | All matching records, their quantities and original key byte totals |
 | `adaptive_measurement` | Choosing successive measurements to identify an unknown specimen using a limited number of probes | 16 | 32 | Replay each tool result, verify that each choice can still distinguish every remaining specimen within budget, and check the final identification |
+| `symbol_recovery` | Recovering a polynomial data block with corrupt and erased symbols over a supplied prime field | 16 | 32 | Coefficients, corrupt locations, missing values and an unused evaluation |
+| `sampled_waveform` | Resolving aliased components of a periodic signal using an extra measurement | 16 | 32 | Recovered gains and held-out readings |
+| `flow_certificate` | Constructing a maximum integral flow and proving optimality with a cut in a directed network | 16 | 32 | Any feasible flow and separating cut of the same value pass |
+| `booklet_imposition` | Positioning pages and blanks on duplex printer sheets for folded booklets | 16 | 32 | Panel assignments and orientations in printer coordinates |
+| `paired_randomization` | Evaluating a randomization test on an experiment with paired assignments and a constrained allocation | 16 | 32 | Exact randomization counts and two-sided tail probability |
+| `quantifier_scope` | Distinguishing two readings of a quantified sentence over a partially observed relation | 16 | 32 | Counts for all four truth-value pairs and canonical witness worlds for the two readings that disagree |
+| `quoted_perspective` | Resolving speaker, addressee, place and day inside nested quotations, including after an inner quotation ends | 16 | 32 | Required facts in both localized report fields, the request language and the language of any API-exposed reasoning |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -36,11 +43,13 @@ The `closed-v5` release runs each family in German and English. Counts are per l
 
 Judged cells run when a judge endpoint is supplied. `drift` measures teacher-forced numerical stability with public fixtures. `--image` adds the generated vision capability check.
 
-The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
+The four v3 families keep counterfactual pairs together in quick and full. They enable thinking in the default configuration. In `language_evidence` and `quoted_perspective`, the visible justification and answer are required on every item. The additional language check reads reasoning exposed by the API, including supported inline thinking tags. A returned trace with the wrong or undetermined language fails the item. If the server omits that channel, the visible report can pass. The scorer keeps the channel's text out of run artifacts.
 
 The `extra` object in each language's summary row reports `report_fields_present` and `reasoning_present` over all scored items. Visible field language rates use responses that supplied both required fields. `reasoning_language_decidable` uses items with returned reasoning, and `reasoning_language_ok` uses those with identifiable reasoning language. `all_channels_language_ok` requires every language check to pass and uses only items with returned reasoning. A metric with no eligible items is omitted. The language check is a deterministic German/English text heuristic.
 
 For `adaptive_measurement`, the paired specimens start with the same request and yield different observations. Only complete evidence that identifies the specimen can earn credit. A valid decision rule may choose any probe that preserves a solution for all still-possible outcomes. The summary reports protocol validity, budget compliance, informative probes, whether the choices preserved a solution, unique identification and final-answer accuracy. Each rate uses the scored responses in the cell.
+
+Exact-JSON tasks also report the fraction of scored responses that parsed and the fraction with the expected top-level JSON type, keys or array length. Among responses with the expected shape, `answer_components_correct` averages the share of exact top-level values within each answer. Nested values must match in full. The leaderboard score continues to require the full answer.
 
 ## Historical diagnostics
 

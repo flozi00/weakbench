@@ -13,50 +13,63 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import closed_flow
 import closed_language
 import closed_observations
+import closed_perspective
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "9e3e9652cbabcc7ef97a7d13d6fee1166a2c0b31"
-DATA_PATH = "releases/closed-v5/cases.jsonl"
-DATA_SHA256 = "6099958de8035fbba6a40b867de744290a5c2d597b11ecbd8960a5ba4996200b"
+DATA_REVISION = "c5e0bfa00e414c4fe2e1ad465c90cc862a8a0acb"
+DATA_PATH = "releases/closed-v6/cases.jsonl"
+DATA_SHA256 = "a24f900f33d58e53326897260bb5acd7481b008e8e559d3cf7f1a451e73fac07"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
+RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
+RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6)
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
-               "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_V4, *RESEARCH_V5)
+               "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
-            "adaptive_measurement": closed_observations}
+            "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
+            "quoted_perspective": closed_perspective}
 PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
-THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_V4, *RESEARCH_V5))
+THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_EXACT))
 JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
 PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, *PROGRAMS, "quantity_contract", "schema_dispatch",
-                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_V4, *RESEARCH_V5))
+                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT))
 PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "schedule_optimal"),
                    "language_evidence": sorted(closed_language.DETAIL_KEYS),
-                   "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS)}
+                   "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS),
+                   "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
+                   "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS)}
+EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
+SCORE_METRICS = {**dict.fromkeys(EXACT_TASKS, EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
-               **dict.fromkeys((*RESEARCH_V4, *RESEARCH_V5, "adaptive_measurement"), 32),
+               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching"]},
-    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence"]},
+    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
     {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
     {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
     {"key": "tutoring", "label": "Tutoring", "tasks": ["contrastive_tutoring"]},
-    {"key": "statistics", "label": "Statistical inference", "tasks": ["stratified_effect", "censored_bounds"]},
+    {"key": "statistics", "label": "Statistical inference", "tasks": ["stratified_effect", "censored_bounds", "paired_randomization"]},
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
-    {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core"]},
+    {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope"]},
     {"key": "accessibility", "label": "Accessible tables", "tasks": ["header_binding"]},
     {"key": "music", "label": "Music notation", "tasks": ["polyphonic_score"]},
     {"key": "unicode", "label": "Unicode text processing", "tasks": ["grapheme_edits", "normalization_join"]},
+    {"key": "network_optimization", "label": "Network optimization", "tasks": ["flow_certificate"]},
+    {"key": "print_production", "label": "Print production", "tasks": ["booklet_imposition"]},
+    {"key": "coding_theory", "label": "Error-correcting codes", "tasks": ["symbol_recovery"]},
+    {"key": "signal_processing", "label": "Signal processing", "tasks": ["sampled_waveform"]},
 ]
 LANGS = ("en", "de")
 
@@ -95,7 +108,7 @@ def decode(data):
                 raise ValueError
             if mode == "program" and not PROGRAMS[family].validate_expected(row["expected"]):
                 raise ValueError
-            if family == "language_evidence" and not closed_language.request_language_ok(row["prompt"], lang):
+            if family in ("language_evidence", "quoted_perspective") and not closed_language.request_language_ok(row["prompt"], lang):
                 raise ValueError
             if mode == "judge":
                 rubric = row["rubric"]
@@ -191,18 +204,38 @@ def load(cells, family, lang, n, seed):
 
 
 def exact(item, reply):
+    def canonical(value):
+        # Preserve JSON type distinctions, including false versus 0 inside nested values.
+        return json.dumps(value, allow_nan=False, sort_keys=True)
+
+    gold = item["expected"]
+    detail = {"valid_json": 0.0, "json_shape_ok": 0.0}
     try:
         pred = strict_json(reply["content"])
-        # Canonical JSON also distinguishes booleans from 0/1, including nested values.
-        correct = json.dumps(pred, allow_nan=False, sort_keys=True) == json.dumps(item["expected"], sort_keys=True)
-        parsed = True
-    except (ValueError, RecursionError):
-        correct = parsed = False
-    return {"correct": correct, "score": float(correct), "detail": {"valid_json": float(parsed)}}
+        correct = canonical(pred) == canonical(gold)
+    except (ValueError, TypeError, RecursionError):
+        return {"correct": False, "score": 0.0, "detail": detail}
+    detail["valid_json"] = 1.0
+    structure = type(pred) is type(gold)
+    if structure and isinstance(gold, dict):
+        structure = pred.keys() == gold.keys()
+    elif structure and isinstance(gold, list):
+        structure = len(pred) == len(gold)
+    detail["json_shape_ok"] = float(structure)
+    if structure:
+        if isinstance(gold, dict) and gold:
+            matches = [canonical(pred[k]) == canonical(v) for k, v in gold.items()]
+            detail["answer_components_correct"] = sum(matches) / len(matches)
+        elif isinstance(gold, list) and gold:
+            matches = [canonical(p) == canonical(g) for p, g in zip(pred, gold)]
+            detail["answer_components_correct"] = sum(matches) / len(matches)
+        else:
+            detail["answer_components_correct"] = float(correct)
+    return {"correct": correct, "score": float(correct), "detail": detail}
 
 
 def public_checks(family, detail):
-    keys = PROGRAM_METRICS.get(family, ("valid_json",))
+    keys = SCORE_METRICS.get(family, ("valid_json",))
     return {k: v for k, v in detail.items() if k in keys and type(v) is float and 0 <= v <= 1}
 
 

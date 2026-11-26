@@ -14,6 +14,7 @@ import common
 import check_response
 import hidden
 import quality
+import test_closed_perspective as perspective_fixture
 
 
 class ClosedSuiteTests(unittest.TestCase):
@@ -50,6 +51,15 @@ class ClosedSuiteTests(unittest.TestCase):
                         fields = {"mode": "program", "expected": {
                             "budget": 2, "probes": ["side", "left", "right"], "target": ("A", "C")[i % 2],
                             "table": {"A": [0, 0, 0], "B": [0, 1, 0], "C": [1, 0, 0], "D": [1, 0, 1]}}}
+                    elif family == "flow_certificate":
+                        fields = {"mode": "program", "expected": {
+                            "nodes": ["s", "t", "isolated"], "source": "s", "sink": "t",
+                            "arcs": {"edge": ["s", "t", 2 + i]}}}
+                        answer = {"value": 2 + i, "flow": {"edge": 2 + i}, "source_side": ["isolated", "s"]}
+                    elif family == "quoted_perspective":
+                        prompt = f"sentinel-input/{family}/{perspective_fixture.REQUESTS[lang]}/{i}"
+                        fields = {"mode": "program", "expected": perspective_fixture.FACTS}
+                        answer = perspective_fixture.render(lang)
                     elif family in hidden.JUDGE_TASKS:
                         fields = {"mode": "judge", "rubric": ["sentinel-criterion", "sentinel-other"]}
                     else:
@@ -114,6 +124,30 @@ class ClosedSuiteTests(unittest.TestCase):
         for bad in ["[]", "[true]", '["true","false"]', "[true,false] extra"]:
             with self.assertRaises(ValueError):
                 hidden.verdict(lambda *a, **kw: bad, "task", ["c1", "c2"], "answer")
+
+    def test_report_release_checks_prompt_language(self):
+        for family in ("language_evidence", "quoted_perspective"):
+            rows = [json.loads(line) for line in self.payload.splitlines()]
+            row = next(r for r in rows if r["family"] == family and r["language"] == "de")
+            row["prompt"] = perspective_fixture.REQUESTS["en"]
+            mismatched = "\n".join(json.dumps(r) for r in rows).encode()
+            with patch.object(hidden, "DATA_SHA256", hashlib.sha256(mismatched).hexdigest()):
+                with self.assertRaisesRegex(ValueError, "invalid private release row"):
+                    hidden.decode(mismatched)
+
+    def test_exact_diagnostics_have_explicit_denominators(self):
+        def check(expected, answer):
+            result = hidden.exact({"expected": expected}, {"content": answer})
+            return result["correct"], hidden.public_checks("revision_ledger", result["detail"])
+
+        correct, checks = check({"x": [1], "y": True}, '{"x":[1],"y":1}')
+        self.assertFalse(correct)
+        self.assertEqual(checks, {"valid_json": 1.0, "json_shape_ok": 1.0, "answer_components_correct": 0.5})
+        for answer, valid in [('{"x":[1]}', 1.0), ('{"x":1,"x":2}', 0.0), ('[]', 1.0), ('no JSON', 0.0)]:
+            self.assertEqual(check({"x": 1, "y": 2}, answer), (False, {"valid_json": valid, "json_shape_ok": 0.0}))
+        self.assertEqual(check([0, 2, 3], '[false,2,4]')[1]["answer_components_correct"], 1/3)
+        self.assertNotIn("answer_components_correct", check([1, 2], "[1]")[1])
+        self.assertEqual(check([], "[]")[1]["answer_components_correct"], 1.0)
 
     def test_offline_completion(self):
         item = hidden.load(hidden.release(), "language_evidence", "de", 1, 0)[0]
@@ -208,13 +242,16 @@ class ClosedSuiteTests(unittest.TestCase):
             self.assertEqual(row["accuracy"], float(row["task"] in hidden.PLAIN_TASKS))
             self.assertEqual(row["score_mean"], 1 if row["task"] in hidden.PLAIN_TASKS else 0.5)
             self.assertEqual(row["extra"]["xl_correct_agree"], 1)
-            if row["task"] == "language_evidence":
+            if row["task"] in ("language_evidence", "quoted_perspective"):
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])
                 self.assertEqual(row["extra"]["answer_facts_ok"], 1)
             if row["task"] == "adaptive_measurement":
                 self.assertEqual(row["extra"]["measurement_identified"], 1)
                 self.assertEqual(row["extra"]["measurement_strategy_safe"], 1)
+            if row["task"] == "flow_certificate":
+                self.assertEqual(row["extra"]["flow_conservation"], 1)
+                self.assertEqual(row["extra"]["flow_cut_equal"], 1)
         info = json.loads((run / "run_info.json").read_text())
         self.assertEqual(info["data_revision"], hidden.DATA_REVISION)
         self.assertEqual(info["data_sha256"], hidden.DATA_SHA256)

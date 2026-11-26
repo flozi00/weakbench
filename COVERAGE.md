@@ -8,6 +8,26 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## Private coverage review, closed-v6
+
+The new language tasks exercise different kinds of ambiguity. In one, a quotation changes the speaker and time that words refer to. In the other, the predicate and participants stay fixed and the nesting order of two quantifiers changes. The remaining additions cover verifiable certificates and reconstruction from incomplete or constrained observations.
+
+| Earlier task or coverage gap | New operation and independent test |
+|---|---|
+| `coref` selects a pronoun antecedent and `de_direct_speech` checks punctuation | `quoted_perspective` resolves pronouns, place and time in nested direct quotations. A separate parser reconstructs the events from the story. The code accepts 64 permitted wordings per case and verifies each assertion in the explanation and answer. [Köder and Maier](https://doi.org/10.1017/S0305000915000318) |
+| `syllogism` reasons over unary categories | `quantifier_scope` composes two generalized quantifiers over a binary relation. A relational evaluator and a bitset interpreter agree on the four truth-value counts and on witnesses for either disagreement. The two readings are explicit in the task. [Barwise and Cooper](https://doi.org/10.1007/BF00350139) |
+| Rate comparisons and missing-data bounds | `paired_randomization` constructs the null distribution under the actual assignment restrictions. Polynomial convolution and complete assignment enumeration agree. Doubling the smaller one-sided tail gives a different answer in 19 of the 32 scenarios. [Matched-pairs permutation tests](https://www.site.uottawa.ca/~nat/Courses/csi5388/Perm.and.Matchedpairs.pdf) |
+| `graph_path` returns a shortest distance | `flow_certificate` asks for both an integral flow and a directed cut that proves its optimality. Exhaustive enumeration of cuts checks the reference solver. Every network admits at least two optimal flows. [Ford and Fulkerson](https://www.cs.yale.edu/homes/lans/readings/routing/ford-max_flow-1956.pdf) |
+| `paper_punch` and `strip_fold` track apertures or a folded stack | `booklet_imposition` places the pages of a reader's booklet in duplex printer coordinates, including intentional blanks and orientation. An index formula agrees with independent physical sheet assembly. [Adobe booklet imposition](https://helpx.adobe.com/indesign/desktop/print/print-booklets/booklet-types.html) |
+| Hamming distance appears in a word-ladder control | `symbol_recovery` locates and repairs corrupted and erased symbols. Berlekamp–Welch decoding and interpolation over every eligible subset agree. [Reed–Solomon decoding](https://homes.cs.washington.edu/~anuprao/pubs/codingtheory/lecture4.pdf) |
+| Existing signal and numeric questions do not resolve aliased components from extra measurements | `sampled_waveform` recovers a mixture whose regularly sampled observations are ambiguous. In every scenario the extra measurement makes the solution unique. Rational elimination agrees with a separate enumeration. [MIT discrete-time sampling](https://ocw.mit.edu/courses/res-6-007-signals-and-systems-spring-2011/resources/lecture-19-discrete-time-sampling/) |
+
+This release adds 448 cases. It clarifies one sentence in the 32 German `quota_matching` instructions about remaining unmatched. A third solver encoded stability as a Boolean satisfiability problem and confirmed all 128 applicant- and studio-proposing allocations across both languages. The archived v5 data remains available at its original revision.
+
+### Local model pilot on closed-v4
+
+A serial, temperature-zero run of Qwen3-4B-Instruct-2507 Q4_K_M evaluated one contrast pair per v4 addition in each language. It solved 0/32 under the strict scorer with a 1,152-token output cap. Fourteen responses had the required JSON keys and incorrect values, ten reached the token cap, and none of the eight single fenced blocks became correct when unwrapped. Transport succeeded for all 32. These are 16 bilingual pair observations from eight underlying contrast pairs, a small diagnostic sample. The aggregate counts, model revision, seed and server build are recorded in the private report. [Pilot report](https://huggingface.co/datasets/flozi00/weakbench-data/blob/b33f2be7ddce1c5e7f3f749fa86aaca70671639b/reports/closed-v4/qwen3-4b-instruct-2507-q4km-pilot.json)
+
 ## Private coverage review, closed-v5
 
 The v4 catalogue included single-turn tool selection, date arithmetic, ranked voting, word operations and locale formatting. Five additions exercise different operations on related inputs.

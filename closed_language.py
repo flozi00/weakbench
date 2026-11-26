@@ -168,11 +168,11 @@ def checked_statements(text, alternatives):
             all(sum(sentence in allowed for sentence in sentences) == 1 for allowed in alternatives))
 
 
-def score(item, reply):
+def score_report(item, reply, evidence, conclusion):
+    """Score two controlled-language fields against sets of permissible assertions."""
     from hidden import strict_json
 
     lang = item["lang"]
-    target = item["expected"]
     prompt = item["messages"][0]["content"]
     try:
         parsed = strict_json(reply.get("content", ""))
@@ -184,15 +184,6 @@ def score(item, reply):
                   all(type(v) is str for v in parsed.values()))
     reason, answer = (parsed[reason_key], parsed[answer_key]) if has_fields else ("", "")
 
-    values = target["values"]
-    best = (max if target["prefer"] == "max" else min)(values, key=values.get)
-    margin = max(values.values()) - min(values.values())
-    forms = FORMS[lang]
-    evidence = [
-        {form.format(name=name, value=v).casefold() for form in forms["value"]} for name, v in values.items()
-    ]
-    conclusion = [{form.format(name=best).casefold() for form in forms["choice"]},
-                  {form.format(value=margin).casefold() for form in forms["margin"]}]
     request_ok = request_language_ok(prompt, lang)
     reason_ok = language_status(reason, lang) is True
     answer_ok = language_status(answer, lang) is True
@@ -219,3 +210,18 @@ def score(item, reply):
     detail["all_language_ok"] = float(all_ok)
     correct = all_ok and evidence_ok and conclusion_ok
     return {"correct": correct, "score": float(correct), "lang_ok": answer_ok if has_fields else None, "detail": detail}
+
+
+def score(item, reply):
+    lang = item["lang"]
+    target = item["expected"]
+    values = target["values"]
+    best = (max if target["prefer"] == "max" else min)(values, key=values.get)
+    margin = max(values.values()) - min(values.values())
+    forms = FORMS[lang]
+    evidence = [
+        {form.format(name=name, value=v).casefold() for form in forms["value"]} for name, v in values.items()
+    ]
+    conclusion = [{form.format(name=best).casefold() for form in forms["choice"]},
+                  {form.format(value=margin).casefold() for form in forms["margin"]}]
+    return score_report(item, reply, evidence, conclusion)

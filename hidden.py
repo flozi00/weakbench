@@ -19,22 +19,24 @@ import closed_images
 import closed_language
 import closed_observations
 import closed_perspective
+import closed_proofs
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "85c9e782f329768135a13fc222eafd9b3d10351e"
-DATA_PATH = "releases/closed-v8/cases.jsonl"
-DATA_SHA256 = "a48b06a5edde20c5278e925f0b83fbcbbee37908301a0f2422006b1288db63ac"
+DATA_REVISION = "aedd600807552650c89f3bdbb815b15aad7a6dfc"
+DATA_PATH = "releases/closed-v9/cases.jsonl"
+DATA_SHA256 = "c9b28e7345338536306cc92d2786e2cf5f1a52d14d12345bead273ecaad8d152"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
 RESEARCH_V6 = ("booklet_imposition", "symbol_recovery", "sampled_waveform", "paired_randomization", "quantifier_scope")
-RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium")
+RESEARCH_EXACT = (*RESEARCH_V4, *RESEARCH_V5, *RESEARCH_V6, "phase_equilibrium", "formula_relocation", "shared_noise")
 EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity_contract",
                "schema_dispatch", "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT)
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
-            "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments}
+            "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs}
+LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
 # The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
 VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32}
 PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
@@ -47,25 +49,27 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS),
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
+                   "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
                    "commitment_repair": sorted(closed_commitments.DETAIL_KEYS)}
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
 SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
-               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair"), 32),
+               **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
-    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective"]},
+    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
     {"key": "retrieval", "label": "Archive retrieval", "tasks": ["archive_retrieval"]},
     {"key": "open", "label": "Evidence and decisions", "tasks": ["evidence_handover", "decision_brief"]},
     {"key": "translation", "label": "Translation", "tasks": ["context_translation"]},
     {"key": "tutoring", "label": "Tutoring", "tasks": ["contrastive_tutoring"]},
-    {"key": "statistics", "label": "Statistical inference", "tasks": ["stratified_effect", "censored_bounds", "paired_randomization"]},
+    {"key": "statistics", "label": "Statistical inference", "tasks": ["stratified_effect", "censored_bounds", "paired_randomization", "shared_noise"]},
+    {"key": "spreadsheets", "label": "Spreadsheet formulas", "tasks": ["formula_relocation"]},
     {"key": "spatial_reasoning", "label": "Geometry and topology", "tasks": ["frame_registration", "raster_topology"]},
     {"key": "formal_reasoning", "label": "Formal reasoning", "tasks": ["automata_witness", "assumption_core", "quantifier_scope"]},
     {"key": "accessibility", "label": "Accessible tables", "tasks": ["header_binding"]},
@@ -125,7 +129,7 @@ def decode(data):
                 raise ValueError
             if mode == "program" and not PROGRAMS[family].validate_expected(row["expected"]):
                 raise ValueError
-            if family in ("language_evidence", "quoted_perspective") and not closed_language.request_language_ok(row["prompt"], lang):
+            if family in LANGUAGE_REPORTS and not closed_language.request_language_ok(row["prompt"], lang):
                 raise ValueError
             if mode == "judge":
                 rubric = row["rubric"]

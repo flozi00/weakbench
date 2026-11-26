@@ -12,13 +12,13 @@ python3 quality.py --url http://candidate:8000 --arm reference --tier quick
 python3 quality.py --url http://candidate:8000 --arm judged --tier full --judge-url http://judge:8000
 ```
 
-The `closed-v8` text suite has 32 families scored by code. Across German and English, these contribute 1,092 quick or 2,184 full cases. A judge adds four rubric-graded families, bringing the totals to 1,156 quick or 2,312 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
+The `closed-v9` text suite has 35 families scored by code. Across German and English, these contribute 1,188 quick or 2,376 full cases. A judge adds four rubric-graded families, bringing the totals to 1,252 quick or 2,504 full. Quick takes the first half of each ordered family and language selection. The judge must pass English and German calibration controls and return one boolean per criterion. Accuracy requires satisfying every criterion. The graded score also reports the fraction satisfied.
 
-To run the quoted dialogue, randomization and flow tasks on a local model:
+To run the proof, spreadsheet and causal reasoning tasks on a local model:
 
 ```sh
 python3 quality.py --url http://localhost:8000 --arm local --langs de,en --no-drift \
-  --tasks quoted_perspective,paired_randomization,flow_certificate --concurrency 4 --max-parallel 4
+  --tasks localized_proof,formula_relocation,shared_noise --concurrency 4 --max-parallel 4
 ```
 
 Two optional private image families add 64 quick or 128 full questions across the two languages. To send the held-out charts and silhouettes to a local vision model, run:
@@ -47,7 +47,7 @@ python3 compare.py --help
 python3 speed.py --help
 ```
 
-`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. Earlier runners are available for `closed-v7` at `07db9356`, `closed-v6` at `fbdce2de`, `closed-v5` at `de074642`, `closed-v4` at `cfb63f1c`, `closed-v3` at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
+`run_info.json` records the private data revision and SHA-256. The manifest records the scorer hash. Compare runs within a release, keeping the scorer, item selection, judge and generation settings fixed. Earlier runners are available for `closed-v8` at `8e0308bf`, `closed-v7` at `07db9356`, `closed-v6` at `fbdce2de`, `closed-v5` at `de074642`, `closed-v4` at `cfb63f1c`, `closed-v3` at `c38602ef` and `closed-v2` at `605df74c`. Family counts, scoring and metric denominators appear in the [task catalogue](TASKS.md). The [coverage analysis](COVERAGE.md) records how the new tasks differ from the earlier diagnostics.
 
 ## Maintain the release
 

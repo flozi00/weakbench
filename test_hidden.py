@@ -20,6 +20,7 @@ import hidden
 import quality
 import test_closed_commitments as booking_fixture
 import test_closed_perspective as perspective_fixture
+import test_closed_proofs as proof_fixture
 
 
 class ClosedSuiteTests(unittest.TestCase):
@@ -81,6 +82,10 @@ class ClosedSuiteTests(unittest.TestCase):
                         prompt = f"sentinel-input/{family}/{perspective_fixture.REQUESTS[lang]}/{i}"
                         fields = {"mode": "program", "expected": perspective_fixture.FACTS}
                         answer = perspective_fixture.render(lang)
+                    elif family == "localized_proof":
+                        expected, request, answer = proof_fixture.wire_fixture(lang)
+                        prompt = f"sentinel-input/{family}/{request}/{i}"
+                        fields = {"mode": "program", "expected": expected}
                     elif family in hidden.JUDGE_TASKS:
                         fields = {"mode": "judge", "rubric": ["sentinel-criterion", "sentinel-other"]}
                     else:
@@ -147,7 +152,7 @@ class ClosedSuiteTests(unittest.TestCase):
                 hidden.verdict(lambda *a, **kw: bad, "task", ["c1", "c2"], "answer")
 
     def test_report_release_checks_prompt_language(self):
-        for family in ("language_evidence", "quoted_perspective"):
+        for family in hidden.LANGUAGE_REPORTS:
             rows = [json.loads(line) for line in self.payload.splitlines()]
             row = next(r for r in rows if r["family"] == family and r["language"] == "de")
             row["prompt"] = perspective_fixture.REQUESTS["en"]
@@ -190,6 +195,47 @@ class ClosedSuiteTests(unittest.TestCase):
             check_response.main(argv)
         self.assertEqual(failure.exception.code, 2)
         self.assertNotIn("PRIVATE_SENTINEL", err.getvalue())
+
+    def test_proof_live_and_saved_completions(self):
+        name = "localized_proof"
+        task = hidden.tasks(hidden.release(), None)[name]
+        args = SimpleNamespace(think="auto", max_tokens=None, temperature=None)
+        native = {"en": "I check the information and explain why the rules give this result.",
+                  "de": "Ich prüfe die Angaben und erkläre, warum dieses Ergebnis aus den Regeln folgt."}
+        for lang in hidden.LANGS:
+            item, = task["load"](lang, 1, quality.SEED)
+            prompt = item["messages"][0]["content"]
+            body = quality.build_body(name, task, item, args, "synthetic")
+            self.assertEqual(body["messages"], [{"role": "user", "content": prompt}])
+            self.assertEqual(body["chat_template_kwargs"], {"enable_thinking": True, "thinking": True})
+            self.assertNotIn("expected", body)
+            answer = self.answers[prompt]
+            fields = json.loads(answer)
+            why = hidden.closed_language.FIELDS[lang][0]
+            naked = json.dumps({**fields, why: ""})
+            other = "en" if lang == "de" else "de"
+            for content, reasoning, correct, verified in (
+                    (answer, None, True, 0), (answer, native[lang], True, 1),
+                    (answer, native[other], False, 0), (naked, native[lang], False, 0)):
+                completion = {"choices": [{"message": {"content": content, "reasoning": reasoning}, "finish_reason": "stop"}]}
+                with patch.object(common, "request", return_value=completion) as fetch:
+                    rec = quality.run_item("http://synthetic", name, task, item, body, 2, private=True)
+                fetch.assert_called_once_with("http://synthetic", "/v1/chat/completions", body, timeout=2)
+                self.assertIs(rec["correct"], correct)
+                self.assertEqual(rec["detail"]["all_channels_verified"], verified)
+                self.assertEqual(rec["detail"]["answer_facts_ok"], 1)
+                self.assertIsNone(rec["reply"])
+                self.assertIsNone(rec["gold"])
+                path = self.tmp / "proof-response.json"
+                path.write_text(json.dumps(completion))
+                out = io.StringIO()
+                with patch.object(common, "request", side_effect=AssertionError), contextlib.redirect_stdout(out):
+                    code = check_response.main(["--task", name, "--lang", lang, "--id", item["id"], "--response", str(path)])
+                report = json.loads(out.getvalue())
+                self.assertEqual(code, int(not correct))
+                self.assertEqual(report["checks"], rec["detail"])
+                self.assertNotIn("Ada/Ray", json.dumps(rec))
+                self.assertNotIn("sentinel-input", out.getvalue())
 
     def test_offline_observations(self):
         item = hidden.load(hidden.release(), "adaptive_measurement", "de", 1, 0)[0]
@@ -366,10 +412,14 @@ class ClosedSuiteTests(unittest.TestCase):
             self.assertEqual(row["accuracy"], float(row["task"] in hidden.PLAIN_TASKS))
             self.assertEqual(row["score_mean"], 1 if row["task"] in hidden.PLAIN_TASKS else 0.5)
             self.assertEqual(row["extra"]["xl_correct_agree"], 1)
-            if row["task"] in ("language_evidence", "quoted_perspective"):
+            if row["task"] in hidden.LANGUAGE_REPORTS:
                 self.assertEqual(row["extra"]["reasoning_present"], 0)
                 self.assertNotIn("all_channels_language_ok", row["extra"])
                 self.assertEqual(row["extra"]["answer_facts_ok"], 1)
+            if row["task"] == "localized_proof":
+                self.assertEqual(row["extra"]["proof_steps_supported"], 1)
+                self.assertEqual(row["extra"]["proof_steps_relevant"], 1)
+                self.assertEqual(row["extra"]["proof_answer_agree"], 1)
             if row["task"] == "adaptive_measurement":
                 self.assertEqual(row["extra"]["measurement_identified"], 1)
                 self.assertEqual(row["extra"]["measurement_strategy_safe"], 1)

@@ -876,7 +876,7 @@ def build_body(name, t, item, args, model, honored=True):
         body |= {"chat_template_kwargs": dict(THINK_OFF), "temperature": 0}
         if honored is False:  # the server thinks anyway: give it a thinking budget
             body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)
-    elif name in ("language_evidence", "quoted_perspective"):
+    elif name in hidden.LANGUAGE_REPORTS:
         body["chat_template_kwargs"] = {"enable_thinking": True, "thinking": True}
     elif not t["think"]:  # --think on over a thinking-off task: a 256-token budget never reaches the answer
         body["max_tokens"] = max(body["max_tokens"], THINK_MAX_TOKENS)

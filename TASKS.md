@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v14` release runs each text family in German and English. Counts are per language.
+The `closed-v15` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -50,6 +50,7 @@ The `closed-v14` release runs each text family in German and English. Counts are
 | `loop_game` | Finding a winning move or a draw on a directed game board with alternating play and possible cycles | 16 | 32 | Exact outcome, duration for a forced result, and all equally optimal first destinations |
 | `sentence_fusion` | Joining two events in one German or English sentence while preserving participant roles, negation and a specified temporal, causal or additive relation | 16 | 32 | A semantic parser accepts equivalent clause orders and constructions from the grammar supplied with each task. |
 | `failure_incidence` | Estimating the probability that a machine remains operational or experiences either of two failures at two times, with delayed observation and censoring | 16 | 32 | Exact risk-set counts and state probabilities. Equivalent fractions are accepted. |
+| `quoted_quorum` | Resolving delegated votes, applying a quorum and reporting the result in the requested language with an unaltered foreign-language quotation | 16 | 32 | Exact tally, decision, source ID and quotation. The two report sentences must match the supplied target-language grammar. Any returned reasoning must pass the language probe. |
 | `evidence_handover` | Keeping an operational handover grounded in the supplied evidence | 8 | 16 | Rubric judge |
 | `decision_brief` | Revising a recommendation when the supplied evidence changes | 8 | 16 | Rubric judge |
 | `context_translation` | Translating in context while preserving domain terminology and the relationship between speakers | 8 | 16 | Rubric judge |
@@ -72,6 +73,8 @@ Exact-JSON tasks also report the fraction of scored responses that parsed and th
 ### Correctness across variants and languages
 
 Private summary rows include `pair_checks`. Each entry carries integer `passed` and `scored` counts. `contrast_both_correct` requires both variants of a contrast pair in the row's language to pass. `bilingual_item_correct` requires the two language versions of one item to pass. `bilingual_contrast_correct` requires all four responses for one contrast pair across both languages to pass. Bilingual counts appear on both language rows. Only complete groups with boolean verdicts and no technical errors enter the denominator. Failed answers and token-limited responses with a negative verdict count as incorrect. A measure without eligible groups is omitted. Summarizing a resumed run uses its latest record for each item. The pairing uses the revision recorded with the run.
+
+In `quoted_quorum`, the request designates four foreign source records. The request-language check excludes only those four exact source lines. In the response, the designated citation must match the chosen original text and identifier. No other span is exempted. Report sentences are parsed in the requested language. Native reasoning, when returned, is assessed by the existing DE/EN language probe. The combined metric requires observable matching reasoning as well as a fully correct report.
 
 ## Private visual tasks
 

@@ -26,6 +26,7 @@ import test_closed_perspective as perspective_fixture
 import test_closed_proofs as proof_fixture
 import test_closed_reference as reference_fixture
 import test_closed_relay as relay_fixture
+import test_closed_quorum as quorum_fixture
 
 
 class ClosedSuiteTests(unittest.TestCase):
@@ -103,6 +104,11 @@ class ClosedSuiteTests(unittest.TestCase):
                     elif family == "listener_reference":
                         fields = {"mode": "program", "expected": reference_fixture.fixture(lang)}
                         answer = "Die Karte ist leise und warm." if lang == "de" else "The card is warm and quiet."
+                    elif family == "quoted_quorum":
+                        spec = quorum_fixture.fixture(lang)
+                        prompt = f"sentinel-input/{family}/{quorum_fixture.sample_prompt(lang, spec)}/{i}"
+                        fields = {"mode": "program", "expected": spec}
+                        answer = quorum_fixture.answer(lang, spec)
                     elif family == "failure_incidence":
                         fields = {"mode": "program", "expected": incidence_fixture.fixture()}
                         answer = incidence_fixture.accepted()

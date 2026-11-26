@@ -26,15 +26,16 @@ import closed_pairs
 import closed_observations
 import closed_perspective
 import closed_proofs
+import closed_quorum
 import closed_reference
 import closed_relay
 import closed_transducer
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "c929f55bc187ce7a397976caee9a00613ef9eb7a"
-DATA_PATH = "releases/closed-v14/cases.jsonl"
-DATA_SHA256 = "65c8285488afde6974e5d11a23d8dd1305b03b185bdcd4a557438deec826af39"
+DATA_REVISION = "11795e6358704440dcfa2504b0e825222e09f85f"
+DATA_PATH = "releases/closed-v15/cases.jsonl"
+DATA_SHA256 = "cf71f6c8cd6ce1bece912b2fa9279df9898bdf7a9357b023a1cf620d7c30c313"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -46,6 +47,7 @@ EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective, "commitment_repair": closed_commitments, "localized_proof": closed_proofs,
+            "quoted_quorum": closed_quorum,
             "failure_incidence": closed_incidence, "sentence_fusion": closed_fusion, "panel_grounding": closed_grounding,
             "package_auction": closed_auction, "listener_reference": closed_reference, "stream_transducer": closed_transducer, "language_relay": closed_relay}
 LANGUAGE_REPORTS = frozenset(("language_evidence", "quoted_perspective", "localized_proof"))
@@ -64,6 +66,7 @@ PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "sch
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS),
                    "localized_proof": sorted(closed_proofs.DETAIL_KEYS),
+                   "quoted_quorum": sorted(closed_quorum.DETAIL_KEYS),
                    "failure_incidence": sorted(closed_incidence.DETAIL_KEYS),
                    "sentence_fusion": sorted(closed_fusion.DETAIL_KEYS),
                    "panel_grounding": sorted(closed_grounding.DETAIL_KEYS),
@@ -79,13 +82,13 @@ FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 3
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
                **dict.fromkeys((*RESEARCH_EXACT, "adaptive_measurement", "flow_certificate", "quoted_perspective", "commitment_repair", "localized_proof",
-                                "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion", "failure_incidence"), 32),
+                                "listener_reference", "stream_transducer", "language_relay", "package_auction", "sentence_fusion", "failure_incidence", "quoted_quorum"), 32),
                "evidence_handover": 16, "decision_brief": 16, "context_translation": 16, "contrastive_tutoring": 16}
 CATEGORIES = [
     {"key": "reasoning", "label": "Verifiable reasoning", "tasks": ["revision_ledger", "service_windows", "quantity_contract", "transfer_audit"]},
     {"key": "coding", "label": "Program tracing", "tasks": ["snapshot_trace", "replica_merge", "stream_transducer"]},
     {"key": "planning", "label": "Constrained planning", "tasks": ["workshop_schedule", "civil_recurrence", "quota_matching", "commitment_repair"]},
-    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay"]},
+    {"key": "language_control", "label": "Language adherence", "tasks": ["language_evidence", "quoted_perspective", "localized_proof", "language_relay", "quoted_quorum"]},
     {"key": "sentence_fusion", "label": "Sentence fusion", "tasks": ["sentence_fusion"]},
     {"key": "reference", "label": "Referring expressions", "tasks": ["listener_reference"]},
     {"key": "tools", "label": "Tool use", "tasks": ["schema_dispatch", "adaptive_measurement"]},
@@ -161,6 +164,8 @@ def decode(data):
             if mode == "program" and not PROGRAMS[family].validate_expected(row["expected"]):
                 raise ValueError
             if family == "panel_grounding" and tuple(row["expected"]["size"]) != image_size:
+                raise ValueError
+            if family == "quoted_quorum" and not closed_quorum.request_language_ok(row["prompt"], lang, row["expected"]):
                 raise ValueError
             if family in LANGUAGE_REPORTS and not closed_language.request_language_ok(row["prompt"], lang):
                 raise ValueError

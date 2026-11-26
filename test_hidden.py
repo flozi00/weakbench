@@ -23,6 +23,7 @@ class ClosedSuiteTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.tmp = Path(temporary.name)
         self.enter(patch.dict(os.environ, {"BENCH_CACHE": str(self.tmp / "cache"), "HF_TOKEN": "dummy"}))
+        self.enter(patch.dict(hidden.VISUAL_COUNTS, {}, clear=True))  # the default text portfolio fixture
         self.enter(patch.multiple(common, RUNS=self.tmp / "runs", RESULTS=self.tmp / "results"))
         rows = []
         self.answers = {}

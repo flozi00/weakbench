@@ -10,7 +10,7 @@ import quality
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task", required=True, choices=hidden.PLAIN_TASKS)
+    parser.add_argument("--task", required=True, choices=(*hidden.PLAIN_TASKS, *hidden.VISUAL_COUNTS))
     parser.add_argument("--lang", required=True, choices=hidden.LANGS)
     parser.add_argument("--id", required=True, help="item ID from the run's items-<task>.jsonl")
     parser.add_argument("--response", type=Path, help="chat completion JSON; for adaptive measurements supply "

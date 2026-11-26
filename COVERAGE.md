@@ -8,6 +8,15 @@ Read `README.md` for the protocol, the gate rules and the per-task data. This fi
 `GAP-CLOSURE.md` is the work log behind the rows marked *closed*; `AA-MAPPING.md` is the same map eval by eval
 against Artificial Analysis's Intelligence Index v5.0.
 
+## Private coverage review, closed-v7
+
+Existing visual diagnostics include simple shape relations and bar charts. The private text tasks for raster topology and bounded inference provide nearby reasoning tasks. Two new optional families send an actual PNG with the localized question. In a full run they add 128 visual cases to the 2,184 text cases.
+
+- **Voxel projections.** Three orthographic silhouettes and the total cube count constrain a 3 × 3 × 3 object. Every sampled problem admits multiple worlds. The model must distinguish necessity from possibility. Enumeration in the visual hull and an independent layer solver agree with a third pixel-based audit on every answer. Eight pairs share a question but differ in one silhouette cell. Eight share the same silhouettes but have a different stated cube count. A deterministic predictor that ignores either input can solve at most 24/32 scenarios per language. [Laurentini on visual hulls](https://doi.org/10.1109/34.273735)
+- **Interval plots.** Two panels display groups in independently calibrated coordinates. The questions require reading points and capped interval endpoints, identifying the matching group, and applying conditions to the level and difference intervals. A second answer combines the plotted point estimates for a specified group. An independent decoder reads the rasterized tick labels, group labels and markers. In all 16 pairs, the wording is identical and changing one plotted interval changes the answer. Both families use distinct German and English instructions with shared evidence and gold. [Cleveland and McGill on graphical perception](https://doi.org/10.1080/01621459.1984.10478080)
+
+A serial loopback pilot with SmolVLM-500M-Instruct Q8 exercised the actual image transport on eight inputs. It solved 0/8 at a 256-token output cap. Both German chart responses had the required JSON shape, and all four voxel outputs reached the cap. These observations describe the small transport pilot. The private aggregate report records the model and projector digests, version and counts. [Pilot report](https://huggingface.co/datasets/flozi00/weakbench-data/blob/0daf9f32b028b16830e5c8c04d632a7bd2b7c171/reports/closed-v7/smolvlm-500m-q8-local-pilot.json)
+
 ## Private coverage review, closed-v6
 
 The new language tasks exercise different kinds of ambiguity. In one, a quotation changes the speaker and time that words refer to. In the other, the predicate and participants stay fixed and the nesting order of two quantifiers changes. The remaining additions cover verifiable certificates and reconstruction from incomplete or constrained observations.

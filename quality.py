@@ -1412,7 +1412,7 @@ def main(argv=None):
     ap.add_argument("--temperature", type=float, help="override every request's temperature")
     ap.add_argument("--max-tokens", type=int, help="override every request's max_tokens")
     ap.add_argument("--timeout", type=float, default=1800, help="per request, seconds")
-    ap.add_argument("--image", action="store_true", help="add the synthetic-image task")
+    ap.add_argument("--image", action="store_true", help="add the synthetic image check, or enable explicitly named private visual tasks")
     ap.add_argument("--no-drift", action="store_true")
     ap.add_argument("--judge-url", help="server that grades judge tasks; the SAME one for both arms of "
                     "an A/B (never the server under test)")
@@ -1446,7 +1446,7 @@ def main(argv=None):
         if not set(langs) <= set(hidden.LANGS) or len(langs) != len(set(langs)):
             ap.error("closed suite requires distinct languages from en,de")
         common.verify_tls()
-        known = [*hidden.PLAIN_TASKS, *hidden.JUDGE_TASKS, "image", "drift"]
+        known = [*hidden.PLAIN_TASKS, *hidden.JUDGE_TASKS, *hidden.VISUAL_COUNTS, "image", "drift"]
         names = (args.tasks.split(",") if args.tasks else
                  [*hidden.PLAIN_TASKS, *(hidden.JUDGE_TASKS if args.judge_url else ()), "drift"])
     else:
@@ -1456,11 +1456,11 @@ def main(argv=None):
             and any(t["counts"][args.tier].get(x, 0) != 0 for x in t["langs"] if x in langs)] + ["drift"]
     if bad := [n for n in names if n not in known]:
         ap.error(f"unknown task(s) {', '.join(bad)}; known: {', '.join(known)}")
-    if args.image and "image" not in names:
+    visual_selected = closed and any(n in hidden.VISUAL_COUNTS for n in names)
+    if not args.image and (visual_selected or "image" in names):
+        ap.error("explicit image tasks require --image")
+    if args.image and not visual_selected and "image" not in names:
         names.append("image")
-    elif not args.image and "image" in names:
-        names.remove("image")
-        print("note: the image task needs --image")
     drift = "drift" in names and not args.no_drift
     names = [n for n in names if n != "drift"]
 

@@ -7,7 +7,7 @@ import quality
 
 def test_every_task_documented():
     doc = (pathlib.Path(__file__).parent / "TASKS.md").read_text()
-    missing = [t for t in (*quality.TASKS, *hidden.FULL_COUNTS) if f"`{t}`" not in doc]
+    missing = [t for t in (*quality.TASKS, *hidden.FULL_COUNTS, *hidden.VISUAL_COUNTS) if f"`{t}`" not in doc]
     assert not missing, f"tasks without a TASKS.md row: {missing}"
 
 

@@ -2,7 +2,7 @@
 
 ## Closed quality suite
 
-The `closed-v6` release runs each family in German and English. Counts are per language.
+The `closed-v7` release runs each text family in German and English. Counts are per language.
 
 | Task | Weakness tested | Quick | Full | Scoring |
 |---|---|---:|---:|---|
@@ -50,6 +50,17 @@ The `extra` object in each language's summary row reports `report_fields_present
 For `adaptive_measurement`, the paired specimens start with the same request and yield different observations. Only complete evidence that identifies the specimen can earn credit. A valid decision rule may choose any probe that preserves a solution for all still-possible outcomes. The summary reports protocol validity, budget compliance, informative probes, whether the choices preserved a solution, unique identification and final-answer accuracy. Each rate uses the scored responses in the cell.
 
 Exact-JSON tasks also report the fraction of scored responses that parsed and the fraction with the expected top-level JSON type, keys or array length. Among responses with the expected shape, `answer_components_correct` averages the share of exact top-level values within each answer. Nested values must match in full. The leaderboard score continues to require the full answer.
+
+## Private visual tasks
+
+Supply `--image` and select one or both task names explicitly. Counts are per language.
+
+| Task | Weakness tested | Quick | Full | Scoring |
+|---|---|---:|---:|---|
+| `voxel_projections` | Determining which cubes and layer populations are forced, possible or impossible from three orthographic silhouettes and a total count | 16 | 32 | Exact per-coordinate status and feasible layer bounds across all consistent arrangements |
+| `interval_plot` | Matching groups across two independently calibrated plots and applying predicates to level and difference intervals | 16 | 32 | Qualifying group IDs, the specified group’s after-change estimate and its difference interval |
+
+The families are optional on multimodal endpoints. Their results are separate from the standard text leaderboard. The earlier public synthetic `image` check is available with `--image` alone.
 
 ## Historical diagnostics
 

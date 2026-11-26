@@ -14,15 +14,16 @@ import urllib.parse
 import urllib.request
 
 import closed_flow
+import closed_images
 import closed_language
 import closed_observations
 import closed_perspective
 import closed_schedule
 
 DATA_REPO = "flozi00/weakbench-data"
-DATA_REVISION = "c5e0bfa00e414c4fe2e1ad465c90cc862a8a0acb"
-DATA_PATH = "releases/closed-v6/cases.jsonl"
-DATA_SHA256 = "a24f900f33d58e53326897260bb5acd7481b008e8e559d3cf7f1a451e73fac07"
+DATA_REVISION = "0daf9f32b028b16830e5c8c04d632a7bd2b7c171"
+DATA_PATH = "releases/closed-v7/cases.jsonl"
+DATA_SHA256 = "1f8ee12494ca34385697c25917ed1f5c6c3091b8c53dc42eaf9d2edb851e7ace"
 RESEARCH_V4 = ("stratified_effect", "censored_bounds", "frame_registration", "raster_topology",
                "automata_witness", "assumption_core", "header_binding", "polyphonic_score")
 RESEARCH_V5 = ("civil_recurrence", "quota_matching", "grapheme_edits", "normalization_join")
@@ -33,18 +34,20 @@ EXACT_TASKS = ("revision_ledger", "service_windows", "snapshot_trace", "quantity
 PROGRAMS = {"workshop_schedule": closed_schedule, "language_evidence": closed_language,
             "adaptive_measurement": closed_observations, "flow_certificate": closed_flow,
             "quoted_perspective": closed_perspective}
+# The console builds its text-only ranking from PLAIN_TASKS, FULL_COUNTS and CATEGORIES.
+VISUAL_COUNTS = {"voxel_projections": 32, "interval_plot": 32}
 PLAIN_TASKS = (*EXACT_TASKS, *PROGRAMS)
-THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_EXACT))
+THINKING_TASKS = frozenset(("replica_merge", "transfer_audit", *PROGRAMS, *RESEARCH_EXACT, *VISUAL_COUNTS))
 JUDGE_TASKS = ("evidence_handover", "decision_brief", "context_translation", "contrastive_tutoring")
 PAIRED_VARIANTS = frozenset((*JUDGE_TASKS, *PROGRAMS, "quantity_contract", "schema_dispatch",
-                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT))
+                             "archive_retrieval", "replica_merge", "transfer_audit", *RESEARCH_EXACT, *VISUAL_COUNTS))
 PROGRAM_METRICS = {"workshop_schedule": ("valid_json", "schedule_feasible", "schedule_optimal"),
                    "language_evidence": sorted(closed_language.DETAIL_KEYS),
                    "adaptive_measurement": sorted(closed_observations.DETAIL_KEYS),
                    "flow_certificate": sorted(closed_flow.DETAIL_KEYS),
                    "quoted_perspective": sorted(closed_perspective.DETAIL_KEYS)}
 EXACT_METRICS = ("valid_json", "json_shape_ok", "answer_components_correct")
-SCORE_METRICS = {**dict.fromkeys(EXACT_TASKS, EXACT_METRICS), **PROGRAM_METRICS}
+SCORE_METRICS = {**dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS), EXACT_METRICS), **PROGRAM_METRICS}
 FULL_COUNTS = {"revision_ledger": 48, "service_windows": 48, "snapshot_trace": 36,
                "quantity_contract": 48, "schema_dispatch": 48, "archive_retrieval": 32,
                "replica_merge": 32, "transfer_audit": 32, "workshop_schedule": 32, "language_evidence": 32,
@@ -94,15 +97,20 @@ def decode(data):
         raise ValueError("private release checksum mismatch")
     cells = collections.defaultdict(list)
     seen = set()
+    counts = FULL_COUNTS | VISUAL_COUNTS
     for number, line in enumerate(data.splitlines(), 1):
         try:
             row = strict_json(line)
             family, lang, uid = row["family"], row["language"], row["id"]
-            if family not in FULL_COUNTS or lang not in LANGS or uid in seen or not re.fullmatch("[a-z0-9_-]+", uid):
+            if family not in counts or lang not in LANGS or uid in seen or not re.fullmatch("[a-z0-9_-]+", uid):
                 raise ValueError
             mode = "program" if family in PROGRAMS else "judge" if family in JUDGE_TASKS else "exact"
             field = "rubric" if mode == "judge" else "expected"
-            if set(row) != {"id", "language", "family", "mode", "prompt", field} or row["mode"] != mode:
+            fields = {"id", "language", "family", "mode", "prompt", field}
+            if family in VISUAL_COUNTS:
+                fields.add("media")
+                closed_images.validate_media(row["media"])
+            if set(row) != fields or row["mode"] != mode:
                 raise ValueError
             if not isinstance(row["prompt"], str) or not row["prompt"].strip():
                 raise ValueError
@@ -119,7 +127,7 @@ def decode(data):
             cells[family, lang].append(row)
         except (ValueError, KeyError, TypeError, RecursionError):
             raise ValueError(f"invalid private release row {number}") from None
-    for family, count in FULL_COUNTS.items():
+    for family, count in counts.items():
         if any(len(cells[family, lang]) != count for lang in LANGS):
             raise ValueError(f"incomplete private release for {family}")
     for lang in LANGS:
@@ -195,7 +203,11 @@ def load(cells, family, lang, n, seed):
     for ordinal in order[:n]:
         row = rows[ordinal]
         uid = hashlib.sha256(f"{DATA_REVISION}/{family}/{ordinal}".encode()).hexdigest()[:32]
-        item = {"id": uid, "lang": lang, "messages": [{"role": "user", "content": row["prompt"]}],
+        content = row["prompt"]
+        if family in VISUAL_COUNTS:
+            content = [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + row["media"]["data"]}},
+                       {"type": "text", "text": row["prompt"]}]
+        item = {"id": uid, "lang": lang, "messages": [{"role": "user", "content": content}],
                 **{k: row[k] for k in ("expected", "rubric") if k in row}}
         if family == "adaptive_measurement":
             item.update(closed_observations.runtime(item["expected"], lang))
@@ -280,7 +292,7 @@ def preflight(judge):
 
 
 def tasks(cells, judge):
-    scorers = dict.fromkeys(EXACT_TASKS, exact)
+    scorers = dict.fromkeys((*EXACT_TASKS, *VISUAL_COUNTS), exact)
     scorers.update({family: module.score for family, module in PROGRAMS.items()})
     scorers.update(dict.fromkeys(JUDGE_TASKS, functools.partial(judged, judge)))
     return {family: {"langs": LANGS, "load": functools.partial(load, cells, family),
@@ -289,7 +301,7 @@ def tasks(cells, judge):
                      "lang_check": False, "junk_check": False,
                      "needs_judge": family in JUDGE_TASKS,
                      "counts": {"quick": dict.fromkeys(LANGS, count // 2), "full": dict.fromkeys(LANGS, count)}}
-            for family, count in FULL_COUNTS.items()}
+            for family, count in (FULL_COUNTS | VISUAL_COUNTS).items()}
 
 
 if __name__ == "__main__":
